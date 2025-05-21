@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -150,8 +149,8 @@ export default function ScreenshotsViewer() {
   return (
     <div className="container py-6">
       <PageHeader
-        heading="Screenshots Viewer"
-        description="View screenshots taken by the desktop app"
+        title="Screenshots Viewer"
+        subtitle="View screenshots taken by the desktop app"
       />
 
       <div className="flex flex-col md:flex-row gap-4 mt-6 mb-4">

@@ -1,54 +1,65 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Tables } from "@/types/database";
 
-interface ProjectWithStats extends Tables<"projects"> {
+export interface ProjectWithStats {
+  id: string;
+  name: string;
   taskCount: number;
   completedTaskCount: number;
   timeSpentHours: number;
+  deadlineStatus?: 'onTrack' | 'atRisk' | 'overdue';
 }
 
 interface ProjectStatsCardProps {
   projects: ProjectWithStats[];
+  className?: string;
 }
 
-export function ProjectStatsCard({ projects }: ProjectStatsCardProps) {
+export function ProjectStatsCard({ projects, className }: ProjectStatsCardProps) {
+  // For now, we'll adapt to use simpler data format until we update all components
+  const projectData = projects.map(project => {
+    if ('hours' in project) {
+      // Handle simplified format from dashboard
+      return {
+        id: project.id || project.name,
+        name: project.name,
+        taskCount: 1,
+        completedTaskCount: 0,
+        timeSpentHours: (project as any).hours || 0,
+      };
+    }
+    return project;
+  });
+
   return (
-    <Card className="col-span-2">
-      <CardHeader>
-        <CardTitle>Active Projects</CardTitle>
-        <CardDescription>
-          Project progress and time statistics
-        </CardDescription>
+    <Card className={className}>
+      <CardHeader className="pb-2">
+        <CardTitle>Project Statistics</CardTitle>
+        <CardDescription>Time spent on projects</CardDescription>
       </CardHeader>
       <CardContent>
-        {projects.length === 0 ? (
-          <div className="flex justify-center py-6 text-muted-foreground">
-            <p>No active projects</p>
+        {projectData.length === 0 ? (
+          <div className="flex justify-center py-8 text-muted-foreground">
+            No project data available
           </div>
         ) : (
-          <div className="space-y-5">
-            {projects.map((project) => {
-              const progressPercentage = project.taskCount > 0
-                ? Math.round((project.completedTaskCount / project.taskCount) * 100)
-                : 0;
-              
-              return (
-                <div key={project.id} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{project.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {project.timeSpentHours.toFixed(1)} hours spent
-                      </p>
-                    </div>
-                    <p className="text-sm font-medium">{progressPercentage}%</p>
-                  </div>
-                  <Progress value={progressPercentage} className="h-2" />
+          <div className="space-y-4">
+            {projectData.map((project) => (
+              <div key={project.id || project.name}>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{project.name}</p>
+                  <p className="text-sm text-muted-foreground">{project.timeSpentHours.toFixed(1)}h</p>
                 </div>
-              );
-            })}
+                <div className="mt-2 h-2 w-full rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ 
+                      width: `${Math.min(project.timeSpentHours / 40 * 100, 100)}%` 
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </CardContent>

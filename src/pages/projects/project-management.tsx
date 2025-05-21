@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -172,14 +171,13 @@ export default function ProjectManagement() {
   return (
     <div className="container py-6">
       <PageHeader
-        heading="Project Management"
-        description="Create and manage projects for your team"
-        actions={
-          <Button onClick={handleNewProject}>
-            <Plus className="mr-2 h-4 w-4" /> Add Project
-          </Button>
-        }
-      />
+        title="Project Management"
+        subtitle="Create and manage projects for your team"
+      >
+        <Button onClick={handleNewProject}>
+          <Plus className="mr-2 h-4 w-4" /> Add Project
+        </Button>
+      </PageHeader>
 
       <Card className="mt-6">
         <CardHeader>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -218,8 +217,8 @@ export default function DashboardContent() {
     return (
       <div className="container py-6">
         <PageHeader
-          heading="Dashboard"
-          description="Overview of your time tracking activity"
+          title="Dashboard"
+          subtitle="Overview of your time tracking activity"
         />
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -231,8 +230,8 @@ export default function DashboardContent() {
   return (
     <div className="container py-6">
       <PageHeader
-        heading="Dashboard"
-        description="Overview of your time tracking activity"
+        title="Dashboard"
+        subtitle="Overview of your time tracking activity"
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
@@ -289,30 +288,177 @@ export default function DashboardContent() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mb-4">
-        <TimeSummaryCard 
-          className="lg:col-span-3"
-          dailyHours={Number((stats.dailyStats.active + stats.dailyStats.idle).toFixed(1))}
-          weeklyHours={Number((stats.weeklyStats.active + stats.weeklyStats.idle).toFixed(1))}
-          activeHours={Number(stats.dailyStats.active.toFixed(1))}
-          idleHours={Number(stats.dailyStats.idle.toFixed(1))}
-        />
+        <Card className="lg:col-span-3">
+          <CardHeader className="pb-2">
+            <CardTitle>Time Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Today</p>
+                  <p className="text-sm text-muted-foreground">{Number((stats.dailyStats.active + stats.dailyStats.idle).toFixed(1))} hours</p>
+                </div>
+                <div className="mt-2 h-2 w-full rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ 
+                      width: `${stats.dailyStats.active + stats.dailyStats.idle > 0 ? 
+                        (stats.dailyStats.active / (stats.dailyStats.active + stats.dailyStats.idle)) * 100 : 0}%` 
+                    }}
+                  />
+                </div>
+                <div className="mt-1 flex text-xs text-muted-foreground">
+                  <span>Active: {Number(stats.dailyStats.active.toFixed(1))}h</span>
+                  <span className="ml-auto">Idle: {Number(stats.dailyStats.idle.toFixed(1))}h</span>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">This Week</p>
+                  <p className="text-sm text-muted-foreground">{Number((stats.weeklyStats.active + stats.weeklyStats.idle).toFixed(1))} hours</p>
+                </div>
+                <div className="mt-2 h-2 w-full rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ 
+                      width: `${stats.weeklyStats.active + stats.weeklyStats.idle > 0 ? 
+                        (stats.weeklyStats.active / (stats.weeklyStats.active + stats.weeklyStats.idle)) * 100 : 0}%` 
+                    }}
+                  />
+                </div>
+                <div className="mt-1 flex text-xs text-muted-foreground">
+                  <span>Active: {Number(stats.weeklyStats.active.toFixed(1))}h</span>
+                  <span className="ml-auto">Idle: {Number(stats.weeklyStats.idle.toFixed(1))}h</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         
-        <ProjectStatsCard 
-          className="lg:col-span-4"
-          projects={stats.projectStats}
-        />
+        <Card className="lg:col-span-4">
+          <CardHeader className="pb-2">
+            <CardTitle>Project Statistics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.projectStats.length === 0 ? (
+              <div className="flex justify-center py-8 text-muted-foreground">
+                No project data available
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {stats.projectStats.map((project) => (
+                  <div key={project.name}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{project.name}</p>
+                      <p className="text-sm text-muted-foreground">{project.hours.toFixed(1)}h</p>
+                    </div>
+                    <div className="mt-2 h-2 w-full rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ 
+                          width: `${Math.min(project.hours / (stats.totalHours || 1) * 100, 100)}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <ActivityChart 
-          className="lg:col-span-4"
-          data={stats.activityData}
-        />
+        <Card className="lg:col-span-4">
+          <CardHeader className="pb-2">
+            <CardTitle>Today's Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.activityData.length === 0 ? (
+              <div className="flex justify-center py-8 text-muted-foreground">
+                No activity data available
+              </div>
+            ) : (
+              <div className="h-[200px]">
+                <div className="flex h-full items-end">
+                  {stats.activityData.map((entry) => {
+                    const totalHours = entry.active + entry.idle;
+                    const height = Math.max(totalHours * 20, 4);
+                    
+                    return (
+                      <div key={entry.hour} className="relative flex-1 group">
+                        <div className="absolute -top-6 left-0 right-0 text-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                          {entry.hour}
+                        </div>
+                        <div className="mx-1 flex flex-col h-full justify-end">
+                          {totalHours > 0 && (
+                            <>
+                              {entry.idle > 0 && (
+                                <div 
+                                  className="w-full bg-yellow-400 dark:bg-yellow-600"
+                                  style={{ height: `${(entry.idle / totalHours) * height}px` }}
+                                />
+                              )}
+                              {entry.active > 0 && (
+                                <div 
+                                  className="w-full bg-green-500 dark:bg-green-600"
+                                  style={{ height: `${(entry.active / totalHours) * height}px` }}
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+          <div className="px-4 pb-4 flex items-center justify-center space-x-4 text-xs">
+            <div className="flex items-center">
+              <div className="h-3 w-3 rounded-full bg-green-500 dark:bg-green-600 mr-2"></div>
+              <span>Active</span>
+            </div>
+            <div className="flex items-center">
+              <div className="h-3 w-3 rounded-full bg-yellow-400 dark:bg-yellow-600 mr-2"></div>
+              <span>Idle</span>
+            </div>
+          </div>
+        </Card>
         
-        <ActiveUsersCard 
-          className="lg:col-span-3"
-          users={stats.activeUsersList}
-        />
+        <Card className="lg:col-span-3">
+          <CardHeader className="pb-2">
+            <CardTitle>Active Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.activeUsersList.length === 0 ? (
+              <div className="flex justify-center py-8 text-muted-foreground">
+                No active users at the moment
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {stats.activeUsersList.map((user) => (
+                  <div key={user.id} className="flex items-center">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full border border-muted bg-muted font-semibold text-muted-foreground">
+                      {user.name.charAt(0)}
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium leading-none">{user.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {user.project} - {user.task}
+                      </p>
+                    </div>
+                    <div className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+                      <div className="h-2 w-2 rounded-full bg-green-600"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

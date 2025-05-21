@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -113,8 +112,8 @@ export default function UsersManagement() {
   return (
     <div className="container py-6">
       <PageHeader
-        heading="User Management"
-        description="Manage users and their roles"
+        title="User Management"
+        subtitle="Manage users and their roles"
       />
 
       <Card className="mt-6">

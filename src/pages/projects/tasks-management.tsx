@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -258,14 +257,13 @@ export default function TasksManagement() {
   return (
     <div className="container py-6">
       <PageHeader
-        heading="Task Management"
-        description="Create and manage tasks for projects"
-        actions={
-          <Button onClick={handleNewTask}>
-            <Plus className="mr-2 h-4 w-4" /> Add Task
-          </Button>
-        }
-      />
+        title="Task Management"
+        subtitle="Create and manage tasks for projects"
+      >
+        <Button onClick={handleNewTask}>
+          <Plus className="mr-2 h-4 w-4" /> Add Task
+        </Button>
+      </PageHeader>
 
       <Card className="mt-6">
         <CardHeader>
