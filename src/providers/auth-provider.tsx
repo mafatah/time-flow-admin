@@ -1,9 +1,9 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
-import { Tables } from "@/types/database";
+import { Tables } from "@/integrations/supabase/types";
 
 interface AuthContextType {
   user: User | null;

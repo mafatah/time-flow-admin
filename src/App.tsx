@@ -18,8 +18,16 @@ import ProjectsPage from "@/pages/projects";
 import TimeTrackingPage from "@/pages/time-tracking";
 import ScreenshotsPage from "@/pages/screenshots";
 import NotFoundPage from "@/pages/not-found";
+import Index from "@/pages/Index";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
+  }
+});
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -37,10 +45,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <Loading message="Loading application..." />;
+  }
+
   return (
     <Routes>
       {/* Auth routes */}
-      <Route path="/login" element={<LoginPage />} />
+      <Route 
+        path="/login" 
+        element={user ? <Navigate to="/" /> : <LoginPage />} 
+      />
+      
+      {/* Landing page redirect */}
+      <Route 
+        path="/index" 
+        element={<Navigate to="/" />} 
+      />
 
       {/* Protected routes */}
       <Route
@@ -56,7 +79,6 @@ function AppRoutes() {
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="time-tracking" element={<TimeTrackingPage />} />
         <Route path="screenshots" element={<ScreenshotsPage />} />
-        {/* Add other app routes here */}
       </Route>
 
       {/* 404 Not Found */}
