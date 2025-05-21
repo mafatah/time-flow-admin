@@ -3,8 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-import 'dotenv/config';
-
+// In browser environment, we use the variables defined in vite.config.ts
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || '';
 
