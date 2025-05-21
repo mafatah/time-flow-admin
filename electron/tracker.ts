@@ -1,9 +1,10 @@
 import { supabase } from '../src/lib/supabase';
 import { nanoid } from 'nanoid';
-import activeWin from 'active-win';
 import { startIdleTracker, stopIdleTracker, setCurrentTimeLog } from './idleTracker';
 import { captureAndUpload } from './screenshotManager';
-import { queueTimeLog } from './unsyncedManager';
+import { queueTimeLog, processQueue } from './unsyncedManager';
+import { captureAppLog } from './appLogsManager';
+import { screenshotIntervalSeconds } from './config';
 import {
   saveSession as storeSession,
   loadSession as getSession,
@@ -16,11 +17,7 @@ let appInterval: ReturnType<typeof setInterval> | undefined;
 let trackingActive = false;
 let userId: string | null = null;
 let currentTaskId: string | null = null;
-let offlineData: {
-  activeWindows: Array<{ title: string; app: string; timestamp: number; taskId: string }>;
-} = {
-  activeWindows: []
-};
+
 
 // Session persistence handled by sessionManager
 let currentTimeLogId: string | null = null;
@@ -92,58 +89,14 @@ export async function startTracking() {
     screenshotInterval = setInterval(() => {
       if (!userId || !currentTaskId) return;
       captureAndUpload(userId, currentTaskId);
-    }, 60000); // Capture every minute
+    }, screenshotIntervalSeconds * 1000);
   }
 
   if (!appInterval) {
-    appInterval = setInterval(async () => {
-      // Implement application tracking
-      try {
-        if (!userId || !currentTaskId) {
-          console.log('Cannot track application: missing user ID or task ID');
-          return;
-        }
-        
-        // Get active window information
-        const activeWindow = await activeWin();
-        
-        if (activeWindow) {
-          const windowData = {
-            title: activeWindow.title,
-            app: activeWindow.owner.name,
-            timestamp: Date.now(),
-            taskId: currentTaskId
-          };
-          
-          // Try to log active window to server
-          try {
-            // Log active window to time_logs table or specialized table if available
-            const { error: logError } = await supabase
-              .from('time_logs')
-              .insert({
-                user_id: userId,
-                task_id: currentTaskId,
-                is_idle: false,
-                // Add metadata about active window
-                metadata: {
-                  window_title: activeWindow.title,
-                  application: activeWindow.owner.name
-                }
-              });
-              
-            if (logError) {
-              console.error('Failed to log active window:', logError);
-              offlineData.activeWindows.push(windowData);
-            }
-          } catch (e) {
-            console.error('Error logging active window:', e);
-            offlineData.activeWindows.push(windowData);
-          }
-        }
-      } catch (error) {
-        console.error('Error tracking application:', error);
-      }
-    }, 10000); // Track every 10 seconds
+    appInterval = setInterval(() => {
+      if (!userId || !currentTaskId) return;
+      void captureAppLog(userId, currentTaskId);
+    }, 10000);
   }
 }
 
@@ -195,34 +148,7 @@ export async function stopTracking() {
 
 // Sync offline data when online
 export async function syncOfflineData() {
-  if (!userId) return;
-  
-  // Sync active windows
-  for (const window of offlineData.activeWindows) {
-    try {
-      // Log active window to time_logs table
-      const { error: logError } = await supabase
-        .from('time_logs')
-        .insert({
-          user_id: userId,
-          task_id: window.taskId,
-          is_idle: false,
-          start_time: new Date(window.timestamp).toISOString(),
-          metadata: {
-            window_title: window.title,
-            application: window.app
-          }
-        });
-        
-      if (!logError) {
-        // Remove from offline data
-        offlineData.activeWindows = offlineData.activeWindows.filter(w => 
-          w.timestamp !== window.timestamp && w.title !== window.title);
-      }
-    } catch (e) {
-      console.error('Failed to sync offline active window data:', e);
-    }
-  }
+  await processQueue();
 }
 
 // Load a saved session from disk

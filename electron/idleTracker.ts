@@ -1,8 +1,9 @@
 import iohook from 'iohook';
 import { supabase } from '../src/lib/supabase';
+import { idleTimeoutMinutes } from './config';
 
 let idleTimer: NodeJS.Timeout | null = null;
-const IDLE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+const IDLE_THRESHOLD = idleTimeoutMinutes * 60 * 1000;
 let currentTimeLogId: string | null = null;
 let isIdle = false;
 
