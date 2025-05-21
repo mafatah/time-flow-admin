@@ -1,3 +1,4 @@
+
 # Welcome to your Lovable project
 
 ## Project info
@@ -38,16 +39,14 @@ npm run dev
 
 ## Environment variables
 
-This project requires Supabase credentials. Create a `.env` file in the project
-root (or supply these variables through your shell) with the following
-variables:
+This project uses Supabase. You can create a `.env` file in the project root with the following variables:
 
 ```bash
-SUPABASE_URL=<your-supabase-url>
-SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
+SUPABASE_URL=https://fkpiqcxkmrtaetvfgcli.supabase.co
+SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4
 ```
 
-The development server will fail to start if these variables are missing.
+Note: The application includes fallback values for these variables if they're not provided in the environment, so it will work in environments with limited configuration options.
 
 **Edit a file directly in GitHub**
 
