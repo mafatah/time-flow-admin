@@ -36,6 +36,19 @@ npm i
 npm run dev
 ```
 
+## Environment variables
+
+This project requires Supabase credentials. Create a `.env` file in the project
+root (or supply these variables through your shell) with the following
+variables:
+
+```bash
+SUPABASE_URL=<your-supabase-url>
+SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
+```
+
+The development server will fail to start if these variables are missing.
+
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).
