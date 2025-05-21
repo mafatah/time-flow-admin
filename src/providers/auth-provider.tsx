@@ -1,6 +1,6 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import type { User, Session } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
 import { Tables } from "@/integrations/supabase/types";
@@ -27,6 +27,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function getSession() {
       setLoading(true);
       
+      // Set up auth state listener FIRST
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, session) => {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
+            // Use setTimeout to avoid blocking the auth callback
+            setTimeout(() => {
+              fetchUserDetails(session.user.id);
+            }, 0);
+          } else {
+            setUserDetails(null);
+          }
+        }
+      );
+      
+      // THEN check for existing session
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
@@ -45,23 +63,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchUserDetails(session.user.id);
       }
 
-      const { data: authListener } = supabase.auth.onAuthStateChange(
-        async (_event, session) => {
-          setSession(session);
-          setUser(session?.user ?? null);
-          
-          if (session?.user) {
-            await fetchUserDetails(session.user.id);
-          } else {
-            setUserDetails(null);
-          }
-        }
-      );
-
       setLoading(false);
 
       return () => {
-        authListener.subscription.unsubscribe();
+        subscription.unsubscribe();
       };
     }
 

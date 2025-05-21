@@ -2,24 +2,41 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/use-toast';
 
 const Index = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   useEffect(() => {
     // Check for an existing session
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        navigate("/");
-      } else {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (data.session) {
+          navigate("/dashboard");
+        } else {
+          navigate("/login");
+        }
+      } catch (error: any) {
+        console.error("Error checking session:", error);
+        toast({
+          title: "Error",
+          description: "Failed to check authentication status",
+          variant: "destructive",
+        });
         navigate("/login");
       }
     };
     
     checkSession();
-  }, [navigate]);
+  }, [navigate, toast]);
   
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-muted/40 p-6">

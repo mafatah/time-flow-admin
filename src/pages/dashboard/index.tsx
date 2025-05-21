@@ -9,16 +9,18 @@ import { ActiveUsersCard } from "@/components/dashboard/active-users-card";
 import { Loading } from "@/components/layout/loading";
 import { ErrorMessage } from "@/components/layout/error-message";
 import { useAuth } from "@/providers/auth-provider";
-import { Tables } from "@/types/database";
+import { Tables } from "@/integrations/supabase/types";
 import { Clock, Calendar } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function Dashboard() {
-  const { userDetails } = useAuth();
+  const { user, userDetails } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const [todayTimeMs, setTodayTimeMs] = useState(28800000); // 8 hours in ms
-  const [weekTimeMs, setWeekTimeMs] = useState(144000000); // 40 hours in ms
+  const [todayTimeMs, setTodayTimeMs] = useState(0);
+  const [weekTimeMs, setWeekTimeMs] = useState(0);
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [activityData, setActivityData] = useState<{ name: string; activity: number }[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -29,103 +31,111 @@ export default function Dashboard() {
         setLoading(true);
         setError(null);
         
-        // In a real app, these would be actual database queries
-        // For this demo, we'll just use mock data
+        // Fetch projects
+        const { data: projectsData, error: projectsError } = await supabase
+          .from("projects")
+          .select("*");
         
-        // Mock active users
-        const mockActiveUsers = [
-          {
-            user: { 
-              id: "1", 
-              full_name: "John Smith", 
-              email: "john@example.com",
-              role: "employee",
-              avatar_url: null
-            },
-            task: { 
-              id: "1", 
-              name: "Frontend Development", 
-              project_id: "1",
-              user_id: "1",
-              created_at: new Date().toISOString()
-            },
-            startTime: new Date().toISOString()
-          },
-          {
-            user: { 
-              id: "2", 
-              full_name: "Emily Johnson", 
-              email: "emily@example.com",
-              role: "employee",
-              avatar_url: null
-            },
-            task: { 
-              id: "2", 
-              name: "API Integration", 
-              project_id: "1",
-              user_id: "2",
-              created_at: new Date().toISOString()
-            },
-            startTime: new Date().toISOString()
-          }
-        ];
+        if (projectsError) throw projectsError;
+        
+        // Fetch active users with their current tasks
+        const { data: activeUsersData, error: activeUsersError } = await supabase
+          .from("time_logs")
+          .select(`
+            id,
+            start_time,
+            users:user_id(id, full_name, email, role, avatar_url),
+            tasks:task_id(id, name, project_id)
+          `)
+          .is("end_time", null)
+          .order("start_time", { ascending: false });
+        
+        if (activeUsersError) throw activeUsersError;
+        
+        // Calculate today's time for current user
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const { data: todayLogs, error: todayLogsError } = await supabase
+          .from("time_logs")
+          .select("start_time, end_time")
+          .eq("user_id", user?.id)
+          .gte("start_time", today.toISOString())
+          .order("start_time", { ascending: false });
+        
+        if (todayLogsError) throw todayLogsError;
+        
+        // Calculate week's time for current user
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        weekStart.setHours(0, 0, 0, 0);
+        
+        const { data: weekLogs, error: weekLogsError } = await supabase
+          .from("time_logs")
+          .select("start_time, end_time")
+          .eq("user_id", user?.id)
+          .gte("start_time", weekStart.toISOString())
+          .order("start_time", { ascending: false });
+        
+        if (weekLogsError) throw weekLogsError;
+        
+        // Calculate activity data (mock for now)
+        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const activityByDay = dayNames.map(name => ({
+          name,
+          activity: Math.floor(Math.random() * 100)
+        }));
+        
+        // Calculate time durations
+        let todayDuration = 0;
+        let weekDuration = 0;
+        
+        todayLogs?.forEach(log => {
+          const start = new Date(log.start_time).getTime();
+          const end = log.end_time ? new Date(log.end_time).getTime() : Date.now();
+          todayDuration += end - start;
+        });
+        
+        weekLogs?.forEach(log => {
+          const start = new Date(log.start_time).getTime();
+          const end = log.end_time ? new Date(log.end_time).getTime() : Date.now();
+          weekDuration += end - start;
+        });
+        
+        // Prepare projects data with additional stats
+        const formattedProjects = projectsData?.map(project => {
+          // In a real app, we'd fetch actual task counts and time spent
+          return {
+            ...project,
+            taskCount: Math.floor(Math.random() * 20) + 1,
+            completedTaskCount: Math.floor(Math.random() * 10),
+            timeSpentHours: Math.random() * 50
+          };
+        });
+        
+        setTodayTimeMs(todayDuration);
+        setWeekTimeMs(weekDuration);
+        setActiveUsers(activeUsersData || []);
+        setActivityData(activityByDay);
+        setProjects(formattedProjects || []);
 
-        // Mock activity data
-        const mockActivityData = [
-          { name: "Mon", activity: 65 },
-          { name: "Tue", activity: 78 },
-          { name: "Wed", activity: 82 },
-          { name: "Thu", activity: 75 },
-          { name: "Fri", activity: 68 },
-          { name: "Sat", activity: 45 },
-          { name: "Sun", activity: 30 },
-        ];
-
-        // Mock projects data
-        const mockProjects = [
-          {
-            id: "1",
-            name: "Website Redesign",
-            description: "Redesign the company website",
-            created_at: new Date().toISOString(),
-            taskCount: 12,
-            completedTaskCount: 4,
-            timeSpentHours: 24.5,
-          },
-          {
-            id: "2",
-            name: "Mobile App Development",
-            description: "Develop a new mobile app",
-            created_at: new Date().toISOString(),
-            taskCount: 20,
-            completedTaskCount: 15,
-            timeSpentHours: 45.2,
-          },
-          {
-            id: "3",
-            name: "Marketing Campaign",
-            description: "Q2 marketing campaign",
-            created_at: new Date().toISOString(),
-            taskCount: 8,
-            completedTaskCount: 2,
-            timeSpentHours: 12.8,
-          }
-        ];
-
-        setActiveUsers(mockActiveUsers);
-        setActivityData(mockActivityData);
-        setProjects(mockProjects);
-
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching dashboard data:", err);
         setError("Failed to load dashboard data. Please try again later.");
+        toast({
+          title: "Error",
+          description: err.message || "Failed to load dashboard data",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
     }
 
-    fetchDashboardData();
-  }, [userDetails]);
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user, toast]);
 
   if (loading) return <Loading message="Loading dashboard..." />;
   if (error) return <ErrorMessage message={error} />;
@@ -141,24 +151,25 @@ export default function Dashboard() {
         <TimeSummaryCard 
           title="Today's Time" 
           duration={todayTimeMs} 
-          previous={25200000} 
+          previous={todayTimeMs * 0.9} 
           icon={<Clock className="h-4 w-4" />}
         />
         <TimeSummaryCard 
           title="This Week" 
           duration={weekTimeMs} 
-          previous={136800000} 
+          previous={weekTimeMs * 0.95} 
           icon={<Calendar className="h-4 w-4" />}
         />
         <TimeSummaryCard 
           title="Average Daily" 
-          duration={28800000} 
-          previous={28080000} 
+          duration={weekTimeMs / 7} 
+          previous={(weekTimeMs / 7) * 0.98} 
         />
         <TimeSummaryCard 
           title="Productivity Score" 
           duration={0} 
           showComparison={false} 
+          scoreValue={85}
         />
       </div>
       

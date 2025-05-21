@@ -30,8 +30,11 @@ const queryClient = new QueryClient({
 });
 
 // Protected route component
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+function ProtectedRoute({ children, requiredRole }: { 
+  children: React.ReactNode;
+  requiredRole?: 'admin' | 'manager' | 'employee';
+}) {
+  const { user, userDetails, loading } = useAuth();
 
   if (loading) {
     return <Loading message="Authenticating..." />;
@@ -39,6 +42,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/login" />;
+  }
+
+  // If a role is required, check if the user has it
+  if (requiredRole && userDetails?.role !== requiredRole && 
+     !(requiredRole === 'manager' && userDetails?.role === 'admin')) {
+    return <Navigate to="/dashboard" />;
   }
 
   return <>{children}</>;
@@ -56,10 +65,15 @@ function AppRoutes() {
       {/* Auth routes */}
       <Route 
         path="/login" 
-        element={user ? <Navigate to="/" /> : <LoginPage />} 
+        element={user ? <Navigate to="/dashboard" /> : <LoginPage />} 
       />
       
       {/* Landing page redirect */}
+      <Route 
+        path="/" 
+        element={<Navigate to={user ? "/dashboard" : "/login"} />} 
+      />
+      
       <Route 
         path="/index" 
         element={<Navigate to="/" />} 
@@ -74,8 +88,12 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="users" element={<UsersPage />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="users" element={
+          <ProtectedRoute requiredRole="manager">
+            <UsersPage />
+          </ProtectedRoute>
+        } />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="time-tracking" element={<TimeTrackingPage />} />
         <Route path="screenshots" element={<ScreenshotsPage />} />
