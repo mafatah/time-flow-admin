@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import activeWin from 'active-win';
 import { startIdleTracker, stopIdleTracker, setCurrentTimeLog } from './idleTracker';
 import { captureAndUpload } from './screenshotManager';
+import { queueTimeLog } from './unsyncedManager';
 import {
   saveSession as storeSession,
   loadSession as getSession,
@@ -35,7 +36,7 @@ export function setTaskId(id: string) {
 }
 
 // Start tracking activities
-export function startTracking() {
+export async function startTracking() {
   if (trackingActive) return;
   if (!userId || !currentTaskId) {
     console.log('Cannot start tracking: missing user ID or task ID');
@@ -43,7 +44,39 @@ export function startTracking() {
   }
 
   trackingActive = true;
-  currentTimeLogId = nanoid();
+  try {
+    const { data, error } = await supabase
+      .from('time_logs')
+      .insert({
+        user_id: userId,
+        task_id: currentTaskId,
+        start_time: new Date().toISOString(),
+        status: 'active'
+      })
+      .select('id')
+      .single();
+
+    if (error || !data) {
+      currentTimeLogId = nanoid();
+      queueTimeLog({
+        user_id: userId,
+        task_id: currentTaskId,
+        start_time: new Date().toISOString(),
+        status: 'active'
+      });
+    } else {
+      currentTimeLogId = data.id;
+    }
+  } catch (err) {
+    console.error('Failed to start time log:', err);
+    currentTimeLogId = nanoid();
+    queueTimeLog({
+      user_id: userId,
+      task_id: currentTaskId,
+      start_time: new Date().toISOString(),
+      status: 'active'
+    });
+  }
 
   const session: SessionData = {
     task_id: currentTaskId,
@@ -115,7 +148,7 @@ export function startTracking() {
 }
 
 // Stop tracking activities
-export function stopTracking() {
+export async function stopTracking() {
   if (!trackingActive) return;
   trackingActive = false;
   if (screenshotInterval) {
@@ -129,6 +162,33 @@ export function stopTracking() {
 
   stopIdleTracker();
   setCurrentTimeLog(null);
+  if (currentTimeLogId) {
+    try {
+      const { error } = await supabase
+        .from('time_logs')
+        .update({ end_time: new Date().toISOString(), status: 'completed' })
+        .eq('id', currentTimeLogId);
+      if (error) {
+        queueTimeLog({
+          id: currentTimeLogId,
+          user_id: userId!,
+          task_id: currentTaskId!,
+          end_time: new Date().toISOString(),
+          status: 'completed'
+        });
+      }
+    } catch (err) {
+      console.error('Failed to stop time log:', err);
+      queueTimeLog({
+        id: currentTimeLogId,
+        user_id: userId!,
+        task_id: currentTaskId!,
+        end_time: new Date().toISOString(),
+        status: 'completed'
+      });
+    }
+  }
+
   clearSession();
   currentTimeLogId = null;
 }
