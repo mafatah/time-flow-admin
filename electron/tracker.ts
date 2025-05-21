@@ -4,6 +4,12 @@ import fs from 'fs';
 import path from 'path';
 import { nanoid } from 'nanoid';
 import activeWin from 'active-win';
+import {
+  saveSession as storeSession,
+  loadSession as getSession,
+  clearSession,
+  SessionData
+} from './sessionManager';
 
 let screenshotInterval: ReturnType<typeof setInterval> | undefined;
 let appInterval: ReturnType<typeof setInterval> | undefined;
@@ -18,8 +24,8 @@ let offlineData: {
   activeWindows: []
 };
 
-// Session persistence
-const SESSION_FILE_PATH = path.join(app.getPath('userData'), 'tracking-session.json');
+// Session persistence handled by sessionManager
+let currentTimeLogId: string | null = null;
 
 // Set the current user ID for tracking
 export function setUserId(id: string) {
@@ -34,7 +40,21 @@ export function setTaskId(id: string) {
 // Start tracking activities
 export function startTracking() {
   if (trackingActive) return;
+  if (!userId || !currentTaskId) {
+    console.log('Cannot start tracking: missing user ID or task ID');
+    return;
+  }
+
   trackingActive = true;
+  currentTimeLogId = nanoid();
+
+  const session: SessionData = {
+    task_id: currentTaskId,
+    user_id: userId,
+    start_time: new Date().toISOString(),
+    time_log_id: currentTimeLogId
+  };
+  storeSession(session);
 
   if (!screenshotInterval) {
     screenshotInterval = setInterval(async () => {
@@ -187,6 +207,9 @@ export function stopTracking() {
     clearInterval(appInterval);
     appInterval = undefined;
   }
+
+  clearSession();
+  currentTimeLogId = null;
 }
 
 // Sync offline data when online
@@ -269,62 +292,12 @@ export async function syncOfflineData() {
   }
 }
 
-// Save the current session
-export function saveSession() {
-  if (!currentTaskId) return;
-  
-  const sessionData = {
-    userId,
-    taskId: currentTaskId,
-    timestamp: Date.now()
-  };
-  
-  try {
-    fs.writeFileSync(SESSION_FILE_PATH, JSON.stringify(sessionData));
-    console.log('Session saved to:', SESSION_FILE_PATH);
-  } catch (error) {
-    console.error('Failed to save session:', error);
-  }
-}
-
-// Check if a saved session exists
-export async function checkForSavedSession() {
-  try {
-    if (fs.existsSync(SESSION_FILE_PATH)) {
-      const sessionData = JSON.parse(fs.readFileSync(SESSION_FILE_PATH, 'utf8'));
-      
-      // Check if the session is for the current user
-      if (sessionData.userId === userId) {
-        return {
-          exists: true,
-          taskId: sessionData.taskId
-        };
-      }
-    }
-  } catch (error) {
-    console.error('Failed to check for saved session:', error);
-  }
-  
-  return {
-    exists: false,
-    taskId: null
-  };
-}
-
-// Load a saved session
-export function loadSession(taskId: string) {
-  currentTaskId = taskId;
-  startTracking();
+// Load a saved session from disk
+export function loadSession(): SessionData | null {
+  return getSession();
 }
 
 // Clear the saved session
 export function clearSavedSession() {
-  try {
-    if (fs.existsSync(SESSION_FILE_PATH)) {
-      fs.unlinkSync(SESSION_FILE_PATH);
-      console.log('Saved session cleared');
-    }
-  } catch (error) {
-    console.error('Failed to clear saved session:', error);
-  }
+  clearSession();
 }

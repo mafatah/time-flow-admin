@@ -13,9 +13,7 @@ declare global {
       startTracking: () => void;
       stopTracking: () => void;
       syncOfflineData: () => void;
-      saveSession: () => void;
-      loadSession: (taskId: string) => void;
-      checkForSavedSession: () => Promise<{ exists: boolean, taskId: string | null }>;
+      loadSession: () => Promise<SessionData | null>;
       clearSavedSession: () => void;
     };
   }
@@ -29,24 +27,30 @@ interface TrackerContextType {
   syncOfflineData: () => void;
 }
 
-interface SavedSession {
-  exists: boolean;
-  taskId: string | null;
+
+interface SessionData {
+  task_id: string;
+  user_id: string;
+  start_time: string;
+  time_log_id: string;
+  end_time?: string;
 }
+
+type SavedSession = SessionData | null;
 
 const TrackerContext = createContext<TrackerContextType | undefined>(undefined);
 
 export function TrackerProvider({ children }: { children: React.ReactNode }) {
   const [isTracking, setIsTracking] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
-  const [savedSession, setSavedSession] = useState<SavedSession>({ exists: false, taskId: null });
+  const [savedSession, setSavedSession] = useState<SavedSession>(null);
   const [showSessionDialog, setShowSessionDialog] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   
   // Check for saved session when user changes
   useEffect(() => {
-    if (user && window.electron?.checkForSavedSession) {
+    if (user && window.electron?.loadSession) {
       checkForSavedSession();
     }
   }, [user]);
@@ -59,10 +63,10 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const checkForSavedSession = async () => {
-    if (window.electron?.checkForSavedSession) {
+    if (window.electron?.loadSession) {
       try {
-        const session = await window.electron.checkForSavedSession();
-        if (session.exists && session.taskId) {
+        const session = await window.electron.loadSession();
+        if (session && session.task_id) {
           setSavedSession(session);
           setShowSessionDialog(true);
         }
@@ -73,12 +77,13 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   };
   
   const resumeSession = () => {
-    if (savedSession.taskId && window.electron?.loadSession) {
-      window.electron.loadSession(savedSession.taskId);
-      setCurrentTaskId(savedSession.taskId);
+    if (savedSession && window.electron?.setTaskId && window.electron?.startTracking) {
+      window.electron.setTaskId(savedSession.task_id);
+      window.electron.startTracking();
+      setCurrentTaskId(savedSession.task_id);
       setIsTracking(true);
       setShowSessionDialog(false);
-      
+
       toast({
         title: "Session resumed",
         description: "Your previous tracking session has been resumed."
@@ -116,12 +121,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   const stopTracking = () => {
     if (window.electron?.stopTracking) {
       window.electron.stopTracking();
-      
-      // Save the session when tracking is stopped
-      if (window.electron?.saveSession) {
-        window.electron.saveSession();
-      }
-      
+
       setIsTracking(false);
       setCurrentTaskId(null);
     }
