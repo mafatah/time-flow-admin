@@ -1,5 +1,6 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query"; 
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -29,11 +30,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loading } from "@/components/layout/loading";
 import { ErrorMessage } from "@/components/layout/error-message";
-import { Tables } from "@/types/database";
 import { formatDate, formatDuration } from "@/lib/utils";
 import { CalendarIcon, Clock, Download, Search } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { format, startOfDay, endOfDay, isWithinInterval } from "date-fns";
+import { useToast } from "@/components/ui/use-toast";
 
 interface TimeLogWithDetails {
   id: string;
@@ -56,154 +56,198 @@ interface TimeLogWithDetails {
 }
 
 export default function TimeTrackingPage() {
-  const [timeLogs, setTimeLogs] = useState<TimeLogWithDetails[]>([]);
-  const [users, setUsers] = useState<{ id: string; full_name: string }[]>([]);
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState("daily"); // daily, weekly, monthly
+  const { toast } = useToast();
 
-  useEffect(() => {
-    async function fetchData() {
+  // Fetch users
+  const { data: users = [] } = useQuery({
+    queryKey: ["users"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("users")
+        .select("id, full_name")
+        .order("full_name");
+        
+      if (error) {
+        console.error("Error fetching users:", error);
+        toast({
+          title: "Error loading users",
+          description: error.message,
+          variant: "destructive"
+        });
+        return [];
+      }
+      
+      return data;
+    }
+  });
+  
+  // Fetch projects
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, name")
+        .order("name");
+        
+      if (error) {
+        console.error("Error fetching projects:", error);
+        toast({
+          title: "Error loading projects",
+          description: error.message,
+          variant: "destructive"
+        });
+        return [];
+      }
+      
+      return data;
+    }
+  });
+  
+  // Fetch time logs with detailed info
+  const { 
+    data: timeLogs = [],
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ["timeLogs", selectedDate, selectedUserId, selectedProjectId],
+    queryFn: async () => {
       try {
-        setLoading(true);
+        // First get all tasks with their project info if we have a project filter
+        let tasksQuery = supabase
+          .from("tasks")
+          .select(`
+            id,
+            name,
+            user_id,
+            project:project_id (
+              id,
+              name
+            )
+          `);
+          
+        if (selectedProjectId) {
+          tasksQuery = tasksQuery.eq("project_id", selectedProjectId);
+        }
         
-        // In a real app, we would fetch real data from Supabase
-        // For this demo, we're using mock data
-        const mockUsers = [
-          { id: "1", full_name: "Admin User" },
-          { id: "2", full_name: "Manager User" },
-          { id: "3", full_name: "Employee One" },
-          { id: "4", full_name: "Employee Two" },
-          { id: "5", full_name: "Second Manager" },
-        ];
+        const { data: tasks, error: tasksError } = await tasksQuery;
         
-        const mockProjects = [
-          { id: "1", name: "Website Redesign" },
-          { id: "2", name: "Mobile App Development" },
-          { id: "3", name: "Marketing Campaign" },
-          { id: "4", name: "CRM Integration" },
-        ];
+        if (tasksError) throw tasksError;
         
-        const mockTimeLogs: TimeLogWithDetails[] = [
-          {
-            id: "1",
-            user: {
-              id: "3",
-              full_name: "Employee One"
-            },
-            task: {
-              id: "1",
-              name: "Frontend Development",
-              project: {
-                id: "1",
-                name: "Website Redesign"
-              }
-            },
-            start_time: "2023-07-15T09:00:00Z",
-            end_time: "2023-07-15T12:30:00Z",
-            is_idle: false,
-            duration_ms: 12600000 // 3.5 hours
-          },
-          {
-            id: "2",
-            user: {
-              id: "3",
-              full_name: "Employee One"
-            },
-            task: {
-              id: "1",
-              name: "Frontend Development",
-              project: {
-                id: "1",
-                name: "Website Redesign"
-              }
-            },
-            start_time: "2023-07-15T13:30:00Z",
-            end_time: "2023-07-15T17:00:00Z",
-            is_idle: false,
-            duration_ms: 12600000 // 3.5 hours
-          },
-          {
-            id: "3",
-            user: {
-              id: "4",
-              full_name: "Employee Two"
-            },
-            task: {
-              id: "2",
-              name: "API Integration",
-              project: {
-                id: "1",
-                name: "Website Redesign"
-              }
-            },
-            start_time: "2023-07-15T09:15:00Z",
-            end_time: "2023-07-15T13:00:00Z",
-            is_idle: true,
-            duration_ms: 13500000 // 3.75 hours
-          },
-          {
-            id: "4",
-            user: {
-              id: "4",
-              full_name: "Employee Two"
-            },
-            task: {
-              id: "3",
-              name: "App Design",
-              project: {
-                id: "2",
-                name: "Mobile App Development"
-              }
-            },
-            start_time: "2023-07-15T14:00:00Z",
-            end_time: "2023-07-15T18:00:00Z",
-            is_idle: false,
-            duration_ms: 14400000 // 4 hours
-          }
-        ];
-
-        setUsers(mockUsers);
-        setProjects(mockProjects);
-        setTimeLogs(mockTimeLogs);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError("Failed to load time tracking data. Please try again later.");
-      } finally {
-        setLoading(false);
+        // If no tasks are found and we have a project filter, return empty array
+        if (tasks.length === 0 && selectedProjectId) {
+          return [];
+        }
+        
+        // Now get time logs for these tasks
+        let timeLogsQuery = supabase
+          .from("time_logs")
+          .select(`
+            id,
+            user_id,
+            task_id,
+            start_time,
+            end_time,
+            is_idle
+          `);
+          
+        // Apply user filter if selected
+        if (selectedUserId) {
+          timeLogsQuery = timeLogsQuery.eq("user_id", selectedUserId);
+        }
+        
+        // Apply date filter if selected
+        if (selectedDate) {
+          const startDate = startOfDay(selectedDate).toISOString();
+          const endDate = endOfDay(selectedDate).toISOString();
+          timeLogsQuery = timeLogsQuery.gte("start_time", startDate).lte("start_time", endDate);
+        }
+        
+        const { data: timeLogs, error: timeLogsError } = await timeLogsQuery;
+        
+        if (timeLogsError) throw timeLogsError;
+        
+        // Get users info
+        const { data: usersData, error: usersError } = await supabase
+          .from("users")
+          .select("id, full_name");
+          
+        if (usersError) throw usersError;
+        
+        const usersMap = new Map(usersData.map(user => [user.id, user]));
+        const tasksMap = new Map(tasks.map(task => [task.id, task]));
+        
+        // Combine all data
+        const timeLogsWithDetails: TimeLogWithDetails[] = timeLogs
+          .filter(log => {
+            // Filter by task if we have a project filter
+            if (selectedProjectId) {
+              const task = tasksMap.get(log.task_id);
+              return task && task.project && task.project.id === selectedProjectId;
+            }
+            return true;
+          })
+          .map(log => {
+            const user = usersMap.get(log.user_id);
+            const task = tasksMap.get(log.task_id);
+            
+            // Calculate duration in milliseconds
+            let duration_ms = 0;
+            if (log.end_time) {
+              duration_ms = new Date(log.end_time).getTime() - new Date(log.start_time).getTime();
+            } else {
+              // If log is still running, calculate duration until now
+              duration_ms = new Date().getTime() - new Date(log.start_time).getTime();
+            }
+            
+            return {
+              ...log,
+              user: {
+                id: user?.id || log.user_id,
+                full_name: user?.full_name || "Unknown User"
+              },
+              task: {
+                id: task?.id || log.task_id,
+                name: task?.name || "Unknown Task",
+                project: task?.project || { id: "", name: "Unknown Project" }
+              },
+              duration_ms
+            };
+          });
+          
+        return timeLogsWithDetails;
+      } catch (err: any) {
+        console.error("Error fetching time logs:", err);
+        toast({
+          title: "Error loading time logs",
+          description: err.message,
+          variant: "destructive"
+        });
+        return [];
       }
     }
-
-    fetchData();
-  }, []);
+  });
 
   const filteredTimeLogs = timeLogs.filter((log) => {
-    const matchesUser = selectedUserId ? log.user.id === selectedUserId : true;
-    const matchesProject = selectedProjectId ? log.task.project.id === selectedProjectId : true;
-    const matchesDate = selectedDate
-      ? new Date(log.start_time).toDateString() === selectedDate.toDateString()
-      : true;
     const matchesSearch = searchQuery
       ? log.user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         log.task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         log.task.project.name.toLowerCase().includes(searchQuery.toLowerCase())
       : true;
     
-    return matchesUser && matchesProject && matchesDate && matchesSearch;
+    return matchesSearch;
   });
 
   // Calculate total time
   const totalTimeMs = filteredTimeLogs.reduce((acc, log) => acc + log.duration_ms, 0);
 
-  if (loading) return <Loading message="Loading time logs..." />;
-  if (error) return <ErrorMessage message={error} />;
+  if (isLoading) return <Loading message="Loading time logs..." />;
+  if (error) return <ErrorMessage message={(error as Error).message} />;
 
   return (
     <>

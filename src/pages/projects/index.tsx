@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { ErrorMessage } from "@/components/layout/error-message";
 import { Tables } from "@/types/database";
 import { formatDate } from "@/lib/utils";
 import { Layout, Plus, Search } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ProjectWithStats extends Tables<"projects"> {
   taskCount: number;
@@ -26,78 +28,94 @@ interface ProjectWithStats extends Tables<"projects"> {
 }
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<ProjectWithStats[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-
-  useEffect(() => {
-    async function fetchProjects() {
+  const { toast } = useToast();
+  
+  // Fetch projects using React Query
+  const {
+    data: projects = [],
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ["projects"],
+    queryFn: async () => {
       try {
-        setLoading(true);
-        
-        // In a real app, we would fetch real data from Supabase
-        // For this demo, we're using mock data
-        const mockProjects: ProjectWithStats[] = [
-          {
-            id: "1",
-            name: "Website Redesign",
-            description: "Complete overhaul of the company website with new branding",
-            created_at: "2023-05-10T08:00:00Z",
-            taskCount: 12,
-            userCount: 3,
-            totalHours: 86
-          },
-          {
-            id: "2",
-            name: "Mobile App Development",
-            description: "Building a new mobile application for both iOS and Android",
-            created_at: "2023-06-15T10:30:00Z",
-            taskCount: 25,
-            userCount: 4,
-            totalHours: 120
-          },
-          {
-            id: "3",
-            name: "Marketing Campaign",
-            description: "Q2 marketing campaign for new product launch",
-            created_at: "2023-07-01T09:15:00Z",
-            taskCount: 8,
-            userCount: 2,
-            totalHours: 45
-          },
-          {
-            id: "4",
-            name: "CRM Integration",
-            description: "Integrate our tools with the new CRM system",
-            created_at: "2023-07-20T14:00:00Z",
-            taskCount: 15,
-            userCount: 5,
-            totalHours: 67
-          }
-        ];
+        // Fetch all projects
+        const { data: projectsData, error: projectsError } = await supabase
+          .from("projects")
+          .select("*");
+          
+        if (projectsError) throw projectsError;
 
-        setProjects(mockProjects);
-        setError(null);
-      } catch (err) {
+        // For each project, get stats
+        const projectsWithStats = await Promise.all(
+          projectsData.map(async (project) => {
+            // Get tasks for this project
+            const { data: tasks, error: tasksError } = await supabase
+              .from("tasks")
+              .select("id, user_id")
+              .eq("project_id", project.id);
+              
+            if (tasksError) throw tasksError;
+            
+            // Get unique users count
+            const uniqueUserIds = tasks ? [...new Set(tasks.map(task => task.user_id))] : [];
+            
+            // Get time logs for all tasks in this project
+            const taskIds = tasks ? tasks.map(task => task.id) : [];
+            let totalHours = 0;
+            
+            if (taskIds.length > 0) {
+              const { data: timeLogs, error: timeLogsError } = await supabase
+                .from("time_logs")
+                .select("start_time, end_time")
+                .in("task_id", taskIds);
+                
+              if (timeLogsError) throw timeLogsError;
+              
+              // Calculate total hours
+              if (timeLogs) {
+                totalHours = timeLogs.reduce((acc, log) => {
+                  if (log.end_time) {
+                    const startTime = new Date(log.start_time).getTime();
+                    const endTime = new Date(log.end_time).getTime();
+                    return acc + (endTime - startTime) / (1000 * 60 * 60); // Convert ms to hours
+                  }
+                  return acc;
+                }, 0);
+              }
+            }
+            
+            return {
+              ...project,
+              taskCount: tasks ? tasks.length : 0,
+              userCount: uniqueUserIds.length,
+              totalHours: Math.round(totalHours * 10) / 10 // Round to 1 decimal place
+            } as ProjectWithStats;
+          })
+        );
+        
+        return projectsWithStats;
+      } catch (err: any) {
         console.error("Error fetching projects:", err);
-        setError("Failed to load projects. Please try again later.");
-      } finally {
-        setLoading(false);
+        toast({
+          title: "Error loading projects",
+          description: err.message || "Failed to load projects",
+          variant: "destructive"
+        });
+        return [];
       }
     }
-
-    fetchProjects();
-  }, []);
+  });
 
   const filteredProjects = projects.filter(
     (project) =>
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase())
+      (project.description?.toLowerCase() || "").includes(searchQuery.toLowerCase())
   );
 
-  if (loading) return <Loading message="Loading projects..." />;
-  if (error) return <ErrorMessage message={error} />;
+  if (isLoading) return <Loading message="Loading projects..." />;
+  if (error) return <ErrorMessage message={(error as Error).message} />;
 
   return (
     <>

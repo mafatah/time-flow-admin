@@ -1,5 +1,6 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -28,13 +29,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loading } from "@/components/layout/loading";
 import { ErrorMessage } from "@/components/layout/error-message";
-import { Tables } from "@/types/database";
 import { formatDate } from "@/lib/utils";
 import { CalendarIcon, Search, Image, Download } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { format, startOfDay, endOfDay } from "date-fns";
+import { useToast } from "@/components/ui/use-toast";
 
-interface Screenshot extends Tables<"screenshots"> {
+interface Screenshot {
+  id: string;
   user: {
     full_name: string;
     email: string;
@@ -42,122 +43,142 @@ interface Screenshot extends Tables<"screenshots"> {
   task: {
     name: string;
   };
+  image_url: string;
+  captured_at: string;
 }
 
 export default function ScreenshotsPage() {
-  const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
-  const [users, setUsers] = useState<{ id: string; full_name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedImage, setSelectedImage] = useState<Screenshot | null>(null);
-
-  useEffect(() => {
-    async function fetchData() {
+  const { toast } = useToast();
+  
+  // Fetch users
+  const { data: users = [] } = useQuery({
+    queryKey: ["users"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("users")
+        .select("id, full_name")
+        .order("full_name");
+        
+      if (error) {
+        console.error("Error fetching users:", error);
+        toast({
+          title: "Error loading users",
+          description: error.message,
+          variant: "destructive"
+        });
+        return [];
+      }
+      
+      return data;
+    }
+  });
+  
+  // Fetch screenshots with user and task details
+  const { 
+    data: screenshots = [],
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ["screenshots", selectedDate, selectedUserId],
+    queryFn: async () => {
       try {
-        setLoading(true);
+        // Build the query based on filters
+        let query = supabase
+          .from("screenshots")
+          .select(`
+            id,
+            image_url,
+            captured_at,
+            user_id,
+            task_id
+          `);
+          
+        // Apply user filter if selected
+        if (selectedUserId) {
+          query = query.eq("user_id", selectedUserId);
+        }
         
-        // In a real app, we would fetch real data from Supabase
-        // For this demo, we're using mock data
-        const mockUsers = [
-          { id: "1", full_name: "Admin User" },
-          { id: "2", full_name: "Manager User" },
-          { id: "3", full_name: "Employee One" },
-          { id: "4", full_name: "Employee Two" },
-          { id: "5", full_name: "Second Manager" },
-        ];
+        // Apply date filter if selected
+        if (selectedDate) {
+          const startDate = startOfDay(selectedDate).toISOString();
+          const endDate = endOfDay(selectedDate).toISOString();
+          query = query.gte("captured_at", startDate).lte("captured_at", endDate);
+        }
         
-        const mockScreenshots: Screenshot[] = [
-          {
-            id: "1",
-            user_id: "3",
-            task_id: "1",
-            image_url: "https://placehold.co/600x400?text=Work+Screenshot+1",
-            captured_at: "2023-07-15T09:30:00Z",
+        const { data: screenshotsData, error: screenshotsError } = await query.order("captured_at", { ascending: false });
+        
+        if (screenshotsError) throw screenshotsError;
+        
+        if (!screenshotsData || screenshotsData.length === 0) {
+          return [];
+        }
+        
+        // Get users info
+        const userIds = [...new Set(screenshotsData.map(s => s.user_id))];
+        const { data: usersData, error: usersError } = await supabase
+          .from("users")
+          .select("id, full_name, email")
+          .in("id", userIds);
+          
+        if (usersError) throw usersError;
+        
+        // Get tasks info
+        const taskIds = [...new Set(screenshotsData.map(s => s.task_id))];
+        const { data: tasksData, error: tasksError } = await supabase
+          .from("tasks")
+          .select("id, name")
+          .in("id", taskIds);
+          
+        if (tasksError) throw tasksError;
+        
+        const usersMap = new Map(usersData.map(user => [user.id, user]));
+        const tasksMap = new Map(tasksData.map(task => [task.id, task]));
+        
+        // Combine all data
+        const screenshotsWithDetails: Screenshot[] = screenshotsData.map(screenshot => {
+          const user = usersMap.get(screenshot.user_id);
+          const task = tasksMap.get(screenshot.task_id);
+          
+          return {
+            ...screenshot,
             user: {
-              full_name: "Employee One",
-              email: "employee1@example.com"
+              full_name: user?.full_name || "Unknown User",
+              email: user?.email || "unknown@example.com"
             },
             task: {
-              name: "Frontend Development"
+              name: task?.name || "Unknown Task"
             }
-          },
-          {
-            id: "2",
-            user_id: "3",
-            task_id: "1",
-            image_url: "https://placehold.co/600x400?text=Work+Screenshot+2",
-            captured_at: "2023-07-15T10:15:00Z",
-            user: {
-              full_name: "Employee One",
-              email: "employee1@example.com"
-            },
-            task: {
-              name: "Frontend Development"
-            }
-          },
-          {
-            id: "3",
-            user_id: "4",
-            task_id: "2",
-            image_url: "https://placehold.co/600x400?text=Work+Screenshot+3",
-            captured_at: "2023-07-15T09:45:00Z",
-            user: {
-              full_name: "Employee Two",
-              email: "employee2@example.com"
-            },
-            task: {
-              name: "API Integration"
-            }
-          },
-          {
-            id: "4",
-            user_id: "4",
-            task_id: "2",
-            image_url: "https://placehold.co/600x400?text=Work+Screenshot+4",
-            captured_at: "2023-07-15T11:00:00Z",
-            user: {
-              full_name: "Employee Two",
-              email: "employee2@example.com"
-            },
-            task: {
-              name: "API Integration"
-            }
-          }
-        ];
-
-        setUsers(mockUsers);
-        setScreenshots(mockScreenshots);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError("Failed to load screenshots. Please try again later.");
-      } finally {
-        setLoading(false);
+          };
+        });
+        
+        return screenshotsWithDetails;
+      } catch (err: any) {
+        console.error("Error fetching screenshots:", err);
+        toast({
+          title: "Error loading screenshots",
+          description: err.message,
+          variant: "destructive"
+        });
+        return [];
       }
     }
-
-    fetchData();
-  }, []);
+  });
 
   const filteredScreenshots = screenshots.filter((screenshot) => {
-    const matchesUser = selectedUserId ? screenshot.user_id === selectedUserId : true;
-    const matchesDate = selectedDate
-      ? new Date(screenshot.captured_at).toDateString() === selectedDate.toDateString()
-      : true;
     const matchesSearch = searchQuery
       ? screenshot.user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         screenshot.task.name.toLowerCase().includes(searchQuery.toLowerCase())
       : true;
     
-    return matchesUser && matchesDate && matchesSearch;
+    return matchesSearch;
   });
 
-  if (loading) return <Loading message="Loading screenshots..." />;
-  if (error) return <ErrorMessage message={error} />;
+  if (isLoading) return <Loading message="Loading screenshots..." />;
+  if (error) return <ErrorMessage message={(error as Error).message} />;
 
   return (
     <>
