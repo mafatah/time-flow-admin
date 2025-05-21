@@ -14,10 +14,10 @@ import LoginPage from "@/pages/auth/login";
 
 // App pages
 import Dashboard from "@/pages/dashboard";
-import UsersPage from "@/pages/users";
-import ProjectsPage from "@/pages/projects";
-import TimeTrackingPage from "@/pages/time-tracking";
-import ScreenshotsPage from "@/pages/screenshots";
+import UsersPage from "@/pages/users/users-management";
+import ProjectsPage from "@/pages/projects/project-management";
+import TimeTrackingPage from "@/pages/time-tracking/time-logs";
+import ScreenshotsPage from "@/pages/screenshots/screenshots-viewer";
 import NotFoundPage from "@/pages/not-found";
 import Index from "@/pages/Index";
 

@@ -60,7 +60,7 @@ export default function LoginPage() {
       } else {
         // Handle login
         await signIn(values.email, values.password);
-        navigate("/");
+        navigate("/dashboard");
       }
     } catch (error: any) {
       toast({
