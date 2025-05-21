@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { nanoid } from 'nanoid';
 import { supabase } from '../src/lib/supabase';
+import { queueScreenshot } from './unsyncedManager';
 
 interface QueueItem {
   path: string;
@@ -28,7 +29,12 @@ export async function captureAndUpload(userId: string, taskId: string) {
     await uploadScreenshot(tempPath, userId, taskId, Date.now());
     fs.unlink(tempPath, () => {});
   } catch {
-    queue.push({ path: tempPath, taskId, timestamp: Date.now() });
+    const unsyncedDir = path.join(app.getPath('userData'), 'unsynced_screenshots');
+    fs.mkdirSync(unsyncedDir, { recursive: true });
+    const dest = path.join(unsyncedDir, filename);
+    fs.copyFileSync(tempPath, dest);
+    fs.unlink(tempPath, () => {});
+    queue.push({ path: dest, taskId, timestamp: Date.now() });
     startRetry(userId);
   }
 }
@@ -52,7 +58,15 @@ async function uploadScreenshot(filePath: string, userId: string, taskId: string
     .from('screenshots')
     .insert({ user_id: userId, task_id: taskId, image_url: imageUrl, captured_at: new Date(ts).toISOString() });
 
-  if (dbError) throw dbError;
+  if (dbError) {
+    queueScreenshot({
+      user_id: userId,
+      task_id: taskId,
+      image_url: imageUrl,
+      captured_at: new Date(ts).toISOString(),
+    });
+    throw dbError;
+  }
 }
 
 function startRetry(userId: string) {
