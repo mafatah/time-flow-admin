@@ -3,13 +3,10 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Fallback values in case environment variables are not available
-const FALLBACK_SUPABASE_URL = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
-const FALLBACK_SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
+import 'dotenv/config';
 
-// Try to get environment variables first, fall back to hardcoded values if not available
-const SUPABASE_URL = process.env.SUPABASE_URL || FALLBACK_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || FALLBACK_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || '';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

@@ -2,6 +2,7 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { supabase } from '../src/lib/supabase';
+import { logError } from './errorHandler';
 
 interface TimeLog {
   id?: string;
@@ -26,6 +27,34 @@ interface UnsyncedData {
 }
 
 const UNSYNCED_FILE_PATH = path.join(app.getPath('userData'), 'unsynced.json');
+const UNSYNCED_APP_LOG_PATH = path.join(app.getPath('userData'), 'unsynced_app_logs.json');
+
+export interface AppLog {
+  user_id: string;
+  task_id: string;
+  app_name: string;
+  window_title: string;
+  timestamp: string;
+}
+
+function loadAppLogs(): AppLog[] {
+  try {
+    if (fs.existsSync(UNSYNCED_APP_LOG_PATH)) {
+      return JSON.parse(fs.readFileSync(UNSYNCED_APP_LOG_PATH, 'utf8')) as AppLog[];
+    }
+  } catch (err) {
+    logError('loadAppLogs', err);
+  }
+  return [];
+}
+
+function saveAppLogs(logs: AppLog[]) {
+  try {
+    fs.writeFileSync(UNSYNCED_APP_LOG_PATH, JSON.stringify(logs));
+  } catch (err) {
+    logError('saveAppLogs', err);
+  }
+}
 let syncInterval: NodeJS.Timeout | null = null;
 
 function loadData(): UnsyncedData {
@@ -59,8 +88,15 @@ export function queueScreenshot(meta: ScreenshotMeta) {
   saveData(data);
 }
 
+export function queueAppLog(log: AppLog) {
+  const logs = loadAppLogs();
+  logs.push(log);
+  saveAppLogs(logs);
+}
+
 export async function processQueue() {
   const data = loadData();
+  const appLogs = loadAppLogs();
 
   for (const log of [...data.time_logs]) {
     try {
@@ -109,7 +145,20 @@ export async function processQueue() {
     }
   }
 
+  for (const log of [...appLogs]) {
+    try {
+      const { error } = await supabase.from('app_logs').insert(log);
+      if (!error) {
+        const idx = appLogs.indexOf(log);
+        if (idx !== -1) appLogs.splice(idx, 1);
+      }
+    } catch (err) {
+      logError('sync app log', err);
+    }
+  }
+
   saveData(data);
+  saveAppLogs(appLogs);
 }
 
 export function startSyncLoop() {

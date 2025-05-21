@@ -4,6 +4,7 @@ import path from 'path';
 import { nanoid } from 'nanoid';
 import { supabase } from '../src/lib/supabase';
 import { queueScreenshot } from './unsyncedManager';
+import { logError, showError } from './errorHandler';
 
 interface QueueItem {
   path: string;
@@ -28,7 +29,9 @@ export async function captureAndUpload(userId: string, taskId: string) {
   try {
     await uploadScreenshot(tempPath, userId, taskId, Date.now());
     fs.unlink(tempPath, () => {});
-  } catch {
+  } catch (err) {
+    logError('captureAndUpload', err);
+    showError('Screenshot Error', 'Failed to upload screenshot. It will be retried.');
     const unsyncedDir = path.join(app.getPath('userData'), 'unsynced_screenshots');
     fs.mkdirSync(unsyncedDir, { recursive: true });
     const dest = path.join(unsyncedDir, filename);
@@ -81,7 +84,8 @@ async function processQueue(userId: string) {
       fs.unlink(item.path, () => {});
       const index = queue.indexOf(item);
       if (index !== -1) queue.splice(index, 1);
-    } catch {
+    } catch (err) {
+      logError('processQueue', err);
       // keep in queue
     }
   }
