@@ -9,6 +9,7 @@ interface TimeSummaryCardProps {
   previous?: number;
   icon?: React.ReactNode;
   showComparison?: boolean;
+  scoreValue?: number;
 }
 
 export function TimeSummaryCard({
@@ -17,8 +18,9 @@ export function TimeSummaryCard({
   previous,
   icon = <Clock className="h-4 w-4" />,
   showComparison = true,
+  scoreValue,
 }: TimeSummaryCardProps) {
-  const durationText = formatDuration(duration);
+  const durationText = scoreValue !== undefined ? `${scoreValue}%` : formatDuration(duration);
   
   // Calculate percentage change
   const percentageChange = previous && previous > 0 
