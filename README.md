@@ -77,6 +77,13 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/16ca980c-c11a-40b9-9bec-cfa784f78c4d) and click on Share -> Publish.
 
+## Working with Codex offline
+
+The Codex environment installs dependencies during setup and then disables
+network access. If you need additional packages, add them to
+`.openai/setup.sh`. The script runs automatically before the network is
+disabled and should install your dependencies using `npm ci`.
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!
