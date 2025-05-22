@@ -116,6 +116,7 @@ export type Database = {
           start_time: string
           task_id: string
           user_id: string
+          status: string
         }
         Insert: {
           end_time?: string | null
@@ -124,6 +125,7 @@ export type Database = {
           start_time?: string
           task_id: string
           user_id: string
+          status?: string
         }
         Update: {
           end_time?: string | null
@@ -132,6 +134,7 @@ export type Database = {
           start_time?: string
           task_id?: string
           user_id?: string
+          status?: string
         }
         Relationships: [
           {

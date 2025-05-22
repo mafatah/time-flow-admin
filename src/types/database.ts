@@ -61,6 +61,7 @@ export interface Database {
           start_time: string
           end_time: string | null
           is_idle: boolean
+          status: string
         }
         Insert: {
           id?: string
@@ -69,6 +70,7 @@ export interface Database {
           start_time?: string
           end_time?: string | null
           is_idle?: boolean
+          status?: string
         }
         Update: {
           id?: string
@@ -77,6 +79,7 @@ export interface Database {
           start_time?: string
           end_time?: string | null
           is_idle?: boolean
+          status?: string
         }
       }
       screenshots: {
