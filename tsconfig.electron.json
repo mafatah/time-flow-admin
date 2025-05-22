@@ -1,18 +1,11 @@
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
+    "outDir": "electron",
+    "rootDir": "electron",
+    "module": "commonjs",
     "target": "ES2020",
-    "module": "ESNext",
-    "lib": ["ES2020", "DOM"],
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "rootDir": "./",
-    "outDir": "./",
-    "noEmit": false,
-    "types": []
+    "noEmitOnError": true
   },
-  "include": ["electron/**/*.ts"],
-  "files": ["electron/shims.d.ts"]
+  "include": ["electron/**/*.ts"]
 }
