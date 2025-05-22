@@ -2,7 +2,8 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "CommonJS",
-    "lib": ["ESNext"],
+    "lib": ["DOM", "DOM.Iterable", "ES2020"],
+    "jsx": "react-jsx",
     "outDir": "electron",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
