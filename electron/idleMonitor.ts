@@ -1,3 +1,4 @@
+// @ts-ignore
 import robot from 'robotjs';
 import { updateTimeLogStatus } from './tracker';
 import { idleTimeoutMinutes } from './config';
