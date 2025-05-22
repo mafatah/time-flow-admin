@@ -72,6 +72,20 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Building the project
+
+The TypeScript configuration is split between the web and Electron parts of the application.
+
+- `tsconfig.app.json` is used when compiling the web code.
+- `tsconfig.electron.json` is used for compiling the Electron process.
+
+You can compile each part individually using the provided npm scripts:
+
+```bash
+npm run build:web
+npm run build:electron
+```
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/16ca980c-c11a-40b9-9bec-cfa784f78c4d) and click on Share -> Publish.
