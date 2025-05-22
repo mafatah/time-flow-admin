@@ -85,8 +85,9 @@ export function queueScreenshot(meta: ScreenshotMeta) {
 }
 
 export function queueAppLog(log: AppLog) {
+  if (!log.message) return;
   const logs = loadAppLogs();
-  logs.push(log);
+  logs.push({ user_id: log.user_id, message: log.message });
   saveAppLogs(logs);
 }
 
@@ -142,8 +143,12 @@ export async function processQueue() {
   }
 
   for (const log of [...appLogs]) {
+    if (!log.message) continue;
     try {
-      const { error } = await supabase.from('app_logs').insert(log);
+      const { error } = await supabase.from('app_logs').insert({
+        user_id: log.user_id,
+        message: log.message
+      });
       if (!error) {
         const idx = appLogs.indexOf(log);
         if (idx !== -1) appLogs.splice(idx, 1);
