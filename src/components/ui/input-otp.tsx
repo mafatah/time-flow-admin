@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 const InputOTP = React.forwardRef<
   React.ElementRef<typeof OTPInput>,
   React.ComponentPropsWithoutRef<typeof OTPInput>
->(({ className, containerClassName, maxLength, ...props }, ref) => (
+>(({ className, containerClassName, maxLength = 6, ...props }, ref) => (
   <OTPInput
     ref={ref}
     maxLength={maxLength}
