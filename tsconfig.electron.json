@@ -8,7 +8,9 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "noEmit": true,
+    "rootDir": "./",
+    "outDir": "./",
+    "noEmit": false,
     "types": []
   },
   "include": ["electron/**/*.ts"],

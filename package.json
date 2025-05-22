@@ -5,7 +5,7 @@
   "type": "module",
   "main": "electron/main.ts",
   "scripts": {
-    "start": "electron electron/main.js",
+    "start": "npm run build:electron && electron electron/main.js",
     "dev": "vite",
     "build": "electron-builder",
     "build:dev": "vite build --mode development",
