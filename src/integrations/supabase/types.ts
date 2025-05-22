@@ -153,6 +153,45 @@ export type Database = {
           },
         ]
       }
+      app_logs: {
+        Row: {
+          user_id: string
+          task_id: string
+          app_name: string
+          window_title: string
+          timestamp: string
+        }
+        Insert: {
+          user_id: string
+          task_id: string
+          app_name: string
+          window_title: string
+          timestamp?: string
+        }
+        Update: {
+          user_id?: string
+          task_id?: string
+          app_name?: string
+          window_title?: string
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           avatar_url: string | null
