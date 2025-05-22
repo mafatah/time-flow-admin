@@ -150,6 +150,27 @@ export type Database = {
           },
         ]
       }
+      app_logs: {
+        Row: {
+          id: string
+          created_at: string
+          message: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          message: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          message?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           avatar_url: string | null
