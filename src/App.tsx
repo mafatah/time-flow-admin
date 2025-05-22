@@ -17,6 +17,9 @@ import UsersPage from "@/pages/users/users-management";
 import ProjectsPage from "@/pages/projects/project-management";
 import TimeTrackingPage from "@/pages/time-tracking/time-logs";
 import ScreenshotsPage from "@/pages/screenshots/screenshots-viewer";
+import CalendarPage from "@/pages/calendar";
+import ReportsPage from "@/pages/reports";
+import SettingsPage from "@/pages/settings";
 import NotFoundPage from "@/pages/not-found";
 import Index from "@/pages/Index";
 
@@ -96,7 +99,14 @@ function AppRoutes() {
         } />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="time-tracking" element={<TimeTrackingPage />} />
+        <Route path="calendar" element={<CalendarPage />} />
+        <Route path="reports" element={<ReportsPage />} />
         <Route path="screenshots" element={<ScreenshotsPage />} />
+        <Route path="settings" element={
+          <ProtectedRoute requiredRole="admin">
+            <SettingsPage />
+          </ProtectedRoute>
+        } />
       </Route>
 
       {/* 404 Not Found */}
