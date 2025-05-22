@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "electron/main.js",
+  "main": "main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -94,16 +94,12 @@
     "vite": "^5.4.1"
   },
   "build": {
-    "appId": "com.timeflow.app",
-    "files": [
-      "dist/**",
-      "electron/*.js"
-    ],
+    "appId": "com.hubstaff.clone",
     "mac": {
       "target": "dmg"
     },
-    "win": {
-      "target": "nsis"
+    "directories": {
+      "output": "dist"
     }
   }
 }
