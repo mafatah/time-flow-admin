@@ -12,6 +12,7 @@
     "lint": "eslint -c .eslintrc.js .",
     "preview": "vite preview",
     "electron:build": "electron-builder",
+    "build:web": "tsc -p tsconfig.app.json",
     "build:electron": "tsc -p tsconfig.electron.json"
   },
   "dependencies": {

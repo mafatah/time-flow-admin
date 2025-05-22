@@ -5,9 +5,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/components/ui/use-toast';
 
 // Check if running in Electron environment
-const isElectron = (): boolean => {
-  return window && window.electron !== undefined;
-};
+const isElectron = (): boolean =>
+  typeof window !== "undefined" && (window as any).electron !== undefined;
 
 interface TrackerContextType {
   isTracking: boolean;
