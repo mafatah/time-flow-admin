@@ -5,13 +5,14 @@
   "type": "module",
   "main": "electron/main.ts",
   "scripts": {
-    "start": "electron electron/main.js",
+    "start": "npm run build:electron && electron electron/main.js",
     "dev": "vite",
     "build": "electron-builder",
     "build:dev": "vite build --mode development",
     "lint": "eslint -c .eslintrc.js .",
     "preview": "vite preview",
-    "electron:build": "electron-builder"
+    "electron:build": "electron-builder",
+    "build:electron": "tsc -p tsconfig.electron.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
