@@ -39,14 +39,14 @@ npm run dev
 
 ## Environment variables
 
-This project uses Supabase. You can create a `.env` file in the project root with the following variables:
+This project uses Supabase. Add a `.env` file in the project root or set the following variables in your environment:
 
 ```bash
 SUPABASE_URL=https://your-supabase-url
 SUPABASE_PUBLISHABLE_KEY=your-supabase-key
 ```
 
-Ensure these variables are set in your environment before running the application.
+These variables must be available in `process.env` when the app runs. If they are missing, the fallback values from `.env.example` are used.
 
 **Edit a file directly in GitHub**
 
