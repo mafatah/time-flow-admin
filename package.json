@@ -5,7 +5,7 @@
   "type": "module",
   "main": "build/electron/main.js",
   "scripts": {
-    "start": "npm run build:electron && electron build/electron/main.js",
+    "start": "npm run build:all && electron build/electron/main.js",
     "electron": "tsc -p tsconfig.electron.json && electron build/electron/main.js",
     "dev:electron": "ts-node electron/main.ts",
     "dev": "vite",
