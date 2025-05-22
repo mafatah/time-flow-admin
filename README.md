@@ -83,6 +83,15 @@ network access. If you need additional packages, add them to
 `.openai/setup.sh`. The script runs automatically before the network is
 disabled and should install your dependencies using `npm ci`.
 
+## Auto-start permissions
+
+The application configures itself to start automatically when you log in.
+On **Windows**, a registry entry under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` is created.
+On **Linux**, a `.desktop` file is written to `~/.config/autostart`.
+Both operations require write access to these locations, so ensure the
+application has the necessary permissions.
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!
