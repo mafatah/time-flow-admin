@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import { OTPInput, OTPInputContext } from "input-otp"
 import { Dot } from "lucide-react"
@@ -18,7 +17,10 @@ const InputOTP = React.forwardRef<
     )}
     className={cn("disabled:cursor-not-allowed", className)}
     {...props}
-  />
+  >
+    {/* This ensures the children prop is passed correctly */}
+    {props.children}
+  </OTPInput>
 ))
 InputOTP.displayName = "InputOTP"
 
