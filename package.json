@@ -5,7 +5,7 @@
   "type": "module",
   "main": "build/electron/main.js",
   "scripts": {
-    "start": "npm run build:all && electron build/electron/main.js",
+    "start": "concurrently \"npm:dev\" \"npm:electron\"",
     "electron": "tsc -p tsconfig.electron.json && electron build/electron/main.js",
     "dev:electron": "ts-node-esm --project tsconfig.electron.json electron/main.ts",
     "dev": "vite",
@@ -104,6 +104,8 @@
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1",
     "ts-node": "^10.9.1"
+    ,
+    "concurrently": "^8.0.1"
   },
   "build": {
     "appId": "com.hubstaff.clone",
