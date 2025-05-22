@@ -8,7 +8,7 @@ interface TimeLog {
   id?: string;
   user_id: string;
   task_id: string;
-  start_time: string;
+  start_time?: string;
   end_time?: string;
   status: string;
   is_idle?: boolean;
