@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { supabase } from '../src/lib/supabase';
 import { logError } from './errorHandler';
+import type { Database } from '../src/integrations/supabase/types';
 
 interface TimeLog {
   id?: string;
@@ -29,13 +30,8 @@ interface UnsyncedData {
 const UNSYNCED_FILE_PATH = path.join(app.getPath('userData'), 'unsynced.json');
 const UNSYNCED_APP_LOG_PATH = path.join(app.getPath('userData'), 'unsynced_app_logs.json');
 
-export interface AppLog {
-  user_id: string;
-  task_id: string;
-  app_name: string;
-  window_title: string;
-  timestamp: string;
-}
+// Offline queue type for inserting into the `app_logs` table
+export type AppLog = Database['public']['Tables']['app_logs']['Insert'];
 
 function loadAppLogs(): AppLog[] {
   try {

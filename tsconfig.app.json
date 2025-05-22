@@ -27,6 +27,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"],
-  "files": ["src/shims.d.ts"]
+  "include": ["src"]
 }
