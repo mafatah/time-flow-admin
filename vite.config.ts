@@ -4,31 +4,33 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+
   return {
     server: {
       host: "::",
-      port: 8080,
+      port: 8080
     },
     plugins: [
       react(),
-      mode === 'development' &&
-      componentTagger(),
+      mode === "development" && componentTagger()
     ].filter(Boolean),
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "./src"),
-      },
+        "@": path.resolve(__dirname, "src")
+      }
     },
     define: {
-      "process.env": {
-        SUPABASE_URL: env.SUPABASE_URL ?? 'https://fkpiqcxkmrtaetvfgcli.supabase.co',
-        SUPABASE_PUBLISHABLE_KEY:
-          env.SUPABASE_PUBLISHABLE_KEY ??
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4',
-      },
+      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(
+        env.VITE_SUPABASE_URL ?? "https://fkpiqcxkmrtaetvfgcli.supabase.co"
+      ),
+      "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(
+        env.VITE_SUPABASE_ANON_KEY ?? "your_default_key"
+      )
     },
+    build: {
+      sourcemap: true
+    }
   };
 });
