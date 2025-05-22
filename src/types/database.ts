@@ -79,6 +79,29 @@ export interface Database {
           is_idle?: boolean
         }
       }
+      app_logs: {
+        Row: {
+          user_id: string
+          task_id: string
+          app_name: string
+          window_title: string
+          timestamp: string
+        }
+        Insert: {
+          user_id: string
+          task_id: string
+          app_name: string
+          window_title: string
+          timestamp?: string
+        }
+        Update: {
+          user_id?: string
+          task_id?: string
+          app_name?: string
+          window_title?: string
+          timestamp?: string
+        }
+      }
       screenshots: {
         Row: {
           id: string
