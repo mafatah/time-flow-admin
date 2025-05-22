@@ -7,7 +7,7 @@
   "scripts": {
     "start": "npm run build:electron && electron build/electron/main.js",
     "electron": "tsc -p tsconfig.electron.json && electron build/electron/main.js",
-    "dev:electron": "ts-node electron/main.ts",
+    "dev:electron": "ts-node-esm --project tsconfig.electron.json electron/main.ts",
     "dev": "vite",
     "build": "electron-builder",
     "build:dev": "vite build --mode development",
