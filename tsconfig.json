@@ -1,24 +1,16 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
   "compilerOptions": {
     "target": "ESNext",
     "module": "CommonJS",
-    "lib": ["ESNext", "DOM"],
-    "outDir": "./dist",
-    "rootDir": "./",
-    "strict": true,
+    "lib": ["ESNext"],
+    "outDir": "electron",
     "esModuleInterop": true,
-    "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true,
+    "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "electron"]
+  "include": ["electron", "src"]
 }
