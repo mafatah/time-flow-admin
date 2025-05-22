@@ -2,26 +2,20 @@ import { supabase } from '../src/lib/supabase';
 import activeWin from 'active-win';
 import { queueAppLog } from './unsyncedManager';
 import { logError } from './errorHandler';
+import type { Database } from '../src/integrations/supabase/types';
 
-export interface AppLog {
-  user_id: string;
-  task_id: string;
-  app_name: string;
-  window_title: string;
-  timestamp: string;
-}
+// Match the structure of the `app_logs` table from Supabase
+export type AppLog = Database['public']['Tables']['app_logs']['Insert'];
 
 export async function captureAppLog(userId: string, taskId: string) {
   let log: AppLog | null = null;
   try {
     const win = await activeWin();
     if (!win) return;
+    const message = `[${taskId}] ${win.owner.name}: ${win.title}`;
     log = {
       user_id: userId,
-      task_id: taskId,
-      app_name: win.owner.name,
-      window_title: win.title,
-      timestamp: new Date().toISOString()
+      message
     };
     const { error } = await supabase.from('app_logs').insert(log);
     if (error) {
