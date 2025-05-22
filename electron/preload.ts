@@ -1,5 +1,7 @@
+
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Expose protected Electron API to the renderer process
 contextBridge.exposeInMainWorld('electron', {
   setUserId: (id: string) => ipcRenderer.send('set-user-id', id),
   setTaskId: (id: string) => ipcRenderer.send('set-task-id', id),
@@ -9,3 +11,6 @@ contextBridge.exposeInMainWorld('electron', {
   loadSession: () => ipcRenderer.invoke('load-session'),
   clearSavedSession: () => ipcRenderer.send('clear-session')
 });
+
+// This allows the renderer process to detect if it's running in Electron
+contextBridge.exposeInMainWorld('isElectron', true);

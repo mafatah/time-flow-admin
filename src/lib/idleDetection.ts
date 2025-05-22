@@ -1,6 +1,8 @@
 
 /**
  * Browser-compatible idle detection module
+ * NOTE: This module should only be used in the Electron desktop app.
+ * The web application should NOT track user activity.
  */
 
 // Store the timestamp of the last user activity
@@ -27,6 +29,9 @@ const resetActivity = (): void => {
 
 // Add event listeners for user activity
 const setupActivityListeners = (): void => {
+  // Skip setup if not in browser environment
+  if (typeof window === 'undefined') return;
+  
   const events = ['mousemove', 'mousedown', 'keypress', 'DOMMouseScroll', 'mousewheel', 
     'touchmove', 'MSPointerMove', 'scroll'];
   
@@ -37,6 +42,9 @@ const setupActivityListeners = (): void => {
 
 // Remove all event listeners
 const removeActivityListeners = (): void => {
+  // Skip if not in browser environment
+  if (typeof window === 'undefined') return;
+  
   const events = ['mousemove', 'mousedown', 'keypress', 'DOMMouseScroll', 'mousewheel', 
     'touchmove', 'MSPointerMove', 'scroll'];
   
@@ -60,6 +68,12 @@ const checkIdleStatus = (): void => {
 
 // Start idle monitoring
 export const startIdleMonitoring = (onStatusChange: (isIdle: boolean) => void): void => {
+  // Check if we're in a browser environment
+  if (typeof window === 'undefined') {
+    console.warn('Idle monitoring is only supported in browser environments');
+    return;
+  }
+  
   // Register callback
   listeners.push(onStatusChange);
   
@@ -74,6 +88,8 @@ export const startIdleMonitoring = (onStatusChange: (isIdle: boolean) => void): 
 
 // Stop idle monitoring
 export const stopIdleMonitoring = (onStatusChange?: (isIdle: boolean) => void): void => {
+  if (typeof window === 'undefined') return;
+  
   if (onStatusChange) {
     // Remove specific callback
     const index = listeners.indexOf(onStatusChange);

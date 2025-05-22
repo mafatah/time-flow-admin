@@ -6,11 +6,11 @@ import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Tables } from '@/integrations/supabase/types';
+import { Download } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 export function TaskSelector() {
-  const { isTracking, currentTaskId, startTracking, stopTracking } = useTracker();
+  const { isTracking, currentTaskId, startTracking, stopTracking, canTrack } = useTracker();
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(currentTaskId);
@@ -56,18 +56,10 @@ export function TaskSelector() {
     }
     
     startTracking(selectedTaskId);
-    toast({
-      title: 'Tracking started',
-      description: 'Your activity is now being tracked',
-    });
   };
   
   const handleStopTracking = () => {
     stopTracking();
-    toast({
-      title: 'Tracking stopped',
-      description: 'Your activity is no longer being tracked',
-    });
   };
   
   return (
@@ -75,12 +67,22 @@ export function TaskSelector() {
       <h3 className="text-lg font-medium mb-4">Activity Tracking</h3>
       
       <div className="space-y-4">
+        {!canTrack && (
+          <div className="bg-amber-50 border border-amber-200 p-3 rounded-md text-amber-800 mb-4">
+            <p className="font-medium">Desktop Application Required</p>
+            <p className="text-sm mt-1">Time tracking is only available in the desktop application.</p>
+            <Button variant="outline" className="mt-2" size="sm">
+              <Download className="mr-1 h-4 w-4" /> Download Desktop App
+            </Button>
+          </div>
+        )}
+        
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="w-full sm:w-2/3">
             <Select
               value={selectedTaskId || ""}
               onValueChange={(value) => setSelectedTaskId(value)}
-              disabled={isTracking}
+              disabled={isTracking || !canTrack}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select a task" />
@@ -107,6 +109,7 @@ export function TaskSelector() {
                 variant="destructive" 
                 className="w-full" 
                 onClick={handleStopTracking}
+                disabled={!canTrack}
               >
                 Stop Tracking
               </Button>
@@ -115,7 +118,7 @@ export function TaskSelector() {
                 variant="default" 
                 className="w-full" 
                 onClick={handleStartTracking}
-                disabled={!selectedTaskId}
+                disabled={!selectedTaskId || !canTrack}
               >
                 Start Tracking
               </Button>
@@ -127,6 +130,12 @@ export function TaskSelector() {
           <div className="text-sm text-green-600 flex items-center">
             <div className="h-2 w-2 rounded-full bg-green-600 mr-2 animate-pulse"></div>
             Currently tracking activity
+          </div>
+        )}
+        
+        {!isTracking && canTrack && (
+          <div className="text-sm text-gray-500">
+            Select a task and start tracking to record your time
           </div>
         )}
       </div>
