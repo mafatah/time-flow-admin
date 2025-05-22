@@ -42,11 +42,11 @@ npm run dev
 This project uses Supabase. You can create a `.env` file in the project root with the following variables:
 
 ```bash
-SUPABASE_URL=https://fkpiqcxkmrtaetvfgcli.supabase.co
-SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4
+SUPABASE_URL=https://your-supabase-url
+SUPABASE_PUBLISHABLE_KEY=your-supabase-key
 ```
 
-Note: The application includes fallback values for these variables if they're not provided in the environment, so it will work in environments with limited configuration options.
+Ensure these variables are set in your environment before running the application.
 
 **Edit a file directly in GitHub**
 
