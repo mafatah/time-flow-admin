@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "electron-builder",
     "build:dev": "vite build --mode development",
-    "lint": "eslint -c .eslintrc.js .",
+    "lint": "eslint .",
     "preview": "vite preview",
     "electron:build": "electron-builder",
     "build:web": "tsc -p tsconfig.app.json",
