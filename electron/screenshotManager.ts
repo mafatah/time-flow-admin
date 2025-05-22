@@ -6,14 +6,40 @@ import { supabase } from '../src/lib/supabase';
 import { queueScreenshot } from './unsyncedManager';
 import { logError, showError } from './errorHandler';
 
+const UNSYNCED_LIST_PATH = path.join(app.getPath('userData'), 'unsynced_screenshots.json');
+
+function loadQueue(): QueueItem[] {
+  try {
+    if (fs.existsSync(UNSYNCED_LIST_PATH)) {
+      return JSON.parse(fs.readFileSync(UNSYNCED_LIST_PATH, 'utf8')) as QueueItem[];
+    }
+  } catch (err) {
+    logError('loadQueue', err);
+  }
+  return [];
+}
+
+function saveQueue(items: QueueItem[]) {
+  try {
+    fs.writeFileSync(UNSYNCED_LIST_PATH, JSON.stringify(items));
+  } catch (err) {
+    logError('saveQueue', err);
+  }
+}
+
 interface QueueItem {
   path: string;
+  userId: string;
   taskId: string;
   timestamp: number;
 }
 
-const queue: QueueItem[] = [];
+const queue: QueueItem[] = loadQueue();
 let retryInterval: NodeJS.Timeout | null = null;
+
+if (queue.length > 0) {
+  startRetry();
+}
 
 export async function captureAndUpload(userId: string, taskId: string) {
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -37,8 +63,9 @@ export async function captureAndUpload(userId: string, taskId: string) {
     const dest = path.join(unsyncedDir, filename);
     fs.copyFileSync(tempPath, dest);
     fs.unlink(tempPath, () => {});
-    queue.push({ path: dest, taskId, timestamp: Date.now() });
-    startRetry(userId);
+    queue.push({ path: dest, userId, taskId, timestamp: Date.now() });
+    saveQueue(queue);
+    startRetry();
   }
 }
 
@@ -72,18 +99,19 @@ async function uploadScreenshot(filePath: string, userId: string, taskId: string
   }
 }
 
-function startRetry(userId: string) {
+function startRetry() {
   if (retryInterval) return;
-  retryInterval = setInterval(() => processQueue(userId), 30000);
+  retryInterval = setInterval(processQueue, 30000);
 }
 
-async function processQueue(userId: string) {
+export async function processQueue() {
   for (const item of [...queue]) {
     try {
-      await uploadScreenshot(item.path, userId, item.taskId, item.timestamp);
+      await uploadScreenshot(item.path, item.userId, item.taskId, item.timestamp);
       fs.unlink(item.path, () => {});
       const index = queue.indexOf(item);
       if (index !== -1) queue.splice(index, 1);
+      saveQueue(queue);
     } catch (err) {
       logError('processQueue', err);
       // keep in queue

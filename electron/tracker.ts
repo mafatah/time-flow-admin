@@ -1,8 +1,8 @@
 import { supabase } from '../src/lib/supabase';
 import { nanoid } from 'nanoid';
 import { startIdleMonitoring, stopIdleMonitoring } from './idleMonitor';
-import { captureAndUpload } from './screenshotManager';
-import { queueTimeLog, processQueue } from './unsyncedManager';
+import { captureAndUpload, processQueue as processScreenshotQueue } from './screenshotManager';
+import { queueTimeLog, processQueue as processUnsyncedQueue } from './unsyncedManager';
 import { captureAppLog } from './appLogsManager';
 import { screenshotIntervalSeconds } from './config';
 import {
@@ -175,7 +175,8 @@ export async function stopTracking() {
 
 // Sync offline data when online
 export async function syncOfflineData() {
-  await processQueue();
+  await processUnsyncedQueue();
+  await processScreenshotQueue();
 }
 
 // Load a saved session from disk
