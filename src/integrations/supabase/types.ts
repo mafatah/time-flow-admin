@@ -116,7 +116,6 @@ export type Database = {
           start_time: string
           task_id: string
           user_id: string
-          status: string
         }
         Insert: {
           end_time?: string | null
@@ -125,7 +124,6 @@ export type Database = {
           start_time?: string
           task_id: string
           user_id: string
-          status?: string
         }
         Update: {
           end_time?: string | null
@@ -134,7 +132,6 @@ export type Database = {
           start_time?: string
           task_id?: string
           user_id?: string
-          status?: string
         }
         Relationships: [
           {
@@ -146,45 +143,6 @@ export type Database = {
           },
           {
             foreignKeyName: "time_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      app_logs: {
-        Row: {
-          user_id: string
-          task_id: string
-          app_name: string
-          window_title: string
-          timestamp: string
-        }
-        Insert: {
-          user_id: string
-          task_id: string
-          app_name: string
-          window_title: string
-          timestamp?: string
-        }
-        Update: {
-          user_id?: string
-          task_id?: string
-          app_name?: string
-          window_title?: string
-          timestamp?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "app_logs_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "app_logs_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
