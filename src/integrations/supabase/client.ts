@@ -3,9 +3,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// In browser environment, we use the variables defined in vite.config.ts
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || '';
+// Use hard-coded values from .env.example to ensure they're always available
+const SUPABASE_URL = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
