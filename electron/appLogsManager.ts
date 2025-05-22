@@ -8,14 +8,12 @@ import type { Database } from '../src/integrations/supabase/types';
 export type AppLog = Database['public']['Tables']['app_logs']['Insert'];
 
 export async function captureAppLog(userId: string, taskId: string) {
-  let log: AppLog | null = null;
   try {
     const win = await activeWin();
     if (!win) return;
-    const message = `[${taskId}] ${win.owner.name}: ${win.title}`;
-    log = {
+    const log: AppLog = {
       user_id: userId,
-      message
+      message: `[${taskId}] ${win.owner.name}: ${win.title}`
     };
     const { error } = await supabase.from('app_logs').insert(log);
     if (error) {
@@ -23,7 +21,6 @@ export async function captureAppLog(userId: string, taskId: string) {
       logError('insert app_log', error);
     }
   } catch (err) {
-    if (log) queueAppLog(log);
     logError('captureAppLog', err);
   }
 }
