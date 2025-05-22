@@ -1,6 +1,6 @@
 import { supabase } from '../src/lib/supabase';
 import { nanoid } from 'nanoid';
-import { startIdleTracker, stopIdleTracker, setCurrentTimeLog } from './idleTracker';
+import { startIdleMonitoring, stopIdleMonitoring } from './idleMonitor';
 import { captureAndUpload } from './screenshotManager';
 import { queueTimeLog, processQueue } from './unsyncedManager';
 import { captureAppLog } from './appLogsManager';
@@ -30,6 +30,35 @@ export function setUserId(id: string) {
 // Set the current task ID for tracking
 export function setTaskId(id: string) {
   currentTaskId = id;
+}
+
+// Update the current time log's idle status
+export async function updateTimeLogStatus(idle: boolean) {
+  if (!currentTimeLogId) return;
+  try {
+    const { error } = await supabase
+      .from('time_logs')
+      .update({ is_idle: idle, status: idle ? 'idle' : 'active' })
+      .eq('id', currentTimeLogId);
+    if (error) {
+      queueTimeLog({
+        id: currentTimeLogId,
+        user_id: userId!,
+        task_id: currentTaskId!,
+        status: idle ? 'idle' : 'active',
+        is_idle: idle
+      });
+    }
+  } catch (err) {
+    console.error('Failed to update idle status:', err);
+    queueTimeLog({
+      id: currentTimeLogId,
+      user_id: userId!,
+      task_id: currentTaskId!,
+      status: idle ? 'idle' : 'active',
+      is_idle: idle
+    });
+  }
 }
 
 // Start tracking activities
@@ -82,8 +111,7 @@ export async function startTracking() {
     time_log_id: currentTimeLogId
   };
   storeSession(session);
-  setCurrentTimeLog(currentTimeLogId);
-  startIdleTracker();
+  startIdleMonitoring();
 
   if (!screenshotInterval) {
     screenshotInterval = setInterval(() => {
@@ -113,8 +141,7 @@ export async function stopTracking() {
     appInterval = undefined;
   }
 
-  stopIdleTracker();
-  setCurrentTimeLog(null);
+  stopIdleMonitoring();
   if (currentTimeLogId) {
     try {
       const { error } = await supabase
