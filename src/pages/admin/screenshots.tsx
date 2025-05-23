@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,14 +54,10 @@ export default function AdminScreenshots() {
       if (usersResponse.data) setUsers(usersResponse.data);
       if (projectsResponse.data) setProjects(projectsResponse.data);
 
-      // Build query for screenshots
+      // Build query for screenshots with manual joins
       let query = supabase
         .from("screenshots")
-        .select(`
-          *,
-          users(full_name, email),
-          projects(name)
-        `)
+        .select("*")
         .gte('timestamp', format(selectedDate, 'yyyy-MM-dd'))
         .lt('timestamp', format(new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd'))
         .order('timestamp', { ascending: false });
@@ -75,11 +70,25 @@ export default function AdminScreenshots() {
         query = query.eq('project_id', selectedProject);
       }
 
-      const { data, error } = await query;
+      const { data: screenshotsData, error } = await query;
 
       if (error) throw error;
-      setScreenshots(data || []);
+
+      // Manually join user and project data
+      const enrichedScreenshots = (screenshotsData || []).map(screenshot => {
+        const user = usersResponse.data?.find(u => u.id === screenshot.user_id);
+        const project = projectsResponse.data?.find(p => p.id === screenshot.project_id);
+        
+        return {
+          ...screenshot,
+          users: user ? { full_name: user.full_name, email: user.email } : undefined,
+          projects: project ? { name: project.name } : undefined
+        };
+      });
+
+      setScreenshots(enrichedScreenshots);
     } catch (error: any) {
+      console.error("Error fetching screenshots:", error);
       toast({
         title: "Error fetching screenshots",
         description: error.message,

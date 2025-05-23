@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,14 +54,10 @@ export default function AdminIdleLogs() {
       if (usersResponse.data) setUsers(usersResponse.data);
       if (projectsResponse.data) setProjects(projectsResponse.data);
 
-      // Build query for idle logs
+      // Build query for idle logs with manual joins
       let query = supabase
         .from("idle_logs")
-        .select(`
-          *,
-          users(full_name, email),
-          projects(name)
-        `)
+        .select("*")
         .gte('idle_start', format(selectedDate, 'yyyy-MM-dd'))
         .lt('idle_start', format(new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd'))
         .order('idle_start', { ascending: false });
@@ -75,11 +70,25 @@ export default function AdminIdleLogs() {
         query = query.eq('project_id', selectedProject);
       }
 
-      const { data, error } = await query;
+      const { data: idleLogsData, error } = await query;
 
       if (error) throw error;
-      setIdleLogs(data || []);
+
+      // Manually join user and project data
+      const enrichedLogs = (idleLogsData || []).map(log => {
+        const user = usersResponse.data?.find(u => u.id === log.user_id);
+        const project = projectsResponse.data?.find(p => p.id === log.project_id);
+        
+        return {
+          ...log,
+          users: user ? { full_name: user.full_name, email: user.email } : undefined,
+          projects: project ? { name: project.name } : undefined
+        };
+      });
+
+      setIdleLogs(enrichedLogs);
     } catch (error: any) {
+      console.error("Error fetching idle logs:", error);
       toast({
         title: "Error fetching idle logs",
         description: error.message,
