@@ -16,6 +16,8 @@ import {
   Menu,
   X,
   Settings,
+  Timer,
+  ClipboardList,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
@@ -50,9 +52,15 @@ export function Sidebar({ className }: SidebarProps) {
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
     },
     {
-      title: "Time Tracking",
-      href: "/time-tracking",
-      icon: Clock,
+      title: "Time Tracker",
+      href: "/time-tracker",
+      icon: Timer,
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
+    },
+    {
+      title: "Time Reports",
+      href: "/time-reports",
+      icon: ClipboardList,
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
     },
     {

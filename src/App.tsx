@@ -15,7 +15,8 @@ import LoginPage from "@/pages/auth/login";
 import Dashboard from "@/pages/dashboard";
 import UsersPage from "@/pages/users/users-management";
 import ProjectsPage from "@/pages/projects";
-import TimeTrackingPage from "@/pages/time-tracking/time-logs";
+import TimeTrackerPage from "@/pages/time-tracker";
+import TimeReportsPage from "@/pages/time-reports";
 import ScreenshotsPage from "@/pages/screenshots/screenshots-viewer";
 import CalendarPage from "@/pages/calendar";
 import ReportsPage from "@/pages/reports";
@@ -97,7 +98,8 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
         <Route path="/projects" element={<ProjectsPage />} />
-        <Route path="/time-tracking" element={<TimeTrackingPage />} />
+        <Route path="/time-tracker" element={<TimeTrackerPage />} />
+        <Route path="/time-reports" element={<TimeReportsPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/screenshots" element={<ScreenshotsPage />} />
