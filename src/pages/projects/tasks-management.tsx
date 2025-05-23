@@ -11,7 +11,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { z } from "zod";
-import { Tables } from "@/integrations/supabase/types";
 import { PageHeader } from "@/components/layout/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -37,7 +36,12 @@ interface User {
   email: string;
 }
 
-interface Task extends Tables<"tasks"> {
+interface Task {
+  id: string;
+  name: string;
+  user_id: string;
+  project_id: string;
+  created_at: string;
   projects?: {
     name: string;
   };
@@ -89,7 +93,7 @@ export default function TasksManagement() {
           .order('created_at', { ascending: false });
         
         if (tasksError) throw tasksError;
-        setTasks(tasksData || []);
+        setTasks((tasksData as any) || []);
         
         // Fetch projects
         const { data: projectsData, error: projectsError } = await supabase
@@ -189,7 +193,7 @@ export default function TasksManagement() {
 
         // Add new task to state
         if (data && data.length > 0) {
-          setTasks([data[0], ...tasks]);
+          setTasks([(data[0] as any), ...tasks]);
         }
       }
 

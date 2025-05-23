@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,15 +65,15 @@ interface ActiveUserData {
   users: {
     id: string;
     full_name: string;
-  }[];
+  };
   tasks: {
     id: string;
     name: string;
     projects: {
       id: string;
       name: string;
-    }[];
-  }[];
+    };
+  };
 }
 
 export default function DashboardContent() {
@@ -172,7 +171,7 @@ export default function DashboardContent() {
         }
         
         // Process time logs
-        (timeLogs as unknown as TimeLog[] | null)?.forEach((log: TimeLog) => {
+        timeLogs?.forEach((log: any) => {
           const startTime = new Date(log.start_time);
           const endTime = log.end_time ? new Date(log.end_time) : new Date();
           const durationMinutes = differenceInMinutes(endTime, startTime);
@@ -225,14 +224,12 @@ export default function DashboardContent() {
         const uniqueActiveUsers = new Map<string, ActiveUser>();
         
         if (activeUsersData) {
-          (activeUsersData as unknown as ActiveUserData[]).forEach((item: ActiveUserData) => {
-            const user = Array.isArray(item.users) ? item.users[0] : item.users;
-            const task = Array.isArray(item.tasks) ? item.tasks[0] : item.tasks;
+          activeUsersData.forEach((item: any) => {
+            const user = item.users;
+            const task = item.tasks;
 
             if (user && task && !uniqueActiveUsers.has(item.user_id)) {
-              const project = Array.isArray(task.projects)
-                ? task.projects[0]
-                : task.projects;
+              const project = task.projects;
 
               uniqueActiveUsers.set(item.user_id, {
                 id: item.user_id,

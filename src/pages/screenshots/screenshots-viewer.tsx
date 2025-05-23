@@ -11,9 +11,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarUI } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/providers/auth-provider";
-import { Tables } from "@/integrations/supabase/types";
 
-interface ScreenshotWithRelations extends Tables<"screenshots"> {
+interface ScreenshotWithRelations {
+  id: string;
+  user_id: string;
+  task_id: string;
+  image_url: string;
+  captured_at: string;
   users?: {
     id: string;
     full_name: string;
@@ -78,7 +82,7 @@ export default function ScreenshotsViewer() {
         const { data, error } = await query.order('captured_at', { ascending: false });
 
         if (error) throw error;
-        setScreenshots(data || []);
+        setScreenshots((data as any) || []);
         
         // Fetch users if admin or manager
         if (userDetails?.role === 'admin' || userDetails?.role === 'manager') {

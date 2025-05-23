@@ -1,116 +1,87 @@
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { PageHeader } from "@/components/layout/page-header";
+import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loading } from "@/components/layout/loading";
-import { ErrorMessage } from "@/components/layout/error-message";
-import { getInitials, getUserRoleLabel, getUserRoleBadgeColor } from "@/lib/utils";
-import { Tables } from "@/integrations/supabase/types";
-import { UserPlus, MoreHorizontal, Search, UserX, Edit, Trash2 } from "lucide-react";
-import { useAuth } from "@/providers/auth-provider";
-import { useToast } from "@/components/ui/use-toast";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { supabase } from "@/lib/supabase";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { Loader2, Plus, Pencil, Trash2, Eye, BarChart3 } from "lucide-react";
+import { z } from "zod";
+import { PageHeader } from "@/components/layout/page-header";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/providers/auth-provider";
+import { differenceInMinutes, format, startOfWeek, endOfWeek } from "date-fns";
 
+// Form schema for creating/editing users
 const userFormSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
   full_name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  role: z.string().refine(val => ['admin', 'manager', 'employee'].includes(val), {
-    message: "Please select a valid role"
-  }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }).optional()
+  email: z.string().email({ message: "Please enter a valid email" }),
+  role: z.enum(["admin", "manager", "employee"], { message: "Please select a role" }),
 });
 
-export default function UsersPage() {
-  const { userDetails } = useAuth();
-  const { toast } = useToast();
-  const [users, setUsers] = useState<Tables<"users">[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+type UserFormValues = z.infer<typeof userFormSchema>;
 
-  const userForm = useForm<z.infer<typeof userFormSchema>>({
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  avatar_url?: string;
+}
+
+interface UserStats {
+  totalHours: number;
+  weeklyHours: number;
+  activeTasks: number;
+  screenshots: number;
+}
+
+export default function UsersPage() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const { toast } = useToast();
+  const { userDetails } = useAuth();
+
+  const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
-      email: "",
       full_name: "",
+      email: "",
       role: "employee",
-      password: ""
-    }
+    },
   });
 
-  useEffect(() => {
-    if (selectedUserId) {
-      const user = users.find(u => u.id === selectedUserId);
-      if (user) {
-        userForm.setValue("email", user.email);
-        userForm.setValue("full_name", user.full_name);
-        userForm.setValue("role", user.role);
-        // Don't set password when editing
-      }
-    }
-  }, [selectedUserId, users, userForm]);
+  // Check if current user can manage users
+  const canManageUsers = userDetails?.role === 'admin' || userDetails?.role === 'manager';
 
+  // Fetch users
   useEffect(() => {
     async function fetchUsers() {
       try {
         setLoading(true);
-        
-        // Only fetch users if current user is admin or manager
-        if (userDetails?.role !== 'admin' && userDetails?.role !== 'manager') {
-          setError("You don't have permission to view users");
-          return;
-        }
-        
         const { data, error } = await supabase
           .from("users")
           .select("*")
-          .order("full_name");
-        
+          .order('full_name');
+
         if (error) throw error;
-        
         setUsers(data || []);
-        setError(null);
-      } catch (err: any) {
-        console.error("Error fetching users:", err);
-        setError("Failed to load users. Please try again later.");
+      } catch (error: any) {
         toast({
-          title: "Error",
-          description: err.message || "Failed to load users",
-          variant: "destructive"
+          title: "Error fetching users",
+          description: error.message,
+          variant: "destructive",
         });
       } finally {
         setLoading(false);
@@ -118,310 +89,383 @@ export default function UsersPage() {
     }
 
     fetchUsers();
-  }, [userDetails, toast]);
+  }, [toast]);
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  async function handleAddUser(values: z.infer<typeof userFormSchema>) {
+  // Fetch user statistics
+  async function fetchUserStats(userId: string) {
+    if (!userId) return;
+    
     try {
-      if (!values.password && !isEditing) {
-        toast({
-          title: "Error",
-          description: "Password is required for new users",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      if (isEditing) {
+      setStatsLoading(true);
+      const startOfThisWeek = startOfWeek(new Date());
+      const endOfThisWeek = endOfWeek(new Date());
+
+      // Get time logs for total hours
+      const { data: timeLogs, error: timeLogsError } = await supabase
+        .from("time_logs")
+        .select("*")
+        .eq("user_id", userId);
+
+      if (timeLogsError) throw timeLogsError;
+
+      // Get weekly time logs
+      const { data: weeklyLogs, error: weeklyError } = await supabase
+        .from("time_logs")
+        .select("*")
+        .eq("user_id", userId)
+        .gte("start_time", startOfThisWeek.toISOString())
+        .lte("start_time", endOfThisWeek.toISOString());
+
+      if (weeklyError) throw weeklyError;
+
+      // Get active tasks count
+      const { data: tasks, error: tasksError } = await supabase
+        .from("tasks")
+        .select("id")
+        .eq("user_id", userId);
+
+      if (tasksError) throw tasksError;
+
+      // Get screenshots count
+      const { data: screenshots, error: screenshotsError } = await supabase
+        .from("screenshots")
+        .select("id")
+        .eq("user_id", userId);
+
+      if (screenshotsError) throw screenshotsError;
+
+      // Calculate total hours
+      let totalHours = 0;
+      timeLogs?.forEach((log) => {
+        const startTime = new Date(log.start_time);
+        const endTime = log.end_time ? new Date(log.end_time) : new Date();
+        const durationMinutes = differenceInMinutes(endTime, startTime);
+        totalHours += durationMinutes / 60;
+      });
+
+      // Calculate weekly hours
+      let weeklyHours = 0;
+      weeklyLogs?.forEach((log) => {
+        const startTime = new Date(log.start_time);
+        const endTime = log.end_time ? new Date(log.end_time) : new Date();
+        const durationMinutes = differenceInMinutes(endTime, startTime);
+        weeklyHours += durationMinutes / 60;
+      });
+
+      setUserStats({
+        totalHours,
+        weeklyHours,
+        activeTasks: tasks?.length || 0,
+        screenshots: screenshots?.length || 0,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error fetching user statistics",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setStatsLoading(false);
+    }
+  }
+
+  // Handle form submission
+  async function onSubmit(values: UserFormValues) {
+    try {
+      if (editingUser) {
         // Update existing user
         const { error } = await supabase
           .from("users")
           .update({
             full_name: values.full_name,
-            role: values.role
+            email: values.email,
+            role: values.role,
           })
-          .eq("id", selectedUserId);
-        
+          .eq("id", editingUser.id);
+
         if (error) throw error;
-        
+
+        toast({
+          title: "User updated",
+          description: "The user has been updated successfully",
+        });
+
         // Update local state
-        setUsers(prev => prev.map(user => 
-          user.id === selectedUserId 
-            ? { ...user, full_name: values.full_name, role: values.role }
-            : user
-        ));
-        
-        toast({
-          title: "Success",
-          description: "User updated successfully"
-        });
+        setUsers(
+          users.map((u) =>
+            u.id === editingUser.id ? { ...u, ...values } : u
+          )
+        );
       } else {
-        // Create new user
-        const { data, error } = await supabase.auth.signUp({
-          email: values.email,
-          password: values.password!,
-          options: {
-            data: {
-              full_name: values.full_name,
-              role: values.role
-            }
-          }
-        });
-        
-        if (error) throw error;
-        
         toast({
-          title: "Success",
-          description: "User created successfully"
+          title: "User creation not supported",
+          description: "Please use Supabase Auth to create new users",
+          variant: "destructive",
         });
       }
-      
+
       // Reset form and close dialog
-      userForm.reset();
-      setIsAddUserOpen(false);
-      setIsEditing(false);
-      setSelectedUserId(null);
-      
-    } catch (err: any) {
-      console.error("Error managing user:", err);
+      form.reset();
+      setIsDialogOpen(false);
+      setEditingUser(null);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: err.message || "Failed to manage user",
-        variant: "destructive"
+        description: error.message,
+        variant: "destructive",
       });
     }
   }
 
-  async function handleDeleteUser(userId: string) {
+  // Handle delete user
+  async function handleDeleteUser(id: string) {
+    if (!id) return;
+    
     try {
-      if (!confirm("Are you sure you want to delete this user?")) {
-        return;
-      }
-      
-      const { error } = await supabase
-        .from("users")
-        .delete()
-        .eq("id", userId);
-      
+      const { error } = await supabase.from("users").delete().eq("id", id);
+
       if (error) throw error;
-      
-      // Update local state
-      setUsers(prev => prev.filter(user => user.id !== userId));
-      
+
       toast({
-        title: "Success",
-        description: "User deleted successfully"
+        title: "User deleted",
+        description: "The user has been deleted successfully",
       });
-    } catch (err: any) {
-      console.error("Error deleting user:", err);
+
+      // Remove from local state
+      setUsers(users.filter((u) => u.id !== id));
+    } catch (error: any) {
       toast({
-        title: "Error",
-        description: err.message || "Failed to delete user",
-        variant: "destructive"
+        title: "Error deleting user",
+        description: error.message,
+        variant: "destructive",
       });
     }
   }
 
-  if (loading) return <Loading message="Loading users..." />;
-  if (error) return <ErrorMessage message={error} />;
+  // Open dialog for editing
+  function handleEditUser(user: User) {
+    setEditingUser(user);
+    form.reset({
+      full_name: user.full_name,
+      email: user.email,
+      role: user.role as "admin" | "manager" | "employee",
+    });
+    setIsDialogOpen(true);
+  }
+
+  // View user stats
+  function handleViewUserStats(userId: string) {
+    setSelectedUserId(userId);
+    fetchUserStats(userId);
+  }
 
   return (
-    <>
-      <PageHeader 
-        title="Users" 
-        subtitle="Manage and monitor your team members"
-      >
-        <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => {
-              setIsEditing(false);
-              setSelectedUserId(null);
-              userForm.reset({
-                email: "",
-                full_name: "",
-                role: "employee",
-                password: ""
-              });
-            }}>
-              <UserPlus className="mr-2 h-4 w-4" /> Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{isEditing ? "Edit User" : "Add New User"}</DialogTitle>
-              <DialogDescription>
-                {isEditing 
-                  ? "Update user details below." 
-                  : "Fill in the details to create a new user account."}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...userForm}>
-              <form onSubmit={userForm.handleSubmit(handleAddUser)} className="space-y-4">
-                <FormField
-                  control={userForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="user@example.com" 
-                          {...field} 
-                          disabled={isEditing}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={userForm.control}
-                  name="full_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Smith" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={userForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="manager">Manager</SelectItem>
-                          <SelectItem value="employee">Employee</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {!isEditing && (
-                  <FormField
-                    control={userForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                <DialogFooter>
-                  <Button type="submit">
-                    {isEditing ? "Update User" : "Create User"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </PageHeader>
+    <div className="container py-6">
+      <PageHeader
+        title="User Management"
+        subtitle="Manage users and view their activity"
+      />
 
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search users..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      <div className="grid gap-6 md:grid-cols-3 mt-6">
+        <div className="md:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : users.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-8 text-center">
+                  <p className="text-muted-foreground">No users found</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead className="w-[120px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.full_name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            user.role === 'admin' ? 'bg-red-100 text-red-800' :
+                            user.role === 'manager' ? 'bg-blue-100 text-blue-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {user.role}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewUserStats(user.id)}
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                            </Button>
+                            {canManageUsers && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEditUser(user)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete user</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete "{user.full_name}"? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteUser(user.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div>
+          <Card>
+            <CardHeader>
+              <CardTitle>User Statistics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!selectedUserId ? (
+                <p className="text-muted-foreground text-sm">
+                  Select a user to view their statistics
+                </p>
+              ) : statsLoading ? (
+                <div className="flex justify-center p-4">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : userStats ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium">Total Hours</p>
+                    <p className="text-2xl font-bold">{userStats.totalHours.toFixed(1)}h</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">This Week</p>
+                    <p className="text-2xl font-bold">{userStats.weeklyHours.toFixed(1)}h</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Active Tasks</p>
+                    <p className="text-2xl font-bold">{userStats.activeTasks}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Screenshots</p>
+                    <p className="text-2xl font-bold">{userStats.screenshots}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  No statistics available for this user
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredUsers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                  No users found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>
-                          {getInitials(user.full_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      {user.full_name}
-                    </div>
-                  </TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={getUserRoleBadgeColor(user.role)}
-                    >
-                      {getUserRoleLabel(user.role)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Open menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => {
-                          setIsEditing(true);
-                          setSelectedUserId(user.id);
-                          setIsAddUserOpen(true);
-                        }}>
-                          <Edit className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteUser(user.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </>
+      {/* Edit User Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="full_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter full name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter email" type="email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="employee">Employee</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="submit">Update User</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
