@@ -1,0 +1,6 @@
+{
+  "user_id": "uuid_here",
+  "project_id": "optional_project_id",
+  "supabase_url": "https://fkpiqcxkmrtaetvfgcli.supabase.co",
+  "supabase_key": "your-anon-key"
+}

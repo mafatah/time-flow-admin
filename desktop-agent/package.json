@@ -1,0 +1,14 @@
+{
+  "name": "desktop-agent",
+  "version": "1.0.0",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^28.3.3",
+    "screenshot-desktop": "^1.14.0",
+    "node-desktop-idle": "^1.0.3",
+    "@supabase/supabase-js": "^2.49.8"
+  }
+}
