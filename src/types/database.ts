@@ -1,4 +1,3 @@
-
 export type Json =
   | string
   | number
@@ -28,6 +27,33 @@ export type Database = {
           user_id?: string
           message?: string
           created_at?: string
+        }
+        Relationships: []
+      }
+      idle_logs: {
+        Row: {
+          id: string
+          user_id: string
+          project_id: string
+          idle_start: string
+          idle_end: string | null
+          duration_minutes: number | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          project_id: string
+          idle_start: string
+          idle_end?: string | null
+          duration_minutes?: number | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          project_id?: string
+          idle_start?: string
+          idle_end?: string | null
+          duration_minutes?: number | null
         }
         Relationships: []
       }
@@ -246,3 +272,24 @@ export type Enums<
   : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
   ? Database["public"]["Enums"][PublicEnumNameOrOptions]
   : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof Database["public"]["CompositeTypes"]
+    | { schema: keyof Database },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof Database["public"]["CompositeTypes"]
+    ? Database["public"]["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const
