@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/layout/page-header";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon, User, Briefcase } from "lucide-react";
@@ -15,8 +14,8 @@ import { Calendar as CalendarIcon, User, Briefcase } from "lucide-react";
 interface Screenshot {
   id: string;
   user_id: string;
-  task_id: string; // This matches the actual database schema
-  captured_at: string; // This matches the actual database schema
+  task_id: string;
+  captured_at: string;
   image_url: string;
   users?: {
     full_name: string;
