@@ -105,10 +105,10 @@ export async function startTracking() {
   }
 
   const session: SessionData = {
-    task_id: currentTaskId,
-    user_id: userId,
+    task_id: currentTaskId!,
+    user_id: userId!,
     start_time: new Date().toISOString(),
-    time_log_id: currentTimeLogId
+    time_log_id: currentTimeLogId!
   };
   storeSession(session);
   startIdleMonitoring();
