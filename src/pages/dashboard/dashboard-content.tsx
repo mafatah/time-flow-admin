@@ -45,6 +45,37 @@ interface DashboardStats {
   activityData: ActivityDataPoint[];
 }
 
+// Define interfaces for Supabase response types
+interface TimeLogTask {
+  name: string;
+  projects: {
+    name: string;
+  };
+}
+
+interface TimeLog {
+  start_time: string;
+  end_time: string | null;
+  is_idle: boolean;
+  tasks: TimeLogTask;
+}
+
+interface ActiveUserData {
+  user_id: string;
+  users: {
+    id: string;
+    full_name: string;
+  };
+  tasks: {
+    id: string;
+    name: string;
+    projects: {
+      id: string;
+      name: string;
+    };
+  };
+}
+
 export default function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
@@ -140,7 +171,7 @@ export default function DashboardContent() {
         }
         
         // Process time logs
-        timeLogs?.forEach(log => {
+        timeLogs?.forEach((log: TimeLog) => {
           const startTime = new Date(log.start_time);
           const endTime = log.end_time ? new Date(log.end_time) : new Date();
           const durationMinutes = differenceInMinutes(endTime, startTime);
@@ -193,7 +224,7 @@ export default function DashboardContent() {
         const uniqueActiveUsers = new Map<string, ActiveUser>();
         
         if (activeUsersData) {
-          activeUsersData.forEach(item => {
+          activeUsersData.forEach((item: ActiveUserData) => {
             // Make sure we have users object with full_name and tasks object with name and projects
             if (item.users && item.tasks && !uniqueActiveUsers.has(item.user_id)) {
               uniqueActiveUsers.set(item.user_id, {
