@@ -61,19 +61,20 @@ interface TimeLog {
 }
 
 interface ActiveUserData {
+  id: string;
   user_id: string;
   users: {
     id: string;
     full_name: string;
-  };
+  }[];
   tasks: {
     id: string;
     name: string;
     projects: {
       id: string;
       name: string;
-    };
-  };
+    }[];
+  }[];
 }
 
 export default function DashboardContent() {
@@ -225,13 +226,19 @@ export default function DashboardContent() {
         
         if (activeUsersData) {
           activeUsersData.forEach((item: ActiveUserData) => {
-            // Make sure we have users object with full_name and tasks object with name and projects
-            if (item.users && item.tasks && !uniqueActiveUsers.has(item.user_id)) {
+            const user = Array.isArray(item.users) ? item.users[0] : item.users;
+            const task = Array.isArray(item.tasks) ? item.tasks[0] : item.tasks;
+
+            if (user && task && !uniqueActiveUsers.has(item.user_id)) {
+              const project = Array.isArray(task.projects)
+                ? task.projects[0]
+                : task.projects;
+
               uniqueActiveUsers.set(item.user_id, {
                 id: item.user_id,
-                name: item.users.full_name,
-                task: item.tasks.name,
-                project: item.tasks.projects?.name || 'Unknown'
+                name: user.full_name,
+                task: task.name,
+                project: project?.name || 'Unknown'
               });
             }
           });
