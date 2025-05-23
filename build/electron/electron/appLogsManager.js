@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.captureAppLog = captureAppLog;
-const supabase_1 = require("../src/lib/supabase");
+const supabase_1 = require("./supabase");
 const active_win_1 = __importDefault(require("active-win"));
 const unsyncedManager_1 = require("./unsyncedManager");
 const errorHandler_1 = require("./errorHandler");
