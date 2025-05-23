@@ -49,19 +49,47 @@ export default function TimeTracker() {
       setLoading(true);
       
       // Load tasks with projects
-      const { data: tasksData, error: tasksError } = await supabase
+      let tasksQuery = supabase
         .from('tasks')
         .select(`
           id,
           name,
+          user_id,
           projects(id, name)
-        `)
-        .order('name');
+        `);
       
-      if (tasksError) throw tasksError;
+      // For admins and managers, show all tasks
+      // For employees, show only their tasks
+      if (userDetails?.role === 'employee') {
+        tasksQuery = tasksQuery.eq('user_id', userDetails.id);
+      }
+      
+      const { data: tasksData, error: tasksError } = await tasksQuery.order('name');
+      
+      if (tasksError) {
+        console.error('Tasks query error:', tasksError);
+        throw tasksError;
+      }
+      
+      console.log('Loaded tasks:', tasksData);
+      console.log('User role:', userDetails?.role);
+      console.log('User ID:', userDetails?.id);
+      
       setTasks(tasksData || []);
       
+      // If no tasks found, show a helpful message
+      if (!tasksData || tasksData.length === 0) {
+        toast({
+          title: "No tasks available",
+          description: userDetails?.role === 'admin' 
+            ? "No tasks exist in the system. Create some tasks first in Projects > Tasks Management." 
+            : "No tasks assigned to you. Contact your admin to assign tasks.",
+          variant: "default",
+        });
+      }
+      
     } catch (error: any) {
+      console.error('Error loading tasks:', error);
       toast({
         title: "Error loading data",
         description: error.message,
