@@ -6,7 +6,7 @@
   "main": "build/electron/main.cjs",
   "scripts": {
     "start": "concurrently \"npm:dev\" \"npm:electron\"",
-    "electron": "tsc -p tsconfig.electron.json && mv build/electron/main.js build/electron/main.cjs && electron build/electron/main.cjs",
+    "electron": "tsc -p tsconfig.electron.json && [ -f build/electron/main.js ] && mv build/electron/main.js build/electron/main.cjs && electron build/electron/main.cjs || echo 'main.js not found'",
     "dev:electron": "ts-node-esm --project tsconfig.electron.json electron/main.ts",
     "dev": "vite",
     "build": "electron-builder",
