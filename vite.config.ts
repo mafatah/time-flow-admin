@@ -10,8 +10,8 @@ export default defineConfig(({ mode }) => {
   return {
     server: {
       host: "::",
-      port: 8080,
-      strictPort: true // Force port 8080, don't try alternatives
+      port: 8080
+      // Allow Vite to try alternative ports if 8080 is taken
     },
     plugins: [
       react(),

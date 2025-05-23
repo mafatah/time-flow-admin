@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
+import http from 'http';
 import { setUserId, setTaskId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } from './tracker';
 import { setupAutoLaunch } from './autoLaunch';
 import { initSystemMonitor } from './systemMonitor';
@@ -8,7 +9,7 @@ import { startSyncLoop } from './unsyncedManager';
 
 let mainWindow: BrowserWindow | null = null;
 
-function createWindow() {
+async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 800,
@@ -21,7 +22,53 @@ function createWindow() {
   const isDev = process.env.NODE_ENV !== 'production';
   
   if (isDev) {
-    const devUrl = 'http://localhost:8080';
+    // Try multiple ports to find where Vite is running
+    const tryPorts = [8080, 8081, 8082, 8083];
+    let devUrl = 'http://localhost:8080';
+    let foundPort = false;
+    
+    for (const port of tryPorts) {
+      try {
+        const testUrl = `http://localhost:${port}`;
+        
+        // Test if port is responding and serving Vite content
+        await new Promise<void>((resolve, reject) => {
+          const req = http.get(testUrl, (res: http.IncomingMessage) => {
+            if (res.statusCode === 200) {
+              let data = '';
+              res.on('data', chunk => {
+                data += chunk;
+              });
+              res.on('end', () => {
+                // Check if response contains Vite characteristics
+                if (data.includes('vite') || data.includes('__vite_dev__') || data.includes('react')) {
+                  devUrl = testUrl;
+                  foundPort = true;
+                  resolve();
+                } else {
+                  reject(new Error(`Port ${port} not serving Vite content`));
+                }
+              });
+            } else {
+              reject(new Error(`Port ${port} returned status ${res.statusCode}`));
+            }
+          });
+          req.on('error', reject);
+          req.setTimeout(2000, () => reject(new Error(`Timeout for port ${port}`)));
+        });
+        
+        console.log(`Found Vite dev server on port ${port}`);
+        break;
+      } catch (e) {
+        console.log(`Port ${port} not available:`, e instanceof Error ? e.message : 'Unknown error');
+        continue;
+      }
+    }
+    
+    if (!foundPort) {
+      console.warn('No Vite dev server found on any port, using default port 8080');
+    }
+    
     console.log('Loading UI from dev server:', devUrl);
     mainWindow.loadURL(devUrl)
       .then(() => {
@@ -57,14 +104,14 @@ function createWindow() {
   mainWindow.webContents.openDevTools();
 }
 
-app.whenReady().then(() => {
-  createWindow();
+app.whenReady().then(async () => {
+  await createWindow();
   setupAutoLaunch().catch(err => console.error(err));
   initSystemMonitor();
   startSyncLoop();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  app.on('activate', async () => {
+    if (BrowserWindow.getAllWindows().length === 0) await createWindow();
   });
 });
 

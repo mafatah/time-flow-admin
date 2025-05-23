@@ -33,7 +33,7 @@ export function Sidebar({ className }: SidebarProps) {
   const sidebarItems = [
     {
       title: "Dashboard",
-      href: "/",
+      href: "/dashboard",
       icon: LayoutDashboard,
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
     },
