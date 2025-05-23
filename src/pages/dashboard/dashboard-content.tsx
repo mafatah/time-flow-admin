@@ -113,8 +113,8 @@ export default function DashboardContent() {
             tasks(name, projects(name))
           `);
           
-        if (!isAdmin) {
-          timeLogsQuery = timeLogsQuery.eq('user_id', userDetails?.id);
+        if (!isAdmin && userDetails?.id) {
+          timeLogsQuery = timeLogsQuery.eq('user_id', userDetails.id);
         }
         
         const { data: timeLogs, error: timeLogsError } = await timeLogsQuery;
@@ -150,8 +150,8 @@ export default function DashboardContent() {
           .from("tasks")
           .select('id');
           
-        if (!isAdmin) {
-          tasksQuery = tasksQuery.eq('user_id', userDetails?.id);
+        if (!isAdmin && userDetails?.id) {
+          tasksQuery = tasksQuery.eq('user_id', userDetails.id);
         }
           
         const { data: tasksData, error: tasksError } = await tasksQuery;
@@ -172,7 +172,7 @@ export default function DashboardContent() {
         }
         
         // Process time logs
-        timeLogs?.forEach((log: TimeLog) => {
+        (timeLogs as unknown as TimeLog[] | null)?.forEach((log: TimeLog) => {
           const startTime = new Date(log.start_time);
           const endTime = log.end_time ? new Date(log.end_time) : new Date();
           const durationMinutes = differenceInMinutes(endTime, startTime);
@@ -225,7 +225,7 @@ export default function DashboardContent() {
         const uniqueActiveUsers = new Map<string, ActiveUser>();
         
         if (activeUsersData) {
-          activeUsersData.forEach((item: ActiveUserData) => {
+          (activeUsersData as unknown as ActiveUserData[]).forEach((item: ActiveUserData) => {
             const user = Array.isArray(item.users) ? item.users[0] : item.users;
             const task = Array.isArray(item.tasks) ? item.tasks[0] : item.tasks;
 
