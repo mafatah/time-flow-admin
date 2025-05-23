@@ -15,7 +15,7 @@
     "preview": "vite preview",
     "electron:build": "electron-builder",
     "build:web": "tsc -p tsconfig.app.json",
-    "build:electron": "tsc -p tsconfig.electron.json && mv build/electron/main.js build/electron/main.cjs",
+    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && mv build/electron/main.js build/electron/main.cjs",
     "build:all": "npm run build:web && npm run build:electron"
   },
   "dependencies": {
