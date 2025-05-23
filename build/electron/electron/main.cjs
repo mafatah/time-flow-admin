@@ -22,6 +22,8 @@ function createWindow() {
     const indexPath = path_1.default.join(__dirname, '../dist/index.html');
     console.log('Loading UI from:', indexPath);
     mainWindow.loadFile(indexPath).catch(err => console.error('Failed to load UI:', err));
+    // Open DevTools for debugging
+    mainWindow.webContents.openDevTools();
 }
 electron_1.app.whenReady().then(() => {
     createWindow();
