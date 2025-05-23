@@ -42,8 +42,8 @@ function DashboardContent() {
             *,
             tasks(name, projects(name))
           `);
-                if (!isAdmin) {
-                    timeLogsQuery = timeLogsQuery.eq('user_id', userDetails?.id);
+                if (!isAdmin && userDetails?.id) {
+                    timeLogsQuery = timeLogsQuery.eq('user_id', userDetails.id);
                 }
                 const { data: timeLogs, error: timeLogsError } = await timeLogsQuery;
                 if (timeLogsError)
@@ -72,8 +72,8 @@ function DashboardContent() {
                 let tasksQuery = supabase_1.supabase
                     .from("tasks")
                     .select('id');
-                if (!isAdmin) {
-                    tasksQuery = tasksQuery.eq('user_id', userDetails?.id);
+                if (!isAdmin && userDetails?.id) {
+                    tasksQuery = tasksQuery.eq('user_id', userDetails.id);
                 }
                 const { data: tasksData, error: tasksError } = await tasksQuery;
                 if (tasksError)
@@ -139,12 +139,10 @@ function DashboardContent() {
                 const uniqueActiveUsers = new Map();
                 if (activeUsersData) {
                     activeUsersData.forEach((item) => {
-                        const user = Array.isArray(item.users) ? item.users[0] : item.users;
-                        const task = Array.isArray(item.tasks) ? item.tasks[0] : item.tasks;
+                        const user = item.users;
+                        const task = item.tasks;
                         if (user && task && !uniqueActiveUsers.has(item.user_id)) {
-                            const project = Array.isArray(task.projects)
-                                ? task.projects[0]
-                                : task.projects;
+                            const project = task.projects;
                             uniqueActiveUsers.set(item.user_id, {
                                 id: item.user_id,
                                 name: user.full_name,

@@ -4,7 +4,7 @@ const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const react_router_dom_1 = require("react-router-dom");
 const button_1 = require("@/components/ui/button");
-const supabase_1 = require("@/lib/supabase");
+const client_1 = require("@/integrations/supabase/client");
 const use_toast_1 = require("@/components/ui/use-toast");
 const Index = () => {
     const navigate = (0, react_router_dom_1.useNavigate)();
@@ -13,7 +13,7 @@ const Index = () => {
         // Check for an existing session
         const checkSession = async () => {
             try {
-                const { data, error } = await supabase_1.supabase.auth.getSession();
+                const { data, error } = await client_1.supabase.auth.getSession();
                 if (error) {
                     throw error;
                 }

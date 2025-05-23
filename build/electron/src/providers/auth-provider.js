@@ -4,7 +4,7 @@ exports.AuthProvider = AuthProvider;
 exports.useAuth = useAuth;
 const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
-const supabase_1 = require("@/lib/supabase");
+const client_1 = require("@/integrations/supabase/client");
 const use_toast_1 = require("@/components/ui/use-toast");
 const AuthContext = (0, react_1.createContext)(undefined);
 function AuthProvider({ children }) {
@@ -17,7 +17,7 @@ function AuthProvider({ children }) {
         async function getSession() {
             setLoading(true);
             // Set up auth state listener FIRST
-            const { data: { subscription } } = supabase_1.supabase.auth.onAuthStateChange((event, session) => {
+            const { data: { subscription } } = client_1.supabase.auth.onAuthStateChange((event, session) => {
                 setSession(session);
                 setUser(session?.user ?? null);
                 if (session?.user) {
@@ -31,7 +31,7 @@ function AuthProvider({ children }) {
                 }
             });
             // THEN check for existing session
-            const { data: { session }, error } = await supabase_1.supabase.auth.getSession();
+            const { data: { session }, error } = await client_1.supabase.auth.getSession();
             if (error) {
                 console.error("Error getting session:", error);
                 toast({
@@ -53,7 +53,7 @@ function AuthProvider({ children }) {
         getSession();
     }, [toast]);
     async function fetchUserDetails(userId) {
-        const { data, error } = await supabase_1.supabase
+        const { data, error } = await client_1.supabase
             .from("users")
             .select("*")
             .eq("id", userId)
@@ -66,7 +66,7 @@ function AuthProvider({ children }) {
     }
     async function signIn(email, password) {
         try {
-            const { error } = await supabase_1.supabase.auth.signInWithPassword({
+            const { error } = await client_1.supabase.auth.signInWithPassword({
                 email,
                 password,
             });
@@ -88,7 +88,7 @@ function AuthProvider({ children }) {
     }
     async function signOut() {
         try {
-            await supabase_1.supabase.auth.signOut();
+            await client_1.supabase.auth.signOut();
             toast({
                 title: "Successfully signed out",
             });

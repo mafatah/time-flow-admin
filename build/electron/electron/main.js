@@ -6,8 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
-const url_1 = require("url");
-const __dirname = path_1.default.dirname((0, url_1.fileURLToPath)(import.meta.url));
 const tracker_1 = require("./tracker");
 const autoLaunch_1 = require("./autoLaunch");
 const systemMonitor_1 = require("./systemMonitor");
