@@ -1,5 +1,5 @@
 
-import { supabase } from '../src/lib/supabase';
+import { supabase } from './supabase';
 import activeWin from 'active-win';
 import { queueAppLog } from './unsyncedManager';
 import { logError } from './errorHandler';

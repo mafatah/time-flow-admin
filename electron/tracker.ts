@@ -1,4 +1,4 @@
-import { supabase } from '../src/lib/supabase';
+import { supabase } from './supabase';
 import { nanoid } from 'nanoid';
 import { startIdleMonitoring, stopIdleMonitoring } from './idleMonitor';
 import { captureAndUpload, processQueue as processScreenshotQueue } from './screenshotManager';

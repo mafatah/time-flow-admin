@@ -1,7 +1,8 @@
+
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { supabase } from '../src/lib/supabase';
+import { supabase } from './supabase';
 import { logError } from './errorHandler';
 import type { Database } from '../src/types/database';
 
