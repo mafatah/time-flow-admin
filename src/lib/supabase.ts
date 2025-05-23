@@ -1,4 +1,2 @@
 
-import { supabase } from '../integrations/supabase/client';
-
-export { supabase };
+export { supabase } from "@/integrations/supabase/client";

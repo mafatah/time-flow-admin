@@ -7,81 +7,9 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
-      projects: {
-        Row: {
-          id: string
-          name: string
-          description: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          description?: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string
-          created_at?: string
-        }
-      }
-      tasks: {
-        Row: {
-          id: string
-          name: string
-          project_id: string
-          user_id: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          project_id: string
-          user_id: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          project_id?: string
-          user_id?: string
-          created_at?: string
-        }
-      }
-      time_logs: {
-        Row: {
-          id: string
-          user_id: string
-          task_id: string
-          start_time: string
-          end_time: string | null
-          is_idle: boolean
-          status: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          task_id: string
-          start_time?: string
-          end_time?: string | null
-          is_idle?: boolean
-          status?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          task_id?: string
-          start_time?: string
-          end_time?: string | null
-          is_idle?: boolean
-          status?: string
-        }
-      }
       app_logs: {
         Row: {
           id: string
@@ -101,6 +29,28 @@ export interface Database {
           message?: string
           created_at?: string
         }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: []
       }
       screenshots: {
         Row: {
@@ -124,6 +74,58 @@ export interface Database {
           image_url?: string
           captured_at?: string
         }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          id: string
+          user_id: string
+          project_id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          project_id: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          project_id?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      time_logs: {
+        Row: {
+          id: string
+          user_id: string
+          task_id: string
+          start_time: string
+          end_time: string | null
+          is_idle: boolean
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          task_id: string
+          start_time?: string
+          end_time?: string | null
+          is_idle?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          task_id?: string
+          start_time?: string
+          end_time?: string | null
+          is_idle?: boolean
+        }
+        Relationships: []
       }
       users: {
         Row: {
@@ -147,6 +149,7 @@ export interface Database {
           role?: string
           avatar_url?: string | null
         }
+        Relationships: []
       }
     }
     Views: {
@@ -158,9 +161,88 @@ export interface Database {
     Enums: {
       [_ in never]: never
     }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
 
-export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
-export type InsertTables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert']
-export type UpdateTables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update']
+export type Tables<
+  PublicTableNameOrOptions extends
+    | keyof (Database["public"]["Tables"] & Database["public"]["Views"])
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+        Database[PublicTableNameOrOptions["schema"]]["Views"])
+    : never = never
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : PublicTableNameOrOptions extends keyof (Database["public"]["Tables"] &
+      Database["public"]["Views"])
+  ? (Database["public"]["Tables"] &
+      Database["public"]["Views"])[PublicTableNameOrOptions] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : never
+
+export type TablesInsert<
+  PublicTableNameOrOptions extends
+    | keyof Database["public"]["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
+  ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : never
+
+export type TablesUpdate<
+  PublicTableNameOrOptions extends
+    | keyof Database["public"]["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
+  ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : never
+
+export type Enums<
+  PublicEnumNameOrOptions extends
+    | keyof Database["public"]["Enums"]
+    | { schema: keyof Database },
+  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+    : never = never
+> = PublicEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
+  ? Database["public"]["Enums"][PublicEnumNameOrOptions]
+  : never
