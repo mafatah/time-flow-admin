@@ -8,14 +8,19 @@ exports.stopTracking = stopTracking;
 exports.syncOfflineData = syncOfflineData;
 exports.loadSession = loadSession;
 exports.clearSavedSession = clearSavedSession;
-const supabase_1 = require("../src/lib/supabase");
-const nanoid_1 = require("nanoid");
-const idleMonitor_1 = require("./idleMonitor");
-const screenshotManager_1 = require("./screenshotManager");
-const unsyncedManager_1 = require("./unsyncedManager");
-const appLogsManager_1 = require("./appLogsManager");
-const config_1 = require("./config");
-const sessionManager_1 = require("./sessionManager");
+const supabase_1 = require("./supabase.cjs");
+// Dynamic import for nanoid since it's an ES module
+let nanoid;
+(async () => {
+    const nanoidModule = await import("nanoid");
+    nanoid = nanoidModule.nanoid;
+})();
+const idleMonitor_1 = require("./idleMonitor.cjs");
+const screenshotManager_1 = require("./screenshotManager.cjs");
+const unsyncedManager_1 = require("./unsyncedManager.cjs");
+const appLogsManager_1 = require("./appLogsManager.cjs");
+const config_1 = require("./config.cjs");
+const sessionManager_1 = require("./sessionManager.cjs");
 let screenshotInterval;
 let appInterval;
 let trackingActive = false;
@@ -82,7 +87,7 @@ async function startTracking() {
             .select('id')
             .single();
         if (error || !data) {
-            currentTimeLogId = (0, nanoid_1.nanoid)();
+            currentTimeLogId = nanoid();
             (0, unsyncedManager_1.queueTimeLog)({
                 user_id: userId,
                 task_id: currentTaskId,
@@ -96,7 +101,7 @@ async function startTracking() {
     }
     catch (err) {
         console.error('Failed to start time log:', err);
-        currentTimeLogId = (0, nanoid_1.nanoid)();
+        currentTimeLogId = nanoid();
         (0, unsyncedManager_1.queueTimeLog)({
             user_id: userId,
             task_id: currentTaskId,

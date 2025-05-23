@@ -7,7 +7,15 @@
   "scripts": {
     "start": "concurrently \"npm:dev\" \"npm:electron\"",
     "start:desktop": "npm run build:all && npx electron build/electron/main.cjs",
-    "electron": "npm run build:electron && npx electron build/electron/main.cjs",
+    "electron": "npm run build:electron && npx electron build/electron/main.cjs", "start": "concurrently \"npm:dev\" \"npm:electron\"",
+    "start:desktop": "npm run build:all && npx electron build/electron/main.cjs",e": "vite_    "build:all": "npm run build:dev && npm run build:electron && mkdir -p build/dist && cp -r dist/* build/dist/",eact_shadcn_ts",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "build/electron/main.cjs",
+  "scripts": {
+    "start": "concurrently \"npm:dev\" \"npm:electron\"",
+    "electron": "npm run build:electron && electron build/electron/main.cjs",
     "dev:electron": "ts-node-esm --project tsconfig.electron.json electron/main.ts",
     "dev": "vite",
     "build": "electron-builder",
@@ -110,15 +118,12 @@
     "vite": "^5.4.1"
   },
   "build": {
-    "appId": "com.timeflow.admin",
+    "appId": "com.hubstaff.clone",
     "mac": {
       "target": "dmg"
     },
-    "win": {
-      "target": "nsis"
-    },
-    "linux": {
-      "target": "AppImage"
+    "directories": {
+      "output": "dist"
     }
   }
 }

@@ -4,21 +4,30 @@
     "module": "CommonJS",
     "lib": ["ES2020"],
     "outDir": "./build/electron",
-    "rootDir": "./src/electron",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
   "include": [
-    "src/electron/**/*"
+    "electron/**/*",
+    "src/lib/**/*",
+    "src/types/**/*",
+    "src/integrations/**/*"
   ],
   "exclude": [
     "node_modules",
     "build",
-    "dist"
+    "dist",
+    "src/lib/idleDetection.ts",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
   ]
 }

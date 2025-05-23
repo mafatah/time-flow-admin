@@ -31,6 +31,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: true
-    }
+    },
+    base: mode === "development" ? "./" : "/"
   };
 });

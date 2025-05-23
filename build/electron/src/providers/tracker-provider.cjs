@@ -4,7 +4,7 @@ exports.TrackerProvider = TrackerProvider;
 exports.useTracker = useTracker;
 const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
-const auth_provider_1 = require("./auth-provider");
+const auth_provider_1 = require("./auth-provider.cjs");
 const alert_dialog_1 = require("@/components/ui/alert-dialog");
 const use_toast_1 = require("@/components/ui/use-toast");
 // Check if running in Electron environment

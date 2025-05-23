@@ -18,6 +18,7 @@ function createWindow() {
   });
 
   const indexPath = path.join(__dirname, '../dist/index.html');
+  console.log('Loading UI from:', indexPath);
   mainWindow.loadFile(indexPath).catch(err => console.error('Failed to load UI:', err));
 }
 

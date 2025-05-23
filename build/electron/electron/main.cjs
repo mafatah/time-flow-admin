@@ -6,20 +6,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
-const tracker_1 = require("./tracker.cjs");
-const autoLaunch_1 = require("./autoLaunch.cjs");
-const systemMonitor_1 = require("./systemMonitor.cjs");
-const unsyncedManager_1 = require("./unsyncedManager.cjs");
+const tracker_1 = require("./tracker");
+const autoLaunch_1 = require("./autoLaunch");
+const systemMonitor_1 = require("./systemMonitor");
+const unsyncedManager_1 = require("./unsyncedManager");
 let mainWindow = null;
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
         width: 1000,
         height: 800,
         webPreferences: {
-            preload: path_1.default.join(__dirname, 'preload.cjs'),
+            preload: path_1.default.join(__dirname, 'preload.js'),
         },
     });
     const indexPath = path_1.default.join(__dirname, '../dist/index.html');
+    console.log('Loading UI from:', indexPath);
     mainWindow.loadFile(indexPath).catch(err => console.error('Failed to load UI:', err));
 }
 electron_1.app.whenReady().then(() => {
