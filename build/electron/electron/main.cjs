@@ -21,7 +21,12 @@ function createWindow() {
     });
     const indexPath = path_1.default.join(__dirname, '../dist/index.html');
     console.log('Loading UI from:', indexPath);
-    mainWindow.loadFile(indexPath).catch(err => console.error('Failed to load UI:', err));
+    mainWindow.loadFile(indexPath)
+        .then(() => {
+        // Force navigation to root path to avoid 404 on reload
+        mainWindow?.webContents.executeJavaScript('window.history.replaceState({}, "", "/");');
+    })
+        .catch(err => console.error('Failed to load UI:', err));
     // Open DevTools for debugging
     mainWindow.webContents.openDevTools();
 }
