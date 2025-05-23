@@ -1,3 +1,4 @@
+
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
@@ -7,6 +8,8 @@
     "rootDir": ".",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "types": ["node", "electron"]
   },
   "include": ["electron", "src", "vite-env.d.ts"]
