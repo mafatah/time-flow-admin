@@ -84,25 +84,22 @@ export interface Database {
       }
       app_logs: {
         Row: {
+          id: string
           user_id: string
-          task_id: string
-          app_name: string
-          window_title: string
-          timestamp: string
+          message: string
+          created_at: string
         }
         Insert: {
+          id?: string
           user_id: string
-          task_id: string
-          app_name: string
-          window_title: string
-          timestamp?: string
+          message: string
+          created_at?: string
         }
         Update: {
+          id?: string
           user_id?: string
-          task_id?: string
-          app_name?: string
-          window_title?: string
-          timestamp?: string
+          message?: string
+          created_at?: string
         }
       }
       screenshots: {

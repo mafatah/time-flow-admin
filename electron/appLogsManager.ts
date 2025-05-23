@@ -1,8 +1,9 @@
+
 import { supabase } from '../src/lib/supabase';
 import activeWin from 'active-win';
 import { queueAppLog } from './unsyncedManager';
 import { logError } from './errorHandler';
-import type { Database } from '../src/integrations/supabase/types';
+import type { Database } from '../src/types/database';
 
 // Match the structure of the `app_logs` table from Supabase
 export type AppLog = Database['public']['Tables']['app_logs']['Insert'];

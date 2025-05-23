@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { supabase } from '../src/lib/supabase';
 import { logError } from './errorHandler';
-import type { Database } from '../src/integrations/supabase/types';
+import type { Database } from '../src/types/database';
 
 interface TimeLog {
   id?: string;
