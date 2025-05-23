@@ -185,9 +185,9 @@ export default function ScreenshotsViewer() {
 
         {/* User Filter - only for admin/manager */}
         {(userDetails?.role === 'admin' || userDetails?.role === 'manager') && (
-          <Select
-            value={selectedUser || ''}
-            onValueChange={value => setSelectedUser(value || null)}
+                  <Select
+          value={selectedUser || 'all'}
+          onValueChange={value => setSelectedUser(value === 'all' ? null : value)}
           >
             <SelectTrigger className="w-full md:w-[200px]">
               <div className="flex items-center">
@@ -196,7 +196,7 @@ export default function ScreenshotsViewer() {
               </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Users</SelectItem>
+              <SelectItem value="all">All Users</SelectItem>
               {users.map(user => (
                 <SelectItem key={user.id} value={user.id}>
                   {user.full_name}
@@ -208,8 +208,8 @@ export default function ScreenshotsViewer() {
 
         {/* Task Filter */}
         <Select
-          value={selectedTask || ''}
-          onValueChange={value => setSelectedTask(value || null)}
+          value={selectedTask || 'all'}
+          onValueChange={value => setSelectedTask(value === 'all' ? null : value)}
         >
           <SelectTrigger className="w-full md:w-[220px]">
             <div className="flex items-center">
@@ -218,7 +218,7 @@ export default function ScreenshotsViewer() {
             </div>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Tasks</SelectItem>
+            <SelectItem value="all">All Tasks</SelectItem>
             {tasks.map(task => (
               <SelectItem key={task.id} value={task.id}>
                 {task.projects?.name} - {task.name}

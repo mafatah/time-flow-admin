@@ -37,25 +37,35 @@ interface QueueItem {
 const queue: QueueItem[] = loadQueue();
 let retryInterval: NodeJS.Timeout | null = null;
 
-if (queue.length > 0) {
-  startRetry();
-}
-
 export async function captureAndUpload(userId: string, taskId: string) {
+  console.log('📸 Starting screenshot capture for user:', userId, 'task:', taskId);
+  
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
+  console.log('🖥️  Display size:', width, 'x', height);
+  
   const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width, height } });
-  if (sources.length === 0) return;
+  console.log('📺 Available sources:', sources.length);
+  
+  if (sources.length === 0) {
+    console.log('❌ No screen sources available - check macOS Screen Recording permissions');
+    logError('captureAndUpload', new Error('No screen sources available'));
+    return;
+  }
 
   const buffer = sources[0].thumbnail.toPNG();
-      const filename = `screenshot_${randomUUID()}.png`;
+  const filename = `screenshot_${randomUUID()}.png`;
   const tempPath = path.join(app.getPath('temp'), filename);
   fs.writeFileSync(tempPath, buffer);
+  console.log('💾 Screenshot saved to temp path:', tempPath);
 
   try {
+    console.log('☁️  Uploading screenshot...');
     await uploadScreenshot(tempPath, userId, taskId, Date.now());
+    console.log('✅ Screenshot uploaded successfully');
     fs.unlink(tempPath, () => {});
   } catch (err) {
+    console.log('❌ Screenshot upload failed:', err);
     logError('captureAndUpload', err);
     showError('Screenshot Error', 'Failed to upload screenshot. It will be retried.');
     const unsyncedDir = path.join(app.getPath('userData'), 'unsynced_screenshots');
@@ -102,6 +112,11 @@ async function uploadScreenshot(filePath: string, userId: string, taskId: string
 function startRetry() {
   if (retryInterval) return;
   retryInterval = setInterval(processQueue, 30000);
+}
+
+// Initialize retry if there are items in queue
+if (queue.length > 0) {
+  startRetry();
 }
 
 export async function processQueue() {

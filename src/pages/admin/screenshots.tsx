@@ -35,8 +35,8 @@ export default function AdminScreenshots() {
   const [users, setUsers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState<string>("");
-  const [selectedProject, setSelectedProject] = useState<string>("");
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedImage, setSelectedImage] = useState<Screenshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -145,13 +145,13 @@ export default function AdminScreenshots() {
           </PopoverContent>
         </Popover>
 
-        <Select value={selectedUser} onValueChange={setSelectedUser}>
+        <Select value={selectedUser || 'all'} onValueChange={value => setSelectedUser(value === 'all' ? null : value)}>
           <SelectTrigger className="w-full md:w-[200px]">
             <User className="mr-2 h-4 w-4" />
             <SelectValue placeholder="All Users" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Users</SelectItem>
+                          <SelectItem value="all">All Users</SelectItem>
             {users.map((user) => (
               <SelectItem key={user.id} value={user.id}>
                 {user.full_name}
@@ -160,13 +160,13 @@ export default function AdminScreenshots() {
           </SelectContent>
         </Select>
 
-        <Select value={selectedProject} onValueChange={setSelectedProject}>
+        <Select value={selectedProject || 'all'} onValueChange={value => setSelectedProject(value === 'all' ? null : value)}>
           <SelectTrigger className="w-full md:w-[200px]">
             <Briefcase className="mr-2 h-4 w-4" />
             <SelectValue placeholder="All Projects" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Projects</SelectItem>
+                          <SelectItem value="all">All Projects</SelectItem>
             {projects.map((project) => (
               <SelectItem key={project.id} value={project.id}>
                 {project.name}

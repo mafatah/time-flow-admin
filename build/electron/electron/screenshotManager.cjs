@@ -34,24 +34,31 @@ function saveQueue(items) {
 }
 const queue = loadQueue();
 let retryInterval = null;
-if (queue.length > 0) {
-    startRetry();
-}
 async function captureAndUpload(userId, taskId) {
+    console.log('📸 Starting screenshot capture for user:', userId, 'task:', taskId);
     const primaryDisplay = electron_1.screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
+    console.log('🖥️  Display size:', width, 'x', height);
     const sources = await electron_1.desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width, height } });
-    if (sources.length === 0)
+    console.log('📺 Available sources:', sources.length);
+    if (sources.length === 0) {
+        console.log('❌ No screen sources available - check macOS Screen Recording permissions');
+        (0, errorHandler_1.logError)('captureAndUpload', new Error('No screen sources available'));
         return;
+    }
     const buffer = sources[0].thumbnail.toPNG();
     const filename = `screenshot_${(0, crypto_1.randomUUID)()}.png`;
     const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
     fs_1.default.writeFileSync(tempPath, buffer);
+    console.log('💾 Screenshot saved to temp path:', tempPath);
     try {
+        console.log('☁️  Uploading screenshot...');
         await uploadScreenshot(tempPath, userId, taskId, Date.now());
+        console.log('✅ Screenshot uploaded successfully');
         fs_1.default.unlink(tempPath, () => { });
     }
     catch (err) {
+        console.log('❌ Screenshot upload failed:', err);
         (0, errorHandler_1.logError)('captureAndUpload', err);
         (0, errorHandler_1.showError)('Screenshot Error', 'Failed to upload screenshot. It will be retried.');
         const unsyncedDir = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_screenshots');
@@ -93,6 +100,10 @@ function startRetry() {
     if (retryInterval)
         return;
     retryInterval = setInterval(processQueue, 30000);
+}
+// Initialize retry if there are items in queue
+if (queue.length > 0) {
+    startRetry();
 }
 async function processQueue() {
     for (const item of [...queue]) {
