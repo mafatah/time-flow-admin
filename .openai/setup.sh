@@ -5,3 +5,11 @@ if [ -f package-lock.json ]; then
 else
   npm install
 fi
+
+if [ -d desktop-agent ]; then
+  if [ -f desktop-agent/package-lock.json ]; then
+    (cd desktop-agent && npm ci)
+  else
+    (cd desktop-agent && npm install)
+  fi
+fi
