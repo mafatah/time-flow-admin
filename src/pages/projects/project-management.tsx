@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -24,11 +25,14 @@ const projectFormSchema = z.object({
 
 type ProjectFormValues = z.infer<typeof projectFormSchema>;
 
+// Define a type for project that strictly matches the database schema
+type Project = Tables<"projects">;
+
 export default function ProjectManagement() {
-  const [projects, setProjects] = useState<Tables<"projects">[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Tables<"projects"> | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const { toast } = useToast();
 
   const form = useForm<ProjectFormValues>({
@@ -73,7 +77,7 @@ export default function ProjectManagement() {
           .from("projects")
           .update({
             name: values.name,
-            description: values.description,
+            description: values.description || null, // Convert undefined to null
           })
           .eq("id", editingProject.id);
 
@@ -88,7 +92,7 @@ export default function ProjectManagement() {
         setProjects(
           projects.map((p) =>
             p.id === editingProject.id
-              ? { ...p, name: values.name, description: values.description }
+              ? { ...p, name: values.name, description: values.description || null }
               : p
           )
         );
@@ -96,7 +100,7 @@ export default function ProjectManagement() {
         // Create new project
         const { data, error } = await supabase.from("projects").insert({
           name: values.name,
-          description: values.description,
+          description: values.description || null, // Convert undefined to null
         }).select();
 
         if (error) throw error;

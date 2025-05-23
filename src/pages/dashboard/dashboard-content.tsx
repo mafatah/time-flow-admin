@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,18 +14,49 @@ import { ActiveUsersCard } from "@/components/dashboard/active-users-card";
 import { ProjectStatsCard } from "@/components/dashboard/project-stats-card";
 import { ActivityChart } from "@/components/dashboard/activity-chart";
 
+// Define strong types for our data
+interface ActiveUser {
+  id: string;
+  name: string;
+  task: string;
+  project: string;
+}
+
+interface ActivityDataPoint {
+  hour: string;
+  active: number;
+  idle: number;
+}
+
+interface ProjectStat {
+  name: string;
+  hours: number;
+}
+
+interface DashboardStats {
+  totalHours: number;
+  activeUsers: number;
+  totalProjects: number;
+  tasksInProgress: number;
+  dailyStats: { active: number, idle: number };
+  weeklyStats: { active: number, idle: number };
+  projectStats: ProjectStat[];
+  activeUsersList: ActiveUser[];
+  activityData: ActivityDataPoint[];
+}
+
 export default function DashboardContent() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     totalHours: 0,
     activeUsers: 0,
     totalProjects: 0,
     tasksInProgress: 0,
     dailyStats: { active: 0, idle: 0 },
     weeklyStats: { active: 0, idle: 0 },
-    projectStats: [] as { name: string; hours: number }[],
-    activeUsersList: [] as { id: string; name: string; task: string; project: string }[],
-    activityData: [] as { hour: string; active: number; idle: number }[]
+    projectStats: [],
+    activeUsersList: [],
+    activityData: []
   });
   
   const { toast } = useToast();
@@ -158,17 +190,21 @@ export default function DashboardContent() {
           .slice(0, 5);
         
         // Format active users list
-        const uniqueActiveUsers = new Map();
-        activeUsersData?.forEach(item => {
-          if (item.users && item.tasks && !uniqueActiveUsers.has(item.user_id)) {
-            uniqueActiveUsers.set(item.user_id, {
-              id: item.user_id,
-              name: item.users.full_name,
-              task: item.tasks.name,
-              project: item.tasks.projects?.name || 'Unknown'
-            });
-          }
-        });
+        const uniqueActiveUsers = new Map<string, ActiveUser>();
+        
+        if (activeUsersData) {
+          activeUsersData.forEach(item => {
+            // Make sure we have users object with full_name and tasks object with name and projects
+            if (item.users && item.tasks && !uniqueActiveUsers.has(item.user_id)) {
+              uniqueActiveUsers.set(item.user_id, {
+                id: item.user_id,
+                name: item.users.full_name,
+                task: item.tasks.name,
+                project: item.tasks.projects?.name || 'Unknown'
+              });
+            }
+          });
+        }
         
         const activeUsersList = Array.from(uniqueActiveUsers.values());
         

@@ -19,3 +19,4 @@ interface Window {
   electron?: ElectronAPI;
   isElectron?: boolean;
 }
+

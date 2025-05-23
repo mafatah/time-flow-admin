@@ -24,6 +24,11 @@ interface SavedSessionType {
 
 const TrackerContext = createContext<TrackerContextType | undefined>(undefined);
 
+// Type guard to check if electron is available
+function electronAvailable(): boolean {
+  return typeof window !== 'undefined' && window.isElectron === true && window.electron !== undefined;
+}
+
 export function TrackerProvider({ children }: { children: React.ReactNode }) {
   const [isTracking, setIsTracking] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
@@ -35,9 +40,9 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   
   // Check for saved session when component mounts and we're in Electron
   useEffect(() => {
-    if (user && canTrack) {
+    if (user && canTrack && electronAvailable()) {
       // In Electron, check for saved sessions
-      window.electron.loadSession()
+      window.electron!.loadSession()
         .then((session: SavedSessionType | null) => {
           if (session && session.task_id) {
             setSavedSession(session);
@@ -58,15 +63,15 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    if (savedSession) {
+    if (savedSession && electronAvailable()) {
       setCurrentTaskId(savedSession.task_id);
       setIsTracking(true);
       setShowSessionDialog(false);
       
       if (user) {
-        window.electron.setUserId(user.id);
-        window.electron.setTaskId(savedSession.task_id);
-        window.electron.startTracking();
+        window.electron!.setUserId(user.id);
+        window.electron!.setTaskId(savedSession.task_id);
+        window.electron!.startTracking();
       }
 
       toast({
@@ -77,8 +82,8 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   };
   
   const discardSession = () => {
-    if (canTrack) {
-      window.electron.clearSavedSession();
+    if (canTrack && electronAvailable()) {
+      window.electron!.clearSavedSession();
     }
     setShowSessionDialog(false);
     
@@ -98,13 +103,13 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    if (!user) return;
+    if (!user || !electronAvailable()) return;
     
     try {
       // Set user and task IDs in Electron
-      window.electron.setUserId(user.id);
-      window.electron.setTaskId(taskId);
-      window.electron.startTracking();
+      window.electron!.setUserId(user.id);
+      window.electron!.setTaskId(taskId);
+      window.electron!.startTracking();
       
       setCurrentTaskId(taskId);
       setIsTracking(true);
@@ -124,11 +129,11 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   };
   
   const stopTracking = async () => {
-    if (!isTracking || !canTrack) return;
+    if (!isTracking || !canTrack || !electronAvailable()) return;
     
     try {
       // Stop tracking in Electron
-      window.electron.stopTracking();
+      window.electron!.stopTracking();
       
       // Update local state
       setIsTracking(false);
@@ -158,9 +163,11 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
+    if (!electronAvailable()) return;
+    
     try {
       // Sync offline data in Electron
-      window.electron.syncOfflineData();
+      window.electron!.syncOfflineData();
       
       toast({
         title: "Sync initiated",
