@@ -29,6 +29,38 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      },
+      app_logs: {
+        Row: {
+          id: string
+          created_at: string
+          message: string
+          level: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          message: string
+          level: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          message?: string
+          level?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       screenshots: {
         Row: {
