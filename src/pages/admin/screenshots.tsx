@@ -14,8 +14,8 @@ import { Calendar as CalendarIcon, User, Briefcase } from "lucide-react";
 interface Screenshot {
   id: string;
   user_id: string;
-  project_id: string;
-  timestamp: string;
+  project_id: string; // Updated from task_id to match database schema
+  timestamp: string; // This field name matches the interface and database
   image_url: string;
   users?: {
     full_name: string;
