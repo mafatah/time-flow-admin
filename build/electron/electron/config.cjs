@@ -11,5 +11,5 @@ exports.SUPABASE_URL = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
 exports.SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
 // Load environment variables from .env file
 dotenv_1.default.config();
-exports.idleTimeoutMinutes = Number(process.env.IDLE_TIMEOUT_MINUTES ?? 5);
-exports.screenshotIntervalSeconds = Number(process.env.SCREENSHOT_INTERVAL_SECONDS ?? 600); // 6 times per hour = every 10 minutes (600 seconds)
+exports.idleTimeoutMinutes = Number(process.env.IDLE_TIMEOUT_MINUTES ?? 1); // 1 minute for testing
+exports.screenshotIntervalSeconds = Number(process.env.SCREENSHOT_INTERVAL_SECONDS ?? 20); // 20 seconds for testing

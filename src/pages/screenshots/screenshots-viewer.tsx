@@ -56,13 +56,15 @@ export default function ScreenshotsViewer() {
         const startDate = startOfDay(selectedDate);
         const endDate = endOfDay(selectedDate);
         
-        // Build query for screenshots
+        // Build query for screenshots - simplified first
         let query = supabase
           .from("screenshots")
           .select(`
-            *,
-            users!fk_screenshots_users(id, full_name, email),
-            tasks!fk_screenshots_tasks(id, name, projects!fk_tasks_projects(id, name))
+            id,
+            user_id,
+            task_id,
+            image_url,
+            captured_at
           `)
           .gte('captured_at', startDate.toISOString())
           .lte('captured_at', endDate.toISOString());
@@ -81,7 +83,12 @@ export default function ScreenshotsViewer() {
         
         const { data, error } = await query.order('captured_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Screenshot query error:', error);
+          throw error;
+        }
+        
+        console.log('Screenshots data:', data);
         setScreenshots((data as any) || []);
         
         // Fetch users if admin or manager
@@ -101,7 +108,7 @@ export default function ScreenshotsViewer() {
           .select(`
             id, 
             name,
-            projects!fk_tasks_projects(id, name)
+            projects(id, name)
           `);
           
         if (userDetails?.role === 'employee') {
