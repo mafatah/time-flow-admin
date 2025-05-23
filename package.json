@@ -3,10 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "build/electron/main.js",
+  "main": "build/electron/main.cjs",
   "scripts": {
     "start": "concurrently \"npm:dev\" \"npm:electron\"",
-    "electron": "tsc -p tsconfig.electron.json && electron build/electron/main.js",
+    "electron": "tsc -p tsconfig.electron.json && mv build/electron/main.js build/electron/main.cjs && electron build/electron/main.cjs",
     "dev:electron": "ts-node-esm --project tsconfig.electron.json electron/main.ts",
     "dev": "vite",
     "build": "electron-builder",
@@ -15,7 +15,7 @@
     "preview": "vite preview",
     "electron:build": "electron-builder",
     "build:web": "tsc -p tsconfig.app.json",
-    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:electron": "tsc -p tsconfig.electron.json && mv build/electron/main.js build/electron/main.cjs",
     "build:all": "npm run build:web && npm run build:electron"
   },
   "dependencies": {
