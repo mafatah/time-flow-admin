@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -68,16 +67,71 @@ export default function ProjectManagement() {
     fetchProjects();
   }, [toast]);
 
+  // Check user role function
+  async function checkUserRole() {
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.user) {
+        console.error("No active session:", sessionError);
+        return null;
+      }
+
+      const userId = sessionData.session.user.id;
+      console.log("Current user ID:", userId);
+
+      // Check if user exists in users table
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("id, email, role")
+        .eq("id", userId)
+        .single();
+
+      if (userError) {
+        console.error("Error fetching user data:", userError);
+        return null;
+      }
+
+      console.log("User data:", userData);
+      return userData;
+    } catch (error) {
+      console.error("Error checking user role:", error);
+      return null;
+    }
+  }
+
   // Handle form submission
   async function onSubmit(values: ProjectFormValues) {
     try {
+      // First check user role and session
+      const userData = await checkUserRole();
+      
+      if (!userData) {
+        toast({
+          title: "Authentication Error",
+          description: "Unable to verify your account. Please try logging out and back in.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (userData.role !== 'admin' && userData.role !== 'manager') {
+        toast({
+          title: "Permission Denied",
+          description: `You need admin or manager role to create projects. Your current role: ${userData.role}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("User has valid role:", userData.role);
+
       if (editingProject) {
         // Update existing project
         const { error } = await supabase
           .from("projects")
           .update({
             name: values.name,
-            description: values.description || null, // Convert undefined to null
+            description: values.description || null,
           })
           .eq("id", editingProject.id);
 
@@ -98,12 +152,17 @@ export default function ProjectManagement() {
         );
       } else {
         // Create new project
+        console.log("Attempting to create project with values:", values);
+        
         const { data, error } = await supabase.from("projects").insert({
           name: values.name,
-          description: values.description || null, // Convert undefined to null
+          description: values.description || null,
         }).select();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Database error:", error);
+          throw error;
+        }
 
         toast({
           title: "Project created",
@@ -121,9 +180,10 @@ export default function ProjectManagement() {
       setIsDialogOpen(false);
       setEditingProject(null);
     } catch (error: any) {
+      console.error("Form submission error:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: `Failed to ${editingProject ? 'update' : 'create'} project: ${error.message}`,
         variant: "destructive",
       });
     }
