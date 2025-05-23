@@ -61,8 +61,8 @@ export default function ScreenshotsViewer() {
           .from("screenshots")
           .select(`
             *,
-            users(id, full_name, email),
-            tasks(id, name, projects(id, name))
+            users!fk_screenshots_users(id, full_name, email),
+            tasks!fk_screenshots_tasks(id, name, projects!fk_tasks_projects(id, name))
           `)
           .gte('captured_at', startDate.toISOString())
           .lte('captured_at', endDate.toISOString());
@@ -101,7 +101,7 @@ export default function ScreenshotsViewer() {
           .select(`
             id, 
             name,
-            projects(id, name)
+            projects!fk_tasks_projects(id, name)
           `);
           
         if (userDetails?.role === 'employee') {

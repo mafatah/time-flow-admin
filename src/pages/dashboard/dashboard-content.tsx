@@ -109,7 +109,7 @@ export default function DashboardContent() {
           .from("time_logs")
           .select(`
             *,
-            tasks(name, projects(name))
+            tasks!fk_time_logs_tasks(name, projects!fk_tasks_projects(name))
           `);
           
         if (!isAdmin && userDetails?.id) {
@@ -126,8 +126,8 @@ export default function DashboardContent() {
           .select(`
             id,
             user_id,
-            users(id, full_name),
-            tasks(id, name, projects(id, name))
+            users!fk_time_logs_users(id, full_name),
+            tasks!fk_time_logs_tasks(id, name, projects!fk_tasks_projects(id, name))
           `)
           .is('end_time', null);
           

@@ -12,4 +12,4 @@ exports.SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3M
 // Load environment variables from .env file
 dotenv_1.default.config();
 exports.idleTimeoutMinutes = Number(process.env.IDLE_TIMEOUT_MINUTES ?? 5);
-exports.screenshotIntervalSeconds = Number(process.env.SCREENSHOT_INTERVAL_SECONDS ?? 60);
+exports.screenshotIntervalSeconds = Number(process.env.SCREENSHOT_INTERVAL_SECONDS ?? 600); // 6 times per hour = every 10 minutes (600 seconds)

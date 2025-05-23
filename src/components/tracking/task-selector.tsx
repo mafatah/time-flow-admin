@@ -23,7 +23,7 @@ export function TaskSelector() {
       
       const { data, error } = await supabase
         .from('tasks')
-        .select('id, name, project_id, projects(name)')
+        .select('id, name, project_id, projects!fk_tasks_projects(name)')
         .eq('user_id', user.id);
         
       if (error) {

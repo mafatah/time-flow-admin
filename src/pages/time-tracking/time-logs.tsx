@@ -38,8 +38,8 @@ export default function TimeLogs() {
           .from("time_logs")
           .select(`
             *,
-            users(id, full_name, email),
-            tasks(id, name, projects(id, name))
+            users!fk_time_logs_users(id, full_name, email),
+            tasks!fk_time_logs_tasks(id, name, projects!fk_tasks_projects(id, name))
           `)
           .gte('start_time', dateRange.from.toISOString())
           .lte('start_time', dateRange.to.toISOString());

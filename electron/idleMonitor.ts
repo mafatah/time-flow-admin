@@ -1,45 +1,32 @@
-// @ts-ignore
-import robot from 'robotjs';
+import { app, powerMonitor } from 'electron';
 import { updateTimeLogStatus } from './tracker';
 import { idleTimeoutMinutes } from './config';
 
-let lastX = 0;
-let lastY = 0;
-let lastActivity = Date.now();
 let currentIdleStatus = false;
-let interval: NodeJS.Timeout | null = null;
+let idleCheckInterval: NodeJS.Timeout | null = null;
 
-function pollMousePosition() {
-  const { x, y } = robot.getMousePos();
-
-  if (x !== lastX || y !== lastY) {
-    lastActivity = Date.now();
-    lastX = x;
-    lastY = y;
-  }
-
-  const now = Date.now();
-  const idle = now - lastActivity > idleTimeoutMinutes * 60 * 1000;
-
-  if (idle !== currentIdleStatus) {
-    currentIdleStatus = idle;
-    updateTimeLogStatus(idle).catch(err =>
+function checkIdleStatus() {
+  const idleTime = powerMonitor.getSystemIdleTime(); // seconds
+  const isIdle = idleTime >= idleTimeoutMinutes * 60;
+  if (isIdle !== currentIdleStatus) {
+    currentIdleStatus = isIdle;
+    updateTimeLogStatus(isIdle).catch(err =>
       console.error('Failed to update idle status:', err)
     );
-    console.log('Idle status changed:', idle);
+    console.log('Idle status changed:', isIdle);
   }
 }
 
 export function startIdleMonitoring() {
-  if (interval) return;
-  lastActivity = Date.now();
-  interval = setInterval(pollMousePosition, 5000);
+  if (idleCheckInterval) return;
+  currentIdleStatus = false;
+  idleCheckInterval = setInterval(checkIdleStatus, 5000);
 }
 
 export function stopIdleMonitoring() {
-  if (interval) {
-    clearInterval(interval);
-    interval = null;
+  if (idleCheckInterval) {
+    clearInterval(idleCheckInterval);
+    idleCheckInterval = null;
   }
   currentIdleStatus = false;
 }

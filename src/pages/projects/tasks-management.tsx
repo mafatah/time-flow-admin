@@ -80,8 +80,8 @@ export default function TasksManagement() {
           .from("tasks")
           .select(`
             *,
-            projects(id, name),
-            users(id, full_name)
+            projects!fk_tasks_projects(id, name),
+            users!fk_tasks_users(id, full_name)
           `);
           
         if (userDetails?.role === 'employee') {
