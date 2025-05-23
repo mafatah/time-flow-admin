@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +30,7 @@ interface User {
   email: string;
   full_name: string;
   role: string;
-  avatar_url: string | null | undefined; // Updated to accept null
+  avatar_url: string | null;
 }
 
 const UsersPage: React.FC = () => {
@@ -124,7 +125,7 @@ const UsersPage: React.FC = () => {
 
   return (
     <>
-      <PageHeader heading="Users" text="Manage users and access roles." />
+      <PageHeader title="Users" subtitle="Manage users and access roles." />
       <Card>
         <CardHeader>
           <CardTitle>Users List</CardTitle>
