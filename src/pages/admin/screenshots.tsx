@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,15 +15,19 @@ import { Calendar as CalendarIcon, User, Briefcase } from "lucide-react";
 interface Screenshot {
   id: string;
   user_id: string;
-  project_id: string; // Updated from task_id to match database schema
-  timestamp: string; // This field name matches the interface and database
+  task_id: string; // This matches the actual database schema
+  captured_at: string; // This matches the actual database schema
   image_url: string;
   users?: {
     full_name: string;
     email: string;
   };
-  projects?: {
+  tasks?: {
     name: string;
+    project_id: string;
+    projects?: {
+      name: string;
+    };
   };
 }
 
@@ -30,6 +35,7 @@ export default function AdminScreenshots() {
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -45,44 +51,60 @@ export default function AdminScreenshots() {
     try {
       setLoading(true);
       
-      // Fetch users and projects
-      const [usersResponse, projectsResponse] = await Promise.all([
+      // Fetch users, projects and tasks
+      const [usersResponse, projectsResponse, tasksResponse] = await Promise.all([
         supabase.from("users").select("id, full_name, email"),
-        supabase.from("projects").select("id, name")
+        supabase.from("projects").select("id, name"),
+        supabase.from("tasks").select("id, name, project_id")
       ]);
 
       if (usersResponse.data) setUsers(usersResponse.data);
       if (projectsResponse.data) setProjects(projectsResponse.data);
+      if (tasksResponse.data) setTasks(tasksResponse.data);
 
       // Build query for screenshots with manual joins
       let query = supabase
         .from("screenshots")
         .select("*")
-        .gte('timestamp', format(selectedDate, 'yyyy-MM-dd'))
-        .lt('timestamp', format(new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd'))
-        .order('timestamp', { ascending: false });
+        .gte('captured_at', format(selectedDate, 'yyyy-MM-dd'))
+        .lt('captured_at', format(new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd'))
+        .order('captured_at', { ascending: false });
 
       if (selectedUser) {
         query = query.eq('user_id', selectedUser);
       }
 
       if (selectedProject) {
-        query = query.eq('project_id', selectedProject);
+        // Filter by project through tasks
+        const projectTasks = tasksResponse.data?.filter(t => t.project_id === selectedProject) || [];
+        const taskIds = projectTasks.map(t => t.id);
+        if (taskIds.length > 0) {
+          query = query.in('task_id', taskIds);
+        } else {
+          // If no tasks found for this project, return empty results
+          setScreenshots([]);
+          return;
+        }
       }
 
       const { data: screenshotsData, error } = await query;
 
       if (error) throw error;
 
-      // Manually join user and project data
+      // Manually join user, task and project data
       const enrichedScreenshots = (screenshotsData || []).map(screenshot => {
         const user = usersResponse.data?.find(u => u.id === screenshot.user_id);
-        const project = projectsResponse.data?.find(p => p.id === screenshot.project_id);
+        const task = tasksResponse.data?.find(t => t.id === screenshot.task_id);
+        const project = task ? projectsResponse.data?.find(p => p.id === task.project_id) : undefined;
         
         return {
           ...screenshot,
           users: user ? { full_name: user.full_name, email: user.email } : undefined,
-          projects: project ? { name: project.name } : undefined
+          tasks: task ? { 
+            name: task.name, 
+            project_id: task.project_id,
+            projects: project ? { name: project.name } : undefined
+          } : undefined
         };
       });
 
@@ -182,10 +204,10 @@ export default function AdminScreenshots() {
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors" />
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-xs">
                     <div className="font-medium truncate">
-                      {screenshot.projects?.name}
+                      {screenshot.tasks?.projects?.name || 'Unknown Project'}
                     </div>
                     <div className="flex justify-between items-center mt-1">
-                      <span>{format(new Date(screenshot.timestamp), 'HH:mm')}</span>
+                      <span>{format(new Date(screenshot.captured_at), 'HH:mm')}</span>
                       <span className="truncate max-w-[120px]">
                         {screenshot.users?.full_name}
                       </span>
@@ -202,12 +224,12 @@ export default function AdminScreenshots() {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              Screenshot - {selectedImage?.projects?.name} by {selectedImage?.users?.full_name}
+              Screenshot - {selectedImage?.tasks?.projects?.name || 'Unknown Project'} by {selectedImage?.users?.full_name}
             </DialogTitle>
           </DialogHeader>
           <div className="mt-4">
             <div className="text-sm text-muted-foreground mb-2">
-              {selectedImage && format(new Date(selectedImage.timestamp), 'MMM dd, yyyy HH:mm:ss')}
+              {selectedImage && format(new Date(selectedImage.captured_at), 'MMM dd, yyyy HH:mm:ss')}
             </div>
             {selectedImage && (
               <img
