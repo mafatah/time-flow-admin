@@ -30,14 +30,29 @@ export default function AdminSettingsPage() {
   const { data: settings, isLoading } = useQuery({
     queryKey: ['settings'],
     queryFn: async () => {
+      // Using a more generic query since the table might not be in TypeScript definitions yet
       const { data, error } = await supabase
-        .from('settings')
+        .from('settings' as any)
         .select('*')
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // If settings table doesn't exist or no data, return default settings
+        if (error.code === 'PGRST116' || error.message.includes('relation "settings" does not exist')) {
+          return {
+            id: 'default',
+            blur_screenshots: false,
+            screenshot_interval_seconds: 300,
+            idle_threshold_seconds: 300,
+            notification_rules: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as SystemSettings;
+        }
+        throw error;
+      }
       
-      if (data.notification_rules) {
+      if (data?.notification_rules) {
         setNotificationRules(JSON.stringify(data.notification_rules, null, 2));
       }
       
@@ -47,25 +62,46 @@ export default function AdminSettingsPage() {
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (updatedSettings: Partial<SystemSettings>) => {
-      const { data, error } = await supabase
-        .from('settings')
-        .update({
-          ...updatedSettings,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', settings?.id)
-        .select()
-        .single();
+      if (!settings?.id || settings.id === 'default') {
+        // Create new settings if none exist
+        const { data, error } = await supabase
+          .from('settings' as any)
+          .insert({
+            ...updatedSettings,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data;
+      } else {
+        // Update existing settings
+        const { data, error } = await supabase
+          .from('settings' as any)
+          .update({
+            ...updatedSettings,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', settings.id)
+          .select()
+          .single();
 
-      if (error) throw error;
-      return data;
+        if (error) throw error;
+        return data;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       toast({ title: 'Settings updated successfully' });
     },
-    onError: (error) => {
-      toast({ title: 'Error updating settings', description: error.message, variant: 'destructive' });
+    onError: (error: any) => {
+      toast({ 
+        title: 'Error updating settings', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
     }
   });
 

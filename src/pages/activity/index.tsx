@@ -15,13 +15,13 @@ import { format } from 'date-fns';
 interface Screenshot {
   id: string;
   user_id: string;
-  task_id: string;
+  task_id: string | null;
   image_url: string;
   captured_at: string;
   activity_percent: number | null;
   focus_percent: number | null;
   classification: string | null;
-  users: { full_name: string };
+  users: { full_name: string } | null;
   tasks: { name: string; projects: { name: string } } | null;
 }
 
@@ -34,7 +34,7 @@ interface AppLog {
   ended_at: string | null;
   duration_seconds: number | null;
   category: string | null;
-  users: { full_name: string };
+  users: { full_name: string } | null;
 }
 
 interface UrlLog {
@@ -45,7 +45,7 @@ interface UrlLog {
   ended_at: string | null;
   duration_seconds: number | null;
   category: string | null;
-  users: { full_name: string };
+  users: { full_name: string } | null;
 }
 
 export default function ActivityPage() {
@@ -59,7 +59,7 @@ export default function ActivityPage() {
         .from('screenshots')
         .select(`
           *,
-          users (full_name),
+          users!inner (full_name),
           tasks (name, projects (name))
         `)
         .order('captured_at', { ascending: false })
@@ -73,34 +73,52 @@ export default function ActivityPage() {
   const { data: appLogs, isLoading: appLogsLoading } = useQuery({
     queryKey: ['app-logs'],
     queryFn: async () => {
+      // Using a more generic query since the table might not be in TypeScript definitions yet
       const { data, error } = await supabase
-        .from('app_logs')
-        .select(`
-          *,
-          users (full_name)
-        `)
-        .order('started_at', { ascending: false })
+        .rpc('get_app_logs_with_users')
         .limit(50);
 
-      if (error) throw error;
-      return data as AppLog[];
+      if (error) {
+        // Fallback to direct query if RPC doesn't exist
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('app_logs' as any)
+          .select(`
+            *,
+            users!inner (full_name)
+          `)
+          .order('started_at', { ascending: false })
+          .limit(50);
+        
+        if (fallbackError) throw fallbackError;
+        return (fallbackData || []) as AppLog[];
+      }
+      return (data || []) as AppLog[];
     }
   });
 
   const { data: urlLogs, isLoading: urlLogsLoading } = useQuery({
     queryKey: ['url-logs'],
     queryFn: async () => {
+      // Using a more generic query since the table might not be in TypeScript definitions yet
       const { data, error } = await supabase
-        .from('url_logs')
-        .select(`
-          *,
-          users (full_name)
-        `)
-        .order('started_at', { ascending: false })
+        .rpc('get_url_logs_with_users')
         .limit(50);
 
-      if (error) throw error;
-      return data as UrlLog[];
+      if (error) {
+        // Fallback to direct query if RPC doesn't exist
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('url_logs' as any)
+          .select(`
+            *,
+            users!inner (full_name)
+          `)
+          .order('started_at', { ascending: false })
+          .limit(50);
+        
+        if (fallbackError) throw fallbackError;
+        return (fallbackData || []) as UrlLog[];
+      }
+      return (data || []) as UrlLog[];
     }
   });
 
@@ -169,7 +187,9 @@ export default function ActivityPage() {
                       />
                       <div className="p-3 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">{screenshot.users.full_name}</span>
+                          <span className="text-sm font-medium">
+                            {screenshot.users?.full_name || 'Unknown User'}
+                          </span>
                           {screenshot.activity_percent && (
                             <Badge variant={screenshot.activity_percent > 70 ? 'default' : 'secondary'}>
                               {screenshot.activity_percent}% active
@@ -193,6 +213,11 @@ export default function ActivityPage() {
                       </div>
                     </div>
                   ))}
+                  {(!screenshots || screenshots.length === 0) && (
+                    <div className="col-span-full text-center text-muted-foreground py-8">
+                      No screenshots found
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -222,9 +247,11 @@ export default function ActivityPage() {
                   <TableBody>
                     {appLogs?.map((log) => (
                       <TableRow key={log.id}>
-                        <TableCell className="font-medium">{log.users.full_name}</TableCell>
+                        <TableCell className="font-medium">
+                          {log.users?.full_name || 'Unknown User'}
+                        </TableCell>
                         <TableCell>{log.app_name}</TableCell>
-                        <TableCell className="max-w-xs truncate">{log.window_title}</TableCell>
+                        <TableCell className="max-w-xs truncate">{log.window_title || 'N/A'}</TableCell>
                         <TableCell>{format(new Date(log.started_at), 'MMM d, HH:mm')}</TableCell>
                         <TableCell>{formatDuration(log.duration_seconds)}</TableCell>
                         <TableCell>
@@ -236,6 +263,13 @@ export default function ActivityPage() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    {(!appLogs || appLogs.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">
+                          No application logs found
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               )}
@@ -265,7 +299,9 @@ export default function ActivityPage() {
                   <TableBody>
                     {urlLogs?.map((log) => (
                       <TableRow key={log.id}>
-                        <TableCell className="font-medium">{log.users.full_name}</TableCell>
+                        <TableCell className="font-medium">
+                          {log.users?.full_name || 'Unknown User'}
+                        </TableCell>
                         <TableCell className="max-w-xs truncate">{log.site_url}</TableCell>
                         <TableCell>{format(new Date(log.started_at), 'MMM d, HH:mm')}</TableCell>
                         <TableCell>{formatDuration(log.duration_seconds)}</TableCell>
@@ -278,6 +314,13 @@ export default function ActivityPage() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    {(!urlLogs || urlLogs.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          No website logs found
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               )}

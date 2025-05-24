@@ -21,12 +21,33 @@ export default function EnhancedDashboard() {
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('v_dashboard')
+      // Try to use the dashboard view first
+      const { data: viewData, error: viewError } = await supabase
+        .from('v_dashboard' as any)
         .select('*');
       
-      if (error) throw error;
-      return data as DashboardUser[];
+      if (!viewError && viewData) {
+        return viewData as DashboardUser[];
+      }
+
+      // Fallback to basic user data if view doesn't exist
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('*');
+
+      if (usersError) throw usersError;
+
+      // Transform basic user data to match expected interface
+      return users.map(user => ({
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        hours_today: 0,
+        hours_this_week: 0,
+        weekly_activity_percent: 0,
+        low_activity: false,
+        recent_screenshot_url: null
+      })) as DashboardUser[];
     }
   });
 
@@ -37,26 +58,27 @@ export default function EnhancedDashboard() {
       const weekStart = new Date();
       weekStart.setDate(weekStart.getDate() - weekStart.getDay());
       
-      const { data: todayHours } = await supabase
+      // Get basic stats from time_logs
+      const { data: todayLogs } = await supabase
         .from('time_logs')
         .select('*')
         .gte('start_time', today);
       
-      const { data: weekHours } = await supabase
+      const { data: weekLogs } = await supabase
         .from('time_logs')
         .select('*')
         .gte('start_time', weekStart.toISOString());
       
-      const { data: activeUsers } = await supabase
+      const { data: activeLogs } = await supabase
         .from('time_logs')
         .select('user_id')
         .gte('start_time', today)
         .is('end_time', null);
       
       return {
-        todayHours: todayHours?.length || 0,
-        weekHours: weekHours?.length || 0,
-        activeUsers: new Set(activeUsers?.map(u => u.user_id)).size || 0
+        todayHours: todayLogs?.length || 0,
+        weekHours: weekLogs?.length || 0,
+        activeUsers: new Set(activeLogs?.map(u => u.user_id)).size || 0
       };
     }
   });
@@ -89,7 +111,7 @@ export default function EnhancedDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dashboardData?.reduce((acc, user) => acc + user.hours_today, 0).toFixed(1) || 0}h
+              {dashboardData?.reduce((acc, user) => acc + (user.hours_today || 0), 0).toFixed(1) || 0}h
             </div>
             <p className="text-xs text-muted-foreground">Total logged today</p>
           </CardContent>
