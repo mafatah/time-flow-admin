@@ -64,13 +64,39 @@ export async function captureAndUpload(userId: string, taskId: string) {
 
     console.log('💾 Screenshot saved to temp path:', tempPath);
 
-    // For testing: Save locally instead of uploading to avoid RLS issues
-    const localDir = path.join(app.getPath('userData'), 'test_screenshots');
-    fs.mkdirSync(localDir, { recursive: true });
-    const localPath = path.join(localDir, filename);
-    fs.copyFileSync(tempPath, localPath);
-    
-    console.log('✅ Test screenshot saved successfully to:', localPath);
+    try {
+      // Upload to Supabase
+      console.log('☁️  Uploading screenshot...');
+      await uploadScreenshot(tempPath, userId, taskId, Date.now());
+      console.log('✅ Screenshot uploaded successfully');
+    } catch (uploadError) {
+      console.error('❌ Screenshot upload failed:', uploadError);
+      
+      // Save to local queue for retry
+      const unsyncedDir = path.join(app.getPath('userData'), 'unsynced_screenshots');
+      fs.mkdirSync(unsyncedDir, { recursive: true });
+      const localPath = path.join(unsyncedDir, filename);
+      fs.copyFileSync(tempPath, localPath);
+      
+      // Add to retry queue
+      queue.push({
+        path: localPath,
+        userId: userId,
+        taskId: taskId,
+        timestamp: Date.now()
+      });
+      saveQueue(queue);
+      startRetry();
+      
+      console.log('📦 Screenshot queued for later upload:', filename);
+    }
+
+    // Also save to test directory for debugging
+    const testDir = path.join(app.getPath('userData'), 'test_screenshots');
+    fs.mkdirSync(testDir, { recursive: true });
+    const testPath = path.join(testDir, filename);
+    fs.copyFileSync(tempPath, testPath);
+    console.log('✅ Test screenshot saved successfully to:', testPath);
     console.log('📊 Screenshot size:', buffer.length, 'bytes');
     
     // Clean up temp file

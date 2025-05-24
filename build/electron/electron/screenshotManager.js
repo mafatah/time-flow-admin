@@ -9,9 +9,9 @@ const electron_1 = require("electron");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const crypto_1 = require("crypto");
-const supabase_1 = require("./supabase.cjs");
-const unsyncedManager_1 = require("./unsyncedManager.cjs");
-const errorHandler_1 = require("./errorHandler.cjs");
+const supabase_1 = require("./supabase");
+const unsyncedManager_1 = require("./unsyncedManager");
+const errorHandler_1 = require("./errorHandler");
 const UNSYNCED_LIST_PATH = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_screenshots.json');
 function loadQueue() {
     try {

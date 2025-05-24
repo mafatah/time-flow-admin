@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, powerMonitor, screen, nativeImage } from 'electron';
 import path from 'path';
 import http from 'http';
 import { setUserId, setTaskId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } from './tracker';
@@ -8,6 +8,12 @@ import { initSystemMonitor } from './systemMonitor';
 import { startSyncLoop } from './unsyncedManager';
 import { startActivityMonitoring, stopActivityMonitoring, triggerActivityCapture, triggerDirectScreenshot } from './activityMonitor';
 import { ensureScreenRecordingPermission, testScreenCapture } from './permissionManager';
+import { screenshotIntervalSeconds } from './config';
+
+// Debug environment variables
+console.log('🔧 Environment variables at startup:');
+console.log('   SCREENSHOT_INTERVAL_SECONDS:', process.env.SCREENSHOT_INTERVAL_SECONDS);
+console.log('   Config screenshotIntervalSeconds:', screenshotIntervalSeconds);
 
 let mainWindow: BrowserWindow | null = null;
 

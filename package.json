@@ -8,9 +8,9 @@
   },
   "main": "build/electron/electron/main.cjs",
   "scripts": {
-    "start": "concurrently \"npm:dev\" \"npm:electron\"",
+    "start": "SCREENSHOT_INTERVAL_SECONDS=20 concurrently \"npm:dev\" \"npm:electron\"",
     "start:desktop": "npm run build:all && npx electron build/electron/main.cjs",
-    "electron": "npm run build:electron && npx electron build/electron/electron/main.cjs",
+    "electron": "SCREENSHOT_INTERVAL_SECONDS=20 npm run build:electron && SCREENSHOT_INTERVAL_SECONDS=20 npx electron build/electron/electron/main.cjs",
     "dev:electron": "ts-node-esm --project tsconfig.electron.json electron/main.ts",
     "dev": "vite",
     "build": "electron-builder",

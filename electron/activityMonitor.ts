@@ -9,6 +9,9 @@ import { screenshotIntervalSeconds, idleTimeoutMinutes } from './config';
 
 const UNSYNCED_ACTIVITY_PATH = path.join(app.getPath('userData'), 'unsynced_activity.json');
 
+// Special UUID for activity monitoring - this represents a virtual "task" for general activity monitoring
+const ACTIVITY_MONITORING_TASK_ID = '00000000-0000-0000-0000-000000000001';
+
 interface ActivitySession {
   id: string;
   user_id: string;
@@ -165,56 +168,88 @@ async function captureActivityScreenshot() {
 }
 
 async function uploadActivityScreenshot(filePath: string, filename: string) {
-  if (!currentUserId || !currentActivitySession) return;
+  if (!currentUserId) {
+    console.log('⚠️ No user ID available, queuing screenshot for later upload');
+    queueScreenshot({
+      user_id: 'unknown',
+      task_id: ACTIVITY_MONITORING_TASK_ID,
+      image_url: `local://${filePath}`,
+      captured_at: new Date().toISOString()
+    });
+    return;
+  }
+
+  // Use a default task ID that should exist in the system
+  // This will be replaced with real task ID when proper time tracking is active
+  const taskId = ACTIVITY_MONITORING_TASK_ID;
+  
+  console.log(`☁️ Uploading activity screenshot - user: ${currentUserId}, task: ${taskId}`);
 
   try {
-    const fileData = fs.readFileSync(filePath);
+    const fileBuffer = fs.readFileSync(filePath);
     
     // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('screenshots')
-      .upload(`activity/${currentUserId}/${filename}`, fileData);
+      .upload(`${currentUserId}/${filename}`, fileBuffer, {
+        contentType: 'image/png',
+        upsert: true
+      });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.log('❌ Storage upload failed:', uploadError);
+      queueScreenshot({
+        user_id: currentUserId,
+        task_id: taskId,
+        image_url: `local://${filePath}`,
+        captured_at: new Date().toISOString()
+      });
+      return;
+    }
 
     // Get public URL
-    const { data: publicUrlData } = supabase.storage
+    const { data: { publicUrl } } = supabase.storage
       .from('screenshots')
-      .getPublicUrl(`activity/${currentUserId}/${filename}`);
+      .getPublicUrl(`${currentUserId}/${filename}`);
 
-    const imageUrl = publicUrlData.publicUrl;
+    // Save to database
+    const { error: dbError } = await supabase
+      .from('screenshots')
+      .insert({
+        user_id: currentUserId,
+        task_id: taskId,
+        image_url: publicUrl,
+        captured_at: new Date().toISOString()
+      });
 
-         // Save screenshot record to database (using existing schema)
-     const screenshotData = {
-       user_id: currentUserId,
-       task_id: 'activity-tracking', // Use a special identifier for activity screenshots
-       image_url: imageUrl,
-       captured_at: new Date().toISOString()
-     };
+    if (dbError) {
+      console.log('❌ Database save failed:', dbError);
+      queueScreenshot({
+        user_id: currentUserId,
+        task_id: taskId,
+        image_url: publicUrl,
+        captured_at: new Date().toISOString()
+      });
+      return;
+    }
 
-     const { error: dbError } = await supabase
-       .from('screenshots')
-       .insert(screenshotData);
-
-     if (dbError) {
-       // Queue for later upload if database fails
-       queueScreenshot(screenshotData);
-       throw dbError;
-     }
-
-    // Clean up temp file
-    fs.unlink(filePath, () => {});
+    console.log('✅ Activity screenshot uploaded successfully');
+    
+    // Clean up local file
+    try {
+      fs.unlinkSync(filePath);
+    } catch (err) {
+      console.log('⚠️ Could not delete local file:', err.message);
+    }
 
   } catch (error) {
-    // Save to local queue for retry
-    const unsyncedDir = path.join(app.getPath('userData'), 'unsynced_screenshots');
-    fs.mkdirSync(unsyncedDir, { recursive: true });
-    const dest = path.join(unsyncedDir, filename);
-    fs.copyFileSync(filePath, dest);
-    fs.unlink(filePath, () => {});
-    
-    console.log('📦 Screenshot queued for later upload:', filename);
-    throw error;
+    console.log('❌ Activity screenshot upload error:', error);
+    queueScreenshot({
+      user_id: currentUserId,
+      task_id: taskId,
+      image_url: `local://${filePath}`,
+      captured_at: new Date().toISOString()
+    });
   }
 }
 
@@ -329,30 +364,16 @@ async function saveActivitySession() {
 // Manual activity trigger (for testing)
 export function triggerActivityCapture() {
   console.log('🧪 triggerActivityCapture() called');
-  console.log(`📊 Activity monitoring state - isMonitoring: ${isMonitoring}, currentUserId: ${currentUserId}`);
+  console.log('📊 Activity monitoring state - isMonitoring:', isMonitoring, 'currentUserId:', currentUserId);
   
+  // Use the real task ID from active tracking if available, otherwise skip
   if (!currentUserId) {
-    console.log('⚠️ No user ID set, using test user for screenshot capture');
-    // Set up minimal state for testing
-    currentUserId = 'test-user-manual-capture';
-    currentActivitySession = {
-      id: randomUUID(),
-      user_id: currentUserId,
-      start_time: new Date().toISOString(),
-      is_active: true,
-      total_screenshots: 0,
-      total_apps: 0
-    };
+    console.log('⚠️ No user ID set for activity capture - skipping screenshot');
+    return;
   }
   
-  if (currentUserId) {
-    console.log('📸 Triggering manual screenshot capture...');
-    captureActivityScreenshot();
-    trackCurrentApp();
-    updateLastActivity();
-  } else {
-    console.log('❌ Cannot trigger capture - no user ID available');
-  }
+  console.log('📸 Triggering manual screenshot capture...');
+  captureActivityScreenshot();
 }
 
 // Direct screenshot test function (for testing without activity monitoring)

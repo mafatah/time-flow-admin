@@ -7,13 +7,13 @@ require("dotenv/config");
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const http_1 = __importDefault(require("http"));
-const tracker_1 = require("./tracker.cjs");
-const autoLaunch_1 = require("./autoLaunch.cjs");
-const systemMonitor_1 = require("./systemMonitor.cjs");
-const unsyncedManager_1 = require("./unsyncedManager.cjs");
-const activityMonitor_1 = require("./activityMonitor.cjs");
-const permissionManager_1 = require("./permissionManager.cjs");
-const config_1 = require("./config.cjs");
+const tracker_1 = require("./tracker");
+const autoLaunch_1 = require("./autoLaunch");
+const systemMonitor_1 = require("./systemMonitor");
+const unsyncedManager_1 = require("./unsyncedManager");
+const activityMonitor_1 = require("./activityMonitor");
+const permissionManager_1 = require("./permissionManager");
+const config_1 = require("./config");
 // Debug environment variables
 console.log('🔧 Environment variables at startup:');
 console.log('   SCREENSHOT_INTERVAL_SECONDS:', process.env.SCREENSHOT_INTERVAL_SECONDS);
@@ -24,7 +24,7 @@ async function createWindow() {
         width: 1000,
         height: 800,
         webPreferences: {
-            preload: path_1.default.join(__dirname, 'preload.cjs'),
+            preload: path_1.default.join(__dirname, 'preload.js'),
         },
     });
     // In development, load from Vite dev server, in production load from file
