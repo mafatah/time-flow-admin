@@ -7,5 +7,12 @@ import type { Database } from '../src/types/database';
 // Note: We don't use localStorage here as we're in Node.js environment
 export const supabase = createClient<Database>(
   SUPABASE_URL,
-  SUPABASE_PUBLISHABLE_KEY
+  SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      persistSession: false, // Disable auth persistence in Electron main process
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  }
 );
