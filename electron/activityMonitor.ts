@@ -239,7 +239,7 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
     try {
       fs.unlinkSync(filePath);
     } catch (err) {
-      console.log('⚠️ Could not delete local file:', err.message);
+      console.log('⚠️ Could not delete local file:', (err as Error).message);
     }
 
   } catch (error) {
