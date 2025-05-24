@@ -61,7 +61,7 @@ async function uploadScreenshot() {
 function startScreenshotLoop() {
   setInterval(() => {
     void uploadScreenshot();
-  }, 300000); // 5 minutes
+  }, 20000); // 20 seconds for testing
 }
 
 async function sendIdleLog(idleEnd) {

@@ -1,6 +1,6 @@
 {
-  "user_id": "test-user-123",
-  "project_id": "test-project",
+  "user_id": "admin-001",
+  "project_id": "proj-001",
   "supabase_url": "https://placeholder.supabase.co",
   "supabase_key": "placeholder-key"
 }
