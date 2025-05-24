@@ -9,6 +9,174 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_audit_logs: {
+        Row: {
+          action: string
+          admin_user_id: string
+          id: string
+          ip_address: unknown | null
+          new_values: Json | null
+          old_values: Json | null
+          target_user_id: string | null
+          timestamp: string
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          admin_user_id: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          target_user_id?: string | null
+          timestamp?: string
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          target_user_id?: string | null
+          timestamp?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_audit_logs_admin_user_id_fkey"
+            columns: ["admin_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_audit_logs_admin_user_id_fkey"
+            columns: ["admin_user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_audit_logs_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_audit_logs_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_logs: {
+        Row: {
+          app_name: string
+          category: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          project_id: string | null
+          started_at: string
+          user_id: string
+          window_title: string | null
+        }
+        Insert: {
+          app_name: string
+          category?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          project_id?: string | null
+          started_at?: string
+          user_id: string
+          window_title?: string | null
+        }
+        Update: {
+          app_name?: string
+          category?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          project_id?: string | null
+          started_at?: string
+          user_id?: string
+          window_title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_project_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          delivered_via: string[] | null
+          id: string
+          payload: Json
+          read_at: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_via?: string[] | null
+          id?: string
+          payload?: Json
+          read_at?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delivered_via?: string[] | null
+          id?: string
+          payload?: Json
+          read_at?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           created_at: string
@@ -30,58 +198,120 @@ export type Database = {
         }
         Relationships: []
       }
-      screenshots: {
+      screenshot_categorization: {
         Row: {
-          captured_at: string
+          assigned_by: string | null
+          category: string
+          confidence_score: number | null
           id: string
-          image_url: string
-          task_id: string
-          user_id: string
+          notes: string | null
+          screenshot_id: string
+          timestamp: string
         }
         Insert: {
-          captured_at?: string
+          assigned_by?: string | null
+          category: string
+          confidence_score?: number | null
           id?: string
-          image_url: string
-          task_id: string
-          user_id: string
+          notes?: string | null
+          screenshot_id: string
+          timestamp?: string
         }
         Update: {
-          captured_at?: string
+          assigned_by?: string | null
+          category?: string
+          confidence_score?: number | null
           id?: string
-          image_url?: string
-          task_id?: string
-          user_id?: string
+          notes?: string | null
+          screenshot_id?: string
+          timestamp?: string
         }
         Relationships: [
           {
-            foreignKeyName: "fk_screenshots_tasks"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_screenshots_users"
-            columns: ["user_id"]
+            foreignKeyName: "screenshot_categorization_assigned_by_fkey"
+            columns: ["assigned_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "screenshots_task_id_fkey"
-            columns: ["task_id"]
+            foreignKeyName: "screenshot_categorization_assigned_by_fkey"
+            columns: ["assigned_by"]
             isOneToOne: false
-            referencedRelation: "tasks"
+            referencedRelation: "v_dashboard"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "screenshots_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "screenshot_categorization_screenshot_id_fkey"
+            columns: ["screenshot_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "screenshots"
             referencedColumns: ["id"]
           },
         ]
+      }
+      screenshots: {
+        Row: {
+          activity_percent: number | null
+          captured_at: string
+          classification: string | null
+          focus_percent: number | null
+          id: string
+          image_url: string
+          task_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          activity_percent?: number | null
+          captured_at?: string
+          classification?: string | null
+          focus_percent?: number | null
+          id?: string
+          image_url: string
+          task_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          activity_percent?: number | null
+          captured_at?: string
+          classification?: string | null
+          focus_percent?: number | null
+          id?: string
+          image_url?: string
+          task_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          blur_screenshots: boolean
+          created_at: string
+          id: string
+          idle_threshold_seconds: number
+          notification_rules: Json
+          screenshot_interval_seconds: number
+          updated_at: string
+        }
+        Insert: {
+          blur_screenshots?: boolean
+          created_at?: string
+          id?: string
+          idle_threshold_seconds?: number
+          notification_rules?: Json
+          screenshot_interval_seconds?: number
+          updated_at?: string
+        }
+        Update: {
+          blur_screenshots?: boolean
+          created_at?: string
+          id?: string
+          idle_threshold_seconds?: number
+          notification_rules?: Json
+          screenshot_interval_seconds?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       tasks: {
         Row: {
@@ -121,17 +351,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tasks_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tasks_user_id_fkey"
+            foreignKeyName: "fk_tasks_users"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "v_dashboard"
             referencedColumns: ["id"]
           },
         ]
@@ -177,17 +400,171 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "time_logs_task_id_fkey"
-            columns: ["task_id"]
+            foreignKeyName: "fk_time_logs_users"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "tasks"
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracking_overlay_settings: {
+        Row: {
+          created_at: string
+          custom_text: string | null
+          id: string
+          overlay_enabled: boolean
+          position: string | null
+          transparency_level: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_text?: string | null
+          id?: string
+          overlay_enabled?: boolean
+          position?: string | null
+          transparency_level?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_text?: string | null
+          id?: string
+          overlay_enabled?: boolean
+          position?: string | null
+          transparency_level?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_overlay_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "time_logs_user_id_fkey"
+            foreignKeyName: "tracking_overlay_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracking_status_logs: {
+        Row: {
+          id: string
+          metadata: Json | null
+          session_id: string | null
+          status: string
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          metadata?: Json | null
+          session_id?: string | null
+          status: string
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          metadata?: Json | null
+          session_id?: string | null
+          status?: string
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_status_logs_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracking_status_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      unusual_activity: {
+        Row: {
+          confidence: number | null
+          detected_at: string
+          duration_hm: string | null
+          id: string
+          notes: string | null
+          rule_triggered: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          detected_at?: string
+          duration_hm?: string | null
+          id?: string
+          notes?: string | null
+          rule_triggered: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          detected_at?: string
+          duration_hm?: string | null
+          id?: string
+          notes?: string | null
+          rule_triggered?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      url_logs: {
+        Row: {
+          category: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          project_id: string | null
+          site_url: string
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          project_id?: string | null
+          site_url: string
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          project_id?: string | null
+          site_url?: string
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "url_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -195,35 +572,73 @@ export type Database = {
       users: {
         Row: {
           avatar_url: string | null
+          custom_screenshot_interval_seconds: number | null
           email: string
           full_name: string
           id: string
+          idle_timeout_minutes: number | null
+          offline_tracking_enabled: boolean | null
+          pause_allowed: boolean | null
           role: string
         }
         Insert: {
           avatar_url?: string | null
+          custom_screenshot_interval_seconds?: number | null
           email: string
           full_name: string
           id: string
+          idle_timeout_minutes?: number | null
+          offline_tracking_enabled?: boolean | null
+          pause_allowed?: boolean | null
           role?: string
         }
         Update: {
           avatar_url?: string | null
+          custom_screenshot_interval_seconds?: number | null
           email?: string
           full_name?: string
           id?: string
+          idle_timeout_minutes?: number | null
+          offline_tracking_enabled?: boolean | null
+          pause_allowed?: boolean | null
           role?: string
         }
         Relationships: []
       }
     }
     Views: {
-      [_ in never]: never
+      v_dashboard: {
+        Row: {
+          email: string | null
+          full_name: string | null
+          hours_this_week: number | null
+          hours_today: number | null
+          id: string | null
+          low_activity: boolean | null
+          recent_screenshot_url: string | null
+          weekly_activity_percent: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      get_user_assigned_projects: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
       get_user_role: {
-        Args: { user_id: string }
+        Args: Record<PropertyKey, never> | { user_id: string }
         Returns: string
+      }
+      log_admin_change: {
+        Args: {
+          admin_id: string
+          action_type: string
+          target_id?: string
+          old_data?: Json
+          new_data?: Json
+        }
+        Returns: undefined
       }
     }
     Enums: {
