@@ -21,65 +21,79 @@ export default function EnhancedDashboard() {
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => {
-      // Try to use the dashboard view first
-      const { data: viewData, error: viewError } = await supabase
-        .from('v_dashboard' as any)
-        .select('*');
-      
-      if (!viewError && viewData) {
-        return viewData as DashboardUser[];
+      try {
+        // Try to use the dashboard view first
+        const { data: viewData, error: viewError } = await supabase
+          .from('v_dashboard' as any)
+          .select('*');
+        
+        if (!viewError && viewData) {
+          return viewData as DashboardUser[];
+        }
+
+        // Fallback to basic user data if view doesn't exist
+        const { data: users, error: usersError } = await supabase
+          .from('users')
+          .select('*');
+
+        if (usersError) throw usersError;
+
+        // Transform basic user data to match expected interface
+        return (users || []).map(user => ({
+          id: user.id,
+          full_name: user.full_name,
+          email: user.email,
+          hours_today: 0,
+          hours_this_week: 0,
+          weekly_activity_percent: 0,
+          low_activity: false,
+          recent_screenshot_url: null
+        })) as DashboardUser[];
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        return [] as DashboardUser[];
       }
-
-      // Fallback to basic user data if view doesn't exist
-      const { data: users, error: usersError } = await supabase
-        .from('users')
-        .select('*');
-
-      if (usersError) throw usersError;
-
-      // Transform basic user data to match expected interface
-      return users.map(user => ({
-        id: user.id,
-        full_name: user.full_name,
-        email: user.email,
-        hours_today: 0,
-        hours_this_week: 0,
-        weekly_activity_percent: 0,
-        low_activity: false,
-        recent_screenshot_url: null
-      })) as DashboardUser[];
     }
   });
 
   const { data: totalStats } = useQuery({
     queryKey: ['total-stats'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-      
-      // Get basic stats from time_logs
-      const { data: todayLogs } = await supabase
-        .from('time_logs')
-        .select('*')
-        .gte('start_time', today);
-      
-      const { data: weekLogs } = await supabase
-        .from('time_logs')
-        .select('*')
-        .gte('start_time', weekStart.toISOString());
-      
-      const { data: activeLogs } = await supabase
-        .from('time_logs')
-        .select('user_id')
-        .gte('start_time', today)
-        .is('end_time', null);
-      
-      return {
-        todayHours: todayLogs?.length || 0,
-        weekHours: weekLogs?.length || 0,
-        activeUsers: new Set(activeLogs?.map(u => u.user_id)).size || 0
-      };
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        
+        // Get basic stats from time_logs
+        const { data: todayLogs } = await supabase
+          .from('time_logs')
+          .select('*')
+          .gte('start_time', today);
+        
+        const { data: weekLogs } = await supabase
+          .from('time_logs')
+          .select('*')
+          .gte('start_time', weekStart.toISOString());
+        
+        const { data: activeLogs } = await supabase
+          .from('time_logs')
+          .select('user_id')
+          .gte('start_time', today)
+          .is('end_time', null);
+        
+        return {
+          todayHours: todayLogs?.length || 0,
+          weekHours: weekLogs?.length || 0,
+          activeUsers: new Set(activeLogs?.map(u => u.user_id)).size || 0
+        };
+      } catch (error) {
+        console.error('Error fetching total stats:', error);
+        return {
+          todayHours: 0,
+          weekHours: 0,
+          activeUsers: 0
+        };
+      }
     }
   });
 
@@ -88,7 +102,9 @@ export default function EnhancedDashboard() {
   }
 
   const lowActivityUsers = dashboardData?.filter(user => user.low_activity) || [];
-  const avgWeeklyActivity = dashboardData?.reduce((acc, user) => acc + user.weekly_activity_percent, 0) / (dashboardData?.length || 1);
+  const avgWeeklyActivity = dashboardData && dashboardData.length > 0 
+    ? dashboardData.reduce((acc, user) => acc + user.weekly_activity_percent, 0) / dashboardData.length 
+    : 0;
 
   return (
     <div className="space-y-6">

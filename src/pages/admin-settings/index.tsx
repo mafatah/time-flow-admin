@@ -30,33 +30,45 @@ export default function AdminSettingsPage() {
   const { data: settings, isLoading } = useQuery({
     queryKey: ['settings'],
     queryFn: async () => {
-      // Using a more generic query since the table might not be in TypeScript definitions yet
-      const { data, error } = await supabase
-        .from('settings' as any)
-        .select('*')
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('settings' as any)
+          .select('*')
+          .single();
 
-      if (error) {
-        // If settings table doesn't exist or no data, return default settings
-        if (error.code === 'PGRST116' || error.message.includes('relation "settings" does not exist')) {
-          return {
-            id: 'default',
-            blur_screenshots: false,
-            screenshot_interval_seconds: 300,
-            idle_threshold_seconds: 300,
-            notification_rules: {},
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          } as SystemSettings;
+        if (error) {
+          // If settings table doesn't exist or no data, return default settings
+          if (error.code === 'PGRST116' || error.message.includes('relation "settings" does not exist')) {
+            return {
+              id: 'default',
+              blur_screenshots: false,
+              screenshot_interval_seconds: 300,
+              idle_threshold_seconds: 300,
+              notification_rules: {},
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            } as SystemSettings;
+          }
+          throw error;
         }
-        throw error;
+        
+        if (data?.notification_rules) {
+          setNotificationRules(JSON.stringify(data.notification_rules, null, 2));
+        }
+        
+        return data as SystemSettings;
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+        return {
+          id: 'default',
+          blur_screenshots: false,
+          screenshot_interval_seconds: 300,
+          idle_threshold_seconds: 300,
+          notification_rules: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as SystemSettings;
       }
-      
-      if (data?.notification_rules) {
-        setNotificationRules(JSON.stringify(data.notification_rules, null, 2));
-      }
-      
-      return data as SystemSettings;
     }
   });
 

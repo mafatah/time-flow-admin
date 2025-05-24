@@ -1,14 +1,13 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { TrendingUp, AlertTriangle, Eye, Target } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { AlertTriangle, TrendingUp, Clock, Focus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { Cell, PieChart, Pie, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 interface UnusualActivity {
   id: string;
@@ -16,113 +15,154 @@ interface UnusualActivity {
   detected_at: string;
   confidence: number;
   rule_triggered: string;
-  duration_hm: string | null;
-  notes: string | null;
-  users: { full_name: string };
+  duration_hm: string;
+  notes: string;
+  users: { full_name: string } | null;
 }
 
-interface UtilizationData {
-  user_id: string;
-  full_name: string;
-  total_hours: number;
-  productive_hours: number;
-  utilization_rate: number;
+interface WorkClassification {
+  name: string;
+  value: number;
+  color: string;
 }
 
 export default function InsightsPage() {
-  const { data: unusualActivities, isLoading: activitiesLoading } = useQuery({
+  const { data: unusualActivities, isLoading: unusualLoading } = useQuery({
     queryKey: ['unusual-activities'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('unusual_activity')
-        .select(`
-          *,
-          users (full_name)
-        `)
-        .order('detected_at', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('unusual_activity' as any)
+          .select('*')
+          .order('detected_at', { ascending: false })
+          .limit(20);
 
-      if (error) throw error;
-      return data as UnusualActivity[];
-    }
-  });
-
-  const { data: utilizationData, isLoading: utilizationLoading } = useQuery({
-    queryKey: ['utilization'],
-    queryFn: async () => {
-      // Mock utilization data - in real app, this would be calculated from time_logs and app_logs
-      const mockData: UtilizationData[] = [
-        { user_id: '1', full_name: 'John Doe', total_hours: 40, productive_hours: 32, utilization_rate: 80 },
-        { user_id: '2', full_name: 'Jane Smith', total_hours: 38, productive_hours: 30, utilization_rate: 79 },
-        { user_id: '3', full_name: 'Bob Wilson', total_hours: 35, productive_hours: 21, utilization_rate: 60 },
-      ];
-      return mockData;
+        if (error) {
+          console.error('Error fetching unusual activities:', error);
+          return [] as UnusualActivity[];
+        }
+        
+        return (data || []).map(item => ({
+          ...item,
+          users: { full_name: 'Unknown User' }
+        })) as UnusualActivity[];
+      } catch (error) {
+        console.error('Error fetching unusual activities:', error);
+        return [] as UnusualActivity[];
+      }
     }
   });
 
   const { data: workClassification } = useQuery({
     queryKey: ['work-classification'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('screenshots')
-        .select('classification')
-        .not('classification', 'is', null);
+      try {
+        const { data: screenshots } = await supabase
+          .from('screenshots')
+          .select('classification')
+          .not('classification', 'is', null);
 
-      if (error) throw error;
-      
-      const counts = data.reduce((acc, item) => {
-        acc[item.classification] = (acc[item.classification] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+        const classifications = screenshots?.reduce((acc: any, screenshot: any) => {
+          const classification = screenshot.classification || 'unclassified';
+          acc[classification] = (acc[classification] || 0) + 1;
+          return acc;
+        }, {}) || {};
 
-      const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
-      
-      return Object.entries(counts).map(([type, count]) => ({
-        type,
-        count,
-        percentage: (count / total) * 100
-      }));
+        return [
+          { name: 'Core Work', value: classifications.core || 0, color: '#10b981' },
+          { name: 'Non-Core', value: classifications.non_core || 0, color: '#f59e0b' },
+          { name: 'Unproductive', value: classifications.unproductive || 0, color: '#ef4444' },
+        ] as WorkClassification[];
+      } catch (error) {
+        console.error('Error fetching work classification:', error);
+        return [] as WorkClassification[];
+      }
     }
   });
 
-  const averageUtilization = utilizationData?.reduce((acc, user) => acc + user.utilization_rate, 0) / (utilizationData?.length || 1);
+  const { data: teamUtilization } = useQuery({
+    queryKey: ['team-utilization'],
+    queryFn: async () => {
+      try {
+        const { data: dashboardData } = await supabase
+          .from('v_dashboard' as any)
+          .select('weekly_activity_percent');
+        
+        if (dashboardData && dashboardData.length > 0) {
+          const avgUtilization = dashboardData.reduce((acc: number, user: any) => 
+            acc + (user.weekly_activity_percent || 0), 0) / dashboardData.length;
+          return Math.round(avgUtilization);
+        }
+        
+        return 75; // Default value
+      } catch (error) {
+        console.error('Error fetching team utilization:', error);
+        return 75;
+      }
+    }
+  });
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Insights & Analytics</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Team Insights</h1>
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5" />
+              <TrendingUp className="h-5 w-5" />
               Team Utilization
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold">{averageUtilization?.toFixed(1)}%</span>
-                <Badge variant={averageUtilization > 75 ? 'default' : 'secondary'}>
-                  {averageUtilization > 75 ? 'Good' : 'Needs Improvement'}
-                </Badge>
-              </div>
-              <Progress value={averageUtilization} className="h-3" />
-              <p className="text-sm text-muted-foreground">
-                Average team productivity utilization this week
-              </p>
-              
-              {utilizationLoading ? (
-                <div>Loading utilization data...</div>
-              ) : (
-                <div className="space-y-2">
-                  {utilizationData?.map((user) => (
-                    <div key={user.user_id} className="flex items-center justify-between text-sm">
-                      <span>{user.full_name}</span>
-                      <span className="font-medium">{user.utilization_rate}%</span>
-                    </div>
-                  ))}
+            <div className="text-3xl font-bold mb-2">{teamUtilization}%</div>
+            <Progress value={teamUtilization} className="mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Average weekly activity across all team members
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Focus className="h-5 w-5" />
+              Work Classification
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={workClassification}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {workClassification?.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {workClassification?.map((item, index) => (
+                <div key={index} className="flex items-center gap-1 text-xs">
+                  <div 
+                    className="w-3 h-3 rounded-full" 
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span>{item.name}</span>
                 </div>
-              )}
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -130,24 +170,29 @@ export default function InsightsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Work Classification
+              <AlertTriangle className="h-5 w-5" />
+              Unusual Activity
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {workClassification?.map((item) => (
-                <div key={item.type} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="capitalize font-medium">{item.type.replace('_', ' ')}</span>
-                    <span className="text-sm font-medium">{item.percentage.toFixed(1)}%</span>
+            <div className="text-3xl font-bold mb-2">
+              {unusualActivities?.length || 0}
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Detected anomalies this week
+            </p>
+            <div className="space-y-2">
+              {unusualActivities?.slice(0, 3).map((activity) => (
+                <div key={activity.id} className="flex items-center justify-between">
+                  <div className="text-sm">
+                    <div className="font-medium">{activity.users?.full_name}</div>
+                    <div className="text-muted-foreground">{activity.rule_triggered}</div>
                   </div>
-                  <Progress value={item.percentage} className="h-2" />
+                  <Badge variant="destructive" className="text-xs">
+                    {Math.round((activity.confidence || 0) * 100)}%
+                  </Badge>
                 </div>
               ))}
-              {(!workClassification || workClassification.length === 0) && (
-                <p className="text-sm text-muted-foreground">No classification data available</p>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -155,79 +200,78 @@ export default function InsightsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            Unusual Activity Detection
-          </CardTitle>
+          <CardTitle>Unusual Activity Log</CardTitle>
         </CardHeader>
         <CardContent>
-          {activitiesLoading ? (
+          {unusualLoading ? (
             <div>Loading unusual activities...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Detected</TableHead>
-                  <TableHead>Rule Triggered</TableHead>
-                  <TableHead>Confidence</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {unusualActivities?.map((activity) => (
-                  <TableRow key={activity.id}>
-                    <TableCell className="font-medium">{activity.users.full_name}</TableCell>
-                    <TableCell>{format(new Date(activity.detected_at), 'MMM d, HH:mm')}</TableCell>
-                    <TableCell>{activity.rule_triggered}</TableCell>
-                    <TableCell>
-                      <Badge variant={activity.confidence > 0.8 ? 'destructive' : 'secondary'}>
-                        {(activity.confidence * 100).toFixed(0)}%
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{activity.duration_hm || 'N/A'}</TableCell>
-                    <TableCell>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="ghost">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Activity Details</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div>
-                              <strong>Employee:</strong> {activity.users.full_name}
-                            </div>
-                            <div>
-                              <strong>Rule:</strong> {activity.rule_triggered}
-                            </div>
-                            <div>
-                              <strong>Confidence:</strong> {(activity.confidence * 100).toFixed(0)}%
-                            </div>
-                            {activity.notes && (
-                              <div>
-                                <strong>Notes:</strong> {activity.notes}
-                              </div>
-                            )}
+            <div className="space-y-4">
+              {unusualActivities?.map((activity) => (
+                <div key={activity.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    <div>
+                      <div className="font-medium">{activity.users?.full_name || 'Unknown User'}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {activity.rule_triggered} • {new Date(activity.detected_at).toLocaleDateString()}
+                      </div>
+                      {activity.duration_hm && (
+                        <div className="text-sm text-muted-foreground">
+                          Duration: {activity.duration_hm}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="destructive">
+                      {Math.round((activity.confidence || 0) * 100)}% confidence
+                    </Badge>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          Details
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Unusual Activity Details</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <strong>Employee:</strong> {activity.users?.full_name}
                           </div>
-                        </DialogContent>
-                      </Dialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {(!unusualActivities || unusualActivities.length === 0) && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      No unusual activities detected
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                          <div>
+                            <strong>Rule Triggered:</strong> {activity.rule_triggered}
+                          </div>
+                          <div>
+                            <strong>Confidence:</strong> {Math.round((activity.confidence || 0) * 100)}%
+                          </div>
+                          <div>
+                            <strong>Detected At:</strong> {new Date(activity.detected_at).toLocaleString()}
+                          </div>
+                          {activity.duration_hm && (
+                            <div>
+                              <strong>Duration:</strong> {activity.duration_hm}
+                            </div>
+                          )}
+                          {activity.notes && (
+                            <div>
+                              <strong>Notes:</strong> {activity.notes}
+                            </div>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              ))}
+              {(!unusualActivities || unusualActivities.length === 0) && (
+                <div className="text-center text-muted-foreground py-8">
+                  No unusual activity detected
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

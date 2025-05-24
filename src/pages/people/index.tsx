@@ -4,12 +4,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, Users, Download, Upload } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Download, Upload, Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -22,15 +22,10 @@ interface User {
 }
 
 export default function PeoplePage() {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [newUser, setNewUser] = useState({
-    email: '',
-    full_name: '',
-    role: 'employee'
-  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ email: '', full_name: '', role: 'employee' });
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
@@ -45,11 +40,18 @@ export default function PeoplePage() {
     }
   });
 
-  const createUserMutation = useMutation({
-    mutationFn: async (userData: typeof newUser) => {
+  const addUserMutation = useMutation({
+    mutationFn: async (userData: { email: string; full_name: string; role: string }) => {
+      // For now, just add to users table directly
+      // In a real app, you'd integrate with Supabase Auth
       const { data, error } = await supabase
         .from('users')
-        .insert([userData])
+        .insert([{
+          id: crypto.randomUUID(), // Generate a temporary ID
+          email: userData.email,
+          full_name: userData.full_name,
+          role: userData.role
+        }])
         .select()
         .single();
 
@@ -58,34 +60,16 @@ export default function PeoplePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setIsCreateDialogOpen(false);
+      toast({ title: 'User added successfully' });
+      setIsAddDialogOpen(false);
       setNewUser({ email: '', full_name: '', role: 'employee' });
-      toast({ title: 'User created successfully' });
     },
-    onError: (error) => {
-      toast({ title: 'Error creating user', description: error.message, variant: 'destructive' });
-    }
-  });
-
-  const updateUserMutation = useMutation({
-    mutationFn: async ({ id, ...userData }: Partial<User> & { id: string }) => {
-      const { data, error } = await supabase
-        .from('users')
-        .update(userData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setEditingUser(null);
-      toast({ title: 'User updated successfully' });
-    },
-    onError: (error) => {
-      toast({ title: 'Error updating user', description: error.message, variant: 'destructive' });
+    onError: (error: any) => {
+      toast({ 
+        title: 'Error adding user', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
     }
   });
 
@@ -102,59 +86,97 @@ export default function PeoplePage() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast({ title: 'User deleted successfully' });
     },
-    onError: (error) => {
-      toast({ title: 'Error deleting user', description: error.message, variant: 'destructive' });
+    onError: (error: any) => {
+      toast({ 
+        title: 'Error deleting user', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
     }
   });
 
-  const handleCreateUser = () => {
-    createUserMutation.mutate(newUser);
+  const handleAddUser = () => {
+    if (!newUser.email || !newUser.full_name) {
+      toast({ title: 'Please fill in all required fields', variant: 'destructive' });
+      return;
+    }
+    addUserMutation.mutate(newUser);
   };
 
-  const handleUpdateUser = () => {
-    if (editingUser) {
-      updateUserMutation.mutate(editingUser);
-    }
+  const handleImportUsers = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const csv = e.target?.result as string;
+        const lines = csv.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        
+        const usersToImport = lines.slice(1)
+          .filter(line => line.trim())
+          .map(line => {
+            const values = line.split(',').map(v => v.trim());
+            return {
+              email: values[headers.indexOf('email')] || '',
+              full_name: values[headers.indexOf('full_name')] || values[headers.indexOf('name')] || '',
+              role: values[headers.indexOf('role')] || 'employee'
+            };
+          })
+          .filter(user => user.email && user.full_name);
+
+        // For demo purposes, just show success message
+        toast({ title: `Prepared to import ${usersToImport.length} users` });
+      } catch (error) {
+        toast({ title: 'Error parsing CSV file', variant: 'destructive' });
+      }
+    };
+    reader.readAsText(file);
   };
 
   const exportUsers = () => {
     if (!users) return;
     
-    const csvContent = [
-      ['Full Name', 'Email', 'Role'],
-      ...users.map(user => [user.full_name, user.email, user.role])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
+    const csv = [
+      'email,full_name,role',
+      ...users.map(user => `${user.email},${user.full_name},${user.role}`)
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'employees.csv';
+    a.download = 'users.csv';
     a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const getRoleBadgeVariant = (role: string) => {
-    switch (role) {
-      case 'admin': return 'destructive';
-      case 'manager': return 'default';
-      default: return 'secondary';
-    }
-  };
+  if (isLoading) {
+    return <div>Loading users...</div>;
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">People Management</h1>
-        <div className="flex gap-2">
-          <Button onClick={exportUsers} variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button variant="outline">
+        <div className="flex items-center gap-2">
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleImportUsers}
+            className="hidden"
+            id="import-users"
+          />
+          <Button variant="outline" onClick={() => document.getElementById('import-users')?.click()}>
             <Upload className="h-4 w-4 mr-2" />
-            Import
+            Import CSV
           </Button>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <Button variant="outline" onClick={exportUsers}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -173,6 +195,7 @@ export default function PeoplePage() {
                     type="email"
                     value={newUser.email}
                     onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                    placeholder="john@company.com"
                   />
                 </div>
                 <div>
@@ -181,6 +204,7 @@ export default function PeoplePage() {
                     id="full_name"
                     value={newUser.full_name}
                     onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
+                    placeholder="John Doe"
                   />
                 </div>
                 <div>
@@ -196,144 +220,70 @@ export default function PeoplePage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={handleCreateUser} className="w-full">
-                  Create Employee
-                </Button>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddUser} disabled={addUserMutation.isPending}>
+                    {addUserMutation.isPending ? 'Adding...' : 'Add Employee'}
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users?.length || 0}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Managers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {users?.filter(u => u.role === 'manager').length || 0}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Admins</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {users?.filter(u => u.role === 'admin').length || 0}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle>Employee Directory</CardTitle>
+          <CardTitle>Team Members</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div>Loading employees...</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Actions</TableHead>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users?.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.full_name}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <Badge variant={user.role === 'admin' ? 'default' : user.role === 'manager' ? 'secondary' : 'outline'}>
+                      {user.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => deleteUserMutation.mutate(user.id)}
+                        disabled={deleteUserMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users?.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.full_name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={getRoleBadgeVariant(user.role)}>
-                        {user.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button size="sm" variant="ghost" onClick={() => setEditingUser(user)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Edit Employee</DialogTitle>
-                            </DialogHeader>
-                            {editingUser && (
-                              <div className="space-y-4">
-                                <div>
-                                  <Label htmlFor="edit_email">Email</Label>
-                                  <Input
-                                    id="edit_email"
-                                    type="email"
-                                    value={editingUser.email}
-                                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="edit_full_name">Full Name</Label>
-                                  <Input
-                                    id="edit_full_name"
-                                    value={editingUser.full_name}
-                                    onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="edit_role">Role</Label>
-                                  <Select value={editingUser.role} onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}>
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="employee">Employee</SelectItem>
-                                      <SelectItem value="manager">Manager</SelectItem>
-                                      <SelectItem value="admin">Admin</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <Button onClick={handleUpdateUser} className="w-full">
-                                  Update Employee
-                                </Button>
-                              </div>
-                            )}
-                          </DialogContent>
-                        </Dialog>
-                        
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={() => deleteUserMutation.mutate(user.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ))}
+              {(!users || users.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    No employees found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

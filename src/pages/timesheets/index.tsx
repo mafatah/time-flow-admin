@@ -3,13 +3,14 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Download, Edit, Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar, Download, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 
 interface TimeLog {
   id: string;
@@ -18,185 +19,263 @@ interface TimeLog {
   start_time: string;
   end_time: string | null;
   is_idle: boolean;
-  tasks: { name: string; projects: { name: string } };
-  users: { full_name: string };
+  users: { full_name: string } | null;
+  tasks: { name: string; projects: { name: string } } | null;
 }
 
 export default function TimesheetsPage() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [view, setView] = useState<'daily' | 'weekly'>('daily');
+  const [selectedWeek, setSelectedWeek] = useState(new Date());
+  const [selectedUser, setSelectedUser] = useState('all');
 
   const { data: timeLogs, isLoading } = useQuery({
-    queryKey: ['time-logs', selectedDate, view],
+    queryKey: ['time-logs', selectedWeek, selectedUser],
     queryFn: async () => {
-      const startDate = view === 'daily' 
-        ? format(selectedDate, 'yyyy-MM-dd')
-        : format(new Date(selectedDate.getTime() - selectedDate.getDay() * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
-      
-      const endDate = view === 'daily'
-        ? format(selectedDate, 'yyyy-MM-dd')
-        : format(new Date(selectedDate.getTime() + (6 - selectedDate.getDay()) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+      try {
+        const weekStart = startOfWeek(selectedWeek);
+        const weekEnd = endOfWeek(selectedWeek);
 
+        let query = supabase
+          .from('time_logs')
+          .select(`
+            id,
+            user_id,
+            task_id,
+            start_time,
+            end_time,
+            is_idle
+          `)
+          .gte('start_time', weekStart.toISOString())
+          .lte('start_time', weekEnd.toISOString())
+          .order('start_time', { ascending: false });
+
+        if (selectedUser !== 'all') {
+          query = query.eq('user_id', selectedUser);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+        
+        // Transform data to match expected interface
+        return (data || []).map(item => ({
+          ...item,
+          users: { full_name: 'Unknown User' },
+          tasks: { name: 'Unknown Task', projects: { name: 'Unknown Project' } }
+        })) as TimeLog[];
+      } catch (error) {
+        console.error('Error fetching time logs:', error);
+        return [] as TimeLog[];
+      }
+    }
+  });
+
+  const { data: users } = useQuery({
+    queryKey: ['users-for-filter'],
+    queryFn: async () => {
       const { data, error } = await supabase
-        .from('time_logs')
-        .select(`
-          *,
-          tasks (name, projects (name)),
-          users (full_name)
-        `)
-        .gte('start_time', startDate)
-        .lte('start_time', endDate + 'T23:59:59');
+        .from('users')
+        .select('id, full_name')
+        .order('full_name');
 
       if (error) throw error;
-      return data as TimeLog[];
+      return data;
     }
   });
 
   const calculateDuration = (startTime: string, endTime: string | null) => {
+    if (!endTime) return 'Ongoing';
+    
     const start = new Date(startTime);
-    const end = endTime ? new Date(endTime) : new Date();
+    const end = new Date(endTime);
     const diffMs = end.getTime() - start.getTime();
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
+    
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
   };
 
-  const exportToCSV = () => {
+  const exportTimesheet = () => {
     if (!timeLogs) return;
     
-    const csvContent = [
-      ['Employee', 'Project', 'Task', 'Start Time', 'End Time', 'Duration', 'Status'],
+    const csv = [
+      'Employee,Project,Task,Start Time,End Time,Duration,Status',
       ...timeLogs.map(log => [
-        log.users.full_name,
-        log.tasks.projects.name,
-        log.tasks.name,
+        log.users?.full_name || 'Unknown',
+        log.tasks?.projects.name || 'Unknown',
+        log.tasks?.name || 'Unknown',
         format(new Date(log.start_time), 'yyyy-MM-dd HH:mm'),
         log.end_time ? format(new Date(log.end_time), 'yyyy-MM-dd HH:mm') : 'Ongoing',
         calculateDuration(log.start_time, log.end_time),
         log.is_idle ? 'Idle' : 'Active'
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
+      ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `timesheets-${format(selectedDate, 'yyyy-MM-dd')}.csv`;
+    a.download = `timesheet-${format(selectedWeek, 'yyyy-MM-dd')}.csv`;
     a.click();
+    URL.revokeObjectURL(url);
   };
+
+  const totalHours = timeLogs?.reduce((total, log) => {
+    if (!log.end_time) return total;
+    const start = new Date(log.start_time);
+    const end = new Date(log.end_time);
+    const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    return total + hours;
+  }, 0) || 0;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Timesheets</h1>
-        <div className="flex gap-2">
-          <Button onClick={exportToCSV} variant="outline">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={exportTimesheet}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
         </div>
       </div>
 
-      <Tabs value={view} onValueChange={(value) => setView(value as 'daily' | 'weekly')}>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          <Input
+            type="week"
+            value={format(selectedWeek, 'yyyy-\\WWW')}
+            onChange={(e) => {
+              const [year, week] = e.target.value.split('-W');
+              const date = new Date(parseInt(year), 0, 1 + (parseInt(week) - 1) * 7);
+              setSelectedWeek(date);
+            }}
+            className="w-40"
+          />
+        </div>
+        <Select value={selectedUser} onValueChange={setSelectedUser}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Select employee" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Employees</SelectItem>
+            {users?.map(user => (
+              <SelectItem key={user.id} value={user.id}>
+                {user.full_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalHours.toFixed(1)}h</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Entries</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{timeLogs?.length || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {timeLogs?.filter(log => !log.end_time).length || 0}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="table" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="daily">Daily View</TabsTrigger>
-          <TabsTrigger value="weekly">Weekly View</TabsTrigger>
+          <TabsTrigger value="table">Table View</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar View</TabsTrigger>
         </TabsList>
 
-        <div className="grid gap-6 lg:grid-cols-4">
+        <TabsContent value="table">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
-                Select Date
-              </CardTitle>
+              <CardTitle>Time Entries</CardTitle>
             </CardHeader>
             <CardContent>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                className="rounded-md border"
-              />
+              {isLoading ? (
+                <div>Loading time logs...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Task</TableHead>
+                      <TableHead>Start Time</TableHead>
+                      <TableHead>End Time</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {timeLogs?.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell className="font-medium">
+                          {log.users?.full_name || 'Unknown User'}
+                        </TableCell>
+                        <TableCell>{log.tasks?.projects.name || 'Unknown'}</TableCell>
+                        <TableCell>{log.tasks?.name || 'Unknown'}</TableCell>
+                        <TableCell>{format(new Date(log.start_time), 'MMM d, HH:mm')}</TableCell>
+                        <TableCell>
+                          {log.end_time ? format(new Date(log.end_time), 'MMM d, HH:mm') : 'Ongoing'}
+                        </TableCell>
+                        <TableCell>{calculateDuration(log.start_time, log.end_time)}</TableCell>
+                        <TableCell>
+                          <Badge variant={log.is_idle ? 'secondary' : log.end_time ? 'default' : 'outline'}>
+                            {log.is_idle ? 'Idle' : log.end_time ? 'Completed' : 'Active'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {(!timeLogs || timeLogs.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground">
+                          No time entries found for the selected period
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
+        </TabsContent>
 
-          <div className="lg:col-span-3">
-            <TabsContent value="daily" className="mt-0">
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    Daily Timesheet - {format(selectedDate, 'MMMM d, yyyy')}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div>Loading timesheets...</div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Employee</TableHead>
-                          <TableHead>Project</TableHead>
-                          <TableHead>Task</TableHead>
-                          <TableHead>Start Time</TableHead>
-                          <TableHead>End Time</TableHead>
-                          <TableHead>Duration</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {timeLogs?.map((log) => (
-                          <TableRow key={log.id}>
-                            <TableCell className="font-medium">{log.users.full_name}</TableCell>
-                            <TableCell>{log.tasks.projects.name}</TableCell>
-                            <TableCell>{log.tasks.name}</TableCell>
-                            <TableCell>{format(new Date(log.start_time), 'HH:mm')}</TableCell>
-                            <TableCell>
-                              {log.end_time ? format(new Date(log.end_time), 'HH:mm') : 'Ongoing'}
-                            </TableCell>
-                            <TableCell>{calculateDuration(log.start_time, log.end_time)}</TableCell>
-                            <TableCell>
-                              <Badge variant={log.is_idle ? 'secondary' : 'default'}>
-                                {log.is_idle ? 'Idle' : 'Active'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="ghost">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {(!timeLogs || timeLogs.length === 0) && (
-                          <TableRow>
-                            <TableCell colSpan={8} className="text-center text-muted-foreground">
-                              No time logs found for this date
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="weekly" className="mt-0">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Weekly Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center text-muted-foreground">
-                    Weekly timesheet view coming soon
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </div>
-        </div>
+        <TabsContent value="calendar">
+          <Card>
+            <CardHeader>
+              <CardTitle>Calendar View</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center text-muted-foreground py-8">
+                Calendar view coming soon...
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );

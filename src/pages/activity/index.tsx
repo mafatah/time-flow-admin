@@ -55,70 +55,103 @@ export default function ActivityPage() {
   const { data: screenshots, isLoading: screenshotsLoading } = useQuery({
     queryKey: ['screenshots'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('screenshots')
-        .select(`
-          *,
-          users!inner (full_name),
-          tasks (name, projects (name))
-        `)
-        .order('captured_at', { ascending: false })
-        .limit(50);
+      try {
+        const { data, error } = await supabase
+          .from('screenshots')
+          .select(`
+            id,
+            user_id,
+            task_id,
+            image_url,
+            captured_at,
+            activity_percent,
+            focus_percent,
+            classification
+          `)
+          .order('captured_at', { ascending: false })
+          .limit(50);
 
-      if (error) throw error;
-      return data as Screenshot[];
+        if (error) throw error;
+        
+        // Transform data to match expected interface
+        return (data || []).map(item => ({
+          ...item,
+          users: { full_name: 'Unknown User' },
+          tasks: null
+        })) as Screenshot[];
+      } catch (error) {
+        console.error('Error fetching screenshots:', error);
+        return [] as Screenshot[];
+      }
     }
   });
 
   const { data: appLogs, isLoading: appLogsLoading } = useQuery({
     queryKey: ['app-logs'],
     queryFn: async () => {
-      // Using a more generic query since the table might not be in TypeScript definitions yet
-      const { data, error } = await supabase
-        .rpc('get_app_logs_with_users')
-        .limit(50);
-
-      if (error) {
-        // Fallback to direct query if RPC doesn't exist
-        const { data: fallbackData, error: fallbackError } = await supabase
+      try {
+        const { data, error } = await supabase
           .from('app_logs' as any)
           .select(`
-            *,
-            users!inner (full_name)
+            id,
+            user_id,
+            app_name,
+            window_title,
+            started_at,
+            ended_at,
+            duration_seconds,
+            category
           `)
           .order('started_at', { ascending: false })
           .limit(50);
         
-        if (fallbackError) throw fallbackError;
-        return (fallbackData || []) as AppLog[];
+        if (error) {
+          console.error('Error fetching app logs:', error);
+          return [] as AppLog[];
+        }
+        
+        return (data || []).map(item => ({
+          ...item,
+          users: { full_name: 'Unknown User' }
+        })) as AppLog[];
+      } catch (error) {
+        console.error('Error fetching app logs:', error);
+        return [] as AppLog[];
       }
-      return (data || []) as AppLog[];
     }
   });
 
   const { data: urlLogs, isLoading: urlLogsLoading } = useQuery({
     queryKey: ['url-logs'],
     queryFn: async () => {
-      // Using a more generic query since the table might not be in TypeScript definitions yet
-      const { data, error } = await supabase
-        .rpc('get_url_logs_with_users')
-        .limit(50);
-
-      if (error) {
-        // Fallback to direct query if RPC doesn't exist
-        const { data: fallbackData, error: fallbackError } = await supabase
+      try {
+        const { data, error } = await supabase
           .from('url_logs' as any)
           .select(`
-            *,
-            users!inner (full_name)
+            id,
+            user_id,
+            site_url,
+            started_at,
+            ended_at,
+            duration_seconds,
+            category
           `)
           .order('started_at', { ascending: false })
           .limit(50);
         
-        if (fallbackError) throw fallbackError;
-        return (fallbackData || []) as UrlLog[];
+        if (error) {
+          console.error('Error fetching URL logs:', error);
+          return [] as UrlLog[];
+        }
+        
+        return (data || []).map(item => ({
+          ...item,
+          users: { full_name: 'Unknown User' }
+        })) as UrlLog[];
+      } catch (error) {
+        console.error('Error fetching URL logs:', error);
+        return [] as UrlLog[];
       }
-      return (data || []) as UrlLog[];
     }
   });
 
