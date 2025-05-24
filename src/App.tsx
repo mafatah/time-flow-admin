@@ -1,136 +1,60 @@
-import * as React from "react";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/providers/auth-provider";
-import { MainLayout } from "@/components/layout/main-layout";
-import { Loading } from "@/components/layout/loading";
-
-// Auth pages
+import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from "@/providers/auth-provider";
+import { TrackerProvider } from "@/providers/tracker-provider";
+import MainLayout from "@/components/layout/main-layout";
 import LoginPage from "@/pages/auth/login";
-
-// App pages
-import Dashboard from "@/pages/dashboard";
-import UsersPage from "@/pages/users/users-management";
+import EnhancedDashboard from "@/pages/dashboard/enhanced-dashboard";
+import TimesheetsPage from "@/pages/timesheets";
+import ActivityPage from "@/pages/activity";
+import InsightsPage from "@/pages/insights";
 import ProjectsPage from "@/pages/projects";
-import TimeTrackingPage from "@/pages/time-tracking/time-logs";
-import ScreenshotsPage from "@/pages/screenshots/screenshots-viewer";
+import PeoplePage from "@/pages/people";
+import AdminSettingsPage from "@/pages/admin-settings";
 import CalendarPage from "@/pages/calendar";
+import ScreenshotsPage from "@/pages/screenshots";
 import ReportsPage from "@/pages/reports";
-import SettingsPage from "@/pages/settings";
 import NotFoundPage from "@/pages/not-found";
-import Index from "@/pages/Index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      staleTime: 5 * 60 * 1000,
       retry: 1,
-      refetchOnWindowFocus: false,
-    }
-  }
+    },
+  },
 });
 
-// Protected route component
-function ProtectedRoute({ children, requiredRole }: { 
-  children: React.ReactNode;
-  requiredRole?: 'admin' | 'manager' | 'employee';
-}) {
-  const { user, userDetails, loading } = useAuth();
-
-  if (loading) {
-    return <Loading message="Authenticating..." />;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
-
-  // If a role is required, check if the user has it
-  if (requiredRole && userDetails?.role !== requiredRole && 
-     !(requiredRole === 'manager' && userDetails?.role === 'admin')) {
-    return <Navigate to="/dashboard" />;
-  }
-
-  return <>{children}</>;
-}
-
-function AppRoutes() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <Loading message="Loading application..." />;
-  }
-
+function App() {
   return (
-    <Routes>
-      {/* Auth routes */}
-      <Route 
-        path="/login" 
-        element={user ? <Navigate to="/dashboard" /> : <LoginPage />} 
-      />
-      
-      {/* Landing page redirect */}
-      <Route 
-        path="/" 
-        element={<Navigate to={user ? "/dashboard" : "/login"} />} 
-      />
-      
-      <Route 
-        path="/index" 
-        element={<Navigate to="/" />} 
-      />
-
-      {/* Protected routes */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="users" element={
-          <ProtectedRoute requiredRole="manager">
-            <UsersPage />
-          </ProtectedRoute>
-        } />
-        <Route path="projects" element={<ProjectsPage />} />
-        <Route path="time-tracking" element={<TimeTrackingPage />} />
-        <Route path="calendar" element={<CalendarPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="screenshots" element={<ScreenshotsPage />} />
-        <Route path="settings" element={
-          <ProtectedRoute requiredRole="admin">
-            <SettingsPage />
-          </ProtectedRoute>
-        } />
-      </Route>
-
-      {/* 404 Not Found */}
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TrackerProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<EnhancedDashboard />} />
+                <Route path="timesheets" element={<TimesheetsPage />} />
+                <Route path="activity" element={<ActivityPage />} />
+                <Route path="insights" element={<InsightsPage />} />
+                <Route path="projects" element={<ProjectsPage />} />
+                <Route path="people" element={<PeoplePage />} />
+                <Route path="admin-settings" element={<AdminSettingsPage />} />
+                <Route path="calendar" element={<CalendarPage />} />
+                <Route path="screenshots" element={<ScreenshotsPage />} />
+                <Route path="reports" element={<ReportsPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            </Routes>
+          </Router>
+        </TrackerProvider>
+      </AuthProvider>
+      <Toaster />
+    </QueryClientProvider>
   );
 }
-
-// Detect if running in Electron
-const isElectron = !!(window && window.process && window.process.versions && window.process.versions.electron);
-const Router = isElectron ? HashRouter : BrowserRouter;
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <Router>
-          <AppRoutes />
-        </Router>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
 
 export default App;

@@ -9,6 +9,109 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      app_logs: {
+        Row: {
+          app_name: string
+          category: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          project_id: string | null
+          started_at: string
+          user_id: string
+          window_title: string | null
+        }
+        Insert: {
+          app_name: string
+          category?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          project_id?: string | null
+          started_at?: string
+          user_id: string
+          window_title?: string | null
+        }
+        Update: {
+          app_name?: string
+          category?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          project_id?: string | null
+          started_at?: string
+          user_id?: string
+          window_title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_project_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          delivered_via: string[] | null
+          id: string
+          payload: Json
+          read_at: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_via?: string[] | null
+          id?: string
+          payload?: Json
+          read_at?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delivered_via?: string[] | null
+          id?: string
+          payload?: Json
+          read_at?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           created_at: string
@@ -32,25 +135,64 @@ export type Database = {
       }
       screenshots: {
         Row: {
+          activity_percent: number | null
           captured_at: string
+          classification: string | null
+          focus_percent: number | null
           id: string
           image_url: string
           task_id: string | null
           user_id: string | null
         }
         Insert: {
+          activity_percent?: number | null
           captured_at?: string
+          classification?: string | null
+          focus_percent?: number | null
           id?: string
           image_url: string
           task_id?: string | null
           user_id?: string | null
         }
         Update: {
+          activity_percent?: number | null
           captured_at?: string
+          classification?: string | null
+          focus_percent?: number | null
           id?: string
           image_url?: string
           task_id?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          blur_screenshots: boolean
+          created_at: string
+          id: string
+          idle_threshold_seconds: number
+          notification_rules: Json
+          screenshot_interval_seconds: number
+          updated_at: string
+        }
+        Insert: {
+          blur_screenshots?: boolean
+          created_at?: string
+          id?: string
+          idle_threshold_seconds?: number
+          notification_rules?: Json
+          screenshot_interval_seconds?: number
+          updated_at?: string
+        }
+        Update: {
+          blur_screenshots?: boolean
+          created_at?: string
+          id?: string
+          idle_threshold_seconds?: number
+          notification_rules?: Json
+          screenshot_interval_seconds?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -89,6 +231,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_tasks_users"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
             referencedColumns: ["id"]
           },
         ]
@@ -133,6 +282,84 @@ export type Database = {
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_time_logs_users"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      unusual_activity: {
+        Row: {
+          confidence: number | null
+          detected_at: string
+          duration_hm: string | null
+          id: string
+          notes: string | null
+          rule_triggered: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          detected_at?: string
+          duration_hm?: string | null
+          id?: string
+          notes?: string | null
+          rule_triggered: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          detected_at?: string
+          duration_hm?: string | null
+          id?: string
+          notes?: string | null
+          rule_triggered?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      url_logs: {
+        Row: {
+          category: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          project_id: string | null
+          site_url: string
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          project_id?: string | null
+          site_url: string
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          project_id?: string | null
+          site_url?: string
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "url_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       users: {
@@ -161,11 +388,27 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_dashboard: {
+        Row: {
+          email: string | null
+          full_name: string | null
+          hours_this_week: number | null
+          hours_today: number | null
+          id: string | null
+          low_activity: boolean | null
+          recent_screenshot_url: string | null
+          weekly_activity_percent: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      get_user_assigned_projects: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
       get_user_role: {
-        Args: { user_id: string }
+        Args: Record<PropertyKey, never> | { user_id: string }
         Returns: string
       }
     }
