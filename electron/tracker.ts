@@ -18,7 +18,6 @@ let trackingActive = false;
 let userId: string | null = null;
 let currentTaskId: string | null = null;
 
-
 // Session persistence handled by sessionManager
 let currentTimeLogId: string | null = null;
 
@@ -64,25 +63,44 @@ export async function updateTimeLogStatus(idle: boolean) {
 // Start tracking activities
 export async function startTracking() {
   if (trackingActive) return;
-  if (!userId || !currentTaskId) {
-    console.log('Cannot start tracking: missing user ID or task ID');
-    return;
+  
+  trackingActive = true;
+  
+  // Start screenshot capture regardless of user/task status
+  if (!screenshotInterval) {
+    screenshotInterval = setInterval(() => {
+      // Pass userId and taskId if available, otherwise undefined for anonymous capture
+      captureAndUpload(userId || undefined, currentTaskId || undefined);
+    }, screenshotIntervalSeconds * 1000);
   }
 
-  trackingActive = true;
-  try {
-    const { data, error } = await supabase
-      .from('time_logs')
-      .insert({
-        user_id: userId,
-        task_id: currentTaskId,
-        start_time: new Date().toISOString(),
-        status: 'active'
-      })
-      .select('id')
-      .single();
+  // Only start time logging and app logging if we have user and task
+  if (userId && currentTaskId) {
+    try {
+      const { data, error } = await supabase
+        .from('time_logs')
+        .insert({
+          user_id: userId,
+          task_id: currentTaskId,
+          start_time: new Date().toISOString(),
+          status: 'active'
+        })
+        .select('id')
+        .single();
 
-    if (error || !data) {
+      if (error || !data) {
+        currentTimeLogId = nanoid();
+        queueTimeLog({
+          user_id: userId,
+          task_id: currentTaskId,
+          start_time: new Date().toISOString(),
+          status: 'active'
+        });
+      } else {
+        currentTimeLogId = data.id;
+      }
+    } catch (err) {
+      console.error('Failed to start time log:', err);
       currentTimeLogId = nanoid();
       queueTimeLog({
         user_id: userId,
@@ -90,41 +108,25 @@ export async function startTracking() {
         start_time: new Date().toISOString(),
         status: 'active'
       });
-    } else {
-      currentTimeLogId = data.id;
     }
-  } catch (err) {
-    console.error('Failed to start time log:', err);
-    currentTimeLogId = nanoid();
-    queueTimeLog({
-      user_id: userId,
-      task_id: currentTaskId,
+
+    const session: SessionData = {
+      task_id: currentTaskId!,
+      user_id: userId!,
       start_time: new Date().toISOString(),
-      status: 'active'
-    });
-  }
+      time_log_id: currentTimeLogId!
+    };
+    storeSession(session);
+    startIdleMonitoring();
 
-  const session: SessionData = {
-    task_id: currentTaskId!,
-    user_id: userId!,
-    start_time: new Date().toISOString(),
-    time_log_id: currentTimeLogId!
-  };
-  storeSession(session);
-  startIdleMonitoring();
-
-  if (!screenshotInterval) {
-    screenshotInterval = setInterval(() => {
-      if (!userId || !currentTaskId) return;
-      captureAndUpload(userId, currentTaskId);
-    }, screenshotIntervalSeconds * 1000);
-  }
-
-  if (!appInterval) {
-    appInterval = setInterval(() => {
-      if (!userId || !currentTaskId) return;
-      void captureAppLog(userId, currentTaskId);
-    }, 10000);
+    if (!appInterval) {
+      appInterval = setInterval(() => {
+        if (!userId || !currentTaskId) return;
+        void captureAppLog(userId, currentTaskId);
+      }, 10000);
+    }
+  } else {
+    console.log('Starting screenshot-only tracking (no user ID or task ID provided)');
   }
 }
 

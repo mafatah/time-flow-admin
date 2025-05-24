@@ -30,8 +30,8 @@ function saveQueue(items: QueueItem[]) {
 
 interface QueueItem {
   path: string;
-  userId: string;
-  taskId: string;
+  userId: string | null;
+  taskId: string | null;
   timestamp: number;
 }
 
@@ -42,7 +42,7 @@ if (queue.length > 0) {
   startRetry();
 }
 
-export async function captureAndUpload(userId: string, taskId: string) {
+export async function captureAndUpload(userId?: string, taskId?: string) {
   try {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
@@ -62,7 +62,7 @@ export async function captureAndUpload(userId: string, taskId: string) {
     fs.writeFileSync(tempPath, buffer);
 
     try {
-      await uploadScreenshot(tempPath, userId, taskId, Date.now());
+      await uploadScreenshot(tempPath, userId || null, taskId || null, Date.now());
       // Clean up temp file after successful upload
       fs.unlink(tempPath, () => {});
       console.log('Screenshot uploaded successfully');
@@ -77,7 +77,7 @@ export async function captureAndUpload(userId: string, taskId: string) {
       fs.copyFileSync(tempPath, dest);
       fs.unlink(tempPath, () => {});
       
-      queue.push({ path: dest, userId, taskId, timestamp: Date.now() });
+      queue.push({ path: dest, userId: userId || null, taskId: taskId || null, timestamp: Date.now() });
       saveQueue(queue);
       startRetry();
     }
@@ -87,10 +87,11 @@ export async function captureAndUpload(userId: string, taskId: string) {
   }
 }
 
-async function uploadScreenshot(filePath: string, userId: string, taskId: string, ts: number) {
+async function uploadScreenshot(filePath: string, userId: string | null, taskId: string | null, ts: number) {
   const fileData = fs.readFileSync(filePath);
   const filename = path.basename(filePath);
-  const storagePath = `${userId}/${filename}`;
+  // Use anonymous folder if no userId provided
+  const storagePath = userId ? `${userId}/${filename}` : `anonymous/${filename}`;
 
   console.log(`Uploading screenshot to storage path: ${storagePath}`);
 
@@ -117,7 +118,7 @@ async function uploadScreenshot(filePath: string, userId: string, taskId: string
   const imageUrl = publicUrlData.publicUrl;
   console.log('Generated public URL:', imageUrl);
 
-  // Insert record into screenshots table
+  // Insert record into screenshots table with nullable fields
   const { error: dbError } = await supabase
     .from('screenshots')
     .insert({ 

@@ -35,39 +35,24 @@ export type Database = {
           captured_at: string
           id: string
           image_url: string
-          task_id: string
-          user_id: string
+          task_id: string | null
+          user_id: string | null
         }
         Insert: {
           captured_at?: string
           id?: string
           image_url: string
-          task_id: string
-          user_id: string
+          task_id?: string | null
+          user_id?: string | null
         }
         Update: {
           captured_at?: string
           id?: string
           image_url?: string
-          task_id?: string
-          user_id?: string
+          task_id?: string | null
+          user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "fk_screenshots_tasks"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_screenshots_users"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       tasks: {
         Row: {
