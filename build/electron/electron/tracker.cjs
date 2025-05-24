@@ -64,12 +64,19 @@ async function updateTimeLogStatus(idle) {
 }
 // Start tracking activities
 async function startTracking() {
-    if (trackingActive)
-        return;
-    if (!userId || !currentTaskId) {
-        console.log('Cannot start tracking: missing user ID or task ID');
+    console.log('🚀 startTracking() called');
+    console.log(`📊 Current state - trackingActive: ${trackingActive}, userId: ${userId}, taskId: ${currentTaskId}`);
+    if (trackingActive) {
+        console.log('⚠️ Tracking already active, returning early');
         return;
     }
+    if (!userId || !currentTaskId) {
+        console.log('❌ Cannot start tracking: missing user ID or task ID');
+        console.log(`   - userId: ${userId}`);
+        console.log(`   - currentTaskId: ${currentTaskId}`);
+        return;
+    }
+    console.log('✅ Starting tracking...');
     trackingActive = true;
     try {
         const { data, error } = await supabase_1.supabase
@@ -114,11 +121,18 @@ async function startTracking() {
     (0, sessionManager_1.saveSession)(session);
     (0, idleMonitor_1.startIdleMonitoring)();
     if (!screenshotInterval) {
+        console.log(`🚀 Setting up screenshot interval: ${config_1.screenshotIntervalSeconds} seconds`);
+        console.log(`📊 Current state - userId: ${userId}, taskId: ${currentTaskId}`);
         screenshotInterval = setInterval(() => {
-            if (!userId || !currentTaskId)
+            console.log(`⏰ Screenshot interval triggered - userId: ${userId}, taskId: ${currentTaskId}`);
+            if (!userId || !currentTaskId) {
+                console.log('❌ Missing userId or taskId, skipping screenshot');
                 return;
+            }
+            console.log('📸 Calling captureAndUpload...');
             (0, screenshotManager_1.captureAndUpload)(userId, currentTaskId);
         }, config_1.screenshotIntervalSeconds * 1000);
+        console.log(`✅ Screenshot interval set up successfully - will capture every ${config_1.screenshotIntervalSeconds}s`);
     }
     if (!appInterval) {
         appInterval = setInterval(() => {

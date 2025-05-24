@@ -9,7 +9,9 @@ electron_1.contextBridge.exposeInMainWorld('electron', {
     stopTracking: () => electron_1.ipcRenderer.send('stop-tracking'),
     syncOfflineData: () => electron_1.ipcRenderer.send('sync-offline-data'),
     loadSession: () => electron_1.ipcRenderer.invoke('load-session'),
-    clearSavedSession: () => electron_1.ipcRenderer.send('clear-session')
+    clearSavedSession: () => electron_1.ipcRenderer.send('clear-session'),
+    send: (channel, ...args) => electron_1.ipcRenderer.send(channel, ...args),
+    invoke: (channel, ...args) => electron_1.ipcRenderer.invoke(channel, ...args)
 });
 // This allows the renderer process to detect if it's running in Electron
 electron_1.contextBridge.exposeInMainWorld('isElectron', true);

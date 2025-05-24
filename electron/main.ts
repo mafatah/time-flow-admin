@@ -6,6 +6,8 @@ import { setUserId, setTaskId, startTracking, stopTracking, syncOfflineData, loa
 import { setupAutoLaunch } from './autoLaunch';
 import { initSystemMonitor } from './systemMonitor';
 import { startSyncLoop } from './unsyncedManager';
+import { startActivityMonitoring, stopActivityMonitoring, triggerActivityCapture, triggerDirectScreenshot } from './activityMonitor';
+import { ensureScreenRecordingPermission, testScreenCapture } from './permissionManager';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -106,6 +108,19 @@ async function createWindow() {
 
 app.whenReady().then(async () => {
   await createWindow();
+  
+  // Request screen recording permission on startup
+  console.log('🚀 App ready, checking permissions...');
+  const hasPermission = await ensureScreenRecordingPermission();
+  
+  if (hasPermission) {
+    // Test screen capture capability
+    await testScreenCapture();
+    console.log('✅ App ready with screen recording permission');
+  } else {
+    console.log('⚠️  App ready but screen recording permission missing');
+  }
+  
   setupAutoLaunch().catch(err => console.error(err));
   initSystemMonitor();
   startSyncLoop();
@@ -119,10 +134,25 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-ipcMain.on('set-user-id', (_e, id) => setUserId(id));
+ipcMain.on('set-user-id', (_e, id) => {
+  setUserId(id);
+  // Start always-on activity monitoring when user ID is set
+  startActivityMonitoring(id);
+});
 ipcMain.on('set-task-id', (_e, id) => setTaskId(id));
 ipcMain.on('start-tracking', () => void startTracking());
 ipcMain.on('stop-tracking', () => void stopTracking());
 ipcMain.on('sync-offline-data', () => void syncOfflineData());
 ipcMain.handle('load-session', () => loadSession());
 ipcMain.on('clear-session', () => clearSavedSession());
+ipcMain.on('trigger-activity-capture', () => triggerActivityCapture());
+ipcMain.handle('trigger-direct-screenshot', async () => await triggerDirectScreenshot());
+
+// Add test mode for development
+ipcMain.on('start-test-mode', () => {
+  console.log('🧪 Starting test mode - simulating user login...');
+  const testUserId = 'test-user-12345';
+  setUserId(testUserId);
+  startActivityMonitoring(testUserId);
+  console.log('✅ Test mode started - activity monitoring should begin');
+});

@@ -64,12 +64,21 @@ export async function updateTimeLogStatus(idle: boolean) {
 
 // Start tracking activities
 export async function startTracking() {
-  if (trackingActive) return;
+  console.log('🚀 startTracking() called');
+  console.log(`📊 Current state - trackingActive: ${trackingActive}, userId: ${userId}, taskId: ${currentTaskId}`);
+  
+  if (trackingActive) {
+    console.log('⚠️ Tracking already active, returning early');
+    return;
+  }
   if (!userId || !currentTaskId) {
-    console.log('Cannot start tracking: missing user ID or task ID');
+    console.log('❌ Cannot start tracking: missing user ID or task ID');
+    console.log(`   - userId: ${userId}`);
+    console.log(`   - currentTaskId: ${currentTaskId}`);
     return;
   }
 
+  console.log('✅ Starting tracking...');
   trackingActive = true;
   try {
     const { data, error } = await supabase
@@ -115,10 +124,20 @@ export async function startTracking() {
   startIdleMonitoring();
 
   if (!screenshotInterval) {
+    console.log(`🚀 Setting up screenshot interval: ${screenshotIntervalSeconds} seconds`);
+    console.log(`📊 Current state - userId: ${userId}, taskId: ${currentTaskId}`);
+    
     screenshotInterval = setInterval(() => {
-      if (!userId || !currentTaskId) return;
+      console.log(`⏰ Screenshot interval triggered - userId: ${userId}, taskId: ${currentTaskId}`);
+      if (!userId || !currentTaskId) {
+        console.log('❌ Missing userId or taskId, skipping screenshot');
+        return;
+      }
+      console.log('📸 Calling captureAndUpload...');
       captureAndUpload(userId, currentTaskId);
     }, screenshotIntervalSeconds * 1000);
+    
+    console.log(`✅ Screenshot interval set up successfully - will capture every ${screenshotIntervalSeconds}s`);
   }
 
   if (!appInterval) {

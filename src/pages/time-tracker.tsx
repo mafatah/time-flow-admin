@@ -191,10 +191,10 @@ export default function TimeTrackerPage() {
       setElapsedTime(0);
 
       // Notify Electron process
-      if (window.electronAPI) {
-        window.electronAPI.setUserId(userDetails.id);
-        window.electronAPI.setTaskId(selectedTask);
-        window.electronAPI.startTracking();
+      if (window.electron) {
+        window.electron.setUserId(userDetails.id);
+        window.electron.setTaskId(selectedTask);
+        window.electron.startTracking();
       }
 
       toast({
@@ -230,8 +230,8 @@ export default function TimeTrackerPage() {
       setSelectedTask('');
 
       // Notify Electron process
-      if (window.electronAPI) {
-        window.electronAPI.stopTracking();
+      if (window.electron) {
+        window.electron.stopTracking();
       }
 
       await calculateTodayTime(); // Refresh today's total
@@ -261,6 +261,75 @@ export default function TimeTrackerPage() {
   const getSelectedTaskName = () => {
     const task = tasks.find(t => t.id === selectedTask);
     return task ? `${task.projects?.name || 'No Project'} - ${task.name}` : '';
+  };
+
+  // Test functions for development
+  const startTestMode = () => {
+    if (window.electron) {
+      console.log('🧪 Starting test mode...');
+      window.electron.send('start-test-mode');
+      toast({
+        title: "Test Mode Started",
+        description: "Activity monitoring started in test mode. Check console logs for screenshot capture.",
+        variant: "default",
+      });
+    } else {
+      console.log('❌ electron not available');
+      toast({
+        title: "Error",
+        description: "Electron API not available. This only works in the desktop app.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const triggerTestCapture = () => {
+    if (window.electron) {
+      console.log('🧪 Triggering test capture...');
+      window.electron.send('trigger-activity-capture');
+      toast({
+        title: "Test Capture Triggered",
+        description: "Manual screenshot capture triggered. Check console logs.",
+        variant: "default",
+      });
+    } else {
+      console.log('❌ electron not available');
+      toast({
+        title: "Error",
+        description: "Electron API not available. This only works in the desktop app.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const triggerDirectTest = async () => {
+    if (window.electron && window.electron.invoke) {
+      console.log('🧪 Triggering direct screenshot test...');
+      try {
+        const result = await window.electron.invoke('trigger-direct-screenshot');
+        toast({
+          title: result ? "Direct Screenshot Success" : "Direct Screenshot Failed",
+          description: result 
+            ? "Screenshot captured successfully! Check console for details." 
+            : "Screenshot capture failed. Check console for error details.",
+          variant: result ? "default" : "destructive",
+        });
+      } catch (error) {
+        console.error('Direct screenshot test error:', error);
+        toast({
+          title: "Test Error",
+          description: "Failed to run direct screenshot test. Check console.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      console.log('❌ electron.invoke not available');
+      toast({
+        title: "Error",
+        description: "Electron API not available. This only works in the desktop app.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -377,6 +446,44 @@ export default function TimeTrackerPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Test Mode (Development Only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-orange-600">🧪 Test Mode (Development Only)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Button 
+                  onClick={startTestMode} 
+                  variant="outline"
+                  className="w-full"
+                >
+                  Start Activity Monitoring Test
+                </Button>
+                <Button 
+                  onClick={triggerTestCapture} 
+                  variant="outline"
+                  className="w-full"
+                >
+                  Trigger Test Screenshot
+                </Button>
+                <Button 
+                  onClick={triggerDirectTest} 
+                  variant="outline"
+                  className="w-full"
+                >
+                  Direct Screenshot Test
+                </Button>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                ⚠️ These buttons test the activity monitoring and screenshot functionality. 
+                Check the console logs and dev tools for debug information.
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {tasks.length === 0 && (
           <Card>

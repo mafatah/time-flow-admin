@@ -6,10 +6,12 @@ interface ElectronAPI {
   syncOfflineData: () => void;
   loadSession: () => Promise<any>;
   clearSession: () => void;
+  send: (channel: string, ...args: any[]) => void;
+  invoke: (channel: string, ...args: any[]) => Promise<any>;
 }
 
 declare global {
   interface Window {
-    electronAPI: ElectronAPI;
+    electron: ElectronAPI;
   }
 } 

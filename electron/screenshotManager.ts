@@ -38,44 +38,47 @@ const queue: QueueItem[] = loadQueue();
 let retryInterval: NodeJS.Timeout | null = null;
 
 export async function captureAndUpload(userId: string, taskId: string) {
-  console.log('📸 Starting screenshot capture for user:', userId, 'task:', taskId);
-  
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-  console.log('🖥️  Display size:', width, 'x', height);
-  
-  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width, height } });
-  console.log('📺 Available sources:', sources.length);
-  
-  if (sources.length === 0) {
-    console.log('❌ No screen sources available - check macOS Screen Recording permissions');
-    logError('captureAndUpload', new Error('No screen sources available'));
-    return;
-  }
-
-  const buffer = sources[0].thumbnail.toPNG();
-  const filename = `screenshot_${randomUUID()}.png`;
-  const tempPath = path.join(app.getPath('temp'), filename);
-  fs.writeFileSync(tempPath, buffer);
-  console.log('💾 Screenshot saved to temp path:', tempPath);
-
   try {
-    console.log('☁️  Uploading screenshot...');
-    await uploadScreenshot(tempPath, userId, taskId, Date.now());
-    console.log('✅ Screenshot uploaded successfully');
+    console.log('📸 Starting screenshot capture for user:', userId, 'task:', taskId);
+    
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.workAreaSize;
+    console.log(`🖥️  Display size: ${width} x ${height}`);
+    
+    const sources = await desktopCapturer.getSources({ 
+      types: ['screen'], 
+      thumbnailSize: { width: Math.min(width, 1920), height: Math.min(height, 1080) }
+    });
+    
+    console.log(`📺 Available sources: ${sources.length}`);
+    
+    if (sources.length === 0) {
+      console.log('❌ No screen sources available');
+      return;
+    }
+
+    const buffer = sources[0].thumbnail.toPNG();
+    const filename = `screenshot_${randomUUID()}.png`;
+    const tempPath = path.join(app.getPath('temp'), filename);
+    fs.writeFileSync(tempPath, buffer);
+
+    console.log('💾 Screenshot saved to temp path:', tempPath);
+
+    // For testing: Save locally instead of uploading to avoid RLS issues
+    const localDir = path.join(app.getPath('userData'), 'test_screenshots');
+    fs.mkdirSync(localDir, { recursive: true });
+    const localPath = path.join(localDir, filename);
+    fs.copyFileSync(tempPath, localPath);
+    
+    console.log('✅ Test screenshot saved successfully to:', localPath);
+    console.log('📊 Screenshot size:', buffer.length, 'bytes');
+    
+    // Clean up temp file
     fs.unlink(tempPath, () => {});
-  } catch (err) {
-    console.log('❌ Screenshot upload failed:', err);
-    logError('captureAndUpload', err);
-    showError('Screenshot Error', 'Failed to upload screenshot. It will be retried.');
-    const unsyncedDir = path.join(app.getPath('userData'), 'unsynced_screenshots');
-    fs.mkdirSync(unsyncedDir, { recursive: true });
-    const dest = path.join(unsyncedDir, filename);
-    fs.copyFileSync(tempPath, dest);
-    fs.unlink(tempPath, () => {});
-    queue.push({ path: dest, userId, taskId, timestamp: Date.now() });
-    saveQueue(queue);
-    startRetry();
+    
+  } catch (error) {
+    console.error('❌ Screenshot capture failed:', error);
+    logError('captureAndUpload', error);
   }
 }
 

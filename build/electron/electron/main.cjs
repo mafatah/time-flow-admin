@@ -11,6 +11,8 @@ const tracker_1 = require("./tracker.cjs");
 const autoLaunch_1 = require("./autoLaunch.cjs");
 const systemMonitor_1 = require("./systemMonitor.cjs");
 const unsyncedManager_1 = require("./unsyncedManager.cjs");
+const activityMonitor_1 = require("./activityMonitor.cjs");
+const permissionManager_1 = require("./permissionManager.cjs");
 let mainWindow = null;
 async function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
@@ -105,6 +107,17 @@ async function createWindow() {
 }
 electron_1.app.whenReady().then(async () => {
     await createWindow();
+    // Request screen recording permission on startup
+    console.log('🚀 App ready, checking permissions...');
+    const hasPermission = await (0, permissionManager_1.ensureScreenRecordingPermission)();
+    if (hasPermission) {
+        // Test screen capture capability
+        await (0, permissionManager_1.testScreenCapture)();
+        console.log('✅ App ready with screen recording permission');
+    }
+    else {
+        console.log('⚠️  App ready but screen recording permission missing');
+    }
     (0, autoLaunch_1.setupAutoLaunch)().catch(err => console.error(err));
     (0, systemMonitor_1.initSystemMonitor)();
     (0, unsyncedManager_1.startSyncLoop)();
@@ -117,10 +130,24 @@ electron_1.app.on('window-all-closed', () => {
     if (process.platform !== 'darwin')
         electron_1.app.quit();
 });
-electron_1.ipcMain.on('set-user-id', (_e, id) => (0, tracker_1.setUserId)(id));
+electron_1.ipcMain.on('set-user-id', (_e, id) => {
+    (0, tracker_1.setUserId)(id);
+    // Start always-on activity monitoring when user ID is set
+    (0, activityMonitor_1.startActivityMonitoring)(id);
+});
 electron_1.ipcMain.on('set-task-id', (_e, id) => (0, tracker_1.setTaskId)(id));
 electron_1.ipcMain.on('start-tracking', () => void (0, tracker_1.startTracking)());
 electron_1.ipcMain.on('stop-tracking', () => void (0, tracker_1.stopTracking)());
 electron_1.ipcMain.on('sync-offline-data', () => void (0, tracker_1.syncOfflineData)());
 electron_1.ipcMain.handle('load-session', () => (0, tracker_1.loadSession)());
 electron_1.ipcMain.on('clear-session', () => (0, tracker_1.clearSavedSession)());
+electron_1.ipcMain.on('trigger-activity-capture', () => (0, activityMonitor_1.triggerActivityCapture)());
+electron_1.ipcMain.handle('trigger-direct-screenshot', async () => await (0, activityMonitor_1.triggerDirectScreenshot)());
+// Add test mode for development
+electron_1.ipcMain.on('start-test-mode', () => {
+    console.log('🧪 Starting test mode - simulating user login...');
+    const testUserId = 'test-user-12345';
+    (0, tracker_1.setUserId)(testUserId);
+    (0, activityMonitor_1.startActivityMonitoring)(testUserId);
+    console.log('✅ Test mode started - activity monitoring should begin');
+});
