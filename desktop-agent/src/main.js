@@ -2,7 +2,7 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const screenshot = require('screenshot-desktop');
-const idle = require('node-desktop-idle');
+const idle = require('desktop-idle');
 const { createClient } = require('@supabase/supabase-js');
 
 const configPath = path.join(__dirname, '..', 'config.json');

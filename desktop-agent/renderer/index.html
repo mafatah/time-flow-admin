@@ -2,9 +2,138 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Time Flow Desktop Agent</title>
+    <title>Time Flow - Employee Tracker</title>
+    <style>
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        text-align: center;
+        min-width: 300px;
+      }
+      .logo {
+        font-size: 24px;
+        font-weight: bold;
+        color: #667eea;
+        margin-bottom: 20px;
+      }
+      .status {
+        font-size: 18px;
+        margin: 15px 0;
+        padding: 10px;
+        border-radius: 8px;
+      }
+      .working {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .stopped {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      button {
+        font-size: 16px;
+        padding: 12px 24px;
+        margin: 10px 5px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .start-btn {
+        background: #28a745;
+        color: white;
+      }
+      .start-btn:hover { background: #218838; }
+      .stop-btn {
+        background: #dc3545;
+        color: white;
+      }
+      .stop-btn:hover { background: #c82333; }
+      .timer {
+        font-size: 32px;
+        font-weight: bold;
+        color: #333;
+        margin: 20px 0;
+        font-family: 'Courier New', monospace;
+      }
+      .info {
+        font-size: 12px;
+        color: #666;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+      }
+      .login-form {
+        margin-bottom: 20px;
+      }
+      input {
+        width: 200px;
+        padding: 10px;
+        margin: 5px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+      }
+      .login-btn {
+        background: #667eea;
+        color: white;
+      }
+      .login-btn:hover { background: #5a6fd8; }
+    </style>
   </head>
   <body>
-    <h1>Time Flow Desktop Agent Running</h1>
+    <div class="container">
+      <div class="logo">⏰ Time Flow</div>
+      
+      <div id="loginScreen" style="display: block;">
+        <h2>Employee Login</h2>
+        <div class="login-form">
+          <input type="text" id="employeeId" placeholder="Employee ID" />
+          <br>
+          <input type="text" id="projectId" placeholder="Project ID (optional)" />
+          <br>
+          <button class="login-btn" onclick="login()">Start Tracking</button>
+        </div>
+      </div>
+
+      <div id="trackingScreen" style="display: none;">
+        <h2 id="employeeName">Welcome, Employee!</h2>
+        
+        <div class="timer" id="timer">00:00:00</div>
+        
+        <div class="status" id="status">
+          Click "Start Work" to begin tracking
+        </div>
+        
+        <div>
+          <button id="startBtn" class="start-btn" onclick="startWork()">Start Work</button>
+          <button id="stopBtn" class="stop-btn" onclick="stopWork()" style="display: none;">Stop Work</button>
+        </div>
+        
+        <div class="info">
+          📸 Screenshots: Every 5 minutes<br>
+          💤 Idle detection: Active<br>
+          📊 Activity monitoring: Running
+        </div>
+        
+        <button onclick="logout()" style="margin-top: 15px; background: #6c757d; color: white;">Logout</button>
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
   </body>
 </html>
