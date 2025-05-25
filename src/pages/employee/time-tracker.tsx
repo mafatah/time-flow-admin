@@ -14,7 +14,8 @@ import {
   Timer, 
   Activity,
   Coffee,
-  Target
+  Target,
+  RefreshCw
 } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 
@@ -24,34 +25,41 @@ interface Project {
   description: string | null;
 }
 
-interface ProjectTask {
-  id: string;
-  name: string;
-  project_id: string;
-  project: Project;
-}
-
 interface ActiveSession {
   id: string;
   task_id: string;
   start_time: string;
   is_idle: boolean;
-  task: ProjectTask;
+  project: Project;
 }
 
 const EmployeeTimeTracker = () => {
   const { userDetails } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
+    console.log('🔄 useEffect triggered');
+    console.log('📋 userDetails:', JSON.stringify(userDetails, null, 2));
+    console.log('🆔 userDetails?.id:', userDetails?.id);
+    console.log('📧 userDetails?.email:', userDetails?.email);
+    console.log('👤 userDetails?.role:', userDetails?.role);
+    
+    // Also check auth state
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('🔐 Current session:', session);
+      console.log('🔐 Session error:', error);
+      console.log('🔐 Session user:', session?.user);
+    });
+    
     if (userDetails?.id) {
-      fetchProjectsAndTasks();
+      console.log('✅ User ID found, loading projects and checking session');
+      loadProjects();
       checkActiveSession();
       
       // Update current time every second
@@ -60,113 +68,87 @@ const EmployeeTimeTracker = () => {
       }, 1000);
       
       return () => clearInterval(interval);
+    } else {
+      console.log('❌ No user ID found, skipping project load');
+      console.log('❌ This means user is not authenticated or userDetails not loaded');
     }
   }, [userDetails?.id]);
 
-  const fetchProjectsAndTasks = async () => {
+  const loadProjects = async () => {
     try {
-      // Fetch all projects
+      console.log('🔄 Loading projects...');
+      console.log('🔗 Supabase client:', supabase);
+      console.log('🌐 Making request to projects table...');
+      
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('id, name, description')
         .order('name');
 
+      console.log('📡 Raw response from Supabase:');
+      console.log('  - data:', projectsData);
+      console.log('  - error:', projectsError);
+
       if (projectsError) {
-        console.error('Error fetching projects:', projectsError);
+        console.error('❌ Error fetching projects:', projectsError);
+        console.error('❌ Error details:', JSON.stringify(projectsError, null, 2));
         throw projectsError;
       }
       
-      console.log('Fetched projects:', projectsData);
-      console.log('Number of projects:', projectsData?.length);
-      setProjects(projectsData || []);
+      console.log('✅ Fetched projects successfully');
+      console.log('📊 Raw projects data:', JSON.stringify(projectsData, null, 2));
+      console.log(`📊 Number of projects: ${projectsData?.length || 0}`);
       
       if (!projectsData || projectsData.length === 0) {
-        console.log('No projects found, showing toast');
+        console.log('⚠️ No projects found in database');
+        console.log('⚠️ Setting projects state to empty array');
+        setProjects([]);
         toast({
           title: 'No projects available',
           description: 'Contact your administrator to create projects for time tracking.',
           variant: 'default'
         });
-        setLoading(false);
-        return;
       } else {
-        console.log('Projects loaded successfully:', projectsData.map(p => p.name));
-      }
-
-      // For each project, ensure there's a task for the current user
-      if (projectsData && userDetails?.id) {
-        const tasksToCreate = [];
-        const existingTasks = [];
-
-        for (const project of projectsData) {
-          // Check if task exists for this project and user
-          const { data: existingTask } = await supabase
-            .from('tasks')
-            .select('id, name, project_id')
-            .eq('project_id', project.id)
-            .eq('user_id', userDetails.id)
-            .single();
-
-          if (existingTask) {
-            existingTasks.push({
-              ...existingTask,
-              project: project
-            });
-          } else {
-            // Create task for this project
-            tasksToCreate.push({
-              name: `Work on ${project.name}`,
-              project_id: project.id,
-              user_id: userDetails.id
-            });
-          }
-        }
-
-        // Create missing tasks
-        if (tasksToCreate.length > 0) {
-          const { data: newTasks, error: createError } = await supabase
-            .from('tasks')
-            .insert(tasksToCreate)
-            .select('id, name, project_id');
-
-          if (createError) {
-            console.error('Error creating tasks:', createError);
-          } else if (newTasks) {
-            // Add project info to new tasks
-            for (const task of newTasks) {
-              const project = projectsData.find(p => p.id === task.project_id);
-              if (project) {
-                existingTasks.push({
-                  ...task,
-                  project: project
-                });
-              }
-            }
-          }
-        }
-
-        setProjectTasks(existingTasks);
+        console.log('📋 Available projects:', projectsData.map(p => `${p.name} (${p.id})`));
+        console.log('📋 Setting projects state...');
+        setProjects(projectsData);
+        console.log('📋 Projects state set successfully');
         
-        if (existingTasks.length > 0 && !selectedProject) {
-          setSelectedProject(existingTasks[0].project_id);
+        // Auto-select first project if none selected
+        if (!selectedProjectId && projectsData.length > 0) {
+          console.log(`🎯 Auto-selecting first project: ${projectsData[0].name} (${projectsData[0].id})`);
+          setSelectedProjectId(projectsData[0].id);
+          console.log(`🎯 Selected project ID set to: ${projectsData[0].id}`);
+        } else {
+          console.log(`🎯 Project already selected: ${selectedProjectId}`);
         }
       }
     } catch (error: any) {
-      console.error('Error fetching projects:', error);
+      console.error('❌ Error loading projects:', error);
+      console.error('❌ Error stack:', error.stack);
       toast({
         title: 'Error loading projects',
         description: error.message,
         variant: 'destructive'
       });
     } finally {
+      console.log('🏁 Setting loading to false');
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const refreshProjects = async () => {
+    setRefreshing(true);
+    await loadProjects();
   };
 
   const checkActiveSession = async () => {
     if (!userDetails?.id) return;
 
     try {
+      console.log('🔍 Checking for active session...');
+      
       const { data, error } = await supabase
         .from('time_logs')
         .select('id, task_id, start_time, is_idle')
@@ -177,7 +159,9 @@ const EmployeeTimeTracker = () => {
         .single();
 
       if (data && !error) {
-        // Get task and project details
+        console.log('✅ Found active session:', data);
+        
+        // Get task and project details separately
         const { data: taskData } = await supabase
           .from('tasks')
           .select('id, name, project_id')
@@ -191,44 +175,95 @@ const EmployeeTimeTracker = () => {
             .eq('id', taskData.project_id)
             .single();
 
-          if (projectData) {
+                    if (projectData) {
             setActiveSession({
-              ...data,
-              task: {
-                ...taskData,
-                project: projectData
-              }
+              id: data.id,
+              task_id: data.task_id,
+              start_time: data.start_time,
+              is_idle: data.is_idle,
+              project: projectData
             });
-            setSelectedProject(taskData.project_id);
+            setSelectedProjectId(taskData.project_id);
           }
         }
+      } else {
+        console.log('ℹ️ No active session found');
+        setActiveSession(null);
       }
     } catch (error) {
-      // No active session found, which is fine
+      console.log('ℹ️ No active session found (expected)');
       setActiveSession(null);
     }
   };
 
-  const startTracking = async () => {
-    if (!selectedProject || !userDetails?.id) return;
+  const findOrCreateTask = async (projectId: string): Promise<string | null> => {
+    if (!userDetails?.id) return null;
 
     try {
-      // Find the task for this project
-      const projectTask = projectTasks.find(pt => pt.project_id === selectedProject);
-      if (!projectTask) {
-        toast({
-          title: 'Error',
-          description: 'No task found for selected project',
-          variant: 'destructive'
-        });
-        return;
+      // First, try to find existing task for this project and user
+      const { data: existingTask } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('user_id', userDetails.id)
+        .single();
+
+      if (existingTask) {
+        console.log('✅ Found existing task:', existingTask.id);
+        return existingTask.id;
+      }
+
+      // Create new task if none exists
+      const project = projects.find(p => p.id === projectId);
+      if (!project) return null;
+
+      const { data: newTask, error: createError } = await supabase
+        .from('tasks')
+        .insert({
+          name: `Work on ${project.name}`,
+          project_id: projectId,
+          user_id: userDetails.id
+        })
+        .select('id')
+        .single();
+
+      if (createError) {
+        console.error('❌ Error creating task:', createError);
+        throw createError;
+      }
+
+      console.log('✅ Created new task:', newTask.id);
+      return newTask.id;
+    } catch (error: any) {
+      console.error('❌ Error finding/creating task:', error);
+      throw error;
+    }
+  };
+
+  const startTracking = async () => {
+    if (!selectedProjectId || !userDetails?.id) {
+      toast({
+        title: 'Error',
+        description: 'Please select a project first',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      console.log('🚀 Starting time tracking...');
+      
+      // Find or create task for this project
+      const taskId = await findOrCreateTask(selectedProjectId);
+      if (!taskId) {
+        throw new Error('Failed to create task for project');
       }
 
       const { data, error } = await supabase
         .from('time_logs')
         .insert({
           user_id: userDetails.id,
-          task_id: projectTask.id,
+          task_id: taskId,
           start_time: new Date().toISOString(),
           is_idle: false
         })
@@ -237,17 +272,21 @@ const EmployeeTimeTracker = () => {
 
       if (error) throw error;
 
-      setActiveSession({
-        ...data,
-        task: projectTask
-      });
-      
-      toast({
-        title: 'Time tracking started',
-        description: `Started tracking time for ${projectTask.project.name}`,
-      });
+      const selectedProject = projects.find(p => p.id === selectedProjectId);
+      if (selectedProject) {
+        setActiveSession({
+          ...data,
+          project: selectedProject
+        });
+        
+        console.log('✅ Time tracking started for:', selectedProject.name);
+        toast({
+          title: 'Time tracking started',
+          description: `Started tracking time for ${selectedProject.name}`,
+        });
+      }
     } catch (error: any) {
-      console.error('Error starting tracking:', error);
+      console.error('❌ Error starting tracking:', error);
       toast({
         title: 'Error starting tracking',
         description: error.message,
@@ -260,6 +299,8 @@ const EmployeeTimeTracker = () => {
     if (!activeSession) return;
 
     try {
+      console.log('⏹️ Stopping time tracking...');
+      
       const { error } = await supabase
         .from('time_logs')
         .update({
@@ -271,13 +312,14 @@ const EmployeeTimeTracker = () => {
 
       const duration = differenceInMinutes(new Date(), new Date(activeSession.start_time));
       
+      console.log('✅ Time tracking stopped');
       setActiveSession(null);
       toast({
         title: 'Time tracking stopped',
-        description: `Tracked ${Math.floor(duration / 60)}h ${duration % 60}m for ${activeSession.task.project.name}`,
+        description: `Tracked ${Math.floor(duration / 60)}h ${duration % 60}m for ${activeSession.project.name}`,
       });
     } catch (error: any) {
-      console.error('Error stopping tracking:', error);
+      console.error('❌ Error stopping tracking:', error);
       toast({
         title: 'Error stopping tracking',
         description: error.message,
@@ -295,7 +337,17 @@ const EmployeeTimeTracker = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
+  console.log('🎨 Rendering EmployeeTimeTracker');
+  console.log('🎨 Current state:');
+  console.log('  - loading:', loading);
+  console.log('  - refreshing:', refreshing);
+  console.log('  - projects.length:', projects.length);
+  console.log('  - selectedProjectId:', selectedProjectId);
+  console.log('  - activeSession:', activeSession);
+  console.log('  - userDetails:', userDetails);
+
   if (loading) {
+    console.log('🎨 Showing loading state');
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-6">
@@ -325,6 +377,15 @@ const EmployeeTimeTracker = () => {
               Not Tracking
             </Badge>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshProjects}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`w-4 h-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
       </div>
 
@@ -337,7 +398,7 @@ const EmployeeTimeTracker = () => {
               Currently Tracking
             </CardTitle>
             <CardDescription>
-              {activeSession.task.project.name}
+              {activeSession.project.name}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -379,12 +440,19 @@ const EmployeeTimeTracker = () => {
               <label className="text-sm font-medium text-gray-700 mb-2 block">
                 Select Project
               </label>
-              <Select value={selectedProject} onValueChange={setSelectedProject}>
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a project" />
                 </SelectTrigger>
                 <SelectContent>
-                  {projects.map((project) => (
+                  {(() => {
+                    console.log('🎨 Rendering Select options');
+                    console.log('🎨 projects for Select:', projects);
+                    return null;
+                  })()}
+                  {projects.map((project) => {
+                    console.log('🎨 Rendering SelectItem for:', project);
+                    return (
                     <SelectItem key={project.id} value={project.id}>
                       <div>
                         <div className="font-medium">{project.name}</div>
@@ -393,14 +461,15 @@ const EmployeeTimeTracker = () => {
                         )}
                       </div>
                     </SelectItem>
-                  ))}
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
 
             <Button 
               onClick={startTracking}
-              disabled={!selectedProject}
+              disabled={!selectedProjectId}
               className="w-full flex items-center justify-center"
             >
               <Play className="w-4 h-4 mr-2" />
@@ -413,22 +482,62 @@ const EmployeeTimeTracker = () => {
       {/* Projects List */}
       <Card>
         <CardHeader>
-          <CardTitle>Available Projects</CardTitle>
-          <CardDescription>
-            Projects created by administrators
-          </CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Available Projects</CardTitle>
+              <CardDescription>
+                Projects created by administrators ({projects.length} total)
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshProjects}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`w-4 h-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
+          {(() => {
+            console.log('🎨 Rendering projects section');
+            console.log('🎨 projects.length:', projects.length);
+            console.log('🎨 projects array:', projects);
+            return null;
+          })()}
           {projects.length === 0 ? (
             <div className="text-center py-8">
+              {(() => {
+                console.log('🎨 Rendering "No projects" message');
+                return null;
+              })()}
               <Timer className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500">No projects available</p>
-              <p className="text-sm text-gray-400">Contact your administrator to create projects</p>
+              <p className="text-gray-500 mb-2">No projects available</p>
+              <p className="text-sm text-gray-400 mb-4">Contact your administrator to create projects</p>
+              <Button
+                variant="outline"
+                onClick={refreshProjects}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Try Again
+              </Button>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {projects.map((project) => (
-                <Card key={project.id} className="border-gray-200">
+              {(() => {
+                console.log('🎨 Rendering projects grid');
+                console.log('🎨 About to map over projects:', projects);
+                return null;
+              })()}
+              {projects.map((project) => {
+                console.log('🎨 Rendering project card:', project);
+                return (
+                <Card key={project.id} className={`border-gray-200 cursor-pointer transition-all ${
+                  selectedProjectId === project.id ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:shadow-md'
+                }`}>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg">{project.name}</CardTitle>
                     {project.description && (
@@ -439,16 +548,24 @@ const EmployeeTimeTracker = () => {
                   </CardHeader>
                   <CardContent>
                     <Button
-                      variant={selectedProject === project.id ? "default" : "outline"}
+                      variant={selectedProjectId === project.id ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setSelectedProject(project.id)}
+                      onClick={() => setSelectedProjectId(project.id)}
                       className="w-full"
                     >
-                      {selectedProject === project.id ? "Selected" : "Select"}
+                      {selectedProjectId === project.id ? (
+                        <>
+                          <Target className="w-4 h-4 mr-2" />
+                          Selected
+                        </>
+                      ) : (
+                        'Select'
+                      )}
                     </Button>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
