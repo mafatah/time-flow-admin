@@ -40,8 +40,8 @@ interface AppSettings {
 
 let appSettings: AppSettings = {
   blur_screenshots: false,
-  screenshot_interval_seconds: 20,
-  idle_threshold_seconds: 180
+  screenshot_interval_seconds: screenshotIntervalSeconds,
+  idle_threshold_seconds: idleTimeoutMinutes * 60
 };
 
 let activityInterval: ReturnType<typeof setInterval> | undefined;

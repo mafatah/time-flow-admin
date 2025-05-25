@@ -82,7 +82,6 @@ async function processQueue() {
                     .from('time_logs')
                     .update({
                     end_time: log.end_time,
-                    status: log.status,
                     is_idle: log.is_idle ?? false
                 })
                     .eq('id', log.id);
@@ -95,9 +94,9 @@ async function processQueue() {
                     .from('time_logs')
                     .insert({
                     user_id: log.user_id,
-                    task_id: log.task_id,
+                    project_id: log.project_id,
                     start_time: log.start_time,
-                    status: log.status
+                    is_idle: log.is_idle ?? false
                 })
                     .select('id')
                     .single();

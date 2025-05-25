@@ -17,7 +17,7 @@ let screenshotInterval: ReturnType<typeof setInterval> | undefined;
 let appInterval: ReturnType<typeof setInterval> | undefined;
 let trackingActive = false;
 let userId: string | null = null;
-let currentTaskId: string | null = null;
+let currentProjectId: string | null = null;
 
 
 // Session persistence handled by sessionManager
@@ -28,9 +28,15 @@ export function setUserId(id: string) {
   userId = id;
 }
 
-// Set the current task ID for tracking
+// Set the current project ID for tracking
+export function setProjectId(id: string) {
+  currentProjectId = id;
+}
+
+// Legacy function for backward compatibility
 export function setTaskId(id: string) {
-  currentTaskId = id;
+  // For now, treat task ID as project ID
+  currentProjectId = id;
 }
 
 // Update the current time log's idle status
@@ -39,14 +45,13 @@ export async function updateTimeLogStatus(idle: boolean) {
   try {
     const { error } = await supabase
       .from('time_logs')
-      .update({ is_idle: idle, status: idle ? 'idle' : 'active' })
+      .update({ is_idle: idle })
       .eq('id', currentTimeLogId);
     if (error) {
       queueTimeLog({
         id: currentTimeLogId,
         user_id: userId!,
-        task_id: currentTaskId!,
-        status: idle ? 'idle' : 'active',
+        project_id: currentProjectId!,
         is_idle: idle
       });
     }
@@ -55,8 +60,7 @@ export async function updateTimeLogStatus(idle: boolean) {
     queueTimeLog({
       id: currentTimeLogId,
       user_id: userId!,
-      task_id: currentTaskId!,
-      status: idle ? 'idle' : 'active',
+      project_id: currentProjectId!,
       is_idle: idle
     });
   }
@@ -65,16 +69,16 @@ export async function updateTimeLogStatus(idle: boolean) {
 // Start tracking activities
 export async function startTracking() {
   console.log('🚀 startTracking() called');
-  console.log(`📊 Current state - trackingActive: ${trackingActive}, userId: ${userId}, taskId: ${currentTaskId}`);
+  console.log(`📊 Current state - trackingActive: ${trackingActive}, userId: ${userId}, projectId: ${currentProjectId}`);
   
   if (trackingActive) {
     console.log('⚠️ Tracking already active, returning early');
     return;
   }
-  if (!userId || !currentTaskId) {
-    console.log('❌ Cannot start tracking: missing user ID or task ID');
+  if (!userId || !currentProjectId) {
+    console.log('❌ Cannot start tracking: missing user ID or project ID');
     console.log(`   - userId: ${userId}`);
-    console.log(`   - currentTaskId: ${currentTaskId}`);
+    console.log(`   - currentProjectId: ${currentProjectId}`);
     return;
   }
 
@@ -85,9 +89,9 @@ export async function startTracking() {
       .from('time_logs')
       .insert({
         user_id: userId,
-        task_id: currentTaskId,
+        project_id: currentProjectId,
         start_time: new Date().toISOString(),
-        status: 'active'
+        is_idle: false
       })
       .select('id')
       .single();
@@ -96,9 +100,9 @@ export async function startTracking() {
       currentTimeLogId = randomUUID();
       queueTimeLog({
         user_id: userId,
-        task_id: currentTaskId,
+        project_id: currentProjectId,
         start_time: new Date().toISOString(),
-        status: 'active'
+        is_idle: false
       });
     } else {
       currentTimeLogId = data.id;
@@ -108,14 +112,14 @@ export async function startTracking() {
     currentTimeLogId = randomUUID();
     queueTimeLog({
       user_id: userId,
-      task_id: currentTaskId,
+      project_id: currentProjectId,
       start_time: new Date().toISOString(),
-      status: 'active'
+      is_idle: false
     });
   }
 
   const session: SessionData = {
-    task_id: currentTaskId!,
+    project_id: currentProjectId!,
     user_id: userId!,
     start_time: new Date().toISOString(),
     time_log_id: currentTimeLogId!
@@ -125,16 +129,16 @@ export async function startTracking() {
 
   if (!screenshotInterval) {
     console.log(`🚀 Setting up screenshot interval: ${screenshotIntervalSeconds} seconds`);
-    console.log(`📊 Current state - userId: ${userId}, taskId: ${currentTaskId}`);
+    console.log(`📊 Current state - userId: ${userId}, projectId: ${currentProjectId}`);
     
     screenshotInterval = setInterval(() => {
-      console.log(`⏰ Screenshot interval triggered - userId: ${userId}, taskId: ${currentTaskId}`);
-      if (!userId || !currentTaskId) {
-        console.log('❌ Missing userId or taskId, skipping screenshot');
+      console.log(`⏰ Screenshot interval triggered - userId: ${userId}, projectId: ${currentProjectId}`);
+      if (!userId || !currentProjectId) {
+        console.log('❌ Missing userId or projectId, skipping screenshot');
         return;
       }
       console.log('📸 Calling captureAndUpload...');
-      captureAndUpload(userId, currentTaskId);
+      captureAndUpload(userId, currentProjectId);
     }, screenshotIntervalSeconds * 1000);
     
     console.log(`✅ Screenshot interval set up successfully - will capture every ${screenshotIntervalSeconds}s`);
@@ -142,8 +146,8 @@ export async function startTracking() {
 
   if (!appInterval) {
     appInterval = setInterval(() => {
-      if (!userId || !currentTaskId) return;
-      void captureAppLog(userId, currentTaskId);
+      if (!userId || !currentProjectId) return;
+      void captureAppLog(userId, currentProjectId);
     }, 10000);
   }
 }
@@ -166,15 +170,14 @@ export async function stopTracking() {
     try {
       const { error } = await supabase
         .from('time_logs')
-        .update({ end_time: new Date().toISOString(), status: 'completed' })
+        .update({ end_time: new Date().toISOString() })
         .eq('id', currentTimeLogId);
       if (error) {
         queueTimeLog({
           id: currentTimeLogId,
           user_id: userId!,
-          task_id: currentTaskId!,
-          end_time: new Date().toISOString(),
-          status: 'completed'
+          project_id: currentProjectId!,
+          end_time: new Date().toISOString()
         });
       }
     } catch (err) {
@@ -182,9 +185,8 @@ export async function stopTracking() {
       queueTimeLog({
         id: currentTimeLogId,
         user_id: userId!,
-        task_id: currentTaskId!,
-        end_time: new Date().toISOString(),
-        status: 'completed'
+        project_id: currentProjectId!,
+        end_time: new Date().toISOString()
       });
     }
   }

@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 export interface SessionData {
-  task_id: string;
+  project_id: string;
   user_id: string;
   start_time: string;
   time_log_id: string;

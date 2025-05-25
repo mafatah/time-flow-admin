@@ -15,13 +15,14 @@ const crypto_1 = require("crypto");
 const supabase_1 = require("./supabase.cjs");
 const unsyncedManager_1 = require("./unsyncedManager.cjs");
 const errorHandler_1 = require("./errorHandler.cjs");
+const config_1 = require("./config.cjs");
 const UNSYNCED_ACTIVITY_PATH = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_activity.json');
 // Special UUID for activity monitoring - this represents a virtual "task" for general activity monitoring
 const ACTIVITY_MONITORING_TASK_ID = '00000000-0000-0000-0000-000000000001';
 let appSettings = {
     blur_screenshots: false,
-    screenshot_interval_seconds: 20,
-    idle_threshold_seconds: 180
+    screenshot_interval_seconds: config_1.screenshotIntervalSeconds,
+    idle_threshold_seconds: config_1.idleTimeoutMinutes * 60
 };
 let activityInterval;
 let appTrackingInterval;
