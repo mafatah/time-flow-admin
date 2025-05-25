@@ -1,5 +1,6 @@
 import { Resolver, Subscription, Query, Args, ObjectType, Field } from '@nestjs/graphql';
 import { Injectable } from '@nestjs/common';
+import { PubSubService } from '../common/pubsub.service';
 
 @ObjectType()
 export class ScreenshotCaptured {
@@ -22,6 +23,8 @@ export class ScreenshotCaptured {
 @Injectable()
 @Resolver()
 export class ScreenshotsResolver {
+  constructor(private pubSubService: PubSubService) {}
+
   @Query(() => String)
   health(): string {
     return 'GraphQL API is running';
@@ -37,27 +40,21 @@ export class ScreenshotsResolver {
     },
   })
   screenshotCaptured(@Args('userId', { nullable: true }) userId?: string) {
-    // Simple mock subscription for development
-    // In production, replace with proper Redis pub/sub or WebSocket implementation
-    const mockData = {
+    return this.pubSubService.asyncIterator<{ screenshotCaptured: ScreenshotCaptured }>('SCREENSHOT_CAPTURED');
+  }
+
+  // Method to publish screenshot events
+  async publishScreenshotCaptured(screenshot: any) {
+    const payload = {
       screenshotCaptured: {
-        id: 'mock-' + Date.now(),
-        image_url: 'mock-screenshot.jpg',
-        captured_at: new Date().toISOString(),
-        activity_percent: Math.floor(Math.random() * 100),
-        userId: userId || 'mock-user',
+        id: screenshot.id,
+        image_url: screenshot.image_url,
+        captured_at: screenshot.captured_at,
+        activity_percent: screenshot.activity_percent,
+        userId: screenshot.user_id,
       },
     };
 
-    // Return async iterable that yields mock data
-    return (async function* () {
-      yield mockData;
-    })();
-  }
-
-  // Method to publish screenshot events (for future implementation)
-  publishScreenshotCaptured(screenshot: any) {
-    console.log('Screenshot captured event:', screenshot);
-    // TODO: Implement proper pub/sub mechanism when needed
+    await this.pubSubService.publish('SCREENSHOT_CAPTURED', payload);
   }
 } 

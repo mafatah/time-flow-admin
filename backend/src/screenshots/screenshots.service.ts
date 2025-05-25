@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SupabaseService } from '../common/supabase.service';
 import { ImageService } from '../common/image.service';
+import { PubSubService } from '../common/pubsub.service';
 import { nanoid } from 'nanoid';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class ScreenshotsService {
     private supabaseService: SupabaseService,
     private imageService: ImageService,
     private configService: ConfigService,
+    private pubSubService: PubSubService,
   ) {}
 
   async uploadBatch(files: Express.Multer.File[], userId: string) {
@@ -39,6 +41,17 @@ export class ScreenshotsService {
       if (error) {
         this.logger.error('Failed to insert screenshot records:', error);
         throw error;
+      }
+
+      // Publish screenshot events for GraphQL subscriptions
+      if (data) {
+        for (const screenshot of data) {
+          try {
+            await this.publishScreenshotEvent(screenshot);
+          } catch (publishError) {
+            this.logger.warn('Failed to publish screenshot event:', publishError);
+          }
+        }
       }
 
       this.logger.log(`Uploaded ${files.length} screenshots for user ${userId}`);
@@ -93,6 +106,20 @@ export class ScreenshotsService {
       this.logger.error('Failed to process and upload file:', error);
       throw error;
     }
+  }
+
+  private async publishScreenshotEvent(screenshot: any) {
+    const payload = {
+      screenshotCaptured: {
+        id: screenshot.id,
+        image_url: screenshot.image_url,
+        captured_at: screenshot.captured_at,
+        activity_percent: screenshot.activity_percent,
+        userId: screenshot.user_id,
+      },
+    };
+
+    await this.pubSubService.publish('SCREENSHOT_CAPTURED', payload);
   }
 
   async getScreenshots(

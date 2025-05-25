@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ImageService } from '../src/common/image.service';
 import * as fs from 'fs';

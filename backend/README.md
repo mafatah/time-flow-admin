@@ -187,6 +187,8 @@ POST /api/notifications/:id/read
 
 ## GraphQL Subscriptions
 
+Real-time subscriptions powered by Redis for screenshot events:
+
 ```graphql
 subscription {
   screenshotCaptured(userId: "optional-user-id") {
@@ -198,6 +200,12 @@ subscription {
   }
 }
 ```
+
+**Features:**
+- Redis-based pub/sub for scalable real-time updates
+- Optional user filtering (subscribe to specific user's screenshots)
+- Automatic event publishing when screenshots are uploaded
+- WebSocket transport with fallback support
 
 ## Background Jobs
 
