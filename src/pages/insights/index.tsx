@@ -201,6 +201,17 @@ const InsightsPage = () => {
     );
   };
 
+  const handleInvestigate = (activity: UnusualActivity) => {
+    // Show detailed investigation modal or navigate to detailed view
+    alert(`Investigating: ${activity.type}\n\nDetails:\n${activity.description}\n\nUser: ${activity.user}\nTime: ${activity.timestamp}\nSeverity: ${activity.severity}`);
+    
+    // In a real application, this would:
+    // 1. Open a detailed investigation modal
+    // 2. Navigate to a detailed activity view
+    // 3. Show related screenshots, app usage, etc.
+    // 4. Allow adding notes or marking as resolved
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -444,7 +455,11 @@ const InsightsPage = () => {
                         <p className="text-xs text-gray-500">{activity.user} • {activity.timestamp}</p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleInvestigate(activity)}
+                    >
                       Investigate
                     </Button>
                   </div>

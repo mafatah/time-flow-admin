@@ -128,6 +128,37 @@ export default function LoginPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
+          {/* Quick Login Buttons for Testing */}
+          {!isSignUp && (
+            <div className="w-full space-y-2">
+              <p className="text-xs text-center text-gray-500">Quick Login (Testing)</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    form.setValue('email', 'admin@timeflow.com');
+                    form.setValue('password', 'admin123456');
+                  }}
+                >
+                  Admin Login
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    form.setValue('email', 'employee@timeflow.com');
+                    form.setValue('password', 'employee123456');
+                  }}
+                >
+                  Employee Login
+                </Button>
+              </div>
+            </div>
+          )}
+          
           <Button
             variant="link"
             className="w-full"

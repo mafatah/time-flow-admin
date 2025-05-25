@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -177,6 +176,27 @@ export function Sidebar({ className }: SidebarProps) {
         <div className="flex flex-col h-full">
           <div className="p-4">
             <h1 className="text-2xl font-bold text-primary">TrackHub</h1>
+            {/* Debug: Show current user role */}
+            {userDetails && (
+              <div className="mt-2 text-xs text-gray-500">
+                Role: {userDetails.role} | ID: {userDetails.id?.slice(0, 8)}...
+                {/* Quick role switcher for testing */}
+                <div className="mt-1 flex gap-1">
+                  <button 
+                    onClick={() => window.location.href = '/login?role=admin'}
+                    className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded"
+                  >
+                    Admin
+                  </button>
+                  <button 
+                    onClick={() => window.location.href = '/login?role=employee'}
+                    className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded"
+                  >
+                    Employee
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="px-3 py-2">
