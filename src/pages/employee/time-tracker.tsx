@@ -71,8 +71,23 @@ const EmployeeTimeTracker = () => {
         .select('id, name, description')
         .order('name');
 
-      if (projectsError) throw projectsError;
+      if (projectsError) {
+        console.error('Error fetching projects:', projectsError);
+        throw projectsError;
+      }
+      
+      console.log('Fetched projects:', projectsData);
       setProjects(projectsData || []);
+      
+      if (!projectsData || projectsData.length === 0) {
+        toast({
+          title: 'No projects available',
+          description: 'Contact your administrator to create projects for time tracking.',
+          variant: 'default'
+        });
+        setLoading(false);
+        return;
+      }
 
       // For each project, ensure there's a task for the current user
       if (projectsData && userDetails?.id) {
