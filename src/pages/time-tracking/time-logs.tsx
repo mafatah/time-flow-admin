@@ -1,346 +1,346 @@
-import { useState, useEffect } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PageHeader } from "@/components/layout/page-header";
-import { supabase } from "@/lib/supabase";
-import { Loader2, Download, Calendar, User, Clock } from "lucide-react";
-import { format, startOfWeek, endOfWeek, isToday, isYesterday, addDays, parseISO } from "date-fns";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarUI } from "@/components/ui/calendar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuth } from "@/providers/auth-provider";
+
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Calendar, Filter, Clock, Edit } from 'lucide-react';
+import { format, subDays } from 'date-fns';
+import { toast } from 'sonner';
+
+interface TimeLog {
+  id: string;
+  user_id: string;
+  project_id: string;
+  start_time: string;
+  end_time: string | null;
+  is_idle: boolean;
+  user_name?: string;
+  project_name?: string;
+}
+
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+}
 
 export default function TimeLogs() {
-  const [timeLogs, setTimeLogs] = useState<any[]>([]);
+  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [selectedTask, setSelectedTask] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<{from: Date, to: Date}>({
-    from: startOfWeek(new Date()),
-    to: endOfWeek(new Date())
+  const [filters, setFilters] = useState({
+    userId: '',
+    projectId: '',
+    startDate: format(subDays(new Date(), 7), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd'),
+    status: 'all' // all, active, completed
   });
-  const [showingCalendar, setShowingCalendar] = useState(false);
-  const { toast } = useToast();
-  const { userDetails } = useAuth();
 
-  // Fetch time logs
   useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        
-        // Build query for time logs
-        let query = supabase
-          .from("time_logs")
-          .select(`
-            *,
-            users!fk_time_logs_users(id, full_name, email),
-            tasks!fk_time_logs_tasks(id, name, projects!fk_tasks_projects(id, name))
-          `)
-          .gte('start_time', dateRange.from.toISOString())
-          .lte('start_time', dateRange.to.toISOString());
-          
-        // Add filters if needed
-        if (selectedUser) {
-          query = query.eq('user_id', selectedUser);
-        } else if (userDetails?.role === 'employee') {
-          // Employees can only see their own logs
-          query = query.eq('user_id', userDetails.id);
-        }
-        
-        if (selectedTask) {
-          query = query.eq('task_id', selectedTask);
-        }
-        
-        const { data, error } = await query.order('start_time', { ascending: false });
+    fetchUsers();
+    fetchProjects();
+  }, []);
 
-        if (error) throw error;
-        setTimeLogs(data || []);
-        
-        // Fetch users if admin or manager
-        if (userDetails?.role === 'admin' || userDetails?.role === 'manager') {
-          const { data: usersData, error: usersError } = await supabase
-            .from("users")
-            .select("id, full_name, email")
-            .order('full_name');
-            
-          if (usersError) throw usersError;
-          setUsers(usersData || []);
-        }
-        
-        // Fetch tasks
-        let tasksQuery = supabase
-          .from("tasks")
-          .select(`
-            id, 
-            name,
-            projects(id, name)
-          `);
-          
-        if (userDetails?.role === 'employee') {
-          tasksQuery = tasksQuery.eq('user_id', userDetails.id);
-        } else if (selectedUser) {
-          tasksQuery = tasksQuery.eq('user_id', selectedUser);
-        }
-        
-        const { data: tasksData, error: tasksError } = await tasksQuery.order('name');
-        
-        if (tasksError) throw tasksError;
-        setTasks(tasksData || []);
-        
-      } catch (error: any) {
-        toast({
-          title: "Error fetching data",
-          description: error.message,
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
+  useEffect(() => {
+    fetchTimeLogs();
+  }, [filters]);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .order('full_name');
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users');
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      toast.error('Failed to fetch projects');
+    }
+  };
+
+  const fetchTimeLogs = async () => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('time_logs')
+        .select('*');
+
+      // Apply filters
+      if (filters.userId) {
+        query = query.eq('user_id', filters.userId);
       }
+
+      if (filters.projectId) {
+        query = query.eq('project_id', filters.projectId);
+      }
+
+      if (filters.startDate) {
+        query = query.gte('start_time', new Date(filters.startDate).toISOString());
+      }
+
+      if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        query = query.lte('start_time', endDate.toISOString());
+      }
+
+      if (filters.status === 'active') {
+        query = query.is('end_time', null);
+      } else if (filters.status === 'completed') {
+        query = query.not('end_time', 'is', null);
+      }
+
+      const { data: timeLogData, error } = await query
+        .order('start_time', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      if (!timeLogData || timeLogData.length === 0) {
+        setTimeLogs([]);
+        return;
+      }
+
+      // Enrich with user and project names
+      const enrichedLogs = timeLogData.map(log => {
+        const user = users.find(u => u.id === log.user_id);
+        const project = projects.find(p => p.id === log.project_id);
+        
+        return {
+          ...log,
+          user_name: user?.full_name || 'Unknown User',
+          project_name: project?.name || 'Unknown Project'
+        };
+      });
+
+      setTimeLogs(enrichedLogs);
+    } catch (error) {
+      console.error('Error fetching time logs:', error);
+      toast.error('Failed to fetch time logs');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    fetchData();
-  }, [toast, dateRange, selectedUser, selectedTask, userDetails]);
-
-  // Calculate total time
-  const calculateTotalTime = () => {
-    let totalMs = 0;
+  const calculateDuration = (start: string, end: string | null): string => {
+    if (!end) return 'Ongoing';
     
-    timeLogs.forEach(log => {
-      const start = new Date(log.start_time).getTime();
-      const end = log.end_time ? new Date(log.end_time).getTime() : new Date().getTime();
-      totalMs += (end - start);
-    });
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    const diffMs = endTime.getTime() - startTime.getTime();
     
-    const hours = Math.floor(totalMs / (1000 * 60 * 60));
-    const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     
     return `${hours}h ${minutes}m`;
   };
 
-  // Format time duration
-  const formatDuration = (startTime: string, endTime: string | null) => {
-    const start = new Date(startTime).getTime();
-    const end = endTime ? new Date(endTime).getTime() : new Date().getTime();
-    const durationMs = end - start;
-    
-    const hours = Math.floor(durationMs / (1000 * 60 * 60));
-    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-    
-    return `${hours}h ${minutes}m`;
-  };
+  const stopTimeLog = async (logId: string) => {
+    try {
+      const { error } = await supabase
+        .from('time_logs')
+        .update({ end_time: new Date().toISOString() })
+        .eq('id', logId);
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    const date = parseISO(dateString);
-    
-    if (isToday(date)) {
-      return `Today, ${format(date, 'h:mm a')}`;
-    } else if (isYesterday(date)) {
-      return `Yesterday, ${format(date, 'h:mm a')}`;
-    } else {
-      return format(date, 'MMM d, yyyy h:mm a');
+      if (error) throw error;
+
+      toast.success('Time log stopped');
+      fetchTimeLogs();
+    } catch (error) {
+      console.error('Error stopping time log:', error);
+      toast.error('Failed to stop time log');
     }
-  };
-
-  // Export to CSV
-  const exportToCsv = () => {
-    // Generate CSV content
-    const headers = ['Date', 'User', 'Project', 'Task', 'Start Time', 'End Time', 'Duration', 'Status'];
-    
-    const rows = timeLogs.map(log => [
-      format(new Date(log.start_time), 'yyyy-MM-dd'),
-      log.users.full_name,
-      log.tasks.projects.name,
-      log.tasks.name,
-      format(new Date(log.start_time), 'HH:mm:ss'),
-      log.end_time ? format(new Date(log.end_time), 'HH:mm:ss') : 'Active',
-      formatDuration(log.start_time, log.end_time),
-      log.is_idle ? 'Idle' : 'Active'
-    ]);
-    
-    // Combine headers and rows
-    const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
-      .join('\n');
-    
-    // Create and download file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `time-logs-${format(new Date(), 'yyyy-MM-dd')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Handle date range selection
-  const handleDateRangeSelect = (range: { from: Date; to: Date }) => {
-    if (range.from && range.to) {
-      setDateRange(range);
-      setShowingCalendar(false);
-    }
-  };
-
-  // Preset date ranges
-  const selectThisWeek = () => {
-    setDateRange({
-      from: startOfWeek(new Date()),
-      to: endOfWeek(new Date())
-    });
-    setShowingCalendar(false);
-  };
-  
-  const selectLastWeek = () => {
-    const today = new Date();
-    setDateRange({
-      from: startOfWeek(addDays(today, -7)),
-      to: endOfWeek(addDays(today, -7))
-    });
-    setShowingCalendar(false);
   };
 
   return (
-    <div className="container py-6">
-      <PageHeader
-        title="Time Logs"
-        subtitle="View and export time tracking data"
-      >
-        <Button onClick={exportToCsv}>
-          <Download className="mr-2 h-4 w-4" /> Export CSV
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Time Logs</h1>
+        <Button onClick={fetchTimeLogs} variant="outline">
+          Refresh
         </Button>
-      </PageHeader>
-
-      <div className="flex flex-col md:flex-row gap-4 mt-6 mb-4">
-        {/* Date Range Selector */}
-        <Popover open={showingCalendar} onOpenChange={setShowingCalendar}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="w-full md:w-auto justify-start">
-              <Calendar className="mr-2 h-4 w-4" />
-              {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d, yyyy')}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <div className="p-3 border-b">
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={selectThisWeek}>This Week</Button>
-                <Button variant="ghost" size="sm" onClick={selectLastWeek}>Last Week</Button>
-              </div>
-            </div>
-            <CalendarUI
-              mode="range"
-              selected={dateRange}
-              onSelect={handleDateRangeSelect as any}
-              numberOfMonths={1}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-
-        {/* User Filter - only for admin/manager */}
-        {(userDetails?.role === 'admin' || userDetails?.role === 'manager') && (
-          <Select
-            value={selectedUser || 'all'}
-            onValueChange={value => setSelectedUser(value === 'all' ? null : value)}
-          >
-            <SelectTrigger className="w-full md:w-[200px]">
-              <div className="flex items-center">
-                <User className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="All Users" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Users</SelectItem>
-              {users.map(user => (
-                <SelectItem key={user.id} value={user.id}>
-                  {user.full_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        {/* Task Filter */}
-        <Select
-          value={selectedTask || 'all'}
-          onValueChange={value => setSelectedTask(value === 'all' ? null : value)}
-        >
-          <SelectTrigger className="w-full md:w-[220px]">
-            <div className="flex items-center">
-              <Clock className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="All Tasks" />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Tasks</SelectItem>
-            {tasks.map(task => (
-              <SelectItem key={task.id} value={task.id}>
-                {task.projects?.name} - {task.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
+      {/* Filters */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Time Entries</CardTitle>
-          <div className="text-sm font-medium">
-            Total Time: <span className="text-primary">{calculateTotalTime()}</span>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Filter className="h-5 w-5" />
+            <span>Filters</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">User</label>
+              <Select 
+                value={filters.userId} 
+                onValueChange={(value) => setFilters(prev => ({ ...prev, userId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All users" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Users</SelectItem>
+                  {users.map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Project</label>
+              <Select 
+                value={filters.projectId} 
+                onValueChange={(value) => setFilters(prev => ({ ...prev, projectId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Projects</SelectItem>
+                  {projects.map(project => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Start Date</label>
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">End Date</label>
+              <Input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Status</label>
+              <Select 
+                value={filters.status} 
+                onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Time Logs Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Clock className="h-5 w-5" />
+            <span>Time Logs ({timeLogs.length})</span>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
+            <div className="text-center py-8">Loading time logs...</div>
           ) : timeLogs.length === 0 ? (
-            <div className="flex justify-center p-8 text-muted-foreground">
-              No time logs found for the selected filters
+            <div className="text-center py-8 text-gray-500">
+              No time logs found for the selected criteria.
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  {(userDetails?.role === 'admin' || userDetails?.role === 'manager') && (
-                    <TableHead>User</TableHead>
-                  )}
+                  <TableHead>User</TableHead>
                   <TableHead>Project</TableHead>
-                  <TableHead>Task</TableHead>
+                  <TableHead>Start Time</TableHead>
+                  <TableHead>End Time</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {timeLogs.map((log) => (
-                  <TableRow key={log.id} className={log.is_idle ? "bg-muted/50" : ""}>
-                    <TableCell>{formatDate(log.start_time)}</TableCell>
-                    {(userDetails?.role === 'admin' || userDetails?.role === 'manager') && (
-                      <TableCell>{log.users?.full_name}</TableCell>
-                    )}
-                    <TableCell>{log.tasks?.projects?.name}</TableCell>
-                    <TableCell>{log.tasks?.name}</TableCell>
-                    <TableCell>{formatDuration(log.start_time, log.end_time)}</TableCell>
+                  <TableRow key={log.id}>
+                    <TableCell className="font-medium">{log.user_name}</TableCell>
+                    <TableCell>{log.project_name}</TableCell>
                     <TableCell>
-                      {!log.end_time ? (
-                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                          Active
-                        </span>
-                      ) : log.is_idle ? (
-                        <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
-                          Idle
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                          Completed
-                        </span>
+                      {format(new Date(log.start_time), 'MMM d, yyyy HH:mm')}
+                    </TableCell>
+                    <TableCell>
+                      {log.end_time 
+                        ? format(new Date(log.end_time), 'MMM d, yyyy HH:mm')
+                        : 'Ongoing'
+                      }
+                    </TableCell>
+                    <TableCell>
+                      {calculateDuration(log.start_time, log.end_time)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-1">
+                        <Badge variant={log.end_time ? 'default' : 'secondary'}>
+                          {log.end_time ? 'Completed' : 'Active'}
+                        </Badge>
+                        {log.is_idle && (
+                          <Badge variant="outline">Idle</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {!log.end_time && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => stopTimeLog(log.id)}
+                        >
+                          Stop
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>
