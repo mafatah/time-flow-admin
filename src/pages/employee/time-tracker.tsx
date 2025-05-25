@@ -77,9 +77,11 @@ const EmployeeTimeTracker = () => {
       }
       
       console.log('Fetched projects:', projectsData);
+      console.log('Number of projects:', projectsData?.length);
       setProjects(projectsData || []);
       
       if (!projectsData || projectsData.length === 0) {
+        console.log('No projects found, showing toast');
         toast({
           title: 'No projects available',
           description: 'Contact your administrator to create projects for time tracking.',
@@ -87,6 +89,8 @@ const EmployeeTimeTracker = () => {
         });
         setLoading(false);
         return;
+      } else {
+        console.log('Projects loaded successfully:', projectsData.map(p => p.name));
       }
 
       // For each project, ensure there's a task for the current user
