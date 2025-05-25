@@ -43,11 +43,9 @@ interface TimeLog {
   id: string;
   start_time: string;
   end_time: string | null;
-  tasks: {
+  project_id: string;
+  projects?: {
     name: string;
-    projects: {
-      name: string;
-    } | null;
   } | null;
 }
 
@@ -78,46 +76,61 @@ export default function CalendarPage() {
       const startDate = startOfMonth(currentDate);
       const endDate = endOfMonth(currentDate);
 
-                    // Fetch time logs for the current month (simplified without joins)
-       let query = supabase
-         .from('time_logs')
-         .select('id, start_time, end_time, user_id, task_id')
-         .not('end_time', 'is', null)
-         .gte('start_time', startDate.toISOString())
-         .lte('start_time', endDate.toISOString());
+      // Fetch time logs for the current month with project information
+      let query = supabase
+        .from('time_logs')
+        .select(`
+          id, 
+          start_time, 
+          end_time, 
+          user_id, 
+          project_id,
+          projects:project_id (
+            name
+          )
+        `)
+        .not('end_time', 'is', null)
+        .gte('start_time', startDate.toISOString())
+        .lte('start_time', endDate.toISOString());
 
-       // Filter by user role
-       if (userDetails?.role === 'employee') {
-         query = query.eq('user_id', userDetails.id);
-       }
+      // Filter by user role
+      if (userDetails?.role === 'employee') {
+        query = query.eq('user_id', userDetails.id);
+      }
 
-       const { data: timeLogs, error } = await query;
-       if (error) throw error;
+      const { data: timeLogs, error } = await query;
+      if (error) throw error;
 
-       // Process data by day
-       const activities: { [key: string]: DayActivity } = {};
-       
-       timeLogs?.forEach(log => {
-         if (log.end_time) {
-           const date = format(parseISO(log.start_time), 'yyyy-MM-dd');
-           const start = parseISO(log.start_time).getTime();
-           const end = parseISO(log.end_time).getTime();
-           const hours = (end - start) / (1000 * 60 * 60);
-           
-           if (!activities[date]) {
-             activities[date] = {
-               date,
-               totalHours: 0,
-               totalTasks: 0,
-               projects: ['General'], // Simplified
-               status: 'none'
-             };
-           }
-           
-           activities[date].totalHours += hours;
-           activities[date].totalTasks += 1;
-         }
-       });
+      // Process data by day
+      const activities: { [key: string]: DayActivity } = {};
+      
+      timeLogs?.forEach(log => {
+        if (log.end_time) {
+          const date = format(parseISO(log.start_time), 'yyyy-MM-dd');
+          const start = parseISO(log.start_time).getTime();
+          const end = parseISO(log.end_time).getTime();
+          const hours = (end - start) / (1000 * 60 * 60);
+          
+          if (!activities[date]) {
+            activities[date] = {
+              date,
+              totalHours: 0,
+              totalTasks: 0,
+              projects: [],
+              status: 'none'
+            };
+          }
+          
+          activities[date].totalHours += hours;
+          activities[date].totalTasks += 1;
+          
+          // Add project name if available
+          const projectName = log.projects?.name || 'Unknown Project';
+          if (!activities[date].projects.includes(projectName)) {
+            activities[date].projects.push(projectName);
+          }
+        }
+      });
 
       // Determine status based on hours worked
       Object.values(activities).forEach(activity => {
@@ -144,49 +157,44 @@ export default function CalendarPage() {
     }
   };
 
-     const loadDayDetails = async (date: Date) => {
-     try {
-       const startDate = startOfDay(date);
-       const endDate = endOfDay(date);
+  const loadDayDetails = async (date: Date) => {
+    try {
+      const startDate = startOfDay(date);
+      const endDate = endOfDay(date);
 
-       let query = supabase
-         .from('time_logs')
-         .select('id, start_time, end_time, task_id')
-         .not('end_time', 'is', null)
-         .gte('start_time', startDate.toISOString())
-         .lte('start_time', endDate.toISOString());
+      let query = supabase
+        .from('time_logs')
+        .select(`
+          id, 
+          start_time, 
+          end_time, 
+          project_id,
+          projects:project_id (
+            name
+          )
+        `)
+        .not('end_time', 'is', null)
+        .gte('start_time', startDate.toISOString())
+        .lte('start_time', endDate.toISOString());
 
-       if (userDetails?.role === 'employee') {
-         query = query.eq('user_id', userDetails.id);
-       }
+      if (userDetails?.role === 'employee') {
+        query = query.eq('user_id', userDetails.id);
+      }
 
-       const { data: logs, error } = await query;
-       if (error) throw error;
+      const { data: logs, error } = await query;
+      if (error) throw error;
 
-       // Transform to match TimeLog interface
-       const transformedLogs: TimeLog[] = (logs || []).map(log => ({
-         id: log.id,
-         start_time: log.start_time,
-         end_time: log.end_time,
-         tasks: {
-           name: 'General Task',
-           projects: {
-             name: 'General Project'
-           }
-         }
-       }));
+      setSelectedDayLogs(logs || []);
 
-       setSelectedDayLogs(transformedLogs);
-
-     } catch (error: any) {
-       console.error('Error loading day details:', error);
-       toast({
-         title: "Error loading day details",
-         description: error.message,
-         variant: "destructive",
-       });
-     }
-   };
+    } catch (error: any) {
+      console.error('Error loading day details:', error);
+      toast({
+        title: "Error loading day details",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const formatDuration = (startTime: string, endTime: string) => {
     const start = parseISO(startTime).getTime();
@@ -364,7 +372,7 @@ export default function CalendarPage() {
                     <div className="text-lg font-semibold">
                       {Object.values(dayActivities).reduce((sum, day) => sum + day.totalTasks, 0)}
                     </div>
-                    <div className="text-xs text-muted-foreground">Total Tasks</div>
+                    <div className="text-xs text-muted-foreground">Total Sessions</div>
                   </div>
                 </div>
 
@@ -400,16 +408,13 @@ export default function CalendarPage() {
                       <div key={log.id} className="p-3 border rounded-lg">
                         <div className="flex items-center justify-between mb-2">
                           <div className="font-medium text-sm">
-                            {log.tasks?.projects?.name || 'No Project'}
+                            {log.projects?.name || 'Unknown Project'}
                           </div>
                           <Badge variant={getStatusBadgeVariant(
                             dayActivities[format(selectedDate, 'yyyy-MM-dd')]?.status || 'none'
                           )}>
                             {log.end_time ? formatDuration(log.start_time, log.end_time) : 'Active'}
                           </Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {log.tasks?.name || 'No Task'}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
                           {format(parseISO(log.start_time), 'HH:mm')} - {' '}
