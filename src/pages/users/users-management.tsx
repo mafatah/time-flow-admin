@@ -22,10 +22,6 @@ type User = {
   full_name: string;
   role: string;
   avatar_url: string | null;
-  idle_timeout_minutes: number | null;
-  offline_tracking_enabled: boolean | null;
-  pause_allowed: boolean | null;
-  custom_screenshot_interval_seconds: number | null;
 };
 
 // Form schema
@@ -56,6 +52,7 @@ export default function UsersManagement() {
   useEffect(() => {
     async function fetchUsers() {
       try {
+        console.log('Fetching users...');
         const { data, error } = await supabase
           .from("users")
           .select(`
@@ -63,15 +60,16 @@ export default function UsersManagement() {
             email,
             full_name,
             role,
-            avatar_url,
-            idle_timeout_minutes,
-            offline_tracking_enabled,
-            pause_allowed,
-            custom_screenshot_interval_seconds
+            avatar_url
           `)
           .order("full_name");
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching users:', error);
+          throw error;
+        }
+        
+        console.log('Users fetched:', data);
         setUsers(data || []);
       } catch (error: any) {
         console.error('Error fetching users:', error);

@@ -12,10 +12,6 @@ interface UserDetails {
   full_name: string;
   role: string;
   avatar_url: string | null;
-  idle_timeout_minutes: number | null;
-  offline_tracking_enabled: boolean | null;
-  pause_allowed: boolean | null;
-  custom_screenshot_interval_seconds: number | null;
 }
 
 interface AuthContextType {
@@ -89,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function fetchUserDetails(userId: string) {
     try {
+      console.log('Fetching user details for:', userId);
       const { data, error } = await supabase
         .from("users")
         .select(`
@@ -96,11 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email,
           full_name,
           role,
-          avatar_url,
-          idle_timeout_minutes,
-          offline_tracking_enabled,
-          pause_allowed,
-          custom_screenshot_interval_seconds
+          avatar_url
         `)
         .eq("id", userId)
         .single();
