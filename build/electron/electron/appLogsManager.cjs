@@ -15,7 +15,10 @@ async function captureAppLog(userId, taskId) {
             return;
         const log = {
             user_id: userId,
-            message: `[${taskId}] ${win.owner.name}: ${win.title}`
+            app_name: win.owner.name,
+            window_title: win.title,
+            started_at: new Date().toISOString(),
+            category: 'core'
         };
         const { error } = await supabase_1.supabase.from('app_logs').insert(log);
         if (error) {

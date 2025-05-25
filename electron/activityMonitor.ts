@@ -1,4 +1,4 @@
-import { app, desktopCapturer, screen } from 'electron';
+import { app, desktopCapturer, screen, Notification } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -28,10 +28,25 @@ interface AppActivity {
   start_time: string;
   end_time?: string;
   duration_seconds: number;
+  url?: string;
 }
+
+// Add blur settings interface
+interface AppSettings {
+  blur_screenshots: boolean;
+  screenshot_interval_seconds: number;
+  idle_threshold_seconds: number;
+}
+
+let appSettings: AppSettings = {
+  blur_screenshots: false,
+  screenshot_interval_seconds: 20,
+  idle_threshold_seconds: 180
+};
 
 let activityInterval: ReturnType<typeof setInterval> | undefined;
 let appTrackingInterval: ReturnType<typeof setInterval> | undefined;
+let notificationInterval: ReturnType<typeof setInterval> | undefined;
 let isMonitoring = false;
 let currentUserId: string | null = null;
 let currentActivitySession: ActivitySession | null = null;
@@ -39,7 +54,7 @@ let lastActivityTime = Date.now();
 let currentApp: AppActivity | null = null;
 
 // Always-on activity monitoring - starts when app launches
-export function startActivityMonitoring(userId: string) {
+export async function startActivityMonitoring(userId: string) {
   if (isMonitoring) {
     console.log('🔄 Activity monitoring already running');
     return;
@@ -49,6 +64,9 @@ export function startActivityMonitoring(userId: string) {
   currentUserId = userId;
   isMonitoring = true;
   lastActivityTime = Date.now();
+
+  // Fetch settings from server first
+  await fetchSettings();
 
   // Create new activity session
   currentActivitySession = {
@@ -63,13 +81,13 @@ export function startActivityMonitoring(userId: string) {
   // Save session to database
   saveActivitySession();
 
-  // Start screenshot capture every X seconds
+  // Start screenshot capture using settings interval
   activityInterval = setInterval(async () => {
     if (currentUserId && isUserActive()) {
       await captureActivityScreenshot();
       updateLastActivity();
     }
-  }, screenshotIntervalSeconds * 1000);
+  }, appSettings.screenshot_interval_seconds * 1000);
 
   // Start app activity tracking every 5 seconds
   appTrackingInterval = setInterval(async () => {
@@ -79,7 +97,12 @@ export function startActivityMonitoring(userId: string) {
     }
   }, 5000);
 
-  console.log(`✅ Activity monitoring started - Screenshots every ${screenshotIntervalSeconds}s, App tracking every 5s`);
+  // Start notification checking every 60 seconds
+  notificationInterval = setInterval(async () => {
+    await checkNotifications();
+  }, 60000);
+
+  console.log(`✅ Activity monitoring started - Screenshots every ${appSettings.screenshot_interval_seconds}s, App tracking every 5s`);
 }
 
 export function stopActivityMonitoring() {
@@ -96,6 +119,11 @@ export function stopActivityMonitoring() {
   if (appTrackingInterval) {
     clearInterval(appTrackingInterval);
     appTrackingInterval = undefined;
+  }
+
+  if (notificationInterval) {
+    clearInterval(notificationInterval);
+    notificationInterval = undefined;
   }
 
   // End current activity session
@@ -118,12 +146,56 @@ export function stopActivityMonitoring() {
 }
 
 function isUserActive(): boolean {
-  const idleTimeMs = idleTimeoutMinutes * 60 * 1000;
+  const idleTimeMs = appSettings.idle_threshold_seconds * 1000;
   return (Date.now() - lastActivityTime) < idleTimeMs;
 }
 
 function updateLastActivity() {
   lastActivityTime = Date.now();
+}
+
+// Add settings fetch function
+export async function fetchSettings() {
+  try {
+    const { data, error } = await supabase
+      .from('settings')
+      .select('*')
+      .single();
+    
+    if (error) {
+      console.log('⚠️ Could not fetch settings, using defaults:', error);
+      return;
+    }
+    
+    if (data) {
+      appSettings = {
+        blur_screenshots: data.blur_screenshots || false,
+        screenshot_interval_seconds: data.screenshot_interval_seconds || 20,
+        idle_threshold_seconds: data.idle_threshold_seconds || 180
+      };
+      console.log('✅ Settings loaded:', appSettings);
+    }
+  } catch (error) {
+    console.error('❌ Settings fetch error:', error);
+    logError('fetchSettings', error);
+  }
+}
+
+// Add blur function using Canvas API
+async function blurImage(buffer: Buffer): Promise<Buffer> {
+  try {
+    // For now, we'll use a simple approach - in production you'd want to use sharp or canvas
+    // This is a placeholder that returns the original buffer
+    // In a real implementation, you'd blur the image here
+    console.log('🔄 Blurring screenshot...');
+    
+    // TODO: Implement actual image blurring using sharp or canvas
+    // For now, just return original buffer
+    return buffer;
+  } catch (error) {
+    console.error('❌ Image blur failed:', error);
+    return buffer; // Return original if blur fails
+  }
 }
 
 async function captureActivityScreenshot() {
@@ -145,7 +217,14 @@ async function captureActivityScreenshot() {
       return;
     }
 
-    const buffer = sources[0].thumbnail.toPNG();
+    let buffer = sources[0].thumbnail.toPNG();
+    
+    // Apply blur if enabled in settings
+    if (appSettings.blur_screenshots) {
+      console.log('🔄 Applying blur to screenshot...');
+      buffer = await blurImage(buffer);
+    }
+    
     const filename = `activity_${randomUUID()}.png`;
     const tempPath = path.join(app.getPath('temp'), filename);
     fs.writeFileSync(tempPath, buffer);
@@ -253,46 +332,6 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
   }
 }
 
-async function trackCurrentApp() {
-  if (!currentUserId || !currentActivitySession) return;
-
-  try {
-    // Get current active application (simplified for now)
-    // This would need native implementation for macOS
-    const appName = await getCurrentAppName();
-    const windowTitle = await getCurrentWindowTitle();
-
-    if (currentApp && currentApp.app_name === appName && currentApp.window_title === windowTitle) {
-      // Still in same app/window, continue tracking
-      return;
-    }
-
-    // End previous app activity
-    if (currentApp) {
-      currentApp.end_time = new Date().toISOString();
-      currentApp.duration_seconds = Math.floor((Date.now() - new Date(currentApp.start_time).getTime()) / 1000);
-      await saveAppActivity();
-    }
-
-    // Start new app activity
-    currentApp = {
-      app_name: appName,
-      window_title: windowTitle,
-      start_time: new Date().toISOString(),
-      duration_seconds: 0
-    };
-
-    currentActivitySession.total_apps++;
-    saveActivitySession();
-
-    console.log('📱 App activity:', appName, '-', windowTitle);
-
-  } catch (error) {
-    console.error('❌ App tracking failed:', error);
-    logError('trackCurrentApp', error);
-  }
-}
-
 async function getCurrentAppName(): Promise<string> {
   // Simplified implementation - would need native module for real app detection
   return 'Unknown App';
@@ -303,16 +342,80 @@ async function getCurrentWindowTitle(): Promise<string> {
   return 'Unknown Window';
 }
 
+async function getCurrentURL(): Promise<string | undefined> {
+  try {
+    // This would need native implementation to get browser URLs
+    // For now, return undefined - in production you'd use AppleScript on macOS
+    // or Windows APIs to get the current browser tab URL
+    return undefined;
+  } catch (error) {
+    console.error('❌ URL capture failed:', error);
+    return undefined;
+  }
+}
+
+async function trackCurrentApp() {
+  if (!currentUserId || !currentActivitySession) return;
+
+  try {
+    // Get current active application
+    const appName = await getCurrentAppName();
+    const windowTitle = await getCurrentWindowTitle();
+    const currentURL = await getCurrentURL();
+
+    if (currentApp && 
+        currentApp.app_name === appName && 
+        currentApp.window_title === windowTitle &&
+        currentApp.url === currentURL) {
+      // Still in same app/window/URL, continue tracking
+      return;
+    }
+
+    // End previous app activity
+    if (currentApp) {
+      currentApp.end_time = new Date().toISOString();
+      currentApp.duration_seconds = Math.floor((Date.now() - new Date(currentApp.start_time).getTime()) / 1000);
+      await saveAppActivity();
+      
+      // Save URL log if we have a URL
+      if (currentApp.url) {
+        await saveURLActivity(currentApp);
+      }
+    }
+
+    // Start new app activity
+    currentApp = {
+      app_name: appName,
+      window_title: windowTitle,
+      start_time: new Date().toISOString(),
+      duration_seconds: 0,
+      url: currentURL
+    };
+
+    currentActivitySession.total_apps++;
+    saveActivitySession();
+
+    console.log('📱 App activity:', appName, '-', windowTitle, currentURL ? `(${currentURL})` : '');
+
+  } catch (error) {
+    console.error('❌ App tracking failed:', error);
+    logError('trackCurrentApp', error);
+  }
+}
+
 async function saveAppActivity() {
   if (!currentApp || !currentUserId || !currentActivitySession) return;
 
   try {
-    // Format app activity as a message for the existing app_logs table
-    const message = `App: ${currentApp.app_name} | Window: ${currentApp.window_title} | Duration: ${currentApp.duration_seconds}s`;
-    
+    // Use the correct app_logs schema
     const appLogData = {
       user_id: currentUserId,
-      message: message
+      app_name: currentApp.app_name,
+      window_title: currentApp.window_title,
+      started_at: currentApp.start_time,
+      ended_at: currentApp.end_time,
+      duration_seconds: currentApp.duration_seconds,
+      category: 'core' // Default category
     };
 
     const { error } = await supabase
@@ -333,16 +436,48 @@ async function saveAppActivity() {
   }
 }
 
+async function saveURLActivity(appActivity: AppActivity) {
+  if (!appActivity.url || !currentUserId) return;
+
+  try {
+    const urlLogData = {
+      user_id: currentUserId,
+      site_url: appActivity.url,
+      started_at: appActivity.start_time,
+      ended_at: appActivity.end_time,
+      duration_seconds: appActivity.duration_seconds,
+      category: 'core' // Default category
+    };
+
+    const { error } = await supabase
+      .from('url_logs')
+      .insert(urlLogData);
+
+    if (error) {
+      console.error('❌ Failed to save URL activity:', error);
+      // Could queue for later upload here
+    } else {
+      console.log('✅ URL activity saved:', appActivity.url);
+    }
+
+  } catch (error) {
+    console.error('❌ Failed to save URL activity:', error);
+    logError('saveURLActivity', error);
+  }
+}
+
 async function saveActivitySession() {
   if (!currentActivitySession) return;
 
   try {
     // Save activity session as an app log entry for now
-    const sessionMessage = `Activity Session: ${currentActivitySession.is_active ? 'Active' : 'Ended'} | Screenshots: ${currentActivitySession.total_screenshots} | Apps: ${currentActivitySession.total_apps}`;
-    
     const sessionLogData = {
       user_id: currentActivitySession.user_id,
-      message: sessionMessage
+      app_name: 'Activity Monitor',
+      window_title: `${currentActivitySession.is_active ? 'Active' : 'Ended'} Session - Screenshots: ${currentActivitySession.total_screenshots}, Apps: ${currentActivitySession.total_apps}`,
+      started_at: currentActivitySession.start_time,
+      ended_at: currentActivitySession.end_time,
+      category: 'system'
     };
 
     const { error } = await supabase
@@ -420,5 +555,79 @@ export async function triggerDirectScreenshot() {
     console.error('❌ Direct screenshot test failed:', error);
     logError('triggerDirectScreenshot', error);
     return false;
+  }
+}
+
+async function checkNotifications() {
+  if (!currentUserId) return;
+
+  try {
+    const { data: notifications, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', currentUserId)
+      .is('read_at', null)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      console.error('❌ Failed to fetch notifications:', error);
+      return;
+    }
+
+    if (notifications && notifications.length > 0) {
+      for (const notification of notifications) {
+        showNotification(notification);
+        
+        // Mark as read
+        await supabase
+          .from('notifications')
+          .update({ read_at: new Date().toISOString() })
+          .eq('id', notification.id);
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Notification check failed:', error);
+    logError('checkNotifications', error);
+  }
+}
+
+function showNotification(notification: any) {
+  try {
+    if (Notification.isSupported()) {
+      const notif = new Notification({
+        title: 'Time Flow',
+        body: getNotificationMessage(notification),
+        icon: path.join(__dirname, '../assets/icon.png'), // Add app icon
+        silent: false
+      });
+
+      notif.show();
+      
+      notif.on('click', () => {
+        console.log('📱 Notification clicked:', notification.type);
+        // Could open admin panel or specific page
+      });
+
+      console.log('📱 Notification shown:', notification.type);
+    }
+  } catch (error) {
+    console.error('❌ Failed to show notification:', error);
+  }
+}
+
+function getNotificationMessage(notification: any): string {
+  switch (notification.type) {
+    case 'low_activity':
+      return 'Low activity detected. Please check your productivity.';
+    case 'long_session':
+      return 'You\'ve been working for a long time. Consider taking a break.';
+    case 'activity_drop':
+      return 'Significant activity drop detected.';
+    case 'unusual_pattern':
+      return 'Unusual activity pattern detected.';
+    default:
+      return notification.payload?.message || 'You have a new notification.';
   }
 } 

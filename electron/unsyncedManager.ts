@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { supabase } from './supabase';
 import { logError } from './errorHandler';
-import type { Database } from '../src/types/database';
+import type { Database } from '../src/integrations/supabase/types';
 
 interface TimeLog {
   id?: string;
@@ -86,9 +86,9 @@ export function queueScreenshot(meta: ScreenshotMeta) {
 }
 
 export function queueAppLog(log: AppLog) {
-  if (!log.message) return;
+  if (!log.app_name) return;
   const logs = loadAppLogs();
-  logs.push({ user_id: log.user_id, message: log.message });
+  logs.push(log);
   saveAppLogs(logs);
 }
 
@@ -144,12 +144,9 @@ export async function processQueue() {
   }
 
   for (const log of [...appLogs]) {
-    if (!log.message) continue;
+    if (!log.app_name) continue;
     try {
-      const { error } = await supabase.from('app_logs').insert({
-        user_id: log.user_id,
-        message: log.message
-      });
+      const { error } = await supabase.from('app_logs').insert(log);
       if (!error) {
         const idx = appLogs.indexOf(log);
         if (idx !== -1) appLogs.splice(idx, 1);

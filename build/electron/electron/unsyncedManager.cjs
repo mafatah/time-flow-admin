@@ -66,10 +66,10 @@ function queueScreenshot(meta) {
     saveData(data);
 }
 function queueAppLog(log) {
-    if (!log.message)
+    if (!log.app_name)
         return;
     const logs = loadAppLogs();
-    logs.push({ user_id: log.user_id, message: log.message });
+    logs.push(log);
     saveAppLogs(logs);
 }
 async function processQueue() {
@@ -124,13 +124,10 @@ async function processQueue() {
         }
     }
     for (const log of [...appLogs]) {
-        if (!log.message)
+        if (!log.app_name)
             continue;
         try {
-            const { error } = await supabase_1.supabase.from('app_logs').insert({
-                user_id: log.user_id,
-                message: log.message
-            });
+            const { error } = await supabase_1.supabase.from('app_logs').insert(log);
             if (!error) {
                 const idx = appLogs.indexOf(log);
                 if (idx !== -1)
