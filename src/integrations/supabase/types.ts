@@ -364,32 +364,32 @@ export type Database = {
           end_time: string | null
           id: string
           is_idle: boolean
+          project_id: string
           start_time: string
-          task_id: string
           user_id: string
         }
         Insert: {
           end_time?: string | null
           id?: string
           is_idle?: boolean
+          project_id: string
           start_time?: string
-          task_id: string
           user_id: string
         }
         Update: {
           end_time?: string | null
           id?: string
           is_idle?: boolean
+          project_id?: string
           start_time?: string
-          task_id?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "fk_time_logs_tasks"
-            columns: ["task_id"]
+            foreignKeyName: "fk_time_logs_project"
+            columns: ["project_id"]
             isOneToOne: false
-            referencedRelation: "tasks"
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {

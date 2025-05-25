@@ -13,8 +13,8 @@ import { format } from "date-fns";
 export default function TimeTracker() {
   const [currentSession, setCurrentSession] = useState<any>(null);
   const [isTracking, setIsTracking] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<string>('');
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [todayTime, setTodayTime] = useState(0);
@@ -49,48 +49,34 @@ export default function TimeTracker() {
     try {
       setLoading(true);
       
-      // Load tasks with projects
-      let tasksQuery = supabase
-        .from('tasks')
-        .select(`
-          id,
-          name,
-          user_id,
-          projects(id, name)
-        `);
+      // Load projects
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name, description')
+        .order('name');
       
-      // For admins and managers, show all tasks
-      // For employees, show only their tasks
-      if (userDetails?.role === 'employee') {
-        tasksQuery = tasksQuery.eq('user_id', userDetails.id);
+      if (projectsError) {
+        console.error('Projects query error:', projectsError);
+        throw projectsError;
       }
       
-      const { data: tasksData, error: tasksError } = await tasksQuery.order('name');
-      
-      if (tasksError) {
-        console.error('Tasks query error:', tasksError);
-        throw tasksError;
-      }
-      
-      console.log('Loaded tasks:', tasksData);
+      console.log('Loaded projects:', projectsData);
       console.log('User role:', userDetails?.role);
       console.log('User ID:', userDetails?.id);
       
-      setTasks(tasksData || []);
+      setProjects(projectsData || []);
       
-      // If no tasks found, show a helpful message
-      if (!tasksData || tasksData.length === 0) {
+      // If no projects found, show a helpful message
+      if (!projectsData || projectsData.length === 0) {
         toast({
-          title: "No tasks available",
-          description: userDetails?.role === 'admin' 
-            ? "No tasks exist in the system. Create some tasks first in Projects > Tasks Management." 
-            : "No tasks assigned to you. Contact your admin to assign tasks.",
+          title: "No projects available",
+          description: "Contact your administrator to create projects for time tracking.",
           variant: "default",
         });
       }
       
     } catch (error: any) {
-      console.error('Error loading tasks:', error);
+      console.error('Error loading projects:', error);
       toast({
         title: "Error loading data",
         description: error.message,
@@ -102,7 +88,7 @@ export default function TimeTracker() {
   };
 
   const loadActiveSession = async () => {
-    if (!userDetails) return;
+    if (!userDetails?.id) return;
     
     try {
       const { data, error } = await supabase
@@ -119,7 +105,7 @@ export default function TimeTracker() {
       if (data) {
         setCurrentSession(data);
         setIsTracking(true);
-        setSelectedTask(data.task_id);
+        setSelectedProject(data.project_id);
         
         // Calculate elapsed time
         const startTime = new Date(data.start_time).getTime();
@@ -162,10 +148,10 @@ export default function TimeTracker() {
   };
 
   const startTracking = async () => {
-    if (!selectedTask || !userDetails) {
+    if (!selectedProject || !userDetails?.id) {
       toast({
-        title: "Please select a task",
-        description: "You need to select a task before starting time tracking.",
+        title: "Please select a project",
+        description: "You need to select a project before starting time tracking.",
         variant: "destructive",
       });
       return;
@@ -178,7 +164,7 @@ export default function TimeTracker() {
         .from('time_logs')
         .insert({
           user_id: userDetails.id,
-          task_id: selectedTask,
+          project_id: selectedProject,
           start_time: startTime
         })
         .select()
@@ -193,13 +179,13 @@ export default function TimeTracker() {
       // Notify Electron process if available
       if (window.electron) {
         window.electron.setUserId(userDetails.id);
-        window.electron.setTaskId(selectedTask);
+        window.electron.setTaskId(selectedProject);
         window.electron.startTracking();
       }
 
       toast({
         title: "Time tracking started",
-        description: "Successfully started tracking time for the selected task.",
+        description: "Successfully started tracking time for the selected project.",
       });
     } catch (error: any) {
       toast({
@@ -256,9 +242,9 @@ export default function TimeTracker() {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const getSelectedTaskName = () => {
-    const task = tasks.find(t => t.id === selectedTask);
-    return task ? `${task.projects?.name || 'Unknown Project'} - ${task.name}` : 'No task selected';
+  const getSelectedProjectName = () => {
+    const project = projects.find(p => p.id === selectedProject);
+    return project ? project.name : 'No project selected';
   };
 
   if (loading) {
@@ -283,21 +269,21 @@ export default function TimeTracker() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Task Selection */}
+          {/* Project Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Select Task</label>
+            <label className="text-sm font-medium">Select Project</label>
             <Select
-              value={selectedTask}
-              onValueChange={setSelectedTask}
+              value={selectedProject}
+              onValueChange={setSelectedProject}
               disabled={isTracking}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose a task to track" />
+                <SelectValue placeholder="Choose a project to track" />
               </SelectTrigger>
               <SelectContent>
-                {tasks.map(task => (
-                  <SelectItem key={task.id} value={task.id}>
-                    {task.projects?.name || 'Unknown Project'} - {task.name}
+                {projects.map(project => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -311,14 +297,14 @@ export default function TimeTracker() {
             </div>
             {isTracking && (
               <div className="text-sm text-muted-foreground mb-4">
-                Tracking: {getSelectedTaskName()}
+                Tracking: {getSelectedProjectName()}
               </div>
             )}
             <div className="flex justify-center gap-3">
               {!isTracking ? (
                 <Button
                   onClick={startTracking}
-                  disabled={!selectedTask}
+                  disabled={!selectedProject}
                   size="lg"
                   className="flex items-center gap-2"
                 >
