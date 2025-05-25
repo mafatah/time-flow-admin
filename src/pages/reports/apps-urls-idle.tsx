@@ -65,54 +65,48 @@ const AppsUrlsIdlePage = () => {
   const [idleData, setIdleData] = useState<IdleData[]>([]);
   const [timeDistribution, setTimeDistribution] = useState<TimeDistribution[]>([]);
 
-  // Mock data - in production, this would come from your API
+  // Fetch real data from API
   useEffect(() => {
-    const mockAppUsage = [
-      { app_name: 'Visual Studio Code', total_time: 28800, usage_count: 145, users: 8, category: 'Development', productivity_score: 95 },
-      { app_name: 'Chrome', total_time: 21600, usage_count: 89, users: 12, category: 'Browser', productivity_score: 70 },
-      { app_name: 'Slack', total_time: 14400, usage_count: 234, users: 15, category: 'Communication', productivity_score: 85 },
-      { app_name: 'Figma', total_time: 18000, usage_count: 67, users: 5, category: 'Design', productivity_score: 90 },
-      { app_name: 'Spotify', total_time: 7200, usage_count: 45, users: 10, category: 'Entertainment', productivity_score: 30 },
-      { app_name: 'Terminal', total_time: 12600, usage_count: 156, users: 6, category: 'Development', productivity_score: 92 },
-      { app_name: 'Photoshop', total_time: 9000, usage_count: 34, users: 3, category: 'Design', productivity_score: 88 },
-      { app_name: 'Excel', total_time: 10800, usage_count: 78, users: 7, category: 'Productivity', productivity_score: 80 }
-    ];
+    const fetchAnalyticsData = async () => {
+      try {
+        // Fetch app usage analytics
+        const appResponse = await fetch(`/api/insights/app-usage-analytics?date=${selectedDate}&userId=${selectedUser !== 'all' ? selectedUser : ''}`);
+        if (appResponse.ok) {
+          const appData = await appResponse.json();
+          setAppUsage(appData || []);
+        }
 
-    const mockUrlUsage = [
-      { domain: 'github.com', total_visits: 456, total_time: 25200, users: 8, category: 'Development', productivity_score: 95 },
-      { domain: 'stackoverflow.com', total_visits: 234, total_time: 14400, users: 10, category: 'Development', productivity_score: 90 },
-      { domain: 'google.com', total_visits: 189, total_time: 7200, users: 15, category: 'Search', productivity_score: 75 },
-      { domain: 'youtube.com', total_visits: 123, total_time: 18000, users: 12, category: 'Entertainment', productivity_score: 25 },
-      { domain: 'linkedin.com', total_visits: 89, total_time: 5400, users: 8, category: 'Social', productivity_score: 60 },
-      { domain: 'figma.com', total_visits: 67, total_time: 16200, users: 5, category: 'Design', productivity_score: 92 },
-      { domain: 'notion.so', total_visits: 145, total_time: 12600, users: 9, category: 'Productivity', productivity_score: 85 },
-      { domain: 'twitter.com', total_visits: 78, total_time: 3600, users: 6, category: 'Social', productivity_score: 35 }
-    ];
+        // Fetch URL usage analytics
+        const urlResponse = await fetch(`/api/insights/url-usage-analytics?date=${selectedDate}&userId=${selectedUser !== 'all' ? selectedUser : ''}`);
+        if (urlResponse.ok) {
+          const urlData = await urlResponse.json();
+          setUrlUsage(urlData || []);
+        }
 
-    const mockIdleData = [
-      { user: 'john.doe@company.com', total_idle_time: 7200, idle_periods: 12, avg_idle_duration: 600, max_idle_duration: 1800, productivity_impact: 15 },
-      { user: 'jane.smith@company.com', total_idle_time: 5400, idle_periods: 8, avg_idle_duration: 675, max_idle_duration: 1200, productivity_impact: 12 },
-      { user: 'mike.wilson@company.com', total_idle_time: 9000, idle_periods: 15, avg_idle_duration: 600, max_idle_duration: 2400, productivity_impact: 22 },
-      { user: 'sarah.johnson@company.com', total_idle_time: 3600, idle_periods: 6, avg_idle_duration: 600, max_idle_duration: 900, productivity_impact: 8 },
-      { user: 'alex.brown@company.com', total_idle_time: 10800, idle_periods: 18, avg_idle_duration: 600, max_idle_duration: 3600, productivity_impact: 28 }
-    ];
+        // Fetch idle analytics
+        const idleResponse = await fetch(`/api/insights/idle-analytics?date=${selectedDate}&userId=${selectedUser !== 'all' ? selectedUser : ''}`);
+        if (idleResponse.ok) {
+          const idleData = await idleResponse.json();
+          setIdleData(idleData || []);
+        }
 
-    const mockTimeDistribution = [
-      { hour: '09:00', apps: 85, urls: 70, idle: 5 },
-      { hour: '10:00', apps: 92, urls: 80, idle: 8 },
-      { hour: '11:00', apps: 88, urls: 75, idle: 12 },
-      { hour: '12:00', apps: 45, urls: 60, idle: 35 },
-      { hour: '13:00', apps: 50, urls: 65, idle: 25 },
-      { hour: '14:00', apps: 90, urls: 85, idle: 10 },
-      { hour: '15:00', apps: 85, urls: 78, idle: 15 },
-      { hour: '16:00', apps: 80, urls: 72, idle: 18 },
-      { hour: '17:00', apps: 75, urls: 68, idle: 20 }
-    ];
+        // Fetch hourly distribution
+        const distributionResponse = await fetch(`/api/insights/hourly-distribution?date=${selectedDate}&userId=${selectedUser !== 'all' ? selectedUser : ''}`);
+        if (distributionResponse.ok) {
+          const distributionData = await distributionResponse.json();
+          setTimeDistribution(distributionData || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch analytics data:', error);
+        // Fallback to empty arrays if API fails
+        setAppUsage([]);
+        setUrlUsage([]);
+        setIdleData([]);
+        setTimeDistribution([]);
+      }
+    };
 
-    setAppUsage(mockAppUsage);
-    setUrlUsage(mockUrlUsage);
-    setIdleData(mockIdleData);
-    setTimeDistribution(mockTimeDistribution);
+    fetchAnalyticsData();
   }, [selectedDate, selectedUser]);
 
   const formatTime = (seconds: number) => {
