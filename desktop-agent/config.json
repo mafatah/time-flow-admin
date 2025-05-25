@@ -1,6 +1,6 @@
 {
-  "user_id": "admin-001",
+  "user_id": "employee@timeflow.com",
   "project_id": "proj-001",
-  "supabase_url": "https://placeholder.supabase.co",
-  "supabase_key": "placeholder-key"
+  "supabase_url": "https://fkpiqcxkmrtaetvfgcli.supabase.co",
+  "supabase_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4"
 }
