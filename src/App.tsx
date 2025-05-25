@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Loading } from "@/components/layout/loading";
@@ -26,6 +26,12 @@ import SettingsPage from "@/pages/settings";
 import NotFoundPage from "@/pages/not-found";
 import Index from "@/pages/Index";
 
+// Employee-specific pages
+import EmployeeDashboard from "@/pages/employee/dashboard";
+import EmployeeTimeTracker from "@/pages/employee/time-tracker";
+import EmployeeReports from "@/pages/employee/reports";
+import EmployeeIdleTime from "@/pages/employee/idle-time";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -35,10 +41,10 @@ const queryClient = new QueryClient({
   }
 });
 
-// Protected route component
-function ProtectedRoute({ children, requiredRole }: { 
+// Protected route component with role-based access
+function ProtectedRoute({ children, allowedRoles }: { 
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'manager' | 'employee';
+  allowedRoles?: ('admin' | 'manager' | 'employee')[];
 }) {
   const { user, userDetails, loading } = useAuth();
 
@@ -50,88 +56,105 @@ function ProtectedRoute({ children, requiredRole }: {
     return <Navigate to="/login" />;
   }
 
-  // If a role is required, check if the user has it
-  if (requiredRole && userDetails?.role !== requiredRole && 
-     !(requiredRole === 'manager' && userDetails?.role === 'admin')) {
-    return <Navigate to="/dashboard" />;
+  // If roles are specified, check if user has required role
+  if (allowedRoles && userDetails?.role && !allowedRoles.includes(userDetails.role as any)) {
+    // Redirect employees to their dashboard, admins/managers to main dashboard
+    if (userDetails.role === 'employee') {
+      return <Navigate to="/employee/dashboard" />;
+    } else {
+      return <Navigate to="/dashboard" />;
+    }
   }
 
   return <>{children}</>;
 }
 
-function AppRoutes() {
-  const { user, loading } = useAuth();
+// Role-based dashboard redirect
+function DashboardRedirect() {
+  const { userDetails, loading } = useAuth();
 
   if (loading) {
-    return <Loading message="Loading application..." />;
+    return <Loading message="Loading..." />;
   }
 
+  if (userDetails?.role === 'employee') {
+    return <Navigate to="/employee/dashboard" replace />;
+  } else {
+    return <Navigate to="/dashboard" replace />;
+  }
+}
+
+function AppRoutes() {
   return (
     <Routes>
-      {/* Auth routes */}
-      <Route 
-        path="/login" 
-        element={user ? <Navigate to="/dashboard" /> : <LoginPage />} 
-      />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/" element={<DashboardRedirect />} />
       
-      {/* Landing page redirect */}
-      <Route 
-        path="/" 
-        element={<Navigate to={user ? "/dashboard" : "/login"} />} 
-      />
-      
-      <Route 
-        path="/index" 
-        element={<Navigate to="/" />} 
-      />
-
-      {/* Protected routes with layout */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
+      {/* Admin/Manager Routes */}
+      <Route element={
+        <ProtectedRoute allowedRoles={['admin', 'manager']}>
+          <MainLayout />
+        </ProtectedRoute>
+      }>
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/users" element={
-          <ProtectedRoute requiredRole="manager">
-            <UsersPage />
-          </ProtectedRoute>
-        } />
+        <Route path="/users" element={<UsersPage />} />
+        <Route path="/screenshots" element={<ScreenshotsPage />} />
+        <Route path="/reports/apps-urls-idle" element={<AppsUrlsIdlePage />} />
+        <Route path="/insights" element={<InsightsPage />} />
+      </Route>
+      
+      <Route element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <MainLayout />
+        </ProtectedRoute>
+      }>
+        <Route path="/settings" element={<SettingsPage />} />
+      </Route>
+
+      {/* Employee Routes */}
+      <Route element={
+        <ProtectedRoute allowedRoles={['employee']}>
+          <MainLayout />
+        </ProtectedRoute>
+      }>
+        <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
+        <Route path="/employee/time-tracker" element={<EmployeeTimeTracker />} />
+        <Route path="/employee/reports" element={<EmployeeReports />} />
+        <Route path="/employee/idle-time" element={<EmployeeIdleTime />} />
+      </Route>
+
+      {/* Shared Routes (all roles) */}
+      <Route element={
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      }>
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/time-tracker" element={<TimeTrackerPage />} />
         <Route path="/time-reports" element={<TimeReportsPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/reports/apps-urls-idle" element={<AppsUrlsIdlePage />} />
-        <Route path="/insights" element={<InsightsPage />} />
-        <Route path="/screenshots" element={<ScreenshotsPage />} />
-        <Route path="/settings" element={
-          <ProtectedRoute requiredRole="admin">
-            <SettingsPage />
-          </ProtectedRoute>
-        } />
       </Route>
 
-      {/* 404 Not Found */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <HashRouter>
-          <AppRoutes />
-        </HashRouter>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </AuthProvider>
       </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+    </QueryClientProvider>
+  );
+}
 
 export default App;

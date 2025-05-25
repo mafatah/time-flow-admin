@@ -34,74 +34,119 @@ export function Sidebar({ className }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   // Define sidebar items based on user role
-  const sidebarItems = [
-    {
-      title: "Dashboard",
-      href: "/dashboard",
-      icon: LayoutDashboard,
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
-    },
-    {
-      title: "Users",
-      href: "/users",
-      icon: Users,
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      title: "Projects",
-      href: "/projects",
-      icon: Layout,
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
-    },
-    {
-      title: "Time Tracker",
-      href: "/time-tracker",
-      icon: Timer,
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
-    },
-    {
-      title: "Time Reports",
-      href: "/time-reports",
-      icon: ClipboardList,
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
-    },
-    {
-      title: "Calendar",
-      href: "/calendar",
-      icon: Calendar,
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
-    },
-    {
-      title: "Screenshots",
-      href: "/screenshots",
-      icon: Image,
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      title: "Reports",
-      href: "/reports",
-      icon: FileText,
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
-    },
-    {
-      title: "Apps & URLs",
-      href: "/reports/apps-urls-idle",
-      icon: Monitor,
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      title: "Insights",
-      href: "/insights",
-      icon: TrendingUp,
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      title: "Settings",
-      href: "/settings",
-      icon: Settings,
-      roles: [UserRole.ADMIN],
-    },
-  ];
+  const getSidebarItems = () => {
+    if (userDetails?.role === 'employee') {
+      return [
+        {
+          title: "My Dashboard",
+          href: "/employee/dashboard",
+          icon: LayoutDashboard,
+          roles: [UserRole.EMPLOYEE],
+        },
+        {
+          title: "Time Tracker",
+          href: "/employee/time-tracker",
+          icon: Timer,
+          roles: [UserRole.EMPLOYEE],
+        },
+        {
+          title: "My Reports",
+          href: "/employee/reports",
+          icon: ClipboardList,
+          roles: [UserRole.EMPLOYEE],
+        },
+        {
+          title: "Idle Time",
+          href: "/employee/idle-time",
+          icon: Clock,
+          roles: [UserRole.EMPLOYEE],
+        },
+        {
+          title: "Projects",
+          href: "/projects",
+          icon: Layout,
+          roles: [UserRole.EMPLOYEE],
+        },
+        {
+          title: "Calendar",
+          href: "/calendar",
+          icon: Calendar,
+          roles: [UserRole.EMPLOYEE],
+        },
+      ];
+    } else {
+      return [
+        {
+          title: "Dashboard",
+          href: "/dashboard",
+          icon: LayoutDashboard,
+          roles: [UserRole.ADMIN, UserRole.MANAGER],
+        },
+        {
+          title: "Users",
+          href: "/users",
+          icon: Users,
+          roles: [UserRole.ADMIN, UserRole.MANAGER],
+        },
+        {
+          title: "Projects",
+          href: "/projects",
+          icon: Layout,
+          roles: [UserRole.ADMIN, UserRole.MANAGER],
+        },
+        {
+          title: "Time Tracker",
+          href: "/time-tracker",
+          icon: Timer,
+          roles: [UserRole.ADMIN, UserRole.MANAGER],
+        },
+        {
+          title: "Time Reports",
+          href: "/time-reports",
+          icon: ClipboardList,
+          roles: [UserRole.ADMIN, UserRole.MANAGER],
+        },
+        {
+          title: "Calendar",
+          href: "/calendar",
+          icon: Calendar,
+          roles: [UserRole.ADMIN, UserRole.MANAGER],
+        },
+        {
+          title: "Screenshots",
+          href: "/screenshots",
+          icon: Image,
+          roles: [UserRole.ADMIN, UserRole.MANAGER],
+        },
+        {
+          title: "Reports",
+          href: "/reports",
+          icon: FileText,
+          roles: [UserRole.ADMIN, UserRole.MANAGER],
+        },
+        {
+          title: "Apps & URLs",
+          href: "/reports/apps-urls-idle",
+          icon: Monitor,
+          roles: [UserRole.ADMIN, UserRole.MANAGER],
+        },
+        {
+          title: "Insights",
+          href: "/insights",
+          icon: TrendingUp,
+          roles: [UserRole.ADMIN, UserRole.MANAGER],
+        },
+        {
+          title: "Settings",
+          href: "/settings",
+          icon: Settings,
+          roles: [UserRole.ADMIN],
+        },
+      ];
+    }
+  };
+
+  const sidebarItems = getSidebarItems();
 
   // Filter items based on user role
   const filteredItems = userDetails
