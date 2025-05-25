@@ -9,26 +9,24 @@ import { useToast } from '@/components/ui/use-toast';
 import { Download } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
-export function TaskSelector() {
-  const { isTracking, currentTaskId, startTracking, stopTracking, canTrack } = useTracker();
+export function ProjectSelector() {
+  const { isTracking, currentProjectId, startTracking, stopTracking, canTrack } = useTracker();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(currentTaskId);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(currentProjectId);
 
-  // Fetch user's tasks
-  const { data: tasks, isLoading: tasksLoading } = useQuery({
-    queryKey: ['userTasks', user?.id],
+  // Fetch projects
+  const { data: projects, isLoading: projectsLoading } = useQuery({
+    queryKey: ['projects'],
     queryFn: async () => {
-      if (!user) return [];
-      
       const { data, error } = await supabase
-        .from('tasks')
-        .select('id, name, project_id, projects!fk_tasks_projects(name)')
-        .eq('user_id', user.id);
+        .from('projects')
+        .select('id, name, description')
+        .order('name');
         
       if (error) {
         toast({
-          title: 'Error fetching tasks',
+          title: 'Error fetching projects',
           description: error.message,
           variant: 'destructive',
         });
@@ -40,22 +38,22 @@ export function TaskSelector() {
     enabled: !!user,
   });
   
-  // Update selected task when currentTaskId changes (from the tracker)
+  // Update selected project when currentProjectId changes
   useEffect(() => {
-    setSelectedTaskId(currentTaskId);
-  }, [currentTaskId]);
+    setSelectedProjectId(currentProjectId);
+  }, [currentProjectId]);
   
   const handleStartTracking = () => {
-    if (!selectedTaskId) {
+    if (!selectedProjectId) {
       toast({
-        title: 'Please select a task',
-        description: 'You must select a task before starting tracking',
+        title: 'Please select a project',
+        description: 'You must select a project before starting tracking',
         variant: 'destructive',
       });
       return;
     }
     
-    startTracking(selectedTaskId);
+    startTracking(selectedProjectId);
   };
   
   const handleStopTracking = () => {
@@ -80,24 +78,24 @@ export function TaskSelector() {
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="w-full sm:w-2/3">
             <Select
-              value={selectedTaskId || ""}
-              onValueChange={(value) => setSelectedTaskId(value)}
+              value={selectedProjectId || ""}
+              onValueChange={(value) => setSelectedProjectId(value)}
               disabled={isTracking || !canTrack}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a task" />
+                <SelectValue placeholder="Select a project" />
               </SelectTrigger>
               <SelectContent>
-                {tasksLoading ? (
-                  <SelectItem value="loading" disabled>Loading tasks...</SelectItem>
-                ) : tasks && tasks.length > 0 ? (
-                  tasks.map((task: any) => (
-                    <SelectItem key={task.id} value={task.id}>
-                      {task.name} ({task.projects?.name})
+                {projectsLoading ? (
+                  <SelectItem value="loading" disabled>Loading projects...</SelectItem>
+                ) : projects && projects.length > 0 ? (
+                  projects.map((project: any) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="no-tasks" disabled>No tasks available</SelectItem>
+                  <SelectItem value="no-projects" disabled>No projects available</SelectItem>
                 )}
               </SelectContent>
             </Select>
@@ -118,7 +116,7 @@ export function TaskSelector() {
                 variant="default" 
                 className="w-full" 
                 onClick={handleStartTracking}
-                disabled={!selectedTaskId || !canTrack}
+                disabled={!selectedProjectId || !canTrack}
               >
                 Start Tracking
               </Button>
@@ -135,7 +133,7 @@ export function TaskSelector() {
         
         {!isTracking && canTrack && (
           <div className="text-sm text-gray-500">
-            Select a task and start tracking to record your time
+            Select a project and start tracking to record your time
           </div>
         )}
       </div>

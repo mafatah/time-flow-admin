@@ -82,47 +82,23 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          task_id: string
+          project_id: string
           image_url: string
           captured_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          task_id: string
+          project_id: string
           image_url: string
           captured_at?: string
         }
         Update: {
           id?: string
           user_id?: string
-          task_id?: string
+          project_id?: string
           image_url?: string
           captured_at?: string
-        }
-        Relationships: []
-      }
-      tasks: {
-        Row: {
-          id: string
-          user_id: string
-          project_id: string
-          name: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          project_id: string
-          name: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          project_id?: string
-          name?: string
-          created_at?: string
         }
         Relationships: []
       }
@@ -130,7 +106,7 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          task_id: string
+          project_id: string
           start_time: string
           end_time: string | null
           is_idle: boolean
@@ -138,7 +114,7 @@ export type Database = {
         Insert: {
           id?: string
           user_id: string
-          task_id: string
+          project_id: string
           start_time?: string
           end_time?: string | null
           is_idle?: boolean
@@ -146,7 +122,7 @@ export type Database = {
         Update: {
           id?: string
           user_id?: string
-          task_id?: string
+          project_id?: string
           start_time?: string
           end_time?: string | null
           is_idle?: boolean
