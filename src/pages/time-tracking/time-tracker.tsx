@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -189,11 +190,11 @@ export default function TimeTracker() {
       setIsTracking(true);
       setElapsedTime(0);
 
-      // Notify Electron process
-      if (window.electronAPI) {
-        window.electronAPI.setUserId(userDetails.id);
-        window.electronAPI.setTaskId(selectedTask);
-        window.electronAPI.startTracking();
+      // Notify Electron process if available
+      if (window.electron) {
+        window.electron.setUserId(userDetails.id);
+        window.electron.setTaskId(selectedTask);
+        window.electron.startTracking();
       }
 
       toast({
@@ -226,9 +227,9 @@ export default function TimeTracker() {
       setIsTracking(false);
       setElapsedTime(0);
 
-      // Notify Electron process
-      if (window.electronAPI) {
-        window.electronAPI.stopTracking();
+      // Notify Electron process if available
+      if (window.electron) {
+        window.electron.stopTracking();
       }
 
       // Recalculate today's time
@@ -381,4 +382,4 @@ export default function TimeTracker() {
       </Card>
     </div>
   );
-} 
+}
