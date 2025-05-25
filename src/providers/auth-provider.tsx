@@ -1,13 +1,26 @@
+
 import * as React from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
-import { Tables } from "@/integrations/supabase/types";
+
+// Define the UserDetails type based on actual database columns
+interface UserDetails {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  avatar_url: string | null;
+  idle_timeout_minutes: number | null;
+  offline_tracking_enabled: boolean | null;
+  pause_allowed: boolean | null;
+  custom_screenshot_interval_seconds: number | null;
+}
 
 interface AuthContextType {
   user: User | null;
-  userDetails: Tables<"users"> | null;
+  userDetails: UserDetails | null;
   session: Session | null;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -18,7 +31,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [userDetails, setUserDetails] = useState<Tables<"users"> | null>(null);
+  const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -30,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Set up auth state listener FIRST
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         (event, session) => {
+          console.log('Auth state change:', event, session?.user?.email);
           setSession(session);
           setUser(session?.user ?? null);
           
@@ -74,28 +88,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [toast]);
 
   async function fetchUserDetails(userId: string) {
-    const { data, error } = await supabase
-      .from("users")
-      .select(`
-        id,
-        email,
-        full_name,
-        role,
-        avatar_url,
-        custom_screenshot_interval_seconds,
-        idle_timeout_minutes,
-        offline_tracking_enabled,
-        pause_allowed
-      `)
-      .eq("id", userId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select(`
+          id,
+          email,
+          full_name,
+          role,
+          avatar_url,
+          idle_timeout_minutes,
+          offline_tracking_enabled,
+          pause_allowed,
+          custom_screenshot_interval_seconds
+        `)
+        .eq("id", userId)
+        .single();
 
-    if (error) {
-      console.error("Error fetching user details:", error);
-      return;
+      if (error) {
+        console.error("Error fetching user details:", error);
+        return;
+      }
+      
+      console.log('User details fetched:', data);
+      setUserDetails(data);
+    } catch (error) {
+      console.error("Unexpected error fetching user details:", error);
     }
-    
-    setUserDetails(data);
   }
 
   async function signIn(email: string, password: string) {

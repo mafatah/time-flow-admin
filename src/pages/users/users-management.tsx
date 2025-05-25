@@ -13,8 +13,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 import { z } from "zod";
-import { Tables } from "@/integrations/supabase/types";
 import { useAuth } from "@/providers/auth-provider";
+
+// Define the User type based on actual database columns
+type User = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  avatar_url: string | null;
+  idle_timeout_minutes: number | null;
+  offline_tracking_enabled: boolean | null;
+  pause_allowed: boolean | null;
+  custom_screenshot_interval_seconds: number | null;
+};
 
 // Form schema
 const userRoleFormSchema = z.object({
@@ -26,10 +38,10 @@ const userRoleFormSchema = z.object({
 type UserRoleFormValues = z.infer<typeof userRoleFormSchema>;
 
 export default function UsersManagement() {
-  const [users, setUsers] = useState<Tables<"users">[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<Tables<"users"> | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const { toast } = useToast();
   const { userDetails } = useAuth();
 
@@ -52,16 +64,17 @@ export default function UsersManagement() {
             full_name,
             role,
             avatar_url,
-            custom_screenshot_interval_seconds,
             idle_timeout_minutes,
             offline_tracking_enabled,
-            pause_allowed
+            pause_allowed,
+            custom_screenshot_interval_seconds
           `)
           .order("full_name");
 
         if (error) throw error;
         setUsers(data || []);
       } catch (error: any) {
+        console.error('Error fetching users:', error);
         toast({
           title: "Error fetching users",
           description: error.message,
@@ -111,7 +124,7 @@ export default function UsersManagement() {
   }
 
   // Open dialog for editing role
-  function handleEditRole(user: Tables<"users">) {
+  function handleEditRole(user: User) {
     setSelectedUser(user);
     form.reset({ role: user.role as "admin" | "manager" | "employee" });
     setIsDialogOpen(true);
