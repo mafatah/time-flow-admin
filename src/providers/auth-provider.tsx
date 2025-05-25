@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -77,7 +76,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchUserDetails(userId: string) {
     const { data, error } = await supabase
       .from("users")
-      .select("*")
+      .select(`
+        id,
+        email,
+        full_name,
+        role,
+        avatar_url,
+        custom_screenshot_interval_seconds,
+        idle_timeout_minutes,
+        offline_tracking_enabled,
+        pause_allowed
+      `)
       .eq("id", userId)
       .single();
 

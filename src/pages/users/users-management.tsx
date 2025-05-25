@@ -46,7 +46,17 @@ export default function UsersManagement() {
       try {
         const { data, error } = await supabase
           .from("users")
-          .select("*")
+          .select(`
+            id,
+            email,
+            full_name,
+            role,
+            avatar_url,
+            custom_screenshot_interval_seconds,
+            idle_timeout_minutes,
+            offline_tracking_enabled,
+            pause_allowed
+          `)
           .order("full_name");
 
         if (error) throw error;
