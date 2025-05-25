@@ -70,7 +70,12 @@ export default function TimeTracker() {
         .order('name');
 
       if (error) throw error;
-      setProjects(data || []);
+      // Convert null to undefined for description field
+      const formattedProjects = (data || []).map(project => ({
+        ...project,
+        description: project.description || undefined
+      }));
+      setProjects(formattedProjects);
     } catch (error) {
       console.error('Error fetching projects:', error);
       toast.error('Failed to fetch projects');
