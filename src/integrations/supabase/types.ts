@@ -147,6 +147,51 @@ export type Database = {
           },
         ]
       }
+      idle_logs: {
+        Row: {
+          created_at: string
+          duration_seconds: number
+          id: string
+          idle_end: string | null
+          idle_start: string
+          time_log_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds: number
+          id?: string
+          idle_end?: string | null
+          idle_start: string
+          time_log_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          idle_end?: string | null
+          idle_start?: string
+          time_log_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "idle_logs_time_log_id_fkey"
+            columns: ["time_log_id"]
+            isOneToOne: false
+            referencedRelation: "time_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "idle_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string

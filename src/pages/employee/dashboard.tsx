@@ -77,15 +77,16 @@ const EmployeeDashboard = () => {
       if (timeLogsError) throw timeLogsError;
 
       // Get idle logs for today
-      const { data: idleLogs, error: idleLogsError } = await supabase
-        .from('idle_logs')
-        .select('*')
-        .eq('user_id', userDetails.id)
-        .gte('idle_start', startOfToday.toISOString())
-        .lte('idle_start', endOfToday.toISOString())
-        .order('idle_start', { ascending: false });
-
-      if (idleLogsError) throw idleLogsError;
+      // Temporarily disable idle_logs query due to schema mismatch
+      const idleLogs: any[] = [];
+      // const { data: idleLogs, error: idleLogsError } = await supabase
+      //   .from('idle_logs')
+      //   .select('*')
+      //   .eq('user_id', userDetails.id)
+      //   .gte('idle_start', startOfToday.toISOString())
+      //   .lte('idle_start', endOfToday.toISOString())
+      //   .order('idle_start', { ascending: false });
+      // if (idleLogsError) throw idleLogsError;
 
                     // Check if currently tracking
        const { data: activeLog, error: activeLogError } = await supabase

@@ -22,7 +22,7 @@ interface IdlePeriod {
   id: string;
   idle_start: string;
   idle_end: string | null;
-  duration_minutes: number | null;
+  duration_seconds: number;
 }
 
 interface IdleStats {
@@ -144,8 +144,8 @@ const EmployeeIdleTime = () => {
       return;
     }
 
-    const totalSeconds = periods.reduce((sum, period) => sum + (period.duration_minutes || 0) * 60, 0);
-    const maxDuration = Math.max(...periods.map(p => (p.duration_minutes || 0) * 60));
+    const totalSeconds = periods.reduce((sum, period) => sum + period.duration_seconds, 0);
+    const maxDuration = Math.max(...periods.map(p => p.duration_seconds));
     const avgDuration = totalSeconds / periods.length;
 
     // Calculate productivity impact (rough estimate)
@@ -173,7 +173,7 @@ const EmployeeIdleTime = () => {
 
     periods.forEach(period => {
       const hour = format(new Date(period.idle_start), 'HH');
-      hourlyMap[hour].minutes += (period.duration_minutes || 0);
+      hourlyMap[hour].minutes += period.duration_seconds / 60;
       hourlyMap[hour].periods += 1;
     });
 
@@ -194,7 +194,7 @@ const EmployeeIdleTime = () => {
       if (!dailyMap[dateKey]) {
         dailyMap[dateKey] = { seconds: 0, periods: 0 };
       }
-      dailyMap[dateKey].seconds += (period.duration_minutes || 0) * 60;
+      dailyMap[dateKey].seconds += period.duration_seconds;
       dailyMap[dateKey].periods += 1;
     });
 
@@ -406,7 +406,7 @@ const EmployeeIdleTime = () => {
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {idlePeriods.slice(0, 20).map((period, index) => {
-                const severity = getIdleSeverity((period.duration_minutes || 0) * 60);
+                const severity = getIdleSeverity(period.duration_seconds);
                 return (
                   <div key={period.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-3">
@@ -416,7 +416,7 @@ const EmployeeIdleTime = () => {
                           {format(new Date(period.idle_start), 'MMM dd, HH:mm')} - {period.idle_end ? format(new Date(period.idle_end), 'HH:mm') : 'Ongoing'}
                         </p>
                         <p className="text-sm text-gray-500">
-                          Duration: {formatDuration((period.duration_minutes || 0) * 60)}
+                          Duration: {formatDuration(period.duration_seconds)}
                         </p>
                       </div>
                     </div>
