@@ -98,6 +98,7 @@ function AppRoutes() {
       }>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/users" element={<UsersPage />} />
+        <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/screenshots" element={<ScreenshotsPage />} />
         <Route path="/reports/apps-urls-idle" element={<AppsUrlsIdlePage />} />
         <Route path="/insights" element={<InsightsPage />} />
@@ -129,7 +130,6 @@ function AppRoutes() {
           <MainLayout />
         </ProtectedRoute>
       }>
-        <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/time-tracker" element={<TimeTrackerPage />} />
         <Route path="/time-reports" element={<TimeReportsPage />} />
         <Route path="/calendar" element={<CalendarPage />} />

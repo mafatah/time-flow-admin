@@ -61,12 +61,6 @@ export function Sidebar({ className }: SidebarProps) {
           roles: [UserRole.EMPLOYEE],
         },
         {
-          title: "Projects",
-          href: "/projects",
-          icon: Layout,
-          roles: [UserRole.EMPLOYEE],
-        },
-        {
           title: "Calendar",
           href: "/calendar",
           icon: Calendar,
@@ -91,12 +85,6 @@ export function Sidebar({ className }: SidebarProps) {
           title: "Projects",
           href: "/projects",
           icon: Layout,
-          roles: [UserRole.ADMIN, UserRole.MANAGER],
-        },
-        {
-          title: "Time Tracker",
-          href: "/time-tracker",
-          icon: Timer,
           roles: [UserRole.ADMIN, UserRole.MANAGER],
         },
         {
