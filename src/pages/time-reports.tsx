@@ -1,109 +1,65 @@
+
 import { useState, useEffect } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageHeader } from "@/components/layout/page-header";
+import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/providers/auth-provider";
-import { Download, User, Clock as ClockIcon, Edit, Save, X } from "lucide-react";
-import { format, parseISO, startOfWeek, endOfWeek, startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { Clock, Download, Filter, Calendar } from "lucide-react";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
 
-interface TimeLog {
+interface TimeReport {
   id: string;
+  user_id: string;
+  project_id: string;
   start_time: string;
   end_time: string | null;
-  user_id: string;
-  task_id: string;
-  tasks: {
-    id: string;
-    name: string;
-    projects: {
-      id: string;
-      name: string;
-    } | null;
-  } | null;
-  users: {
-    id: string;
+  is_idle: boolean;
+  users?: {
     full_name: string;
     email: string;
-  } | null;
+  };
+  projects?: {
+    name: string;
+  };
 }
 
-interface EditingLog {
-  id: string;
-  start_time: string;
-  end_time: string;
-  reason: string;
-}
-
-export default function TimeReportsPage() {
-  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
-  const [filteredLogs, setFilteredLogs] = useState<TimeLog[]>([]);
+export default function TimeReports() {
+  const [reports, setReports] = useState<TimeReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [selectedUser, setSelectedUser] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('week');
+  const [projects, setProjects] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
-  
-  // Filters
-  const [dateRange, setDateRange] = useState("week");
-  const [selectedUser, setSelectedUser] = useState("all");
-  const [selectedTask, setSelectedTask] = useState("all");
   
   const { userDetails } = useAuth();
   const { toast } = useToast();
 
-  const [editingLog, setEditingLog] = useState<EditingLog | null>(null);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [showAuditTrail, setShowAuditTrail] = useState(false);
-
   useEffect(() => {
-    loadInitialData();
+    loadFilters();
   }, [userDetails]);
 
   useEffect(() => {
-    applyFilters();
-  }, [timeLogs, dateRange, selectedUser, selectedTask]);
+    loadReports();
+  }, [selectedProject, selectedUser, dateFilter, userDetails]);
 
-  const loadInitialData = async () => {
+  const loadFilters = async () => {
     try {
-      setLoading(true);
-      
-      // Load time logs with related data
-      const { data: logsData, error: logsError } = await supabase
-        .from('time_logs')
-        .select(`
-          id,
-          start_time,
-          end_time,
-          user_id,
-          task_id,
-          tasks!inner (
-            id,
-            name,
-            projects (
-              id,
-              name
-            )
-          ),
-          users!inner (
-            id,
-            full_name,
-            email
-          )
-        `)
-        .not('end_time', 'is', null)
-        .order('start_time', { ascending: false });
+      // Load projects
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name')
+        .order('name');
 
-      if (logsError) throw logsError;
+      if (projectsError) throw projectsError;
+      setProjects(projectsData || []);
 
-      setTimeLogs(logsData as any || []);
-
-      // Load users for filter (admin/manager only)
-      if (userDetails?.role !== 'employee') {
+      // Load users (only for admins)
+      if (userDetails?.role === 'admin') {
         const { data: usersData, error: usersError } = await supabase
           .from('users')
           .select('id, full_name, email')
@@ -112,27 +68,70 @@ export default function TimeReportsPage() {
         if (usersError) throw usersError;
         setUsers(usersData || []);
       }
+    } catch (error: any) {
+      console.error('Error loading filters:', error);
+    }
+  };
 
-      // Load tasks for filter
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('tasks')
+  const loadReports = async () => {
+    try {
+      setLoading(true);
+      
+      // Calculate date range
+      let startDate: Date;
+      const endDate = endOfDay(new Date());
+      
+      switch (dateFilter) {
+        case 'today':
+          startDate = startOfDay(new Date());
+          break;
+        case 'week':
+          startDate = startOfDay(subDays(new Date(), 7));
+          break;
+        case 'month':
+          startDate = startOfDay(subDays(new Date(), 30));
+          break;
+        default:
+          startDate = startOfDay(subDays(new Date(), 7));
+      }
+
+      let query = supabase
+        .from('time_logs')
         .select(`
           id,
-          name,
-          projects (
-            id,
-            name
-          )
+          user_id,
+          project_id,
+          start_time,
+          end_time,
+          is_idle,
+          users:user_id (full_name, email),
+          projects:project_id (name)
         `)
-        .order('name');
+        .gte('start_time', startDate.toISOString())
+        .lte('start_time', endDate.toISOString())
+        .order('start_time', { ascending: false });
 
-      if (tasksError) throw tasksError;
-      setTasks(tasksData || []);
+      // Filter by user for employees
+      if (userDetails?.role === 'employee') {
+        query = query.eq('user_id', userDetails.id);
+      } else if (selectedUser !== 'all') {
+        query = query.eq('user_id', selectedUser);
+      }
 
+      // Filter by project if selected
+      if (selectedProject !== 'all') {
+        query = query.eq('project_id', selectedProject);
+      }
+
+      const { data, error } = await query.limit(100);
+
+      if (error) throw error;
+
+      setReports(data || []);
     } catch (error: any) {
-      console.error('Error loading data:', error);
+      console.error('Error loading reports:', error);
       toast({
-        title: "Error loading data",
+        title: "Error loading reports",
         description: error.message,
         variant: "destructive",
       });
@@ -141,473 +140,212 @@ export default function TimeReportsPage() {
     }
   };
 
-  const applyFilters = () => {
-    let filtered = [...timeLogs];
-
-    // Filter by date range
-    const now = new Date();
-    let startDate: Date;
-    let endDate: Date = now;
-
-    switch (dateRange) {
-      case "today":
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        break;
-      case "week":
-        startDate = startOfWeek(now, { weekStartsOn: 1 });
-        endDate = endOfWeek(now, { weekStartsOn: 1 });
-        break;
-      case "month":
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      default:
-        startDate = new Date(0); // All time
-    }
-
-    if (dateRange !== "all") {
-      filtered = filtered.filter(log => {
-        const logDate = parseISO(log.start_time);
-        return logDate >= startDate && logDate <= endDate;
-      });
-    }
-
-    // Filter by user (admin/manager only)
-    if (selectedUser !== "all" && userDetails?.role !== 'employee') {
-      filtered = filtered.filter(log => log.user_id === selectedUser);
-    } else if (userDetails?.role === 'employee') {
-      // Employees can only see their own logs
-      filtered = filtered.filter(log => log.user_id === userDetails.id);
-    }
-
-    // Filter by task
-    if (selectedTask !== "all") {
-      filtered = filtered.filter(log => log.task_id === selectedTask);
-    }
-
-    setFilteredLogs(filtered);
-  };
-
-  const calculateTotalTime = () => {
-    let totalMs = 0;
-    filteredLogs.forEach(log => {
-      if (log.end_time) {
-        const start = parseISO(log.start_time).getTime();
-        const end = parseISO(log.end_time).getTime();
-        totalMs += (end - start);
-      }
-    });
-    return totalMs;
-  };
-
-  const formatTime = (milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
-  };
-
   const formatDuration = (startTime: string, endTime: string | null) => {
-    if (!endTime) return "In Progress";
+    if (!endTime) return 'Active';
     
-    const start = parseISO(startTime).getTime();
-    const end = parseISO(endTime).getTime();
-    const duration = end - start;
-    
-    return formatTime(duration);
-  };
-
-  const calculateDuration = (startTime: string, endTime: string) => {
     const start = new Date(startTime).getTime();
     const end = new Date(endTime).getTime();
     const duration = end - start;
+    const hours = Math.floor(duration / (1000 * 60 * 60));
+    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
     
-    return formatTime(duration);
-  };
-
-  const exportToCSV = () => {
-    const headers = ["Date", "User", "Project", "Task", "Start Time", "End Time", "Duration"];
-    const csvData = filteredLogs.map(log => [
-      format(parseISO(log.start_time), "yyyy-MM-dd"),
-      log.users?.full_name || "No User",
-      log.tasks?.projects?.name || "No Project",
-      log.tasks?.name || "No Task",
-      format(parseISO(log.start_time), "HH:mm:ss"),
-      log.end_time ? format(parseISO(log.end_time), "HH:mm:ss") : "In Progress",
-      formatDuration(log.start_time, log.end_time)
-    ]);
-
-    const csvContent = [headers, ...csvData]
-      .map(row => row.map(cell => `"${cell}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `time_logs_${format(new Date(), "yyyy-MM-dd")}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "Export successful",
-      description: "Time logs have been exported to CSV file.",
-    });
-  };
-
-  const startEdit = (log: TimeLog) => {
-    if (!log.end_time) return;
-    
-    setEditingLog({
-      id: log.id,
-      start_time: format(new Date(log.start_time), "yyyy-MM-dd'T'HH:mm"),
-      end_time: format(new Date(log.end_time), "yyyy-MM-dd'T'HH:mm"),
-      reason: ''
-    });
-  };
-
-  const saveEdit = async () => {
-    if (!editingLog || !userDetails) return;
-
-    try {
-      const originalLog = timeLogs.find(log => log.id === editingLog.id);
-      if (!originalLog) return;
-
-      // Update the time log
-      const { error: updateError } = await supabase
-        .from('time_logs')
-        .update({
-          start_time: new Date(editingLog.start_time).toISOString(),
-          end_time: new Date(editingLog.end_time).toISOString()
-        })
-        .eq('id', editingLog.id);
-
-      if (updateError) throw updateError;
-
-          // Log the edit for audit purposes (simplified)
-    console.log('Time log edited:', {
-      admin: userDetails.full_name,
-      target: originalLog.users?.full_name,
-      old: { start_time: originalLog.start_time, end_time: originalLog.end_time },
-      new: { start_time: editingLog.start_time, end_time: editingLog.end_time },
-      reason: editingLog.reason
-    });
-
-      toast({
-        title: "Time log updated",
-        description: "Time log has been successfully updated with audit trail.",
-      });
-
-      setEditingLog(null);
-      loadInitialData(); // Refresh data
-
-    } catch (error: any) {
-      toast({
-        title: "Error updating time log",
-        description: error.message,
-        variant: "destructive",
-      });
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
     }
+    return `${minutes}m`;
   };
 
-  const loadAuditTrail = async () => {
-    // Simplified audit trail - in production you'd have a proper audit table
-    setAuditLogs([]);
-    toast({
-      title: "Audit Trail",
-      description: "Audit trail feature requires database setup. Check console logs for edit history.",
+  const getTotalHours = () => {
+    let totalMs = 0;
+    reports.forEach(report => {
+      if (report.end_time) {
+        const start = new Date(report.start_time).getTime();
+        const end = new Date(report.end_time).getTime();
+        totalMs += (end - start);
+      }
     });
+    return (totalMs / (1000 * 60 * 60)).toFixed(1);
+  };
+
+  const exportCSV = () => {
+    const csvData = reports.map(report => ({
+      User: report.users?.full_name || 'Unknown',
+      Email: report.users?.email || '',
+      Project: report.projects?.name || 'Unknown',
+      'Start Time': format(new Date(report.start_time), 'yyyy-MM-dd HH:mm:ss'),
+      'End Time': report.end_time ? format(new Date(report.end_time), 'yyyy-MM-dd HH:mm:ss') : 'Active',
+      Duration: formatDuration(report.start_time, report.end_time),
+      'Is Idle': report.is_idle ? 'Yes' : 'No'
+    }));
+
+    const csvString = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `time-reports-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   if (loading) {
     return (
-      <div className="container py-6">
-        <PageHeader
-          title="Time Reports"
-          subtitle="View and export time tracking data"
-        />
-        <div className="mt-6 text-center">Loading...</div>
+      <div className="space-y-4">
+        <PageHeader title="Time Reports" subtitle="View detailed time tracking reports" />
+        <div className="text-center py-8">Loading reports...</div>
       </div>
     );
   }
 
   return (
-    <div className="container py-6">
-      <PageHeader
-        title="Time Reports"
-        subtitle="View and export time tracking data"
-      />
+    <div className="space-y-6">
+      <PageHeader title="Time Reports" subtitle="View detailed time tracking reports" />
 
-      <div className="mt-6 space-y-6">
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Filters</CardTitle>
-              <div className="flex gap-2">
-                <Dialog open={showAuditTrail} onOpenChange={setShowAuditTrail}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" onClick={loadAuditTrail}>
-                      <ClockIcon className="h-4 w-4 mr-2" />
-                      Audit Trail
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Manual Edit Audit Trail</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      {auditLogs.map((audit) => (
-                        <div key={audit.id} className="border rounded p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <p className="font-medium">
-                                {audit.admin_user?.full_name} edited {audit.target_user?.full_name}'s time
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {format(new Date(audit.timestamp), 'PPpp')}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="font-medium">Before:</p>
-                              <p>Start: {format(new Date(audit.old_values.start_time), 'PPpp')}</p>
-                              <p>End: {format(new Date(audit.old_values.end_time), 'PPpp')}</p>
-                            </div>
-                            <div>
-                              <p className="font-medium">After:</p>
-                              <p>Start: {format(new Date(audit.new_values.start_time), 'PPpp')}</p>
-                              <p>End: {format(new Date(audit.new_values.end_time), 'PPpp')}</p>
-                            </div>
-                          </div>
-                          {audit.new_values.reason && (
-                            <div className="mt-2">
-                              <p className="font-medium text-sm">Reason:</p>
-                              <p className="text-sm">{audit.new_values.reason}</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                <Button onClick={exportToCSV} variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
-              </div>
+      {/* Summary Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Summary
+            </CardTitle>
+            <Button onClick={exportCSV} className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold">{getTotalHours()}h</div>
+              <div className="text-sm text-muted-foreground">Total Hours</div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Date Range Filter */}
-              <div>
-                <label className="text-sm font-medium mb-2 block">Date Range</label>
-                <Select value={dateRange} onValueChange={setDateRange}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="week">This Week</SelectItem>
-                    <SelectItem value="month">This Month</SelectItem>
-                    <SelectItem value="all">All Time</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="text-center">
+              <div className="text-2xl font-bold">{reports.length}</div>
+              <div className="text-sm text-muted-foreground">Total Sessions</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold">
+                {new Set(reports.map(r => r.user_id)).size}
               </div>
+              <div className="text-sm text-muted-foreground">Active Users</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-              {/* User Filter (Admin/Manager only) */}
-              {userDetails?.role !== 'employee' && (
-                <div>
-                  <label className="text-sm font-medium mb-2 block">User</label>
-                  <Select value={selectedUser} onValueChange={setSelectedUser}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Users</SelectItem>
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Task Filter */}
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {userDetails?.role === 'admin' && (
               <div>
-                <label className="text-sm font-medium mb-2 block">Task</label>
-                <Select value={selectedTask} onValueChange={setSelectedTask}>
+                <label className="text-sm font-medium mb-2 block">User</label>
+                <Select value={selectedUser} onValueChange={setSelectedUser}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select user" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Tasks</SelectItem>
-                    {tasks.map((task) => (
-                      <SelectItem key={task.id} value={task.id}>
-                        {task.projects?.name || 'No Project'} - {task.name}
+                    <SelectItem value="all">All Users</SelectItem>
+                    {users.map(user => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.full_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            )}
 
-        {/* Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-primary">{formatTime(calculateTotalTime())}</div>
-                <div className="text-sm text-muted-foreground">Total Time</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold">{filteredLogs.length}</div>
-                <div className="text-sm text-muted-foreground">Time Entries</div>
-              </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Project</label>
+              <Select value={selectedProject} onValueChange={setSelectedProject}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects.map(project => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Time Entries */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Time Logs ({filteredLogs.length})</CardTitle>
-              <div className="flex gap-2">
-                <Dialog open={showAuditTrail} onOpenChange={setShowAuditTrail}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" onClick={loadAuditTrail}>
-                      <ClockIcon className="h-4 w-4 mr-2" />
-                      Audit Trail
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Manual Edit Audit Trail</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      {auditLogs.map((audit) => (
-                        <div key={audit.id} className="border rounded p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <p className="font-medium">
-                                {audit.admin_user?.full_name} edited {audit.target_user?.full_name}'s time
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {format(new Date(audit.timestamp), 'PPpp')}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="font-medium">Before:</p>
-                              <p>Start: {format(new Date(audit.old_values.start_time), 'PPpp')}</p>
-                              <p>End: {format(new Date(audit.old_values.end_time), 'PPpp')}</p>
-                            </div>
-                            <div>
-                              <p className="font-medium">After:</p>
-                              <p>Start: {format(new Date(audit.new_values.start_time), 'PPpp')}</p>
-                              <p>End: {format(new Date(audit.new_values.end_time), 'PPpp')}</p>
-                            </div>
-                          </div>
-                          {audit.new_values.reason && (
-                            <div className="mt-2">
-                              <p className="font-medium text-sm">Reason:</p>
-                              <p className="text-sm">{audit.new_values.reason}</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                <Button onClick={exportToCSV} variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
-              </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Time Period</label>
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select time period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Reports Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Time Logs ({reports.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {reports.length > 0 ? (
             <div className="space-y-4">
-              {filteredLogs.map((log) => (
-                <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="font-medium">{log.users?.full_name}</p>
-                      <p className="text-sm text-muted-foreground">{log.users?.email}</p>
+              {reports.map(report => (
+                <div key={report.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1">
+                    <div className="font-medium">
+                      {report.users?.full_name || 'Unknown User'}
                     </div>
-                    <div>
-                      <p className="font-medium">{log.tasks?.projects?.name}</p>
-                      <p className="text-sm text-muted-foreground">{log.tasks?.name}</p>
+                    <div className="text-sm text-muted-foreground">
+                      {report.projects?.name || 'Unknown Project'}
                     </div>
-                    {editingLog?.id === log.id ? (
-                      <div className="space-y-2">
-                        <Input
-                          type="datetime-local"
-                          value={editingLog.start_time}
-                          onChange={(e) => setEditingLog({...editingLog, start_time: e.target.value})}
-                        />
-                        <Input
-                          type="datetime-local"
-                          value={editingLog.end_time}
-                          onChange={(e) => setEditingLog({...editingLog, end_time: e.target.value})}
-                        />
-                        <Textarea
-                          placeholder="Reason for edit..."
-                          value={editingLog.reason}
-                          onChange={(e) => setEditingLog({...editingLog, reason: e.target.value})}
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-sm">
-                          {format(new Date(log.start_time), 'MMM dd, HH:mm')} - 
-                          {log.end_time ? format(new Date(log.end_time), 'HH:mm') : 'Active'}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {log.end_time ? calculateDuration(log.start_time, log.end_time) : 'In progress'}
-                        </p>
-                      </div>
-                    )}
-                    <div>
-                      <Badge variant={log.end_time ? "default" : "secondary"}>
-                        {log.end_time ? "Completed" : "Active"}
-                      </Badge>
+                    <div className="text-xs text-muted-foreground">
+                      {format(new Date(report.start_time), 'MMM dd, yyyy HH:mm')}
+                      {report.end_time && ` - ${format(new Date(report.end_time), 'HH:mm')}`}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    {editingLog?.id === log.id ? (
-                      <>
-                        <Button size="sm" onClick={saveEdit}>
-                          <Save className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingLog(null)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      userDetails?.role !== 'employee' && log.end_time && (
-                        <Button size="sm" variant="outline" onClick={() => startEdit(log)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      )
+                  <div className="text-right">
+                    <Badge variant={report.end_time ? "secondary" : "default"}>
+                      {formatDuration(report.start_time, report.end_time)}
+                    </Badge>
+                    {report.is_idle && (
+                      <Badge variant="outline" className="ml-2">
+                        Idle
+                      </Badge>
                     )}
                   </div>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No time logs found</p>
+              <p className="text-sm">Try adjusting your filters or check back later</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-} 
+}

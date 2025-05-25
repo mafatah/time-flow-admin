@@ -1,304 +1,298 @@
-import { useState, useEffect } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PageHeader } from "@/components/layout/page-header";
-import { supabase } from "@/lib/supabase";
-import { Loader2, Calendar, User, Clock, Image as ImageIcon } from "lucide-react";
-import { format, startOfDay, endOfDay, isToday, isYesterday, parseISO } from "date-fns";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarUI } from "@/components/ui/calendar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuth } from "@/providers/auth-provider";
 
-interface ScreenshotWithRelations {
+import { useState, useEffect } from "react";
+import { PageHeader } from "@/components/layout/page-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/providers/auth-provider";
+import { Calendar, Clock, Eye, Filter } from "lucide-react";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
+
+interface Screenshot {
   id: string;
   user_id: string;
-  task_id: string;
+  project_id: string;
   image_url: string;
   captured_at: string;
-  users?: {
-    id: string;
-    full_name: string;
-    email: string;
-  };
-  tasks?: {
-    id: string;
+  activity_percent?: number;
+  focus_percent?: number;
+  projects?: {
     name: string;
-    projects?: {
-      id: string;
-      name: string;
-    };
   };
 }
 
 export default function ScreenshotsViewer() {
-  const [screenshots, setScreenshots] = useState<ScreenshotWithRelations[]>([]);
+  const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [selectedTask, setSelectedTask] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [showingCalendar, setShowingCalendar] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<ScreenshotWithRelations | null>(null);
-  const { toast } = useToast();
+  const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null);
+  const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('today');
+  const [projects, setProjects] = useState<any[]>([]);
+  
   const { userDetails } = useAuth();
+  const { toast } = useToast();
 
-  // Fetch screenshots
   useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        
-        // Calculate date range for the selected day
-        const startDate = startOfDay(selectedDate);
-        const endDate = endOfDay(selectedDate);
-        
-        // Build query for screenshots - simplified first
-        let query = supabase
-          .from("screenshots")
-          .select(`
-            id,
-            user_id,
-            task_id,
-            image_url,
-            captured_at
-          `)
-          .gte('captured_at', startDate.toISOString())
-          .lte('captured_at', endDate.toISOString());
-          
-        // Add filters if needed
-        if (selectedUser) {
-          query = query.eq('user_id', selectedUser);
-        } else if (userDetails?.role === 'employee') {
-          // Employees can only see their own screenshots
-          query = query.eq('user_id', userDetails.id);
-        }
-        
-        if (selectedTask) {
-          query = query.eq('task_id', selectedTask);
-        }
-        
-        const { data, error } = await query.order('captured_at', { ascending: false });
+    loadProjects();
+  }, [userDetails]);
 
-        if (error) {
-          console.error('Screenshot query error:', error);
-          throw error;
-        }
-        
-        console.log('Screenshots data:', data);
-        setScreenshots((data as any) || []);
-        
-        // Fetch users if admin or manager
-        if (userDetails?.role === 'admin' || userDetails?.role === 'manager') {
-          const { data: usersData, error: usersError } = await supabase
-            .from("users")
-            .select("id, full_name, email")
-            .order('full_name');
-            
-          if (usersError) throw usersError;
-          setUsers(usersData || []);
-        }
-        
-        // Fetch tasks
-        let tasksQuery = supabase
-          .from("tasks")
-          .select(`
-            id, 
-            name,
-            projects(id, name)
-          `);
-          
-        if (userDetails?.role === 'employee') {
-          tasksQuery = tasksQuery.eq('user_id', userDetails.id);
-        } else if (selectedUser) {
-          tasksQuery = tasksQuery.eq('user_id', selectedUser);
-        }
-        
-        const { data: tasksData, error: tasksError } = await tasksQuery.order('name');
-        
-        if (tasksError) throw tasksError;
-        setTasks(tasksData || []);
-        
-      } catch (error: any) {
-        toast({
-          title: "Error fetching screenshots",
-          description: error.message,
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
+  useEffect(() => {
+    loadScreenshots();
+  }, [selectedProject, dateFilter, userDetails]);
+
+  const loadProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error: any) {
+      console.error('Error loading projects:', error);
+    }
+  };
+
+  const loadScreenshots = async () => {
+    try {
+      setLoading(true);
+      
+      // Calculate date range
+      let startDate: Date;
+      const endDate = endOfDay(new Date());
+      
+      switch (dateFilter) {
+        case 'today':
+          startDate = startOfDay(new Date());
+          break;
+        case 'week':
+          startDate = startOfDay(subDays(new Date(), 7));
+          break;
+        case 'month':
+          startDate = startOfDay(subDays(new Date(), 30));
+          break;
+        default:
+          startDate = startOfDay(new Date());
       }
-    }
 
-    fetchData();
-  }, [toast, selectedDate, selectedUser, selectedTask, userDetails]);
+      let query = supabase
+        .from('screenshots')
+        .select(`
+          id,
+          user_id,
+          project_id,
+          image_url,
+          captured_at,
+          activity_percent,
+          focus_percent,
+          projects:project_id (name)
+        `)
+        .gte('captured_at', startDate.toISOString())
+        .lte('captured_at', endDate.toISOString())
+        .order('captured_at', { ascending: false });
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    const date = parseISO(dateString);
-    
-    if (isToday(date)) {
-      return `Today at ${format(date, 'h:mm a')}`;
-    } else if (isYesterday(date)) {
-      return `Yesterday at ${format(date, 'h:mm a')}`;
-    } else {
-      return format(date, 'MMM d, yyyy h:mm a');
+      // Filter by user for employees
+      if (userDetails?.role === 'employee') {
+        query = query.eq('user_id', userDetails.id);
+      }
+
+      // Filter by project if selected
+      if (selectedProject !== 'all') {
+        query = query.eq('project_id', selectedProject);
+      }
+
+      const { data, error } = await query.limit(50);
+
+      if (error) throw error;
+
+      setScreenshots(data || []);
+    } catch (error: any) {
+      console.error('Error loading screenshots:', error);
+      toast({
+        title: "Error loading screenshots",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handle date selection
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date) {
-      setSelectedDate(date);
-      setShowingCalendar(false);
-    }
+  const openScreenshot = (screenshot: Screenshot) => {
+    setSelectedScreenshot(screenshot);
   };
+
+  const closeScreenshot = () => {
+    setSelectedScreenshot(null);
+  };
+
+  const getActivityColor = (percent?: number) => {
+    if (!percent) return 'bg-gray-200';
+    if (percent >= 80) return 'bg-green-500';
+    if (percent >= 60) return 'bg-yellow-500';
+    if (percent >= 40) return 'bg-orange-500';
+    return 'bg-red-500';
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Screenshots" subtitle="View your captured screenshots" />
+        <div className="text-center py-8">Loading screenshots...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container py-6">
-      <PageHeader
-        title="Screenshots Viewer"
-        subtitle="View screenshots taken by the desktop app"
-      />
+    <div className="space-y-6">
+      <PageHeader title="Screenshots" subtitle="View your captured screenshots" />
 
-      <div className="flex flex-col md:flex-row gap-4 mt-6 mb-4">
-        {/* Date Selector */}
-        <Popover open={showingCalendar} onOpenChange={setShowingCalendar}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="w-full md:w-auto justify-start">
-              <Calendar className="mr-2 h-4 w-4" />
-              {isToday(selectedDate) ? "Today" : isYesterday(selectedDate) ? "Yesterday" : format(selectedDate, 'MMM d, yyyy')}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarUI
-              mode="single"
-              selected={selectedDate}
-              onSelect={handleDateSelect}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-
-        {/* User Filter - only for admin/manager */}
-        {(userDetails?.role === 'admin' || userDetails?.role === 'manager') && (
-                  <Select
-          value={selectedUser || 'all'}
-          onValueChange={value => setSelectedUser(value === 'all' ? null : value)}
-          >
-            <SelectTrigger className="w-full md:w-[200px]">
-              <div className="flex items-center">
-                <User className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="All Users" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Users</SelectItem>
-              {users.map(user => (
-                <SelectItem key={user.id} value={user.id}>
-                  {user.full_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        {/* Task Filter */}
-        <Select
-          value={selectedTask || 'all'}
-          onValueChange={value => setSelectedTask(value === 'all' ? null : value)}
-        >
-          <SelectTrigger className="w-full md:w-[220px]">
-            <div className="flex items-center">
-              <Clock className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="All Tasks" />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Tasks</SelectItem>
-            {tasks.map(task => (
-              <SelectItem key={task.id} value={task.id}>
-                {task.projects?.name} - {task.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
+      {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Screenshots</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Project</label>
+              <Select value={selectedProject} onValueChange={setSelectedProject}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects.map(project => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ) : screenshots.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center">
-              <ImageIcon className="h-12 w-12 text-muted-foreground mb-2" />
-              <p className="text-muted-foreground">No screenshots found for the selected date</p>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Time Period</label>
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select time period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {screenshots.map((screenshot) => (
-                <div
-                  key={screenshot.id}
-                  className="relative border rounded-md overflow-hidden group cursor-pointer"
-                  onClick={() => setSelectedImage(screenshot)}
-                >
-                  <img
-                    src={screenshot.image_url}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Screenshots Grid */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Screenshots ({screenshots.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {screenshots.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {screenshots.map(screenshot => (
+                <div key={screenshot.id} className="border rounded-lg p-4 space-y-3">
+                  <img 
+                    src={screenshot.image_url} 
                     alt="Screenshot"
-                    className="w-full h-40 object-cover"
+                    className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => openScreenshot(screenshot)}
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors" />
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-xs">
-                    <div className="font-medium truncate">
-                      {screenshot.tasks?.projects?.name} - {screenshot.tasks?.name}
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4" />
+                      <span>{screenshot.projects?.name || 'Unknown Project'}</span>
                     </div>
-                    <div className="flex justify-between items-center mt-1">
-                      <span>{formatDate(screenshot.captured_at)}</span>
-                      {(userDetails?.role === 'admin' || userDetails?.role === 'manager') && (
-                        <span className="truncate max-w-[120px]">{screenshot.users?.full_name}</span>
-                      )}
+                    
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>{format(new Date(screenshot.captured_at), 'MMM dd, yyyy HH:mm')}</span>
                     </div>
+
+                    {screenshot.activity_percent && (
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${getActivityColor(screenshot.activity_percent)}`} />
+                        <span className="text-sm">Activity: {screenshot.activity_percent}%</span>
+                      </div>
+                    )}
                   </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openScreenshot(screenshot)}
+                    className="w-full"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Full Size
+                  </Button>
                 </div>
               ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No screenshots found</p>
+              <p className="text-sm">Try adjusting your filters or check back later</p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Image Preview Dialog */}
-      <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>
-              Screenshot - {selectedImage?.tasks?.projects?.name} - {selectedImage?.tasks?.name}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="mt-4">
-            <div className="flex justify-between items-center text-sm mb-2">
-              <span>{selectedImage && formatDate(selectedImage.captured_at)}</span>
-              {selectedImage?.users && <span>User: {selectedImage.users.full_name}</span>}
-            </div>
-            <div className="border rounded-md overflow-hidden">
-              {selectedImage && (
-                <img
-                  src={selectedImage.image_url}
-                  alt="Screenshot"
-                  className="w-full h-auto"
-                />
-              )}
+      {/* Screenshot Modal */}
+      {selectedScreenshot && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    {selectedScreenshot.projects?.name || 'Unknown Project'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(selectedScreenshot.captured_at), 'MMM dd, yyyy HH:mm')}
+                  </p>
+                  {selectedScreenshot.activity_percent && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant="secondary">
+                        Activity: {selectedScreenshot.activity_percent}%
+                      </Badge>
+                      {selectedScreenshot.focus_percent && (
+                        <Badge variant="outline">
+                          Focus: {selectedScreenshot.focus_percent}%
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <Button variant="outline" onClick={closeScreenshot}>
+                  Close
+                </Button>
+              </div>
+              
+              <img 
+                src={selectedScreenshot.image_url} 
+                alt="Screenshot"
+                className="w-full h-auto rounded-lg"
+              />
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   );
 }
