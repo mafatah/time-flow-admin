@@ -18,6 +18,8 @@ import {
   Settings,
   Timer,
   ClipboardList,
+  TrendingUp,
+  Monitor,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
@@ -80,6 +82,18 @@ export function Sidebar({ className }: SidebarProps) {
       href: "/reports",
       icon: FileText,
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE],
+    },
+    {
+      title: "Apps & URLs",
+      href: "/reports/apps-urls-idle",
+      icon: Monitor,
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    {
+      title: "Insights",
+      href: "/insights",
+      icon: TrendingUp,
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       title: "Settings",

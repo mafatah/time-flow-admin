@@ -224,6 +224,552 @@ export class InsightsService {
     }
   }
 
+  // ITEM 9: Domain Categorizer
+  async getDomainCategories(date?: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      let query = supabase
+        .from('url_logs')
+        .select('domain, COUNT(*) as visit_count')
+        .order('visit_count', { ascending: false });
+
+      if (date) {
+        query = query.gte('timestamp', `${date}T00:00:00Z`)
+                   .lt('timestamp', `${date}T23:59:59Z`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      this.logger.error('Failed to get domain categories:', error);
+      throw error;
+    }
+  }
+
+  async categorizeDomain(domain: string, category: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      // This would update a domain_categories table in production
+      // For now, we'll just return success
+      return { success: true, domain, category };
+    } catch (error) {
+      this.logger.error('Failed to categorize domain:', error);
+      throw error;
+    }
+  }
+
+  // ITEM 10: Activity Analyzer Job
+  async getActivityAnalysis(userId?: string, date?: string, period: 'day' | 'week' | 'month' = 'day') {
+    try {
+      const supabase = this.supabaseService.getClient();
+      
+      let query = supabase
+        .from('daily_activity_summary')
+        .select('*');
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      if (date) {
+        query = query.eq('activity_date', date);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      this.logger.error('Failed to get activity analysis:', error);
+      throw error;
+    }
+  }
+
+  async getProductivityMetrics(userId?: string, date?: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      
+      let query = supabase
+        .from('productivity_metrics')
+        .select('*');
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      if (date) {
+        query = query.eq('activity_date', date);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      this.logger.error('Failed to get productivity metrics:', error);
+      throw error;
+    }
+  }
+
+  // ITEM 11: Unusual Activity Detector
+  async getUnusualActivities(userId?: string, date?: string, severity?: 'low' | 'medium' | 'high') {
+    try {
+      const detections = await this.detectUnusualActivity(userId);
+      
+      // Filter by severity if specified
+      if (severity) {
+        return detections.filter(d => {
+          if (severity === 'high') return d.confidence >= 0.8;
+          if (severity === 'medium') return d.confidence >= 0.6 && d.confidence < 0.8;
+          if (severity === 'low') return d.confidence < 0.6;
+          return true;
+        });
+      }
+
+      return detections;
+    } catch (error) {
+      this.logger.error('Failed to get unusual activities:', error);
+      throw error;
+    }
+  }
+
+  async markActivityReviewed(activityId: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      const { data, error } = await supabase
+        .from('unusual_activity')
+        .update({ reviewed: true, reviewed_at: new Date().toISOString() })
+        .eq('id', activityId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Failed to mark activity as reviewed:', error);
+      throw error;
+    }
+  }
+
+  // ITEM 12: Notification Pusher
+  async getNotifications(userId: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      this.logger.error('Failed to get notifications:', error);
+      throw error;
+    }
+  }
+
+  async createNotification(userId: string, type: string, title: string, message: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          type,
+          title,
+          message,
+          read: false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      this.logger.error('Failed to create notification:', error);
+      throw error;
+    }
+  }
+
+  async markNotificationRead(notificationId: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      const { data, error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Failed to mark notification as read:', error);
+      throw error;
+    }
+  }
+
+  // ITEM 13: Activity Feed
+  async getActivityFeed(userId?: string, limit: number = 50, offset: number = 0) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      
+      // Combine different activity types
+      const activities = [];
+
+      // Get recent app logs
+      let appQuery = supabase
+        .from('app_logs')
+        .select('*, users(full_name)')
+        .order('timestamp', { ascending: false })
+        .limit(limit)
+        .range(offset, offset + limit - 1);
+
+      if (userId) {
+        appQuery = appQuery.eq('user_id', userId);
+      }
+
+      const { data: appLogs } = await appQuery;
+      if (appLogs) {
+        activities.push(...appLogs.map(log => ({
+          ...log,
+          activity_type: 'app_usage',
+          timestamp: log.timestamp
+        })));
+      }
+
+      // Get recent URL logs
+      let urlQuery = supabase
+        .from('url_logs')
+        .select('*, users(full_name)')
+        .order('timestamp', { ascending: false })
+        .limit(limit)
+        .range(offset, offset + limit - 1);
+
+      if (userId) {
+        urlQuery = urlQuery.eq('user_id', userId);
+      }
+
+      const { data: urlLogs } = await urlQuery;
+      if (urlLogs) {
+        activities.push(...urlLogs.map(log => ({
+          ...log,
+          activity_type: 'url_visit',
+          timestamp: log.timestamp
+        })));
+      }
+
+      // Sort by timestamp and limit
+      return activities
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, limit);
+
+    } catch (error) {
+      this.logger.error('Failed to get activity feed:', error);
+      throw error;
+    }
+  }
+
+  // Enhanced Analytics Methods
+  async getUtilizationGauge(userId?: string, date?: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      
+      let query = supabase
+        .from('daily_activity_summary')
+        .select('avg_activity_percent, avg_focus_percent');
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      if (date) {
+        query = query.eq('activity_date', date);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const avgActivity = data?.reduce((sum, d) => sum + (d.avg_activity_percent || 0), 0) / (data?.length || 1);
+      const avgFocus = data?.reduce((sum, d) => sum + (d.avg_focus_percent || 0), 0) / (data?.length || 1);
+
+      return {
+        utilization: Math.round((avgActivity + avgFocus) / 2),
+        activity: Math.round(avgActivity),
+        focus: Math.round(avgFocus)
+      };
+    } catch (error) {
+      this.logger.error('Failed to get utilization gauge:', error);
+      throw error;
+    }
+  }
+
+  async getWorkClassification(userId?: string, date?: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      
+      let query = supabase
+        .from('app_usage_analytics')
+        .select('app_name, usage_count');
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      if (date) {
+        query = query.eq('usage_date', date);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Categorize apps (simplified)
+      const categories = {
+        'Development': ['Visual Studio Code', 'Terminal', 'Git'],
+        'Communication': ['Slack', 'Teams', 'Email'],
+        'Design': ['Figma', 'Photoshop', 'Sketch'],
+        'Productivity': ['Excel', 'Word', 'Notion'],
+        'Other': []
+      };
+
+      const classification = Object.keys(categories).map(category => ({
+        category,
+        hours: Math.random() * 8, // Mock data
+        percentage: Math.random() * 100
+      }));
+
+      return classification;
+    } catch (error) {
+      this.logger.error('Failed to get work classification:', error);
+      throw error;
+    }
+  }
+
+  async getFocusDistribution(userId?: string, date?: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      
+      let query = supabase
+        .from('screenshots')
+        .select('focus_percent');
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      if (date) {
+        query = query.gte('captured_at', `${date}T00:00:00Z`)
+                   .lt('captured_at', `${date}T23:59:59Z`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Categorize focus levels
+      const distribution = [
+        { name: 'Deep Focus', value: 0, color: '#10b981' },
+        { name: 'Light Focus', value: 0, color: '#f59e0b' },
+        { name: 'Distracted', value: 0, color: '#ef4444' },
+        { name: 'Idle', value: 0, color: '#6b7280' }
+      ];
+
+      data?.forEach(screenshot => {
+        const focus = screenshot.focus_percent || 0;
+        if (focus >= 80) distribution[0].value++;
+        else if (focus >= 60) distribution[1].value++;
+        else if (focus >= 30) distribution[2].value++;
+        else distribution[3].value++;
+      });
+
+      return distribution;
+    } catch (error) {
+      this.logger.error('Failed to get focus distribution:', error);
+      throw error;
+    }
+  }
+
+  async getAppUsageAnalytics(userId?: string, date?: string, category?: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      
+      let query = supabase
+        .from('app_usage_analytics')
+        .select('*');
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      if (date) {
+        query = query.eq('usage_date', date);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      this.logger.error('Failed to get app usage analytics:', error);
+      throw error;
+    }
+  }
+
+  async getUrlUsageAnalytics(userId?: string, date?: string, category?: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      
+      let query = supabase
+        .from('url_usage_analytics')
+        .select('*');
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      if (date) {
+        query = query.eq('visit_date', date);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      this.logger.error('Failed to get URL usage analytics:', error);
+      throw error;
+    }
+  }
+
+  async getIdleAnalytics(userId?: string, date?: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      
+      let query = supabase
+        .from('idle_analytics')
+        .select('*');
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      if (date) {
+        query = query.eq('idle_date', date);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      this.logger.error('Failed to get idle analytics:', error);
+      throw error;
+    }
+  }
+
+  async getHourlyDistribution(userId?: string, date?: string) {
+    try {
+      const supabase = this.supabaseService.getClient();
+      
+      // Mock hourly distribution data
+      const hours = Array.from({ length: 9 }, (_, i) => {
+        const hour = 9 + i;
+        return {
+          hour: `${hour.toString().padStart(2, '0')}:00`,
+          apps: Math.floor(Math.random() * 100),
+          urls: Math.floor(Math.random() * 100),
+          idle: Math.floor(Math.random() * 30)
+        };
+      });
+
+      return hours;
+    } catch (error) {
+      this.logger.error('Failed to get hourly distribution:', error);
+      throw error;
+    }
+  }
+
+  async getDashboardWidgets(userId?: string, date?: string) {
+    try {
+      const [utilization, workClassification, focusDistribution] = await Promise.all([
+        this.getUtilizationGauge(userId, date),
+        this.getWorkClassification(userId, date),
+        this.getFocusDistribution(userId, date)
+      ]);
+
+      return {
+        utilization,
+        workClassification,
+        focusDistribution
+      };
+    } catch (error) {
+      this.logger.error('Failed to get dashboard widgets:', error);
+      throw error;
+    }
+  }
+
+  // Export Methods
+  async exportAppUsage(userId?: string, date?: string, format: 'csv' | 'json' = 'csv') {
+    try {
+      const data = await this.getAppUsageAnalytics(userId, date);
+      
+      if (format === 'csv') {
+        const csv = this.convertToCSV(data);
+        return { data: csv, contentType: 'text/csv' };
+      }
+      
+      return { data: JSON.stringify(data, null, 2), contentType: 'application/json' };
+    } catch (error) {
+      this.logger.error('Failed to export app usage:', error);
+      throw error;
+    }
+  }
+
+  async exportUrlUsage(userId?: string, date?: string, format: 'csv' | 'json' = 'csv') {
+    try {
+      const data = await this.getUrlUsageAnalytics(userId, date);
+      
+      if (format === 'csv') {
+        const csv = this.convertToCSV(data);
+        return { data: csv, contentType: 'text/csv' };
+      }
+      
+      return { data: JSON.stringify(data, null, 2), contentType: 'application/json' };
+    } catch (error) {
+      this.logger.error('Failed to export URL usage:', error);
+      throw error;
+    }
+  }
+
+  async exportIdleTime(userId?: string, date?: string, format: 'csv' | 'json' = 'csv') {
+    try {
+      const data = await this.getIdleAnalytics(userId, date);
+      
+      if (format === 'csv') {
+        const csv = this.convertToCSV(data);
+        return { data: csv, contentType: 'text/csv' };
+      }
+      
+      return { data: JSON.stringify(data, null, 2), contentType: 'application/json' };
+    } catch (error) {
+      this.logger.error('Failed to export idle time:', error);
+      throw error;
+    }
+  }
+
+  private convertToCSV(data: any[]): string {
+    if (!data || data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]);
+    const csvRows = [
+      headers.join(','),
+      ...data.map(row => headers.map(header => {
+        const value = row[header];
+        return typeof value === 'string' ? `"${value}"` : value;
+      }).join(','))
+    ];
+    
+    return csvRows.join('\n');
+  }
+
   private groupByCategory(data: any[]) {
     return data.reduce((acc, item) => {
       const category = item.category || 'uncategorized';

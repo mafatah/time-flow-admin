@@ -20,6 +20,8 @@ import TimeReportsPage from "@/pages/time-reports";
 import ScreenshotsPage from "@/pages/screenshots/screenshots-viewer";
 import CalendarPage from "@/pages/calendar";
 import ReportsPage from "@/pages/reports";
+import AppsUrlsIdlePage from "@/pages/reports/apps-urls-idle";
+import InsightsPage from "@/pages/insights";
 import SettingsPage from "@/pages/settings";
 import NotFoundPage from "@/pages/not-found";
 import Index from "@/pages/Index";
@@ -102,6 +104,8 @@ function AppRoutes() {
         <Route path="/time-reports" element={<TimeReportsPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/reports/apps-urls-idle" element={<AppsUrlsIdlePage />} />
+        <Route path="/insights" element={<InsightsPage />} />
         <Route path="/screenshots" element={<ScreenshotsPage />} />
         <Route path="/settings" element={
           <ProtectedRoute requiredRole="admin">

@@ -1,139 +1,477 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>Time Flow - Employee Tracker</title>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeFlow Agent</title>
     <style>
-      body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        margin: 0;
-        padding: 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .container {
-        background: white;
-        padding: 30px;
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        text-align: center;
-        min-width: 300px;
-      }
-      .logo {
-        font-size: 24px;
-        font-weight: bold;
-        color: #667eea;
-        margin-bottom: 20px;
-      }
-      .status {
-        font-size: 18px;
-        margin: 15px 0;
-        padding: 10px;
-        border-radius: 8px;
-      }
-      .working {
-        background: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-      }
-      .stopped {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-      }
-      button {
-        font-size: 16px;
-        padding: 12px 24px;
-        margin: 10px 5px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-      }
-      .start-btn {
-        background: #28a745;
-        color: white;
-      }
-      .start-btn:hover { background: #218838; }
-      .stop-btn {
-        background: #dc3545;
-        color: white;
-      }
-      .stop-btn:hover { background: #c82333; }
-      .timer {
-        font-size: 32px;
-        font-weight: bold;
-        color: #333;
-        margin: 20px 0;
-        font-family: 'Courier New', monospace;
-      }
-      .info {
-        font-size: 12px;
-        color: #666;
-        margin-top: 20px;
-        padding-top: 15px;
-        border-top: 1px solid #eee;
-      }
-      .login-form {
-        margin-bottom: 20px;
-      }
-      input {
-        width: 200px;
-        padding: 10px;
-        margin: 5px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        font-size: 14px;
-      }
-      .login-btn {
-        background: #667eea;
-        color: white;
-      }
-      .login-btn:hover { background: #5a6fd8; }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="logo">⏰ Time Flow</div>
-      
-      <div id="loginScreen" style="display: block;">
-        <h2>Employee Login</h2>
-        <div class="login-form">
-          <input type="text" id="employeeId" placeholder="Employee ID" />
-          <br>
-          <input type="text" id="projectId" placeholder="Project ID (optional)" />
-          <br>
-          <button class="login-btn" onclick="login()">Start Tracking</button>
-        </div>
-      </div>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-      <div id="trackingScreen" style="display: none;">
-        <h2 id="employeeName">Welcome, Employee!</h2>
-        
-        <div class="timer" id="timer">00:00:00</div>
-        
-        <div class="status" id="status">
-          Click "Start Work" to begin tracking
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow: hidden;
+        }
+
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .main {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .status-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.active {
+            background: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+        }
+
+        .status-indicator.paused {
+            background: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
+        }
+
+        .status-indicator.stopped {
+            background: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
+        }
+
+        .status-indicator.idle {
+            background: #6b7280;
+            box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.3);
+        }
+
+        .status-text {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .status-time {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .metric {
+            text-align: center;
+            padding: 15px;
+            background: rgba(103, 126, 234, 0.1);
+            border-radius: 12px;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .activity-stats {
+            margin-top: 15px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .queue-status {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+        }
+
+        .queue-status.offline {
+            background: rgba(239, 68, 68, 0.1);
+            border-left-color: #ef4444;
+        }
+
+        .queue-text {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .settings-section {
+            margin-top: 10px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .setting-label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .setting-value {
+            font-size: 12px;
+            color: #333;
+            background: rgba(0, 0, 0, 0.05);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .footer {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+
+        .footer-text {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: #666;
+        }
+
+        .connection-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .connection-dot.offline {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.error {
+            background: #ef4444;
+        }
+
+        .notification.warning {
+            background: #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">TimeFlow Agent</div>
+            <div class="subtitle">Employee Time Tracker</div>
         </div>
-        
-        <div>
-          <button id="startBtn" class="start-btn" onclick="startWork()">Start Work</button>
-          <button id="stopBtn" class="stop-btn" onclick="stopWork()" style="display: none;">Stop Work</button>
+
+        <div class="main">
+            <!-- Tracking Status -->
+            <div class="status-card">
+                <div class="status-header">
+                    <div style="display: flex; align-items: center;">
+                        <div id="statusIndicator" class="status-indicator stopped"></div>
+                        <div>
+                            <div id="statusText" class="status-text">Not Tracking</div>
+                            <div id="statusTime" class="status-time">Ready to start</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button id="startBtn" class="btn btn-primary">Start Tracking</button>
+                    <button id="pauseBtn" class="btn btn-secondary" disabled>Pause</button>
+                    <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
+                </div>
+
+                <div class="metrics">
+                    <div class="metric">
+                        <div id="activityPercent" class="metric-value">0%</div>
+                        <div class="metric-label">Activity</div>
+                    </div>
+                    <div class="metric">
+                        <div id="focusPercent" class="metric-value">0%</div>
+                        <div class="metric-label">Focus</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Statistics -->
+            <div class="status-card">
+                <h3 style="margin-bottom: 15px; font-size: 16px; color: #333;">Activity Statistics</h3>
+                
+                <div class="activity-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Mouse Clicks</span>
+                        <span id="mouseClicks" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Keystrokes</span>
+                        <span id="keystrokes" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Mouse Movements</span>
+                        <span id="mouseMovements" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Active Time</span>
+                        <span id="activeTime" class="stat-value">0m</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Idle Time</span>
+                        <span id="idleTime" class="stat-value">0m</span>
+                    </div>
+                </div>
+
+                <div class="progress-bar">
+                    <div id="activityProgress" class="progress-fill" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Sync Status -->
+            <div class="status-card">
+                <h3 style="margin-bottom: 15px; font-size: 16px; color: #333;">Sync Status</h3>
+                
+                <div id="queueStatus" class="queue-status">
+                    <div class="queue-text">All data synced ✓</div>
+                </div>
+
+                <div class="activity-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Screenshots Queued</span>
+                        <span id="screenshotsQueued" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">App Logs Queued</span>
+                        <span id="appLogsQueued" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">URL Logs Queued</span>
+                        <span id="urlLogsQueued" class="stat-value">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="status-card">
+                <h3 style="margin-bottom: 15px; font-size: 16px; color: #333;">Current Settings</h3>
+                
+                <div class="settings-section">
+                    <div class="setting-item">
+                        <span class="setting-label">Screenshot Interval</span>
+                        <span id="screenshotInterval" class="setting-value">5m</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Idle Threshold</span>
+                        <span id="idleThreshold" class="setting-value">5m</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Blur Screenshots</span>
+                        <span id="blurScreenshots" class="setting-value">No</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Track URLs</span>
+                        <span id="trackUrls" class="setting-value">Yes</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Track Apps</span>
+                        <span id="trackApps" class="setting-value">Yes</span>
+                    </div>
+                </div>
+            </div>
         </div>
-        
-        <div class="info">
-          📸 Screenshots: Every 5 minutes<br>
-          💤 Idle detection: Active<br>
-          📊 Activity monitoring: Running
+
+        <div class="footer">
+            <div class="connection-status">
+                <div id="connectionDot" class="connection-dot"></div>
+                <span id="connectionText">Connected</span>
+            </div>
+            <div class="footer-text">TimeFlow Desktop Agent v2.0</div>
         </div>
-        
-        <button onclick="logout()" style="margin-top: 15px; background: #6c757d; color: white;">Logout</button>
-      </div>
     </div>
 
+    <div id="notification" class="notification"></div>
+
     <script src="renderer.js"></script>
-  </body>
+</body>
 </html>

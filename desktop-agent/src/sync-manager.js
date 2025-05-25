@@ -1,579 +1,461 @@
+const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 
 class SyncManager {
   constructor(config) {
     this.config = config;
-    this.isOnline = navigator.onLine;
-    this.syncQueue = [];
-    this.retryQueue = [];
-    this.maxRetries = 3;
-    this.syncInterval = 30000; // 30 seconds
-    this.batchSize = 10;
-    this.lastSyncTime = null;
+    this.supabase = createClient(config.supabase_url, config.supabase_key);
+    this.isOnline = true;
+    this.syncInterval = null;
+    this.queuePath = path.join(__dirname, '..', 'offline-queue.json');
     
-    // Local storage paths
-    this.dataDir = path.join(__dirname, '..', 'data');
-    this.queueFile = path.join(this.dataDir, 'sync-queue.json');
-    this.cacheFile = path.join(this.dataDir, 'data-cache.json');
-    this.screenshotsDir = path.join(this.dataDir, 'screenshots');
+    // Initialize offline queue
+    this.queue = this.loadQueue();
     
-    this.ensureDirectories();
-    this.loadQueues();
-    this.setupEventListeners();
-    this.startSyncLoop();
+    // Start sync process
+    this.startSyncProcess();
+    
+    // Monitor connection
+    this.monitorConnection();
   }
 
-  ensureDirectories() {
-    const dirs = [this.dataDir, this.screenshotsDir];
-    dirs.forEach(dir => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-    });
-  }
-
-  loadQueues() {
+  // === QUEUE MANAGEMENT ===
+  loadQueue() {
     try {
-      if (fs.existsSync(this.queueFile)) {
-        const data = JSON.parse(fs.readFileSync(this.queueFile, 'utf8'));
-        this.syncQueue = data.syncQueue || [];
-        this.retryQueue = data.retryQueue || [];
-        this.lastSyncTime = data.lastSyncTime || null;
+      if (fs.existsSync(this.queuePath)) {
+        const data = fs.readFileSync(this.queuePath, 'utf8');
+        return JSON.parse(data);
       }
     } catch (error) {
-      console.error('Failed to load sync queues:', error);
-      this.syncQueue = [];
-      this.retryQueue = [];
+      console.error('❌ Failed to load queue:', error);
     }
-  }
-
-  saveQueues() {
-    try {
-      const data = {
-        syncQueue: this.syncQueue,
-        retryQueue: this.retryQueue,
-        lastSyncTime: this.lastSyncTime
-      };
-      fs.writeFileSync(this.queueFile, JSON.stringify(data, null, 2));
-    } catch (error) {
-      console.error('Failed to save sync queues:', error);
-    }
-  }
-
-  setupEventListeners() {
-    // Network status monitoring
-    window.addEventListener('online', () => {
-      console.log('📡 Connection restored - starting sync');
-      this.isOnline = true;
-      this.processQueue();
-    });
-
-    window.addEventListener('offline', () => {
-      console.log('📴 Connection lost - queuing data locally');
-      this.isOnline = false;
-    });
-  }
-
-  startSyncLoop() {
-    setInterval(() => {
-      if (this.isOnline) {
-        this.processQueue();
-        this.pullLatestData();
-      }
-    }, this.syncInterval);
-  }
-
-  // === PUSH DATA METHODS ===
-
-  async addTimeLog(timeLogData) {
-    const item = {
-      id: this.generateId(),
-      type: 'time_log',
-      data: {
-        ...timeLogData,
-        user_id: this.config.user_id,
-        project_id: this.config.project_id,
-        timestamp: new Date().toISOString()
-      },
-      timestamp: Date.now(),
-      retries: 0
-    };
-
-    this.syncQueue.push(item);
-    this.saveQueues();
-
-    if (this.isOnline) {
-      await this.processQueue();
-    }
-
-    return item.id;
-  }
-
-  async addAppLogs(appLogsArray) {
-    const item = {
-      id: this.generateId(),
-      type: 'app_logs_batch',
-      data: appLogsArray.map(log => ({
-        ...log,
-        user_id: this.config.user_id,
-        project_id: this.config.project_id
-      })),
-      timestamp: Date.now(),
-      retries: 0
-    };
-
-    this.syncQueue.push(item);
-    this.saveQueues();
-
-    if (this.isOnline) {
-      await this.processQueue();
-    }
-
-    return item.id;
-  }
-
-  async addUrlLogs(urlLogsArray) {
-    const item = {
-      id: this.generateId(),
-      type: 'url_logs_batch',
-      data: urlLogsArray.map(log => ({
-        ...log,
-        user_id: this.config.user_id,
-        project_id: this.config.project_id
-      })),
-      timestamp: Date.now(),
-      retries: 0
-    };
-
-    this.syncQueue.push(item);
-    this.saveQueues();
-
-    if (this.isOnline) {
-      await this.processQueue();
-    }
-
-    return item.id;
-  }
-
-  async addScreenshot(screenshotBuffer, metadata = {}) {
-    // Save screenshot locally first
-    const fileName = `screenshot_${Date.now()}.png`;
-    const localPath = path.join(this.screenshotsDir, fileName);
     
-    try {
-      fs.writeFileSync(localPath, screenshotBuffer);
-    } catch (error) {
-      console.error('Failed to save screenshot locally:', error);
-      throw error;
-    }
+    return {
+      screenshots: [],
+      appLogs: [],
+      urlLogs: [],
+      idleLogs: [],
+      timeLogs: []
+    };
+  }
 
-    const item = {
-      id: this.generateId(),
-      type: 'screenshot',
-      data: {
-        fileName,
-        localPath,
-        user_id: this.config.user_id,
-        project_id: this.config.project_id,
-        captured_at: new Date().toISOString(),
-        ...metadata
-      },
-      timestamp: Date.now(),
+  saveQueue() {
+    try {
+      fs.writeFileSync(this.queuePath, JSON.stringify(this.queue, null, 2));
+    } catch (error) {
+      console.error('❌ Failed to save queue:', error);
+    }
+  }
+
+  // === SCREENSHOT HANDLING ===
+  async addScreenshot(imageBuffer, metadata) {
+    const screenshotData = {
+      id: `screenshot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      imageBuffer: imageBuffer.toString('base64'),
+      metadata: metadata,
+      timestamp: new Date().toISOString(),
       retries: 0
     };
 
-    this.syncQueue.push(item);
-    this.saveQueues();
-
     if (this.isOnline) {
-      await this.processQueue();
-    }
-
-    return item.id;
-  }
-
-  async addScreenshotBatch(screenshots) {
-    const savedScreenshots = [];
-
-    // Save all screenshots locally first
-    for (const screenshot of screenshots) {
-      const fileName = `screenshot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.png`;
-      const localPath = path.join(this.screenshotsDir, fileName);
-      
       try {
-        fs.writeFileSync(localPath, screenshot.buffer);
-        savedScreenshots.push({
-          fileName,
-          localPath,
-          ...screenshot.metadata
-        });
+        await this.uploadScreenshot(screenshotData);
+        console.log('✅ Screenshot uploaded immediately');
+        return;
       } catch (error) {
-        console.error('Failed to save screenshot locally:', error);
+        console.log('⚠️ Screenshot upload failed, queuing for later');
       }
     }
 
-    const item = {
-      id: this.generateId(),
-      type: 'screenshot_batch',
-      data: {
-        screenshots: savedScreenshots,
-        user_id: this.config.user_id,
-        project_id: this.config.project_id
-      },
-      timestamp: Date.now(),
+    // Add to queue
+    this.queue.screenshots.push(screenshotData);
+    this.saveQueue();
+    console.log(`📦 Screenshot queued (${this.queue.screenshots.length} pending)`);
+  }
+
+  async uploadScreenshot(screenshotData) {
+    const { imageBuffer, metadata } = screenshotData;
+    const buffer = Buffer.from(imageBuffer, 'base64');
+    
+    // Upload to storage
+    const fileName = `${metadata.user_id}/${Date.now()}.png`;
+    const { error: uploadError } = await this.supabase.storage
+      .from('screenshots')
+      .upload(fileName, buffer, { 
+        contentType: 'image/png',
+        upsert: true 
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Get public URL
+    const { data: publicUrl } = this.supabase.storage
+      .from('screenshots')
+      .getPublicUrl(fileName);
+
+    // Save to database
+    const { error: dbError } = await this.supabase
+      .from('screenshots')
+      .insert({
+        user_id: metadata.user_id,
+        time_log_id: metadata.time_log_id,
+        image_url: publicUrl.publicUrl,
+        activity_percent: metadata.activity_percent,
+        focus_percent: metadata.focus_percent,
+        mouse_clicks: metadata.mouse_clicks,
+        keystrokes: metadata.keystrokes,
+        mouse_movements: metadata.mouse_movements,
+        is_blurred: metadata.is_blurred,
+        captured_at: metadata.captured_at
+      });
+
+    if (dbError) throw dbError;
+  }
+
+  // === APP LOGS HANDLING ===
+  async addAppLogs(appLogs) {
+    const logData = {
+      id: `app_logs_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      logs: appLogs,
+      timestamp: new Date().toISOString(),
       retries: 0
     };
 
-    this.syncQueue.push(item);
-    this.saveQueues();
-
     if (this.isOnline) {
-      await this.processQueue();
+      try {
+        await this.uploadAppLogs(logData);
+        console.log('✅ App logs uploaded immediately');
+        return;
+      } catch (error) {
+        console.log('⚠️ App logs upload failed, queuing for later');
+      }
     }
 
-    return item.id;
+    // Add to queue
+    this.queue.appLogs.push(logData);
+    this.saveQueue();
+    console.log(`📦 App logs queued (${this.queue.appLogs.length} pending)`);
   }
 
-  // === PULL DATA METHODS ===
+  async uploadAppLogs(logData) {
+    const { error } = await this.supabase
+      .from('app_logs')
+      .insert(logData.logs);
 
-  async pullLatestData() {
+    if (error) throw error;
+  }
+
+  // === URL LOGS HANDLING ===
+  async addUrlLogs(urlLogs) {
+    const logData = {
+      id: `url_logs_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      logs: urlLogs,
+      timestamp: new Date().toISOString(),
+      retries: 0
+    };
+
+    if (this.isOnline) {
+      try {
+        await this.uploadUrlLogs(logData);
+        console.log('✅ URL logs uploaded immediately');
+        return;
+      } catch (error) {
+        console.log('⚠️ URL logs upload failed, queuing for later');
+      }
+    }
+
+    // Add to queue
+    this.queue.urlLogs.push(logData);
+    this.saveQueue();
+    console.log(`📦 URL logs queued (${this.queue.urlLogs.length} pending)`);
+  }
+
+  async uploadUrlLogs(logData) {
+    const { error } = await this.supabase
+      .from('url_logs')
+      .insert(logData.logs);
+
+    if (error) throw error;
+  }
+
+  // === IDLE LOGS HANDLING ===
+  async addIdleLog(idleLog) {
+    const logData = {
+      id: `idle_log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      log: idleLog,
+      timestamp: new Date().toISOString(),
+      retries: 0
+    };
+
+    if (this.isOnline) {
+      try {
+        await this.uploadIdleLog(logData);
+        console.log('✅ Idle log uploaded immediately');
+        return;
+      } catch (error) {
+        console.log('⚠️ Idle log upload failed, queuing for later');
+      }
+    }
+
+    // Add to queue
+    this.queue.idleLogs.push(logData);
+    this.saveQueue();
+    console.log(`📦 Idle log queued (${this.queue.idleLogs.length} pending)`);
+  }
+
+  async uploadIdleLog(logData) {
+    const { error } = await this.supabase
+      .from('idle_logs')
+      .insert(logData.log);
+
+    if (error) throw error;
+  }
+
+  // === TIME LOGS HANDLING ===
+  async addTimeLog(timeLog) {
+    const logData = {
+      id: `time_log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      log: timeLog,
+      timestamp: new Date().toISOString(),
+      retries: 0
+    };
+
+    if (this.isOnline) {
+      try {
+        await this.uploadTimeLog(logData);
+        console.log('✅ Time log uploaded immediately');
+        return;
+      } catch (error) {
+        console.log('⚠️ Time log upload failed, queuing for later');
+      }
+    }
+
+    // Add to queue
+    this.queue.timeLogs.push(logData);
+    this.saveQueue();
+    console.log(`📦 Time log queued (${this.queue.timeLogs.length} pending)`);
+  }
+
+  async uploadTimeLog(logData) {
+    if (logData.log.action === 'update_idle') {
+      const { error } = await this.supabase
+        .from('time_logs')
+        .update(logData.log.data)
+        .eq('id', logData.log.id);
+
+      if (error) throw error;
+    } else {
+      const { error } = await this.supabase
+        .from('time_logs')
+        .insert(logData.log);
+
+      if (error) throw error;
+    }
+  }
+
+  // === SYNC PROCESS ===
+  startSyncProcess() {
+    // Sync every 30 seconds
+    this.syncInterval = setInterval(() => {
+      this.syncQueue();
+    }, 30000);
+
+    // Initial sync after 5 seconds
+    setTimeout(() => this.syncQueue(), 5000);
+  }
+
+  async syncQueue() {
     if (!this.isOnline) return;
 
-    try {
-      await Promise.all([
-        this.pullDashboardData(),
-        this.pullUserSettings(),
-        this.pullProjectData()
-      ]);
-    } catch (error) {
-      console.error('Failed to pull latest data:', error);
-    }
-  }
+    const totalItems = Object.values(this.queue).reduce((sum, arr) => sum + arr.length, 0);
+    if (totalItems === 0) return;
 
-  async pullDashboardData() {
-    try {
-      const response = await this.apiRequest('GET', '/api/dashboard');
-      
-      if (response.ok) {
-        const dashboardData = await response.json();
-        this.saveToCache('dashboard', dashboardData);
-        this.notifyDataUpdate('dashboard', dashboardData);
-      }
-    } catch (error) {
-      console.error('Failed to pull dashboard data:', error);
-    }
-  }
+    console.log(`🔄 Syncing ${totalItems} queued items...`);
 
-  async pullUserSettings() {
-    try {
-      const response = await this.apiRequest('GET', '/api/users/settings');
-      
-      if (response.ok) {
-        const settings = await response.json();
-        this.saveToCache('settings', settings);
-        this.notifyDataUpdate('settings', settings);
-      }
-    } catch (error) {
-      console.error('Failed to pull user settings:', error);
-    }
-  }
-
-  async pullProjectData() {
-    try {
-      const response = await this.apiRequest('GET', `/api/projects/${this.config.project_id}`);
-      
-      if (response.ok) {
-        const projectData = await response.json();
-        this.saveToCache('project', projectData);
-        this.notifyDataUpdate('project', projectData);
-      }
-    } catch (error) {
-      console.error('Failed to pull project data:', error);
-    }
-  }
-
-  // === QUEUE PROCESSING ===
-
-  async processQueue() {
-    if (!this.isOnline || this.syncQueue.length === 0) return;
-
-    console.log(`🔄 Processing ${this.syncQueue.length} items in sync queue`);
-
-    // Process items in batches
-    const batch = this.syncQueue.splice(0, this.batchSize);
+    // Sync screenshots
+    await this.syncScreenshots();
     
-    for (const item of batch) {
+    // Sync app logs
+    await this.syncAppLogs();
+    
+    // Sync URL logs
+    await this.syncUrlLogs();
+    
+    // Sync idle logs
+    await this.syncIdleLogs();
+    
+    // Sync time logs
+    await this.syncTimeLogs();
+
+    this.saveQueue();
+  }
+
+  async syncScreenshots() {
+    const screenshots = [...this.queue.screenshots];
+    
+    for (let i = screenshots.length - 1; i >= 0; i--) {
+      const screenshot = screenshots[i];
+      
       try {
-        await this.syncItem(item);
-        console.log(`✅ Synced ${item.type} (${item.id})`);
+        await this.uploadScreenshot(screenshot);
+        this.queue.screenshots.splice(i, 1);
+        console.log('✅ Screenshot synced');
       } catch (error) {
-        console.error(`❌ Failed to sync ${item.type} (${item.id}):`, error);
+        screenshot.retries++;
+        console.error(`❌ Screenshot sync failed (retry ${screenshot.retries}):`, error.message);
         
-        // Add to retry queue if not exceeded max retries
-        if (item.retries < this.maxRetries) {
-          item.retries++;
-          item.lastError = error.message;
-          item.nextRetry = Date.now() + (item.retries * 30000); // Exponential backoff
-          this.retryQueue.push(item);
-        } else {
-          console.error(`🚫 Max retries exceeded for ${item.type} (${item.id})`);
+        // Remove after 5 failed attempts
+        if (screenshot.retries >= 5) {
+          this.queue.screenshots.splice(i, 1);
+          console.log('🗑️ Screenshot removed after 5 failed attempts');
         }
       }
     }
-
-    this.lastSyncTime = Date.now();
-    this.saveQueues();
-
-    // Process retry queue
-    await this.processRetryQueue();
-
-    // Continue processing if there are more items
-    if (this.syncQueue.length > 0) {
-      setTimeout(() => this.processQueue(), 1000);
-    }
   }
 
-  async processRetryQueue() {
-    const now = Date.now();
-    const readyToRetry = this.retryQueue.filter(item => item.nextRetry <= now);
+  async syncAppLogs() {
+    const appLogs = [...this.queue.appLogs];
     
-    if (readyToRetry.length === 0) return;
-
-    console.log(`🔁 Retrying ${readyToRetry.length} failed items`);
-
-    this.retryQueue = this.retryQueue.filter(item => item.nextRetry > now);
-
-    for (const item of readyToRetry) {
+    for (let i = appLogs.length - 1; i >= 0; i--) {
+      const logData = appLogs[i];
+      
       try {
-        await this.syncItem(item);
-        console.log(`✅ Retry successful for ${item.type} (${item.id})`);
+        await this.uploadAppLogs(logData);
+        this.queue.appLogs.splice(i, 1);
+        console.log('✅ App logs synced');
       } catch (error) {
-        console.error(`❌ Retry failed for ${item.type} (${item.id}):`, error);
+        logData.retries++;
+        console.error(`❌ App logs sync failed (retry ${logData.retries}):`, error.message);
         
-        if (item.retries < this.maxRetries) {
-          item.retries++;
-          item.lastError = error.message;
-          item.nextRetry = Date.now() + (item.retries * 30000);
-          this.retryQueue.push(item);
-        } else {
-          console.error(`🚫 Max retries exceeded for ${item.type} (${item.id})`);
+        if (logData.retries >= 5) {
+          this.queue.appLogs.splice(i, 1);
+          console.log('🗑️ App logs removed after 5 failed attempts');
         }
       }
     }
-
-    this.saveQueues();
   }
 
-  async syncItem(item) {
-    switch (item.type) {
-      case 'time_log':
-        return await this.syncTimeLog(item.data);
+  async syncUrlLogs() {
+    const urlLogs = [...this.queue.urlLogs];
+    
+    for (let i = urlLogs.length - 1; i >= 0; i--) {
+      const logData = urlLogs[i];
       
-      case 'app_logs_batch':
-        return await this.syncAppLogsBatch(item.data);
-      
-      case 'url_logs_batch':
-        return await this.syncUrlLogsBatch(item.data);
-      
-      case 'screenshot':
-        return await this.syncScreenshot(item.data);
-      
-      case 'screenshot_batch':
-        return await this.syncScreenshotBatch(item.data);
-      
-      default:
-        throw new Error(`Unknown sync item type: ${item.type}`);
-    }
-  }
-
-  // === INDIVIDUAL SYNC METHODS ===
-
-  async syncTimeLog(data) {
-    if (data.action === 'start') {
-      const response = await this.apiRequest('POST', '/api/time/start', data);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-    } else if (data.action === 'stop') {
-      const response = await this.apiRequest('POST', '/api/time/stop', data);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      try {
+        await this.uploadUrlLogs(logData);
+        this.queue.urlLogs.splice(i, 1);
+        console.log('✅ URL logs synced');
+      } catch (error) {
+        logData.retries++;
+        console.error(`❌ URL logs sync failed (retry ${logData.retries}):`, error.message);
+        
+        if (logData.retries >= 5) {
+          this.queue.urlLogs.splice(i, 1);
+          console.log('🗑️ URL logs removed after 5 failed attempts');
+        }
       }
     }
   }
 
-  async syncAppLogsBatch(data) {
-    const response = await this.apiRequest('POST', '/api/apps', data);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-  }
-
-  async syncUrlLogsBatch(data) {
-    const response = await this.apiRequest('POST', '/api/urls', data);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-  }
-
-  async syncScreenshot(data) {
-    try {
-      const imageBuffer = fs.readFileSync(data.localPath);
+  async syncIdleLogs() {
+    const idleLogs = [...this.queue.idleLogs];
+    
+    for (let i = idleLogs.length - 1; i >= 0; i--) {
+      const logData = idleLogs[i];
       
-      const formData = new FormData();
-      const blob = new Blob([imageBuffer], { type: 'image/png' });
-      formData.append('screenshots', blob, data.fileName);
-
-      const response = await fetch(`${this.getApiUrl()}/api/screenshots/batch`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.config.auth_token}`,
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      try {
+        await this.uploadIdleLog(logData);
+        this.queue.idleLogs.splice(i, 1);
+        console.log('✅ Idle log synced');
+      } catch (error) {
+        logData.retries++;
+        console.error(`❌ Idle log sync failed (retry ${logData.retries}):`, error.message);
+        
+        if (logData.retries >= 5) {
+          this.queue.idleLogs.splice(i, 1);
+          console.log('🗑️ Idle log removed after 5 failed attempts');
+        }
       }
-
-      // Delete local file after successful upload
-      fs.unlinkSync(data.localPath);
-    } catch (error) {
-      throw error;
     }
   }
 
-  async syncScreenshotBatch(data) {
-    try {
-      const formData = new FormData();
+  async syncTimeLogs() {
+    const timeLogs = [...this.queue.timeLogs];
+    
+    for (let i = timeLogs.length - 1; i >= 0; i--) {
+      const logData = timeLogs[i];
       
-      for (const screenshot of data.screenshots) {
-        const imageBuffer = fs.readFileSync(screenshot.localPath);
-        const blob = new Blob([imageBuffer], { type: 'image/png' });
-        formData.append('screenshots', blob, screenshot.fileName);
+      try {
+        await this.uploadTimeLog(logData);
+        this.queue.timeLogs.splice(i, 1);
+        console.log('✅ Time log synced');
+      } catch (error) {
+        logData.retries++;
+        console.error(`❌ Time log sync failed (retry ${logData.retries}):`, error.message);
+        
+        if (logData.retries >= 5) {
+          this.queue.timeLogs.splice(i, 1);
+          console.log('🗑️ Time log removed after 5 failed attempts');
+        }
       }
-
-      const response = await fetch(`${this.getApiUrl()}/api/screenshots/batch`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.config.auth_token}`,
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      // Delete local files after successful upload
-      for (const screenshot of data.screenshots) {
-        fs.unlinkSync(screenshot.localPath);
-      }
-    } catch (error) {
-      throw error;
     }
+  }
+
+  // === CONNECTION MONITORING ===
+  monitorConnection() {
+    setInterval(async () => {
+      try {
+        // Simple connectivity test
+        const { data, error } = await this.supabase
+          .from('users')
+          .select('id')
+          .limit(1);
+
+        const wasOnline = this.isOnline;
+        this.isOnline = !error;
+
+        if (!wasOnline && this.isOnline) {
+          console.log('🌐 Connection restored - starting sync');
+          this.syncQueue();
+        } else if (wasOnline && !this.isOnline) {
+          console.log('📡 Connection lost - switching to offline mode');
+        }
+
+      } catch (error) {
+        this.isOnline = false;
+      }
+    }, 60000); // Check every minute
   }
 
   // === UTILITY METHODS ===
-
-  async apiRequest(method, endpoint, data = null) {
-    const url = `${this.getApiUrl()}${endpoint}`;
-    const options = {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.auth_token}`,
-      }
-    };
-
-    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-      options.body = JSON.stringify(data);
-    }
-
-    return fetch(url, options);
-  }
-
-  getApiUrl() {
-    return this.config.backend_url || 'http://localhost:3000';
-  }
-
-  generateId() {
-    return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  saveToCache(key, data) {
-    try {
-      let cache = {};
-      if (fs.existsSync(this.cacheFile)) {
-        cache = JSON.parse(fs.readFileSync(this.cacheFile, 'utf8'));
-      }
-      
-      cache[key] = {
-        data,
-        timestamp: Date.now()
-      };
-      
-      fs.writeFileSync(this.cacheFile, JSON.stringify(cache, null, 2));
-    } catch (error) {
-      console.error('Failed to save to cache:', error);
-    }
-  }
-
-  loadFromCache(key) {
-    try {
-      if (fs.existsSync(this.cacheFile)) {
-        const cache = JSON.parse(fs.readFileSync(this.cacheFile, 'utf8'));
-        return cache[key]?.data || null;
-      }
-    } catch (error) {
-      console.error('Failed to load from cache:', error);
-    }
-    return null;
-  }
-
-  notifyDataUpdate(type, data) {
-    // Emit custom events for UI updates
-    window.dispatchEvent(new CustomEvent('dataUpdate', {
-      detail: { type, data }
-    }));
-  }
-
-  // === STATUS METHODS ===
-
-  getStatus() {
+  getQueueStatus() {
     return {
-      isOnline: this.isOnline,
-      queueLength: this.syncQueue.length,
-      retryQueueLength: this.retryQueue.length,
-      lastSyncTime: this.lastSyncTime,
-      lastSyncAgo: this.lastSyncTime ? Date.now() - this.lastSyncTime : null
+      screenshots: this.queue.screenshots.length,
+      appLogs: this.queue.appLogs.length,
+      urlLogs: this.queue.urlLogs.length,
+      idleLogs: this.queue.idleLogs.length,
+      timeLogs: this.queue.timeLogs.length,
+      total: Object.values(this.queue).reduce((sum, arr) => sum + arr.length, 0),
+      isOnline: this.isOnline
     };
   }
 
-  async forceSync() {
-    if (!this.isOnline) {
-      throw new Error('Cannot force sync while offline');
-    }
-    
-    console.log('🚀 Force sync initiated');
-    await this.processQueue();
-    await this.pullLatestData();
+  clearQueue() {
+    this.queue = {
+      screenshots: [],
+      appLogs: [],
+      urlLogs: [],
+      idleLogs: [],
+      timeLogs: []
+    };
+    this.saveQueue();
+    console.log('🗑️ Queue cleared');
   }
 
-  clearQueues() {
-    this.syncQueue = [];
-    this.retryQueue = [];
-    this.saveQueues();
-    console.log('🗑️ Sync queues cleared');
-  }
-
-  async healthCheck() {
-    try {
-      const response = await this.apiRequest('GET', '/api/health');
-      return response.ok;
-    } catch (error) {
-      return false;
+  destroy() {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
     }
   }
 }
