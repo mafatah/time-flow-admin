@@ -1,3 +1,4 @@
+
 -- Fix RLS policies for app_logs table
 -- This migration fixes the permission issues preventing app logs from being saved
 
@@ -128,4 +129,4 @@ CREATE POLICY "Service role can manage idle logs" ON idle_logs
 
 COMMENT ON POLICY "Service role can manage app logs" ON app_logs IS 'Allows desktop agent to insert app logs using service role';
 COMMENT ON POLICY "Service role can manage screenshots" ON screenshots IS 'Allows desktop agent to insert screenshots using service role';
-COMMENT ON POLICY "Service role can manage time logs" ON time_logs IS 'Allows desktop agent to insert time logs using service role'; 
+COMMENT ON POLICY "Service role can manage time logs" ON time_logs IS 'Allows desktop agent to insert time logs using service role';

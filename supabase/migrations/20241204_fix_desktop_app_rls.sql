@@ -1,3 +1,4 @@
+
 -- Fix RLS policies for desktop app data collection
 -- This migration allows the desktop app to save activity data without authentication issues
 
@@ -60,4 +61,4 @@ BEGIN
                    WHERE table_name = 'screenshots' AND column_name = 'mouse_clicks') THEN
         ALTER TABLE public.screenshots ADD COLUMN mouse_clicks INTEGER DEFAULT 0;
     END IF;
-END $$; 
+END $$;
