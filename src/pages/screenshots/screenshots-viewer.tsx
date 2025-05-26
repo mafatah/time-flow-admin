@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -97,8 +96,6 @@ export default function ScreenshotsViewer() {
           project_id,
           image_url,
           captured_at,
-          activity_percent,
-          focus_percent,
           classification
         `);
 
