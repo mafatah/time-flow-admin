@@ -13,12 +13,12 @@ interface AppLog {
   id: string;
   user_id: string;
   app_name: string;
-  window_title?: string;
+  window_title: string | null;
   started_at: string;
-  ended_at?: string;
-  duration_seconds?: number;
-  category?: string;
-  project_id?: string;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  category: string | null;
+  project_id: string | null;
 }
 
 export default function AppMonitoring() {
@@ -57,7 +57,7 @@ export default function AppMonitoring() {
     return matchesSearch && matchesCategory;
   });
 
-  const getCategoryColor = (category?: string) => {
+  const getCategoryColor = (category?: string | null) => {
     switch (category) {
       case 'development':
         return 'bg-green-100 text-green-800';
@@ -74,7 +74,7 @@ export default function AppMonitoring() {
     }
   };
 
-  const formatDuration = (seconds?: number) => {
+  const formatDuration = (seconds?: number | null) => {
     if (!seconds) return 'N/A';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -305,4 +305,4 @@ export default function AppMonitoring() {
       </Card>
     </div>
   );
-} 
+}

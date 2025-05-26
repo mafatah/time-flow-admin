@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -225,15 +224,26 @@ const InsightsPage = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('unusual_activity')
-        .select(`
-          *,
-          user:users(email, full_name)
-        `)
+        .select(`*`)
         .order('detected_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      setUnusualActivities(data || []);
+      
+      // Fetch user data separately
+      const userIds = [...new Set(data?.map(activity => activity.user_id) || [])];
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .in('id', userIds);
+
+      // Enrich activities with user data
+      const enrichedActivities = data?.map(activity => ({
+        ...activity,
+        user: userData?.find(user => user.id === activity.user_id)
+      })) || [];
+
+      setUnusualActivities(enrichedActivities);
     } catch (error) {
       console.error('Error fetching unusual activities:', error);
     } finally {
@@ -307,12 +317,12 @@ const InsightsPage = () => {
 
       // Process screenshots
       screenshots?.forEach(screenshot => {
-        if (userPatterns[screenshot.user_id!]) {
-          userPatterns[screenshot.user_id!].screenshot_count++;
+        if (screenshot.user_id && userPatterns[screenshot.user_id]) {
+          userPatterns[screenshot.user_id].screenshot_count++;
           
           // Add activity metrics if available
           if (screenshot.activity_percent !== null) {
-            userPatterns[screenshot.user_id!].productivity_score += screenshot.activity_percent;
+            userPatterns[screenshot.user_id].productivity_score += screenshot.activity_percent || 0;
           }
         }
       });

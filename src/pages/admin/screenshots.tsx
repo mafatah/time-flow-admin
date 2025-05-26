@@ -10,12 +10,14 @@ import { toast } from 'sonner';
 
 interface Screenshot {
   id: string;
-  user_id: string;
-  project_id: string;
+  user_id: string | null;
+  project_id: string | null;
   image_url: string;
   captured_at: string;
-  activity_percent?: number;
-  focus_percent?: number;
+  activity_percent?: number | null;
+  focus_percent?: number | null;
+  classification?: string | null;
+  task_id?: string | null;
   user_name?: string;
   user_email?: string;
   project_name?: string;
@@ -54,9 +56,9 @@ export default function AdminScreenshots() {
         return;
       }
 
-      // Get unique user IDs and project IDs
-      const userIds = [...new Set(screenshotData.map(s => s.user_id).filter(Boolean))];
-      const projectIds = [...new Set(screenshotData.map(s => s.project_id).filter(Boolean))];
+      // Get unique user IDs and project IDs, filtering out nulls
+      const userIds = [...new Set(screenshotData.map(s => s.user_id).filter(Boolean))] as string[];
+      const projectIds = [...new Set(screenshotData.map(s => s.project_id).filter(Boolean))] as string[];
 
       // Fetch user data
       const { data: userData } = await supabase

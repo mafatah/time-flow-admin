@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,9 +15,10 @@ interface URLLog {
   user_id: string;
   site_url: string;
   started_at: string;
-  ended_at?: string;
-  duration_seconds: number;
-  category: string;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  category: string | null;
+  project_id: string | null;
   user?: {
     email: string;
     full_name?: string;
@@ -41,15 +43,26 @@ export default function URLMonitoring() {
       setLoading(true);
       const { data, error } = await supabase
         .from('url_logs')
-        .select(`
-          *,
-          user:users(email, full_name)
-        `)
+        .select(`*`)
         .order('started_at', { ascending: false })
         .limit(500);
 
       if (error) throw error;
-      setUrlLogs(data || []);
+      
+      // Fetch user data separately
+      const userIds = [...new Set(data?.map(log => log.user_id) || [])];
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .in('id', userIds);
+
+      // Enrich logs with user data
+      const enrichedLogs = data?.map(log => ({
+        ...log,
+        user: userData?.find(user => user.id === log.user_id)
+      })) || [];
+
+      setUrlLogs(enrichedLogs);
     } catch (error) {
       console.error('Error fetching URL logs:', error);
     } finally {
@@ -80,7 +93,7 @@ export default function URLMonitoring() {
     return matchesSearch && matchesCategory && matchesUser;
   });
 
-  const getCategoryColor = (category: string) => {
+  const getCategoryColor = (category: string | null) => {
     switch (category) {
       case 'development':
         return 'bg-green-100 text-green-800';
@@ -95,7 +108,8 @@ export default function URLMonitoring() {
     }
   };
 
-  const formatDuration = (seconds: number) => {
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return 'N/A';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
@@ -112,7 +126,8 @@ export default function URLMonitoring() {
   const getTotalTimeByCategory = () => {
     const categoryTotals: { [key: string]: number } = {};
     filteredLogs.forEach(log => {
-      categoryTotals[log.category] = (categoryTotals[log.category] || 0) + log.duration_seconds;
+      const category = log.category || 'other';
+      categoryTotals[category] = (categoryTotals[category] || 0) + (log.duration_seconds || 0);
     });
     return categoryTotals;
   };
@@ -141,7 +156,7 @@ export default function URLMonitoring() {
             <CardContent>
               <div className="text-2xl font-bold">{formatDuration(totalSeconds)}</div>
               <p className="text-xs text-muted-foreground">
-                {filteredLogs.filter(log => log.category === category).length} visits
+                {filteredLogs.filter(log => (log.category || 'other') === category).length} visits
               </p>
             </CardContent>
           </Card>
@@ -250,7 +265,7 @@ export default function URLMonitoring() {
                     </TableCell>
                     <TableCell>
                       <Badge className={getCategoryColor(log.category)}>
-                        {log.category}
+                        {log.category || 'other'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -293,4 +308,4 @@ export default function URLMonitoring() {
       </Card>
     </div>
   );
-} 
+}

@@ -1,159 +1,92 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Search, Calendar, Filter, Download, Eye } from 'lucide-react';
+import { Calendar, Download, Eye, Search, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 interface Screenshot {
   id: string;
-  user_id: string;
-  project_id: string;
+  user_id: string | null;
+  project_id: string | null;
   image_url: string;
   captured_at: string;
-  activity_percent?: number;
-  focus_percent?: number;
-  classification?: string;
+  classification: string | null;
+  activity_percent?: number | null;
+  focus_percent?: number | null;
+  task_id?: string | null;
   user_name?: string;
   user_email?: string;
   project_name?: string;
 }
 
-interface User {
-  id: string;
-  full_name: string;
-  email: string;
-}
-
-interface Project {
-  id: string;
-  name: string;
-}
-
 export default function ScreenshotsViewer() {
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    userId: '',
-    projectId: '',
-    date: new Date().toISOString().split('T')[0],
-    searchTerm: ''
-  });
-
-  useEffect(() => {
-    fetchUsers();
-    fetchProjects();
-  }, []);
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+  const [searchTerm, setSearchTerm] = useState('');
+  const [classificationFilter, setClassificationFilter] = useState('all');
+  const [userFilter, setUserFilter] = useState('all');
+  const [users, setUsers] = useState<any[]>([]);
 
   useEffect(() => {
     fetchScreenshots();
-  }, [filters]);
-
-  const fetchUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, full_name, email')
-        .order('full_name');
-
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      toast.error('Failed to fetch users');
-    }
-  };
-
-  const fetchProjects = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-      toast.error('Failed to fetch projects');
-    }
-  };
+    fetchUsers();
+  }, [selectedDate]);
 
   const fetchScreenshots = async () => {
     setLoading(true);
     try {
-      let query = supabase
+      const startDate = new Date(selectedDate);
+      const endDate = new Date(selectedDate);
+      endDate.setDate(endDate.getDate() + 1);
+
+      const { data: screenshotData, error: screenshotError } = await supabase
         .from('screenshots')
-        .select(`
-          id,
-          user_id,
-          project_id,
-          image_url,
-          captured_at,
-          classification
-        `);
+        .select('*')
+        .gte('captured_at', startDate.toISOString())
+        .lt('captured_at', endDate.toISOString())
+        .order('captured_at', { ascending: false });
 
-      // Apply filters
-      if (filters.userId) {
-        query = query.eq('user_id', filters.userId);
-      }
-
-      if (filters.projectId) {
-        query = query.eq('project_id', filters.projectId);
-      }
-
-      if (filters.date) {
-        const startDate = new Date(filters.date);
-        const endDate = new Date(filters.date);
-        endDate.setDate(endDate.getDate() + 1);
-        
-        query = query
-          .gte('captured_at', startDate.toISOString())
-          .lt('captured_at', endDate.toISOString());
-      }
-
-      const { data: screenshotData, error } = await query
-        .order('captured_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
+      if (screenshotError) throw screenshotError;
 
       if (!screenshotData || screenshotData.length === 0) {
         setScreenshots([]);
         return;
       }
 
-      // Enrich with user and project names
-      const enrichedScreenshots = screenshotData.map(screenshot => {
-        const user = users.find(u => u.id === screenshot.user_id);
-        const project = projects.find(p => p.id === screenshot.project_id);
-        
-        return {
-          ...screenshot,
-          user_name: user?.full_name || 'Unknown User',
-          user_email: user?.email || 'Unknown',
-          project_name: project?.name || 'Unknown Project'
-        };
-      });
+      // Get unique user IDs and project IDs, filtering out nulls
+      const userIds = [...new Set(screenshotData.map(s => s.user_id).filter(Boolean))] as string[];
+      const projectIds = [...new Set(screenshotData.map(s => s.project_id).filter(Boolean))] as string[];
 
-      // Apply search filter
-      let filteredScreenshots = enrichedScreenshots;
-      if (filters.searchTerm) {
-        const searchLower = filters.searchTerm.toLowerCase();
-        filteredScreenshots = enrichedScreenshots.filter(screenshot =>
-          screenshot.user_name?.toLowerCase().includes(searchLower) ||
-          screenshot.project_name?.toLowerCase().includes(searchLower) ||
-          screenshot.classification?.toLowerCase().includes(searchLower)
-        );
-      }
+      // Fetch user data
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .in('id', userIds);
 
-      setScreenshots(filteredScreenshots);
+      // Fetch project data
+      const { data: projectData } = await supabase
+        .from('projects')
+        .select('id, name')
+        .in('id', projectIds);
+
+      // Combine data
+      const enrichedScreenshots = screenshotData.map(screenshot => ({
+        ...screenshot,
+        user_name: userData?.find(u => u.id === screenshot.user_id)?.full_name || 'Unknown',
+        user_email: userData?.find(u => u.id === screenshot.user_id)?.email || 'Unknown',
+        project_name: projectData?.find(p => p.id === screenshot.project_id)?.name || 'Unknown Project'
+      }));
+
+      setScreenshots(enrichedScreenshots);
     } catch (error) {
       console.error('Error fetching screenshots:', error);
       toast.error('Failed to fetch screenshots');
@@ -161,6 +94,28 @@ export default function ScreenshotsViewer() {
       setLoading(false);
     }
   };
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, email, full_name');
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
+  const filteredScreenshots = screenshots.filter(screenshot => {
+    const matchesSearch = screenshot.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         screenshot.project_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesClassification = classificationFilter === 'all' || screenshot.classification === classificationFilter;
+    const matchesUser = userFilter === 'all' || screenshot.user_id === userFilter;
+    
+    return matchesSearch && matchesClassification && matchesUser;
+  });
 
   const handleViewScreenshot = (imageUrl: string) => {
     window.open(imageUrl, '_blank');
@@ -186,136 +141,135 @@ export default function ScreenshotsViewer() {
     }
   };
 
-  const getActivityColor = (percent?: number) => {
-    if (!percent) return 'gray';
-    if (percent >= 80) return 'green';
-    if (percent >= 60) return 'yellow';
-    return 'red';
+  const getClassificationColor = (classification: string | null) => {
+    switch (classification) {
+      case 'productive':
+        return 'bg-green-100 text-green-800';
+      case 'neutral':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'distracting':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Screenshots Viewer</h1>
+        <div className="flex items-center space-x-2">
+          <Calendar className="h-4 w-4" />
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2"
+          />
+        </div>
       </div>
 
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
+          <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            <span>Filters</span>
+            Filters
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by user or project..."
-                  value={filters.searchTerm}
-                  onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
-                  className="pl-10"
-                />
-              </div>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              <Input
+                placeholder="Search users or projects..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64"
+              />
             </div>
+            
+            <Select value={classificationFilter} onValueChange={setClassificationFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by classification" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Classifications</SelectItem>
+                <SelectItem value="productive">Productive</SelectItem>
+                <SelectItem value="neutral">Neutral</SelectItem>
+                <SelectItem value="distracting">Distracting</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">User</label>
-              <Select 
-                value={filters.userId} 
-                onValueChange={(value) => setFilters(prev => ({ ...prev, userId: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select user" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Users</SelectItem>
-                  {users.map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Project</label>
-              <Select 
-                value={filters.projectId} 
-                onValueChange={(value) => setFilters(prev => ({ ...prev, projectId: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select project" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Projects</SelectItem>
-                  {projects.map(project => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Date</label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="date"
-                  value={filters.date}
-                  onChange={(e) => setFilters(prev => ({ ...prev, date: e.target.value }))}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+            <Select value={userFilter} onValueChange={setUserFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by user" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Users</SelectItem>
+                {users.map(user => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.full_name || user.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Screenshots Grid */}
       <Card>
         <CardHeader>
           <CardTitle>
-            Screenshots ({screenshots.length})
+            Screenshots for {format(new Date(selectedDate), 'MMMM d, yyyy')} ({filteredScreenshots.length} found)
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Loading screenshots...</div>
-          ) : screenshots.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No screenshots found with the current filters.
+            <div className="text-center py-4">Loading screenshots...</div>
+          ) : filteredScreenshots.length === 0 ? (
+            <div className="text-center py-4 text-gray-500">
+              No screenshots found for the selected filters.
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {screenshots.map((screenshot) => (
-                <div key={screenshot.id} className="border rounded-lg overflow-hidden">
-                  <div className="aspect-video bg-gray-100 relative group">
+              {filteredScreenshots.map((screenshot) => (
+                <div key={screenshot.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
                     <img
                       src={screenshot.image_url}
                       alt="Screenshot"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = '/placeholder.svg';
-                      }}
+                      className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => handleViewScreenshot(screenshot.image_url)}
                     />
-                    <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {format(new Date(screenshot.captured_at), 'HH:mm:ss')}
+                      </span>
+                      <Badge className={getClassificationColor(screenshot.classification)}>
+                        {screenshot.classification || 'unclassified'}
+                      </Badge>
+                    </div>
+                    
+                    <div className="text-xs text-gray-600">
+                      <div>User: {screenshot.user_name}</div>
+                      <div>Project: {screenshot.project_name}</div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-2">
                       <Button
+                        variant="outline"
                         size="sm"
-                        variant="secondary"
                         onClick={() => handleViewScreenshot(screenshot.image_url)}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button
+                        variant="outline"
                         size="sm"
-                        variant="secondary"
                         onClick={() => handleDownloadScreenshot(
                           screenshot.image_url,
                           `screenshot-${screenshot.id}.png`
@@ -323,27 +277,6 @@ export default function ScreenshotsViewer() {
                       >
                         <Download className="h-4 w-4" />
                       </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="p-3 space-y-2">
-                    <div className="text-sm font-medium">{screenshot.user_name}</div>
-                    <div className="text-xs text-gray-500">{screenshot.project_name}</div>
-                    <div className="text-xs text-gray-500">
-                      {format(new Date(screenshot.captured_at), 'MMM d, yyyy HH:mm')}
-                    </div>
-                    
-                    <div className="flex justify-between items-center">
-                      {screenshot.activity_percent && (
-                        <Badge variant="outline" className={`text-${getActivityColor(screenshot.activity_percent)}-600`}>
-                          {screenshot.activity_percent}% Activity
-                        </Badge>
-                      )}
-                      {screenshot.classification && (
-                        <Badge variant="secondary">
-                          {screenshot.classification}
-                        </Badge>
-                      )}
                     </div>
                   </div>
                 </div>
