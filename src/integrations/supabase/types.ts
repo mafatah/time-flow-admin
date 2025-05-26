@@ -258,6 +258,7 @@ export type Database = {
           focus_percent: number | null
           id: string
           image_url: string
+          project_id: string | null
           task_id: string | null
           user_id: string | null
         }
@@ -268,6 +269,7 @@ export type Database = {
           focus_percent?: number | null
           id?: string
           image_url: string
+          project_id?: string | null
           task_id?: string | null
           user_id?: string | null
         }
@@ -278,10 +280,33 @@ export type Database = {
           focus_percent?: number | null
           id?: string
           image_url?: string
+          project_id?: string | null
           task_id?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_screenshots_users"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_screenshots_users"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "screenshots_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {
@@ -387,6 +412,13 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fk_time_logs_project"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_time_logs_projects"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"

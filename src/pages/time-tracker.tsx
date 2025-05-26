@@ -1,185 +1,157 @@
-import { useState, useEffect } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageHeader } from "@/components/layout/page-header";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/providers/auth-provider";
-import { Play, Square, Clock, Calendar } from "lucide-react";
-import { format } from "date-fns";
 
-export default function TimeTrackerPage() {
-  const [currentSession, setCurrentSession] = useState<any>(null);
-  const [isTracking, setIsTracking] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<string>('');
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [todayTime, setTodayTime] = useState(0);
-  const { userDetails } = useAuth();
-  const { toast } = useToast();
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Play, Square, Clock, BarChart3 } from 'lucide-react';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
 
-  // Timer effect
+interface Project {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface TimeLog {
+  id: string;
+  user_id: string;
+  project_id: string;
+  start_time: string;
+  end_time: string | null;
+  is_idle: boolean;
+}
+
+export default function TimeTracker() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [currentSession, setCurrentSession] = useState<TimeLog | null>(null);
+  const [recentSessions, setRecentSessions] = useState<TimeLog[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState<string>('00:00:00');
+
+  useEffect(() => {
+    fetchProjects();
+    fetchRecentSessions();
+    checkActiveSession();
+  }, []);
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    if (isTracking && currentSession) {
+    if (currentSession) {
       interval = setInterval(() => {
-        const startTime = new Date(currentSession.start_time).getTime();
-        const now = new Date().getTime();
-        setElapsedTime(now - startTime);
+        const start = new Date(currentSession.start_time);
+        const now = new Date();
+        const diff = now.getTime() - start.getTime();
+        
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        setElapsedTime(
+          `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+        );
       }, 1000);
     }
-    
+
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isTracking, currentSession]);
+  }, [currentSession]);
 
-  // Load initial data
-  useEffect(() => {
-    loadInitialData();
-    loadActiveSession();
-    calculateTodayTime();
-  }, [userDetails]);
-
-  const loadInitialData = async () => {
+  const fetchProjects = async () => {
     try {
-      setLoading(true);
-      
-      // Load tasks with projects
-      let tasksQuery = supabase
-        .from('tasks')
-        .select(`
-          id,
-          name,
-          user_id,
-          projects(id, name)
-        `);
-      
-      // For admins and managers, show all tasks
-      // For employees, show only their tasks
-      if (userDetails?.role === 'employee') {
-        tasksQuery = tasksQuery.eq('user_id', userDetails.id);
-      }
-      
-      const { data: tasksData, error: tasksError } = await tasksQuery.order('name');
-      
-      if (tasksError) {
-        console.error('Tasks query error:', tasksError);
-        throw tasksError;
-      }
-      
-      console.log('Loaded tasks:', tasksData);
-      console.log('User role:', userDetails?.role);
-      console.log('User ID:', userDetails?.id);
-      
-      setTasks(tasksData || []);
-      
-      // If no tasks found, show a helpful message
-      if (!tasksData || tasksData.length === 0) {
-        toast({
-          title: "No tasks available",
-          description: userDetails?.role === 'admin' 
-            ? "No tasks exist in the system. Create some tasks first in Projects > Tasks Management." 
-            : "No tasks assigned to you. Contact your admin to assign tasks.",
-          variant: "default",
-        });
-      }
-      
-    } catch (error: any) {
-      console.error('Error loading tasks:', error);
-      toast({
-        title: "Error loading data",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      // Convert null to undefined for description field
+      const formattedProjects = (data || []).map(project => ({
+        ...project,
+        description: project.description || undefined
+      }));
+      setProjects(formattedProjects);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      toast.error('Failed to fetch projects');
     }
   };
 
-  const loadActiveSession = async () => {
-    if (!userDetails) return;
-    
+  const fetchRecentSessions = async () => {
     try {
       const { data, error } = await supabase
         .from('time_logs')
         .select('*')
-        .eq('user_id', userDetails.id)
-        .is('end_time', null)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-      
-      if (data) {
-        setCurrentSession(data);
-        setIsTracking(true);
-        setSelectedTask(data.task_id);
-        
-        // Calculate elapsed time
-        const startTime = new Date(data.start_time).getTime();
-        const now = new Date().getTime();
-        setElapsedTime(now - startTime);
-      }
-    } catch (error: any) {
-      console.error('Error loading active session:', error);
+        .order('start_time', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setRecentSessions(data || []);
+    } catch (error) {
+      console.error('Error fetching recent sessions:', error);
     }
   };
 
-  const calculateTodayTime = async () => {
-    if (!userDetails) return;
-    
+  const checkActiveSession = async () => {
     try {
-      const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
-      
-      const { data, error } = await supabase
+      const { data: session, error } = await supabase
         .from('time_logs')
-        .select('start_time, end_time')
-        .eq('user_id', userDetails.id)
-        .gte('start_time', startOfDay.toISOString())
-        .lt('start_time', endOfDay.toISOString());
-      
-      if (error) throw error;
-      
-      let totalMs = 0;
-      data?.forEach(log => {
-        const start = new Date(log.start_time).getTime();
-        const end = log.end_time ? new Date(log.end_time).getTime() : new Date().getTime();
-        totalMs += (end - start);
-      });
-      
-      setTodayTime(totalMs);
-    } catch (error: any) {
-      console.error('Error calculating today time:', error);
+        .select('*')
+        .is('end_time', null)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (session) {
+        setCurrentSession(session);
+        setSelectedProject(session.project_id);
+      }
+    } catch (error) {
+      console.error('Error checking active session:', error);
     }
   };
 
   const startTracking = async () => {
-    if (!selectedTask || !userDetails) {
-      toast({
-        title: "Please select a task",
-        description: "You need to select a task before starting time tracking.",
-        variant: "destructive",
-      });
+    if (!selectedProject) {
+      toast.error('Please select a project first');
       return;
     }
 
+    setLoading(true);
     try {
-      const startTime = new Date().toISOString();
+      // Check if there's already an active session
+      const { data: existingSession } = await supabase
+        .from('time_logs')
+        .select('*')
+        .is('end_time', null)
+        .single();
+
+      if (existingSession) {
+        toast.error('There is already an active tracking session');
+        return;
+      }
+
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        toast.error('Please log in to start tracking');
+        return;
+      }
 
       const { data, error } = await supabase
         .from('time_logs')
         .insert({
-          user_id: userDetails.id,
-          task_id: selectedTask,
-          start_time: startTime
+          user_id: user.id,
+          project_id: selectedProject,
+          start_time: new Date().toISOString(),
+          is_idle: false
         })
         .select()
         .single();
@@ -187,324 +159,168 @@ export default function TimeTrackerPage() {
       if (error) throw error;
 
       setCurrentSession(data);
-      setIsTracking(true);
-      setElapsedTime(0);
-
-      // Notify Electron process
-      if (window.electron) {
-        window.electron.setUserId(userDetails.id);
-        window.electron.setTaskId(selectedTask);
-        window.electron.startTracking();
-      }
-
-      toast({
-        title: "Time tracking started",
-        description: `Started tracking time for ${getSelectedTaskName()}`,
-      });
-    } catch (error: any) {
+      toast.success('Time tracking started');
+      fetchRecentSessions();
+    } catch (error) {
       console.error('Error starting tracking:', error);
-      toast({
-        title: "Error starting tracking",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error('Failed to start tracking');
+    } finally {
+      setLoading(false);
     }
   };
 
   const stopTracking = async () => {
-    if (!currentSession || !userDetails) return;
+    if (!currentSession) return;
 
+    setLoading(true);
     try {
-      const endTime = new Date().toISOString();
-
       const { error } = await supabase
         .from('time_logs')
-        .update({ end_time: endTime })
+        .update({ end_time: new Date().toISOString() })
         .eq('id', currentSession.id);
 
       if (error) throw error;
 
       setCurrentSession(null);
-      setIsTracking(false);
-      setElapsedTime(0);
-      setSelectedTask('');
-
-      // Notify Electron process
-      if (window.electron) {
-        window.electron.stopTracking();
-      }
-
-      await calculateTodayTime(); // Refresh today's total
-
-      toast({
-        title: "Time tracking stopped",
-        description: "Time has been logged successfully",
-      });
-    } catch (error: any) {
+      setElapsedTime('00:00:00');
+      toast.success('Time tracking stopped');
+      fetchRecentSessions();
+    } catch (error) {
       console.error('Error stopping tracking:', error);
-      toast({
-        title: "Error stopping tracking",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error('Failed to stop tracking');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const formatTime = (milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  const formatDuration = (start: string, end: string | null): string => {
+    const startTime = new Date(start);
+    const endTime = end ? new Date(end) : new Date();
+    const diffMs = endTime.getTime() - startTime.getTime();
+    
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    return `${hours}h ${minutes}m`;
   };
 
-  const getSelectedTaskName = () => {
-    const task = tasks.find(t => t.id === selectedTask);
-    return task ? `${task.projects?.name || 'No Project'} - ${task.name}` : '';
+  const getProjectName = (projectId: string): string => {
+    return projects.find(p => p.id === projectId)?.name || 'Unknown Project';
   };
-
-  // Test functions for development
-  const startTestMode = () => {
-    if (window.electron) {
-      console.log('🧪 Starting test mode...');
-      window.electron.send('start-test-mode');
-      toast({
-        title: "Test Mode Started",
-        description: "Activity monitoring started in test mode. Check console logs for screenshot capture.",
-        variant: "default",
-      });
-    } else {
-      console.log('❌ electron not available');
-      toast({
-        title: "Error",
-        description: "Electron API not available. This only works in the desktop app.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const triggerTestCapture = () => {
-    if (window.electron) {
-      console.log('🧪 Triggering test capture...');
-      window.electron.send('trigger-activity-capture');
-      toast({
-        title: "Test Capture Triggered",
-        description: "Manual screenshot capture triggered. Check console logs.",
-        variant: "default",
-      });
-    } else {
-      console.log('❌ electron not available');
-      toast({
-        title: "Error",
-        description: "Electron API not available. This only works in the desktop app.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const triggerDirectTest = async () => {
-    if (window.electron && window.electron.invoke) {
-      console.log('🧪 Triggering direct screenshot test...');
-      try {
-        const result = await window.electron.invoke('trigger-direct-screenshot');
-        toast({
-          title: result ? "Direct Screenshot Success" : "Direct Screenshot Failed",
-          description: result 
-            ? "Screenshot captured successfully! Check console for details." 
-            : "Screenshot capture failed. Check console for error details.",
-          variant: result ? "default" : "destructive",
-        });
-      } catch (error) {
-        console.error('Direct screenshot test error:', error);
-        toast({
-          title: "Test Error",
-          description: "Failed to run direct screenshot test. Check console.",
-          variant: "destructive",
-        });
-      }
-    } else {
-      console.log('❌ electron.invoke not available');
-      toast({
-        title: "Error",
-        description: "Electron API not available. This only works in the desktop app.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="container py-6">
-        <PageHeader
-          title="Time Tracker"
-          subtitle="Track time spent on tasks and projects"
-        />
-        <div className="mt-6 text-center">Loading...</div>
-      </div>
-    );
-  }
 
   return (
-    <div className="container py-6">
-      <PageHeader
-        title="Time Tracker"
-        subtitle="Track time spent on tasks and projects"
-      />
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Time Tracker</h1>
+      </div>
 
-      <div className="mt-6 space-y-6">
-        {/* Today's Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Today's Summary - {format(new Date(), 'MMMM d, yyyy')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{formatTime(todayTime)}</div>
-                <div className="text-sm text-muted-foreground">Total Time Today</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">
-                  <Badge variant={isTracking ? "default" : "secondary"}>
-                    {isTracking ? "Tracking" : "Not Tracking"}
-                  </Badge>
+      {/* Current Session */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Clock className="h-5 w-5" />
+            <span>Current Session</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-4">
+            <Select 
+              value={selectedProject} 
+              onValueChange={setSelectedProject}
+              disabled={!!currentSession}
+            >
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Select a project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map(project => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {currentSession ? (
+              <Button 
+                onClick={stopTracking} 
+                disabled={loading}
+                variant="destructive"
+                className="flex items-center space-x-2"
+              >
+                <Square className="h-4 w-4" />
+                <span>Stop</span>
+              </Button>
+            ) : (
+              <Button 
+                onClick={startTracking} 
+                disabled={loading || !selectedProject}
+                className="flex items-center space-x-2"
+              >
+                <Play className="h-4 w-4" />
+                <span>Start</span>
+              </Button>
+            )}
+          </div>
+
+          {currentSession && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="font-medium text-green-800">
+                    Tracking: {getProjectName(currentSession.project_id)}
+                  </div>
+                  <div className="text-sm text-green-600">
+                    Started at {format(new Date(currentSession.start_time), 'HH:mm:ss')}
+                  </div>
                 </div>
-                <div className="text-sm text-muted-foreground">Current Status</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-muted-foreground">
-                  {format(new Date(), 'EEEE')}
+                <div className="text-2xl font-mono font-bold text-green-800">
+                  {elapsedTime}
                 </div>
-                <div className="text-sm text-muted-foreground">Today</div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Active Timer */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Time Tracker
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!isTracking ? (
-              <>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Select Task</label>
-                  <Select value={selectedTask} onValueChange={setSelectedTask}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a task to track time for..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tasks.map((task) => (
-                        <SelectItem key={task.id} value={task.id}>
-                          {task.projects?.name || 'No Project'} - {task.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button 
-                  onClick={startTracking} 
-                  disabled={!selectedTask}
-                  className="w-full"
-                  size="lg"
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Start Tracking
-                </Button>
-              </>
-            ) : (
-              <>
-                <div className="text-center space-y-2">
-                  <div className="text-4xl font-mono font-bold text-primary">
-                    {formatTime(elapsedTime)}
+      {/* Recent Sessions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <BarChart3 className="h-5 w-5" />
+            <span>Recent Sessions</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentSessions.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No time tracking sessions found.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentSessions.map((session) => (
+                <div key={session.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <div className="font-medium">{getProjectName(session.project_id)}</div>
+                    <div className="text-sm text-gray-500">
+                      {format(new Date(session.start_time), 'MMM d, yyyy HH:mm')}
+                      {session.end_time && ` - ${format(new Date(session.end_time), 'HH:mm')}`}
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Tracking: {getSelectedTaskName()}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Started: {currentSession ? format(new Date(currentSession.start_time), 'h:mm a') : ''}
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">
+                      {formatDuration(session.start_time, session.end_time)}
+                    </span>
+                    <Badge variant={session.end_time ? 'default' : 'secondary'}>
+                      {session.end_time ? 'Completed' : 'Active'}
+                    </Badge>
                   </div>
                 </div>
-                <Button 
-                  onClick={stopTracking} 
-                  variant="destructive"
-                  className="w-full"
-                  size="lg"
-                >
-                  <Square className="h-4 w-4 mr-2" />
-                  Stop Tracking
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Test Mode (Development Only) */}
-        {process.env.NODE_ENV === 'development' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-orange-600">🧪 Test Mode (Development Only)</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Button 
-                  onClick={startTestMode} 
-                  variant="outline"
-                  className="w-full"
-                >
-                  Start Activity Monitoring Test
-                </Button>
-                <Button 
-                  onClick={triggerTestCapture} 
-                  variant="outline"
-                  className="w-full"
-                >
-                  Trigger Test Screenshot
-                </Button>
-                <Button 
-                  onClick={triggerDirectTest} 
-                  variant="outline"
-                  className="w-full"
-                >
-                  Direct Screenshot Test
-                </Button>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                ⚠️ These buttons test the activity monitoring and screenshot functionality. 
-                Check the console logs and dev tools for debug information.
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {tasks.length === 0 && (
-          <Card>
-            <CardContent className="text-center py-8">
-              <div className="text-muted-foreground">
-                {userDetails?.role === 'admin' ? (
-                  <>
-                    <p>No tasks available in the system.</p>
-                    <p className="mt-2">Create some projects and tasks first to start tracking time.</p>
-                  </>
-                ) : (
-                  <>
-                    <p>No tasks assigned to you.</p>
-                    <p className="mt-2">Contact your admin to assign tasks for time tracking.</p>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-} 
+}

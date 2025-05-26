@@ -1,15 +1,15 @@
 
-import { useState, useEffect } from "react";
-import { PageHeader } from "@/components/layout/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/providers/auth-provider";
-import { Clock, Download, Filter, Calendar } from "lucide-react";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Download, Filter, Calendar } from 'lucide-react';
+import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { toast } from 'sonner';
 
 interface TimeReport {
   id: string;
@@ -18,264 +18,242 @@ interface TimeReport {
   start_time: string;
   end_time: string | null;
   is_idle: boolean;
-  users?: {
-    full_name: string;
-    email: string;
-  };
-  projects?: {
-    name: string;
-  };
+  user_name?: string;
+  user_email?: string;
+  project_name?: string;
+}
+
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
 }
 
 export default function TimeReports() {
   const [reports, setReports] = useState<TimeReport[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProject, setSelectedProject] = useState<string>('all');
-  const [selectedUser, setSelectedUser] = useState<string>('all');
-  const [dateFilter, setDateFilter] = useState<string>('week');
-  const [projects, setProjects] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  
-  const { userDetails } = useAuth();
-  const { toast } = useToast();
+  const [filters, setFilters] = useState({
+    userId: '',
+    projectId: '',
+    startDate: format(subDays(new Date(), 7), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd'),
+    includeIdle: true
+  });
 
   useEffect(() => {
-    loadFilters();
-  }, [userDetails]);
+    fetchUsers();
+    fetchProjects();
+  }, []);
 
   useEffect(() => {
-    loadReports();
-  }, [selectedProject, selectedUser, dateFilter, userDetails]);
+    fetchReports();
+  }, [filters]);
 
-  const loadFilters = async () => {
+  const fetchUsers = async () => {
     try {
-      // Load projects
-      const { data: projectsData, error: projectsError } = await supabase
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .order('full_name');
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users');
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
         .from('projects')
         .select('id, name')
         .order('name');
 
-      if (projectsError) throw projectsError;
-      setProjects(projectsData || []);
-
-      // Load users (only for admins)
-      if (userDetails?.role === 'admin') {
-        const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('id, full_name, email')
-          .order('full_name');
-
-        if (usersError) throw usersError;
-        setUsers(usersData || []);
-      }
-    } catch (error: any) {
-      console.error('Error loading filters:', error);
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      toast.error('Failed to fetch projects');
     }
   };
 
-  const loadReports = async () => {
+  const fetchReports = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      // Calculate date range
-      let startDate: Date;
-      const endDate = endOfDay(new Date());
-      
-      switch (dateFilter) {
-        case 'today':
-          startDate = startOfDay(new Date());
-          break;
-        case 'week':
-          startDate = startOfDay(subDays(new Date(), 7));
-          break;
-        case 'month':
-          startDate = startOfDay(subDays(new Date(), 30));
-          break;
-        default:
-          startDate = startOfDay(subDays(new Date(), 7));
-      }
+      const startDate = startOfDay(new Date(filters.startDate));
+      const endDate = endOfDay(new Date(filters.endDate));
 
       let query = supabase
         .from('time_logs')
-        .select(`
-          id,
-          user_id,
-          project_id,
-          start_time,
-          end_time,
-          is_idle,
-          users:user_id (full_name, email),
-          projects:project_id (name)
-        `)
+        .select('*')
         .gte('start_time', startDate.toISOString())
-        .lte('start_time', endDate.toISOString())
+        .lte('start_time', endDate.toISOString());
+
+      if (filters.userId) {
+        query = query.eq('user_id', filters.userId);
+      }
+
+      if (filters.projectId) {
+        query = query.eq('project_id', filters.projectId);
+      }
+
+      if (!filters.includeIdle) {
+        query = query.eq('is_idle', false);
+      }
+
+      const { data: timeLogData, error } = await query
         .order('start_time', { ascending: false });
-
-      // Filter by user for employees
-      if (userDetails?.role === 'employee') {
-        query = query.eq('user_id', userDetails.id);
-      } else if (selectedUser !== 'all') {
-        query = query.eq('user_id', selectedUser);
-      }
-
-      // Filter by project if selected
-      if (selectedProject !== 'all') {
-        query = query.eq('project_id', selectedProject);
-      }
-
-      const { data, error } = await query.limit(100);
 
       if (error) throw error;
 
-      setReports(data || []);
-    } catch (error: any) {
-      console.error('Error loading reports:', error);
-      toast({
-        title: "Error loading reports",
-        description: error.message,
-        variant: "destructive",
+      if (!timeLogData || timeLogData.length === 0) {
+        setReports([]);
+        return;
+      }
+
+      // Enrich with user and project names
+      const enrichedReports = timeLogData.map(report => {
+        const user = users.find(u => u.id === report.user_id);
+        const project = projects.find(p => p.id === report.project_id);
+        
+        return {
+          ...report,
+          user_name: user?.full_name || 'Unknown User',
+          user_email: user?.email || 'Unknown',
+          project_name: project?.name || 'Unknown Project'
+        };
       });
+
+      setReports(enrichedReports);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      toast.error('Failed to fetch time reports');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDuration = (startTime: string, endTime: string | null) => {
-    if (!endTime) return 'Active';
+  const calculateDuration = (start: string, end: string | null): string => {
+    if (!end) return 'Ongoing';
     
-    const start = new Date(startTime).getTime();
-    const end = new Date(endTime).getTime();
-    const duration = end - start;
-    const hours = Math.floor(duration / (1000 * 60 * 60));
-    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    const diffMs = endTime.getTime() - startTime.getTime();
     
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    return `${hours}h ${minutes}m`;
   };
 
-  const getTotalHours = () => {
-    let totalMs = 0;
-    reports.forEach(report => {
-      if (report.end_time) {
-        const start = new Date(report.start_time).getTime();
-        const end = new Date(report.end_time).getTime();
-        totalMs += (end - start);
-      }
-    });
-    return (totalMs / (1000 * 60 * 60)).toFixed(1);
-  };
-
-  const exportCSV = () => {
+  const exportToCSV = () => {
     const csvData = reports.map(report => ({
-      User: report.users?.full_name || 'Unknown',
-      Email: report.users?.email || '',
-      Project: report.projects?.name || 'Unknown',
+      'User': report.user_name,
+      'Email': report.user_email,
+      'Project': report.project_name,
       'Start Time': format(new Date(report.start_time), 'yyyy-MM-dd HH:mm:ss'),
-      'End Time': report.end_time ? format(new Date(report.end_time), 'yyyy-MM-dd HH:mm:ss') : 'Active',
-      Duration: formatDuration(report.start_time, report.end_time),
-      'Is Idle': report.is_idle ? 'Yes' : 'No'
+      'End Time': report.end_time ? format(new Date(report.end_time), 'yyyy-MM-dd HH:mm:ss') : 'Ongoing',
+      'Duration': calculateDuration(report.start_time, report.end_time),
+      'Status': report.is_idle ? 'Idle' : 'Active'
     }));
 
-    const csvString = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).join(','))
+    const csvHeaders = Object.keys(csvData[0] || {});
+    const csvRows = csvData.map(row => 
+      csvHeaders.map(header => `"${row[header as keyof typeof row] || ''}"`).join(',')
+    );
+    
+    const csvContent = [
+      csvHeaders.join(','),
+      ...csvRows
     ].join('\n');
 
-    const blob = new Blob([csvString], { type: 'text/csv' });
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `time-reports-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+    
+    toast.success('Report exported successfully');
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <PageHeader title="Time Reports" subtitle="View detailed time tracking reports" />
-        <div className="text-center py-8">Loading reports...</div>
-      </div>
-    );
-  }
+  const getTotalHours = (): string => {
+    const totalMs = reports
+      .filter(report => report.end_time)
+      .reduce((total, report) => {
+        const start = new Date(report.start_time);
+        const end = new Date(report.end_time!);
+        return total + (end.getTime() - start.getTime());
+      }, 0);
+
+    const hours = Math.floor(totalMs / (1000 * 60 * 60));
+    const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Time Reports" subtitle="View detailed time tracking reports" />
-
-      {/* Summary Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Summary
-            </CardTitle>
-            <Button onClick={exportCSV} className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Export CSV
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold">{getTotalHours()}h</div>
-              <div className="text-sm text-muted-foreground">Total Hours</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">{reports.length}</div>
-              <div className="text-sm text-muted-foreground">Total Sessions</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">
-                {new Set(reports.map(r => r.user_id)).size}
-              </div>
-              <div className="text-sm text-muted-foreground">Active Users</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Time Reports</h1>
+        <Button onClick={exportToCSV} disabled={reports.length === 0}>
+          <Download className="h-4 w-4 mr-2" />
+          Export CSV
+        </Button>
+      </div>
 
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center space-x-2">
             <Filter className="h-5 w-5" />
-            Filters
+            <span>Filters</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {userDetails?.role === 'admin' && (
-              <div>
-                <label className="text-sm font-medium mb-2 block">User</label>
-                <Select value={selectedUser} onValueChange={setSelectedUser}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select user" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Users</SelectItem>
-                    {users.map(user => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Project</label>
-              <Select value={selectedProject} onValueChange={setSelectedProject}>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">User</label>
+              <Select 
+                value={filters.userId} 
+                onValueChange={(value) => setFilters(prev => ({ ...prev, userId: value }))}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select project" />
+                  <SelectValue placeholder="All users" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
+                  <SelectItem value="">All Users</SelectItem>
+                  {users.map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Project</label>
+              <Select 
+                value={filters.projectId} 
+                onValueChange={(value) => setFilters(prev => ({ ...prev, projectId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Projects</SelectItem>
                   {projects.map(project => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
@@ -285,16 +263,36 @@ export default function TimeReports() {
               </Select>
             </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Time Period</label>
-              <Select value={dateFilter} onValueChange={setDateFilter}>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Start Date</label>
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">End Date</label>
+              <Input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Include Idle Time</label>
+              <Select 
+                value={filters.includeIdle ? 'true' : 'false'} 
+                onValueChange={(value) => setFilters(prev => ({ ...prev, includeIdle: value === 'true' }))}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select time period" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="true">Yes</SelectItem>
+                  <SelectItem value="false">No</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -302,47 +300,85 @@ export default function TimeReports() {
         </CardContent>
       </Card>
 
+      {/* Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{reports.length}</div>
+            <div className="text-sm text-gray-500">Total Sessions</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{getTotalHours()}</div>
+            <div className="text-sm text-gray-500">Total Time</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">
+              {reports.filter(r => !r.is_idle).length}
+            </div>
+            <div className="text-sm text-gray-500">Active Sessions</div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Reports Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Time Logs ({reports.length})</CardTitle>
+          <CardTitle>Time Log Details</CardTitle>
         </CardHeader>
         <CardContent>
-          {reports.length > 0 ? (
-            <div className="space-y-4">
-              {reports.map(report => (
-                <div key={report.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <div className="font-medium">
-                      {report.users?.full_name || 'Unknown User'}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {report.projects?.name || 'Unknown Project'}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {format(new Date(report.start_time), 'MMM dd, yyyy HH:mm')}
-                      {report.end_time && ` - ${format(new Date(report.end_time), 'HH:mm')}`}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <Badge variant={report.end_time ? "secondary" : "default"}>
-                      {formatDuration(report.start_time, report.end_time)}
-                    </Badge>
-                    {report.is_idle && (
-                      <Badge variant="outline" className="ml-2">
-                        Idle
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
+          {loading ? (
+            <div className="text-center py-8">Loading reports...</div>
+          ) : reports.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No time logs found for the selected criteria.
             </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No time logs found</p>
-              <p className="text-sm">Try adjusting your filters or check back later</p>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Start Time</TableHead>
+                  <TableHead>End Time</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reports.map((report) => (
+                  <TableRow key={report.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{report.user_name}</div>
+                        <div className="text-sm text-gray-500">{report.user_email}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{report.project_name}</TableCell>
+                    <TableCell>
+                      {format(new Date(report.start_time), 'MMM d, yyyy HH:mm')}
+                    </TableCell>
+                    <TableCell>
+                      {report.end_time 
+                        ? format(new Date(report.end_time), 'MMM d, yyyy HH:mm')
+                        : 'Ongoing'
+                      }
+                    </TableCell>
+                    <TableCell>
+                      {calculateDuration(report.start_time, report.end_time)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={report.is_idle ? 'secondary' : 'default'}>
+                        {report.is_idle ? 'Idle' : 'Active'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
