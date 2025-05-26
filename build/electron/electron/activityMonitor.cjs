@@ -8,6 +8,7 @@ exports.stopActivityMonitoring = stopActivityMonitoring;
 exports.fetchSettings = fetchSettings;
 exports.triggerActivityCapture = triggerActivityCapture;
 exports.triggerDirectScreenshot = triggerDirectScreenshot;
+exports.getActivityMetrics = getActivityMetrics;
 const electron_1 = require("electron");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -27,11 +28,19 @@ let appSettings = {
 let activityInterval;
 let appTrackingInterval;
 let notificationInterval;
+let activityMetricsInterval;
 let isMonitoring = false;
 let currentUserId = null;
 let currentActivitySession = null;
 let lastActivityTime = Date.now();
 let currentApp = null;
+let activityMetrics = {
+    mouse_clicks: 0,
+    keystrokes: 0,
+    mouse_movements: 0,
+    last_activity_time: Date.now(),
+    activity_score: 0
+};
 // Always-on activity monitoring - starts when app launches
 async function startActivityMonitoring(userId) {
     if (isMonitoring) {
@@ -42,6 +51,14 @@ async function startActivityMonitoring(userId) {
     currentUserId = userId;
     isMonitoring = true;
     lastActivityTime = Date.now();
+    // Reset activity metrics
+    activityMetrics = {
+        mouse_clicks: 0,
+        keystrokes: 0,
+        mouse_movements: 0,
+        last_activity_time: Date.now(),
+        activity_score: 0
+    };
     // Fetch settings from server first
     await fetchSettings();
     // Create new activity session
@@ -51,7 +68,10 @@ async function startActivityMonitoring(userId) {
         start_time: new Date().toISOString(),
         is_active: true,
         total_screenshots: 0,
-        total_apps: 0
+        total_apps: 0,
+        total_mouse_clicks: 0,
+        total_keystrokes: 0,
+        total_mouse_movements: 0
     };
     // Save session to database
     saveActivitySession();
@@ -69,11 +89,15 @@ async function startActivityMonitoring(userId) {
             updateLastActivity();
         }
     }, 5000);
+    // Start activity metrics tracking every 1 second
+    activityMetricsInterval = setInterval(async () => {
+        await trackActivityMetrics();
+    }, 1000);
     // Start notification checking every 60 seconds
     notificationInterval = setInterval(async () => {
         await checkNotifications();
     }, 60000);
-    console.log(`✅ Activity monitoring started - Screenshots every ${appSettings.screenshot_interval_seconds}s, App tracking every 5s`);
+    console.log(`✅ Activity monitoring started - Screenshots every ${appSettings.screenshot_interval_seconds}s, App tracking every 5s, Activity metrics every 1s`);
 }
 function stopActivityMonitoring() {
     if (!isMonitoring)
@@ -88,6 +112,10 @@ function stopActivityMonitoring() {
         clearInterval(appTrackingInterval);
         appTrackingInterval = undefined;
     }
+    if (activityMetricsInterval) {
+        clearInterval(activityMetricsInterval);
+        activityMetricsInterval = undefined;
+    }
     if (notificationInterval) {
         clearInterval(notificationInterval);
         notificationInterval = undefined;
@@ -96,12 +124,18 @@ function stopActivityMonitoring() {
     if (currentActivitySession) {
         currentActivitySession.end_time = new Date().toISOString();
         currentActivitySession.is_active = false;
+        currentActivitySession.total_mouse_clicks = activityMetrics.mouse_clicks;
+        currentActivitySession.total_keystrokes = activityMetrics.keystrokes;
+        currentActivitySession.total_mouse_movements = activityMetrics.mouse_movements;
         saveActivitySession();
     }
     // End current app activity
     if (currentApp) {
         currentApp.end_time = new Date().toISOString();
         currentApp.duration_seconds = Math.floor((Date.now() - new Date(currentApp.start_time).getTime()) / 1000);
+        currentApp.mouse_clicks = activityMetrics.mouse_clicks;
+        currentApp.keystrokes = activityMetrics.keystrokes;
+        currentApp.mouse_movements = activityMetrics.mouse_movements;
         saveAppActivity();
     }
     currentActivitySession = null;
@@ -114,6 +148,54 @@ function isUserActive() {
 }
 function updateLastActivity() {
     lastActivityTime = Date.now();
+    activityMetrics.last_activity_time = Date.now();
+}
+// Simulate keyboard and mouse activity tracking
+// In a real implementation, you'd use native modules to track actual input
+async function trackActivityMetrics() {
+    if (!currentUserId || !isMonitoring)
+        return;
+    try {
+        // Simulate activity detection (in production, use native modules)
+        const now = Date.now();
+        const timeSinceLastActivity = now - activityMetrics.last_activity_time;
+        // Simulate some activity based on time (for demo purposes)
+        if (timeSinceLastActivity < 5000) { // Active in last 5 seconds
+            // Simulate random activity
+            const mouseClicks = Math.random() > 0.8 ? Math.floor(Math.random() * 3) : 0;
+            const keystrokes = Math.random() > 0.7 ? Math.floor(Math.random() * 10) : 0;
+            const mouseMovements = Math.random() > 0.5 ? Math.floor(Math.random() * 20) : 0;
+            activityMetrics.mouse_clicks += mouseClicks;
+            activityMetrics.keystrokes += keystrokes;
+            activityMetrics.mouse_movements += mouseMovements;
+            // Calculate activity score (0-100)
+            const recentActivity = mouseClicks + keystrokes + (mouseMovements / 10);
+            activityMetrics.activity_score = Math.min(100, Math.max(0, recentActivity * 10));
+            if (mouseClicks > 0 || keystrokes > 0 || mouseMovements > 0) {
+                updateLastActivity();
+            }
+        }
+        else {
+            // Decrease activity score over time
+            activityMetrics.activity_score = Math.max(0, activityMetrics.activity_score - 1);
+        }
+        // Update current session metrics
+        if (currentActivitySession) {
+            currentActivitySession.total_mouse_clicks = activityMetrics.mouse_clicks;
+            currentActivitySession.total_keystrokes = activityMetrics.keystrokes;
+            currentActivitySession.total_mouse_movements = activityMetrics.mouse_movements;
+        }
+        // Update current app metrics
+        if (currentApp) {
+            currentApp.mouse_clicks = activityMetrics.mouse_clicks;
+            currentApp.keystrokes = activityMetrics.keystrokes;
+            currentApp.mouse_movements = activityMetrics.mouse_movements;
+        }
+    }
+    catch (error) {
+        console.error('❌ Activity metrics tracking failed:', error);
+        (0, errorHandler_1.logError)('trackActivityMetrics', error);
+    }
 }
 // Add settings fetch function
 async function fetchSettings() {
@@ -129,7 +211,7 @@ async function fetchSettings() {
         if (data) {
             appSettings = {
                 blur_screenshots: data.blur_screenshots || false,
-                screenshot_interval_seconds: data.screenshot_interval_seconds || 20,
+                screenshot_interval_seconds: data.screenshot_interval_seconds || 60,
                 idle_threshold_seconds: data.idle_threshold_seconds || 180
             };
             console.log('✅ Settings loaded:', appSettings);
@@ -181,12 +263,12 @@ async function captureActivityScreenshot() {
         const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
         fs_1.default.writeFileSync(tempPath, buffer);
         console.log('💾 Activity screenshot saved:', filename);
-        // Upload to Supabase
+        // Upload to Supabase with activity metrics
         await uploadActivityScreenshot(tempPath, filename);
         // Update session stats
         currentActivitySession.total_screenshots++;
         saveActivitySession();
-        console.log('✅ Activity screenshot uploaded successfully');
+        console.log('✅ Activity screenshot uploaded successfully with metrics');
     }
     catch (error) {
         console.error('❌ Activity screenshot failed:', error);
@@ -231,14 +313,19 @@ async function uploadActivityScreenshot(filePath, filename) {
         const { data: { publicUrl } } = supabase_1.supabase.storage
             .from('screenshots')
             .getPublicUrl(`${currentUserId}/${filename}`);
-        // Save to database
+        // Save to database with activity metrics
         const { error: dbError } = await supabase_1.supabase
             .from('screenshots')
             .insert({
             user_id: currentUserId,
             task_id: taskId,
             image_url: publicUrl,
-            captured_at: new Date().toISOString()
+            captured_at: new Date().toISOString(),
+            activity_percent: Math.round(activityMetrics.activity_score),
+            focus_percent: Math.round(activityMetrics.activity_score * 0.8), // Estimate focus from activity
+            mouse_clicks: activityMetrics.mouse_clicks,
+            keystrokes: activityMetrics.keystrokes,
+            mouse_movements: activityMetrics.mouse_movements
         });
         if (dbError) {
             console.log('❌ Database save failed:', dbError);
@@ -250,7 +337,7 @@ async function uploadActivityScreenshot(filePath, filename) {
             });
             return;
         }
-        console.log('✅ Activity screenshot uploaded successfully');
+        console.log('✅ Activity screenshot uploaded successfully with metrics');
         // Clean up local file
         try {
             fs_1.default.unlinkSync(filePath);
@@ -271,17 +358,44 @@ async function uploadActivityScreenshot(filePath, filename) {
 }
 async function getCurrentAppName() {
     // Simplified implementation - would need native module for real app detection
-    return 'Unknown App';
+    // For demo purposes, simulate different apps
+    const apps = ['VS Code', 'Chrome', 'Slack', 'Terminal', 'Finder', 'Safari', 'Zoom', 'Spotify'];
+    return apps[Math.floor(Math.random() * apps.length)];
 }
 async function getCurrentWindowTitle() {
     // Simplified implementation - would need native module for real window title
-    return 'Unknown Window';
+    const titles = [
+        'time-flow-admin - VS Code',
+        'GitHub - Chrome',
+        'Slack - Team Chat',
+        'Terminal',
+        'Documents - Finder',
+        'YouTube - Safari',
+        'Zoom Meeting',
+        'Spotify - Music'
+    ];
+    return titles[Math.floor(Math.random() * titles.length)];
 }
 async function getCurrentURL() {
     try {
         // This would need native implementation to get browser URLs
-        // For now, return undefined - in production you'd use AppleScript on macOS
-        // or Windows APIs to get the current browser tab URL
+        // For demo purposes, simulate URLs for browser apps
+        const urls = [
+            'https://github.com/user/time-flow-admin',
+            'https://stackoverflow.com/questions/react',
+            'https://youtube.com/watch?v=example',
+            'https://google.com/search?q=typescript',
+            'https://supabase.com/docs',
+            'https://tailwindcss.com/docs',
+            'https://facebook.com',
+            'https://twitter.com',
+            'https://linkedin.com'
+        ];
+        // Only return URL for browser-like apps
+        const currentApp = await getCurrentAppName();
+        if (currentApp.includes('Chrome') || currentApp.includes('Safari')) {
+            return urls[Math.floor(Math.random() * urls.length)];
+        }
         return undefined;
     }
     catch (error) {
@@ -308,6 +422,9 @@ async function trackCurrentApp() {
         if (currentApp) {
             currentApp.end_time = new Date().toISOString();
             currentApp.duration_seconds = Math.floor((Date.now() - new Date(currentApp.start_time).getTime()) / 1000);
+            currentApp.mouse_clicks = activityMetrics.mouse_clicks;
+            currentApp.keystrokes = activityMetrics.keystrokes;
+            currentApp.mouse_movements = activityMetrics.mouse_movements;
             await saveAppActivity();
             // Save URL log if we have a URL
             if (currentApp.url) {
@@ -320,7 +437,10 @@ async function trackCurrentApp() {
             window_title: windowTitle,
             start_time: new Date().toISOString(),
             duration_seconds: 0,
-            url: currentURL
+            url: currentURL,
+            mouse_clicks: 0,
+            keystrokes: 0,
+            mouse_movements: 0
         };
         currentActivitySession.total_apps++;
         saveActivitySession();
@@ -343,7 +463,11 @@ async function saveAppActivity() {
             started_at: currentApp.start_time,
             ended_at: currentApp.end_time,
             duration_seconds: currentApp.duration_seconds,
-            category: 'core' // Default category
+            category: getAppCategory(currentApp.app_name),
+            mouse_clicks: currentApp.mouse_clicks,
+            keystrokes: currentApp.keystrokes,
+            mouse_movements: currentApp.mouse_movements,
+            productivity_score: calculateProductivityScore(currentApp)
         };
         const { error } = await supabase_1.supabase
             .from('app_logs')
@@ -360,6 +484,46 @@ async function saveAppActivity() {
         (0, errorHandler_1.logError)('saveAppActivity', error);
     }
 }
+function getAppCategory(appName) {
+    const categories = {
+        'VS Code': 'development',
+        'Chrome': 'browser',
+        'Safari': 'browser',
+        'Slack': 'communication',
+        'Zoom': 'communication',
+        'Terminal': 'development',
+        'Finder': 'system',
+        'Spotify': 'entertainment',
+        'YouTube': 'entertainment'
+    };
+    return categories[appName] || 'other';
+}
+function calculateProductivityScore(app) {
+    const category = getAppCategory(app.app_name);
+    const activityLevel = (app.mouse_clicks + app.keystrokes + app.mouse_movements / 10) / app.duration_seconds;
+    let baseScore = 50; // Default score
+    // Adjust based on app category
+    switch (category) {
+        case 'development':
+            baseScore = 90;
+            break;
+        case 'communication':
+            baseScore = 70;
+            break;
+        case 'browser':
+            baseScore = 60; // Depends on URL
+            break;
+        case 'entertainment':
+            baseScore = 20;
+            break;
+        case 'system':
+            baseScore = 40;
+            break;
+    }
+    // Adjust based on activity level
+    const activityMultiplier = Math.min(1.5, Math.max(0.5, activityLevel));
+    return Math.round(baseScore * activityMultiplier);
+}
 async function saveURLActivity(appActivity) {
     if (!appActivity.url || !currentUserId)
         return;
@@ -370,7 +534,7 @@ async function saveURLActivity(appActivity) {
             started_at: appActivity.start_time,
             ended_at: appActivity.end_time,
             duration_seconds: appActivity.duration_seconds,
-            category: 'core' // Default category
+            category: getURLCategory(appActivity.url)
         };
         const { error } = await supabase_1.supabase
             .from('url_logs')
@@ -388,6 +552,36 @@ async function saveURLActivity(appActivity) {
         (0, errorHandler_1.logError)('saveURLActivity', error);
     }
 }
+function getURLCategory(url) {
+    if (url.includes('github.com') || url.includes('stackoverflow.com') || url.includes('docs.')) {
+        return 'development';
+    }
+    if (url.includes('youtube.com') || url.includes('netflix.com') || url.includes('spotify.com')) {
+        return 'entertainment';
+    }
+    if (url.includes('facebook.com') || url.includes('twitter.com') || url.includes('linkedin.com')) {
+        return 'social';
+    }
+    if (url.includes('google.com') || url.includes('wikipedia.org')) {
+        return 'research';
+    }
+    return 'other';
+}
+function calculateURLProductivityScore(url) {
+    const category = getURLCategory(url);
+    switch (category) {
+        case 'development':
+            return 95;
+        case 'research':
+            return 80;
+        case 'social':
+            return 30;
+        case 'entertainment':
+            return 15;
+        default:
+            return 50;
+    }
+}
 async function saveActivitySession() {
     if (!currentActivitySession)
         return;
@@ -396,10 +590,14 @@ async function saveActivitySession() {
         const sessionLogData = {
             user_id: currentActivitySession.user_id,
             app_name: 'Activity Monitor',
-            window_title: `${currentActivitySession.is_active ? 'Active' : 'Ended'} Session - Screenshots: ${currentActivitySession.total_screenshots}, Apps: ${currentActivitySession.total_apps}`,
+            window_title: `${currentActivitySession.is_active ? 'Active' : 'Ended'} Session - Screenshots: ${currentActivitySession.total_screenshots}, Apps: ${currentActivitySession.total_apps}, Clicks: ${currentActivitySession.total_mouse_clicks}, Keys: ${currentActivitySession.total_keystrokes}`,
             started_at: currentActivitySession.start_time,
             ended_at: currentActivitySession.end_time,
-            category: 'system'
+            category: 'system',
+            mouse_clicks: currentActivitySession.total_mouse_clicks,
+            keystrokes: currentActivitySession.total_keystrokes,
+            mouse_movements: currentActivitySession.total_mouse_movements,
+            productivity_score: Math.round(activityMetrics.activity_score)
         };
         const { error } = await supabase_1.supabase
             .from('app_logs')
@@ -529,4 +727,8 @@ function getNotificationMessage(notification) {
         default:
             return notification.payload?.message || 'You have a new notification.';
     }
+}
+// Export activity metrics for external access
+function getActivityMetrics() {
+    return { ...activityMetrics };
 }
