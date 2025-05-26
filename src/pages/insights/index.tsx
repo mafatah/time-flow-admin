@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -451,6 +452,27 @@ const InsightsPage = () => {
     return matchesSearch && matchesSeverity;
   });
 
+  const markNotificationAsRead = (id: number) => {
+    setNotifications(prev => 
+      prev.map(notif => 
+        notif.id === id ? { ...notif, read: true } : notif
+      )
+    );
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'warning':
+        return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      case 'error':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'success':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-blue-500" />;
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -695,7 +717,7 @@ const InsightsPage = () => {
                           {activity.user?.full_name || activity.user?.email || 'Unknown User'} • 
                           {new Date(activity.detected_at).toLocaleString()} • 
                           Duration: {activity.duration_hm || 'N/A'} • 
-                          Confidence: {Math.round(activity.confidence * 100)}%
+                          Confidence: {Math.round((activity.confidence || 0) * 100)}%
                         </p>
                       </div>
                     </div>
