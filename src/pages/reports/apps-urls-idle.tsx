@@ -1,632 +1,294 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Monitor, 
-  Globe, 
-  Coffee, 
-  Search, 
-  Download, 
-  Filter,
-  Clock,
-  TrendingUp,
-  BarChart3,
-  PieChart as PieChartIcon,
-  Users
-} from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { Badge } from '@/components/ui/badge';
+import { Clock, Globe, PauseCircle, Activity } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/providers/auth-provider';
 
-interface AppUsage {
+interface AppLog {
+  id: string;
   app_name: string;
-  total_time: number;
-  usage_count: number;
-  users: number;
-  category: string;
-  productivity_score: number;
+  window_title: string;
+  started_at: string;
+  ended_at: string;
+  duration_seconds: number;
+  user_id: string;
+  project_id: string;
 }
 
-interface UrlUsage {
-  domain: string;
-  total_visits: number;
-  total_time: number;
-  users: number;
-  category: string;
-  productivity_score: number;
+interface UrlLog {
+  id: string;
+  site_url: string;
+  started_at: string;
+  ended_at: string;
+  duration_seconds: number;
+  user_id: string;
+  project_id: string;
 }
 
-interface IdleData {
-  user: string;
-  total_idle_time: number;
-  idle_periods: number;
-  avg_idle_duration: number;
-  max_idle_duration: number;
-  productivity_impact: number;
+interface IdleLog {
+  id: string;
+  idle_start: string;
+  idle_end: string;
+  duration_minutes: number;
+  user_id: string;
+  project_id: string;
 }
 
-interface TimeDistribution {
-  hour: string;
-  apps: number;
-  urls: number;
-  idle: number;
+interface AnalyticsData {
+  appLogs: AppLog[];
+  urlLogs: UrlLog[];
+  idleLogs: IdleLog[];
 }
 
-const AppsUrlsIdlePage = () => {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedUser, setSelectedUser] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  
-  const [appUsage, setAppUsage] = useState<AppUsage[]>([]);
-  const [urlUsage, setUrlUsage] = useState<UrlUsage[]>([]);
-  const [idleData, setIdleData] = useState<IdleData[]>([]);
-  const [timeDistribution, setTimeDistribution] = useState<TimeDistribution[]>([]);
+export default function AppsUrlsIdlePage() {
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
+    appLogs: [],
+    urlLogs: [],
+    idleLogs: []
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { userDetails } = useAuth();
 
-  // Fetch real data from API
-  useEffect(() => {
-    const fetchAnalyticsData = async () => {
-      try {
-        // Fetch app usage analytics
-        const appResponse = await fetch(`/api/insights/app-usage-analytics?date=${selectedDate}&userId=${selectedUser !== 'all' ? selectedUser : ''}`);
-        if (appResponse.ok) {
-          const appData = await appResponse.json();
-          setAppUsage(appData || []);
-        }
+  const fetchAnalyticsData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        // Fetch URL usage analytics
-        const urlResponse = await fetch(`/api/insights/url-usage-analytics?date=${selectedDate}&userId=${selectedUser !== 'all' ? selectedUser : ''}`);
-        if (urlResponse.ok) {
-          const urlData = await urlResponse.json();
-          setUrlUsage(urlData || []);
-        }
+      // Fetch app logs
+      const { data: appLogs, error: appLogsError } = await supabase
+        .from('app_logs')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(100);
 
-        // Fetch idle analytics
-        const idleResponse = await fetch(`/api/insights/idle-analytics?date=${selectedDate}&userId=${selectedUser !== 'all' ? selectedUser : ''}`);
-        if (idleResponse.ok) {
-          const idleData = await idleResponse.json();
-          setIdleData(idleData || []);
-        }
-
-        // Fetch hourly distribution
-        const distributionResponse = await fetch(`/api/insights/hourly-distribution?date=${selectedDate}&userId=${selectedUser !== 'all' ? selectedUser : ''}`);
-        if (distributionResponse.ok) {
-          const distributionData = await distributionResponse.json();
-          setTimeDistribution(distributionData || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch analytics data:', error);
-        // Fallback to empty arrays if API fails
-        setAppUsage([]);
-        setUrlUsage([]);
-        setIdleData([]);
-        setTimeDistribution([]);
+      if (appLogsError) {
+        console.error('Error fetching app logs:', appLogsError);
       }
-    };
 
-    fetchAnalyticsData();
-  }, [selectedDate, selectedUser]);
+      // Fetch URL logs
+      const { data: urlLogs, error: urlLogsError } = await supabase
+        .from('url_logs')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(100);
 
-  const formatTime = (seconds: number) => {
+      if (urlLogsError) {
+        console.error('Error fetching URL logs:', urlLogsError);
+      }
+
+      // Fetch idle logs
+      const { data: idleLogs, error: idleLogsError } = await supabase
+        .from('idle_logs')
+        .select('*')
+        .order('idle_start', { ascending: false })
+        .limit(100);
+
+      if (idleLogsError) {
+        console.error('Error fetching idle logs:', idleLogsError);
+      }
+
+      setAnalyticsData({
+        appLogs: appLogs || [],
+        urlLogs: urlLogs || [],
+        idleLogs: idleLogs || []
+      });
+
+    } catch (error) {
+      console.error('Failed to fetch analytics data:', error);
+      setError('Failed to load analytics data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userDetails) {
+      fetchAnalyticsData();
+    }
+  }, [userDetails]);
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return '0s';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
-  };
-
-  const getProductivityColor = (score: number) => {
-    if (score >= 80) return 'text-green-600 bg-green-50';
-    if (score >= 60) return 'text-yellow-600 bg-yellow-50';
-    return 'text-red-600 bg-red-50';
-  };
-
-  const getCategoryColor = (category: string) => {
-    const colors: { [key: string]: string } = {
-      'Development': '#3b82f6',
-      'Design': '#8b5cf6',
-      'Communication': '#10b981',
-      'Productivity': '#f59e0b',
-      'Entertainment': '#ef4444',
-      'Social': '#ec4899',
-      'Browser': '#6b7280',
-      'Search': '#14b8a6'
-    };
-    return colors[category] || '#6b7280';
-  };
-
-  const filteredApps = appUsage.filter(app => 
-    app.app_name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-    (categoryFilter === 'all' || app.category === categoryFilter)
-  );
-
-  const filteredUrls = urlUsage.filter(url => 
-    url.domain.toLowerCase().includes(searchTerm.toLowerCase()) &&
-    (categoryFilter === 'all' || url.category === categoryFilter)
-  );
-
-  const exportData = (type: string) => {
-    let data: any[] = [];
-    let filename = '';
+    const remainingSeconds = seconds % 60;
     
-    switch (type) {
-      case 'apps':
-        data = filteredApps;
-        filename = 'app-usage-report.csv';
-        break;
-      case 'urls':
-        data = filteredUrls;
-        filename = 'url-usage-report.csv';
-        break;
-      case 'idle':
-        data = idleData;
-        filename = 'idle-time-report.csv';
-        break;
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${remainingSeconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`;
+    } else {
+      return `${remainingSeconds}s`;
     }
-
-    const csv = [
-      Object.keys(data[0]).join(','),
-      ...data.map(row => Object.values(row).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
   };
+
+  const formatDurationMinutes = (minutes: number | null) => {
+    if (!minutes) return '0m';
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${remainingMinutes}m`;
+    } else {
+      return `${remainingMinutes}m`;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-red-500">Error: {error}</p>
+            <button 
+              onClick={fetchAnalyticsData}
+              className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
+            >
+              Retry
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Apps, URLs & Idle Reports</h1>
-          <p className="text-gray-600">Detailed analysis of application usage, website visits, and idle time</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <Select value={selectedUser} onValueChange={setSelectedUser}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select user" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Users</SelectItem>
-              <SelectItem value="john.doe">John Doe</SelectItem>
-              <SelectItem value="jane.smith">Jane Smith</SelectItem>
-              <SelectItem value="mike.wilson">Mike Wilson</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <h1 className="text-3xl font-bold">Apps, URLs & Idle Time Analytics</h1>
+        <button 
+          onClick={fetchAnalyticsData}
+          className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
+        >
+          Refresh Data
+        </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Apps Used</CardTitle>
-            <Monitor className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{appUsage.length}</div>
-            <p className="text-xs text-muted-foreground">Across all users</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Websites Visited</CardTitle>
-            <Globe className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{urlUsage.length}</div>
-            <p className="text-xs text-muted-foreground">Unique domains</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Idle Time</CardTitle>
-            <Coffee className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatTime(idleData.reduce((sum, user) => sum + user.total_idle_time, 0))}
-            </div>
-            <p className="text-xs text-muted-foreground">All users combined</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Productivity</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {Math.round(appUsage.reduce((sum, app) => sum + app.productivity_score, 0) / appUsage.length)}%
-            </div>
-            <p className="text-xs text-muted-foreground">Based on app usage</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search apps or websites..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Development">Development</SelectItem>
-                <SelectItem value="Design">Design</SelectItem>
-                <SelectItem value="Communication">Communication</SelectItem>
-                <SelectItem value="Productivity">Productivity</SelectItem>
-                <SelectItem value="Entertainment">Entertainment</SelectItem>
-                <SelectItem value="Social">Social</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Tabs defaultValue="apps" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="apps">Applications</TabsTrigger>
-          <TabsTrigger value="urls">Websites</TabsTrigger>
-          <TabsTrigger value="idle">Idle Time</TabsTrigger>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+      <Tabs defaultValue="apps" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="apps" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Applications ({analyticsData.appLogs.length})
+          </TabsTrigger>
+          <TabsTrigger value="urls" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            URLs ({analyticsData.urlLogs.length})
+          </TabsTrigger>
+          <TabsTrigger value="idle" className="flex items-center gap-2">
+            <PauseCircle className="h-4 w-4" />
+            Idle Time ({analyticsData.idleLogs.length})
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="apps" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Application Usage</h2>
-            <Button onClick={() => exportData('apps')} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* App Usage Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Applications by Time</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={filteredApps.slice(0, 8)}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="app_name" 
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                        fontSize={12}
-                      />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value: number) => [formatTime(value), 'Time Used']}
-                      />
-                      <Bar 
-                        dataKey="total_time" 
-                        fill="#3b82f6"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* App Categories Pie Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Usage by Category</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={Object.entries(
-                          filteredApps.reduce((acc, app) => {
-                            acc[app.category] = (acc[app.category] || 0) + app.total_time;
-                            return acc;
-                          }, {} as { [key: string]: number })
-                        ).map(([category, time]) => ({ category, time }))}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        dataKey="time"
-                        nameKey="category"
-                      >
-                        {Object.keys(
-                          filteredApps.reduce((acc, app) => {
-                            acc[app.category] = true;
-                            return acc;
-                          }, {} as { [key: string]: boolean })
-                        ).map((category, index) => (
-                          <Cell key={`cell-${index}`} fill={getCategoryColor(category)} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => formatTime(value)} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* App Usage Table */}
+        <TabsContent value="apps">
           <Card>
             <CardHeader>
-              <CardTitle>Detailed Application Usage</CardTitle>
+              <CardTitle>Application Usage</CardTitle>
+              <CardDescription>Recent application activity and usage patterns</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-2">Application</th>
-                      <th className="text-left p-2">Category</th>
-                      <th className="text-left p-2">Time Used</th>
-                      <th className="text-left p-2">Usage Count</th>
-                      <th className="text-left p-2">Users</th>
-                      <th className="text-left p-2">Productivity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredApps.map((app, index) => (
-                      <tr key={index} className="border-b hover:bg-gray-50">
-                        <td className="p-2 font-medium">{app.app_name}</td>
-                        <td className="p-2">
-                          <Badge 
-                            style={{ backgroundColor: getCategoryColor(app.category), color: 'white' }}
-                          >
-                            {app.category}
-                          </Badge>
-                        </td>
-                        <td className="p-2">{formatTime(app.total_time)}</td>
-                        <td className="p-2">{app.usage_count}</td>
-                        <td className="p-2">{app.users}</td>
-                        <td className="p-2">
-                          <Badge className={getProductivityColor(app.productivity_score)}>
-                            {app.productivity_score}%
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="urls" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Website Usage</h2>
-            <Button onClick={() => exportData('urls')} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* URL Usage Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Websites by Visits</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={filteredUrls.slice(0, 8)}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="domain" 
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                        fontSize={12}
-                      />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar 
-                        dataKey="total_visits" 
-                        fill="#10b981"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* URL Categories */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Website Categories</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {Object.entries(
-                    filteredUrls.reduce((acc, url) => {
-                      acc[url.category] = (acc[url.category] || 0) + url.total_visits;
-                      return acc;
-                    }, {} as { [key: string]: number })
-                  ).map(([category, visits]) => (
-                    <div key={category} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: getCategoryColor(category) }}
-                        />
-                        <span className="text-sm font-medium">{category}</span>
+              <div className="space-y-4">
+                {analyticsData.appLogs.length === 0 ? (
+                  <p className="text-muted-foreground">No application logs found</p>
+                ) : (
+                  analyticsData.appLogs.map((log) => (
+                    <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{log.app_name}</h3>
+                        <p className="text-sm text-muted-foreground">{log.window_title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(log.started_at).toLocaleString()}
+                        </p>
                       </div>
-                      <span className="text-sm text-gray-600">{visits} visits</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {formatDuration(log.duration_seconds)}
+                        </Badge>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* URL Usage Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Detailed Website Usage</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-2">Domain</th>
-                      <th className="text-left p-2">Category</th>
-                      <th className="text-left p-2">Total Visits</th>
-                      <th className="text-left p-2">Time Spent</th>
-                      <th className="text-left p-2">Users</th>
-                      <th className="text-left p-2">Productivity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUrls.map((url, index) => (
-                      <tr key={index} className="border-b hover:bg-gray-50">
-                        <td className="p-2 font-medium">{url.domain}</td>
-                        <td className="p-2">
-                          <Badge 
-                            style={{ backgroundColor: getCategoryColor(url.category), color: 'white' }}
-                          >
-                            {url.category}
-                          </Badge>
-                        </td>
-                        <td className="p-2">{url.total_visits}</td>
-                        <td className="p-2">{formatTime(url.total_time)}</td>
-                        <td className="p-2">{url.users}</td>
-                        <td className="p-2">
-                          <Badge className={getProductivityColor(url.productivity_score)}>
-                            {url.productivity_score}%
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="idle" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Idle Time Analysis</h2>
-            <Button onClick={() => exportData('idle')} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
-
-          {/* Idle Time Table */}
+        <TabsContent value="urls">
           <Card>
             <CardHeader>
-              <CardTitle>User Idle Time Breakdown</CardTitle>
-              <CardDescription>Detailed analysis of idle periods and productivity impact</CardDescription>
+              <CardTitle>URL Activity</CardTitle>
+              <CardDescription>Recent website visits and browsing patterns</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-2">User</th>
-                      <th className="text-left p-2">Total Idle Time</th>
-                      <th className="text-left p-2">Idle Periods</th>
-                      <th className="text-left p-2">Avg Duration</th>
-                      <th className="text-left p-2">Max Duration</th>
-                      <th className="text-left p-2">Productivity Impact</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {idleData.map((user, index) => (
-                      <tr key={index} className="border-b hover:bg-gray-50">
-                        <td className="p-2 font-medium">{user.user}</td>
-                        <td className="p-2">{formatTime(user.total_idle_time)}</td>
-                        <td className="p-2">{user.idle_periods}</td>
-                        <td className="p-2">{formatTime(user.avg_idle_duration)}</td>
-                        <td className="p-2">{formatTime(user.max_idle_duration)}</td>
-                        <td className="p-2">
-                          <Badge className={getProductivityColor(100 - user.productivity_impact)}>
-                            -{user.productivity_impact}%
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-4">
+                {analyticsData.urlLogs.length === 0 ? (
+                  <p className="text-muted-foreground">No URL logs found</p>
+                ) : (
+                  analyticsData.urlLogs.map((log) => (
+                    <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{log.site_url}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(log.started_at).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {formatDuration(log.duration_seconds)}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="overview" className="space-y-6">
-          <h2 className="text-xl font-semibold">Activity Overview</h2>
-          
-          {/* Time Distribution Chart */}
+        <TabsContent value="idle">
           <Card>
             <CardHeader>
-              <CardTitle>Hourly Activity Distribution</CardTitle>
-              <CardDescription>Apps usage, URL visits, and idle time throughout the day</CardDescription>
+              <CardTitle>Idle Time</CardTitle>
+              <CardDescription>Periods of inactivity and idle time tracking</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={timeDistribution}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="hour" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line 
-                      type="monotone" 
-                      dataKey="apps" 
-                      stroke="#3b82f6" 
-                      strokeWidth={2}
-                      name="App Usage %"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="urls" 
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      name="URL Activity %"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="idle" 
-                      stroke="#ef4444" 
-                      strokeWidth={2}
-                      name="Idle Time %"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div className="space-y-4">
+                {analyticsData.idleLogs.length === 0 ? (
+                  <p className="text-muted-foreground">No idle time logs found</p>
+                ) : (
+                  analyticsData.idleLogs.map((log) => (
+                    <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <h3 className="font-medium">Idle Period</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(log.idle_start).toLocaleString()} - {new Date(log.idle_end).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">
+                          <PauseCircle className="h-3 w-3 mr-1" />
+                          {formatDurationMinutes(log.duration_minutes)}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -634,6 +296,4 @@ const AppsUrlsIdlePage = () => {
       </Tabs>
     </div>
   );
-};
-
-export default AppsUrlsIdlePage; 
+}
