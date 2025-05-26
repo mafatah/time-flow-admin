@@ -13,7 +13,8 @@ import {
   Clock, 
   Timer, 
   Target,
-  RefreshCw
+  RefreshCw,
+  Camera
 } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 
@@ -244,6 +245,55 @@ const EmployeeTimeTracker = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const triggerManualScreenshot = async () => {
+    try {
+      console.log('📸 Triggering manual screenshot...');
+      
+      // Check if we're in Electron environment
+      if (typeof window !== 'undefined' && (window as any).electron) {
+        // Set user ID first
+        (window as any).electron.send('set-user-id', userDetails?.id);
+        
+        // Wait a moment then trigger screenshot
+        setTimeout(async () => {
+          try {
+            await (window as any).electron.invoke('trigger-direct-screenshot');
+            console.log('✅ Screenshot triggered successfully');
+            toast({
+              title: 'Screenshot captured',
+              description: 'Manual screenshot has been taken and saved',
+            });
+          } catch (error) {
+            console.error('❌ Screenshot failed:', error);
+            toast({
+              title: 'Screenshot failed',
+              description: 'Could not capture screenshot. Check console for details.',
+              variant: 'destructive'
+            });
+          }
+        }, 500);
+        
+        // Also trigger activity monitoring
+        (window as any).electron.send('trigger-activity-capture');
+        
+      } else {
+        console.log('⚠️ Not in Electron environment - screenshot not available');
+        toast({
+          title: 'Screenshot not available',
+          description: 'Screenshots are only available in the desktop app',
+          variant: 'default'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error triggering screenshot:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to trigger screenshot',
+        variant: 'destructive'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -310,14 +360,25 @@ const EmployeeTimeTracker = () => {
                   {formatDuration(activeSession.start_time)}
                 </p>
               </div>
-              <Button 
-                onClick={stopTracking}
-                variant="destructive"
-                className="flex items-center"
-              >
-                <Square className="w-4 h-4 mr-2" />
-                Stop Tracking
-              </Button>
+              <div className="flex items-center space-x-2">
+                <Button 
+                  onClick={triggerManualScreenshot}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center"
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Screenshot
+                </Button>
+                <Button 
+                  onClick={stopTracking}
+                  variant="destructive"
+                  className="flex items-center"
+                >
+                  <Square className="w-4 h-4 mr-2" />
+                  Stop Tracking
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

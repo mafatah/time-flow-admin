@@ -455,19 +455,12 @@ async function saveAppActivity() {
     if (!currentApp || !currentUserId || !currentActivitySession)
         return;
     try {
-        // Use the correct app_logs schema
+        // Use minimal app_logs schema - only basic columns that definitely exist
         const appLogData = {
             user_id: currentUserId,
+            project_id: '00000000-0000-0000-0000-000000000001', // Use default project UUID
             app_name: currentApp.app_name,
-            window_title: currentApp.window_title,
-            started_at: currentApp.start_time,
-            ended_at: currentApp.end_time,
-            duration_seconds: currentApp.duration_seconds,
-            category: getAppCategory(currentApp.app_name),
-            mouse_clicks: currentApp.mouse_clicks,
-            keystrokes: currentApp.keystrokes,
-            mouse_movements: currentApp.mouse_movements,
-            productivity_score: calculateProductivityScore(currentApp)
+            window_title: currentApp.window_title
         };
         const { error } = await supabase_1.supabase
             .from('app_logs')
@@ -528,12 +521,10 @@ async function saveURLActivity(appActivity) {
     if (!appActivity.url || !currentUserId)
         return;
     try {
+        // Use minimal url_logs schema
         const urlLogData = {
             user_id: currentUserId,
             site_url: appActivity.url,
-            started_at: appActivity.start_time,
-            ended_at: appActivity.end_time,
-            duration_seconds: appActivity.duration_seconds,
             category: getURLCategory(appActivity.url)
         };
         const { error } = await supabase_1.supabase
@@ -586,18 +577,12 @@ async function saveActivitySession() {
     if (!currentActivitySession)
         return;
     try {
-        // Save activity session as an app log entry for now
+        // Save activity session as an app log entry for now - minimal schema
         const sessionLogData = {
             user_id: currentActivitySession.user_id,
+            project_id: '00000000-0000-0000-0000-000000000001', // Use default project UUID
             app_name: 'Activity Monitor',
-            window_title: `${currentActivitySession.is_active ? 'Active' : 'Ended'} Session - Screenshots: ${currentActivitySession.total_screenshots}, Apps: ${currentActivitySession.total_apps}, Clicks: ${currentActivitySession.total_mouse_clicks}, Keys: ${currentActivitySession.total_keystrokes}`,
-            started_at: currentActivitySession.start_time,
-            ended_at: currentActivitySession.end_time,
-            category: 'system',
-            mouse_clicks: currentActivitySession.total_mouse_clicks,
-            keystrokes: currentActivitySession.total_keystrokes,
-            mouse_movements: currentActivitySession.total_mouse_movements,
-            productivity_score: Math.round(activityMetrics.activity_score)
+            window_title: `${currentActivitySession.is_active ? 'Active' : 'Ended'} Session - Screenshots: ${currentActivitySession.total_screenshots}`
         };
         const { error } = await supabase_1.supabase
             .from('app_logs')

@@ -40,8 +40,8 @@ export default function TimeReports() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
-    userId: '',
-    projectId: '',
+    userId: 'all',
+    projectId: 'all',
     startDate: format(subDays(new Date(), 7), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
     includeIdle: true
@@ -98,11 +98,11 @@ export default function TimeReports() {
         .gte('start_time', startDate.toISOString())
         .lte('start_time', endDate.toISOString());
 
-      if (filters.userId) {
+      if (filters.userId && filters.userId !== 'all') {
         query = query.eq('user_id', filters.userId);
       }
 
-      if (filters.projectId) {
+      if (filters.projectId && filters.projectId !== 'all') {
         query = query.eq('project_id', filters.projectId);
       }
 
@@ -233,7 +233,7 @@ export default function TimeReports() {
                   <SelectValue placeholder="All users" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Users</SelectItem>
+                  <SelectItem value="all">All Users</SelectItem>
                   {users.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.full_name}
@@ -253,7 +253,7 @@ export default function TimeReports() {
                   <SelectValue placeholder="All projects" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Projects</SelectItem>
+                  <SelectItem value="all">All Projects</SelectItem>
                   {projects.map(project => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}

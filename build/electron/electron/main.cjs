@@ -7,6 +7,7 @@ require("dotenv/config");
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const http_1 = __importDefault(require("http"));
+const fs_1 = __importDefault(require("fs"));
 const tracker_1 = require("./tracker.cjs");
 const autoLaunch_1 = require("./autoLaunch.cjs");
 const systemMonitor_1 = require("./systemMonitor.cjs");
@@ -122,6 +123,38 @@ electron_1.app.whenReady().then(async () => {
     }
     else {
         console.log('⚠️  App ready but screen recording permission missing');
+    }
+    // Auto-load desktop-agent config if it exists
+    try {
+        // Try multiple possible paths for the config file
+        const possiblePaths = [
+            path_1.default.join(__dirname, '../desktop-agent/config.json'),
+            path_1.default.join(__dirname, '../../desktop-agent/config.json'),
+            path_1.default.join(process.cwd(), 'desktop-agent/config.json'),
+            path_1.default.join(electron_1.app.getAppPath(), 'desktop-agent/config.json')
+        ];
+        let configPath = '';
+        let config = null;
+        for (const testPath of possiblePaths) {
+            console.log('🔍 Checking config path:', testPath);
+            if (fs_1.default.existsSync(testPath)) {
+                configPath = testPath;
+                config = JSON.parse(fs_1.default.readFileSync(testPath, 'utf8'));
+                console.log('📋 Found desktop-agent config at:', configPath);
+                break;
+            }
+        }
+        if (config && config.user_id && config.auto_start_tracking) {
+            console.log('🚀 Auto-starting activity monitoring for user:', config.user_id);
+            (0, tracker_1.setUserId)(config.user_id);
+            (0, activityMonitor_1.startActivityMonitoring)(config.user_id);
+        }
+        else if (!config) {
+            console.log('⚠️  No desktop-agent config found in any expected location');
+        }
+    }
+    catch (error) {
+        console.log('⚠️  Could not load desktop-agent config:', error);
     }
     (0, autoLaunch_1.setupAutoLaunch)().catch(err => console.error(err));
     (0, systemMonitor_1.initSystemMonitor)();

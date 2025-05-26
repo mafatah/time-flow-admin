@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { app, BrowserWindow, ipcMain, powerMonitor, screen, nativeImage } from 'electron';
 import path from 'path';
 import http from 'http';
+import fs from 'fs';
 import { setUserId, setTaskId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } from './tracker';
 import { setupAutoLaunch } from './autoLaunch';
 import { initSystemMonitor } from './systemMonitor';
@@ -125,6 +126,40 @@ app.whenReady().then(async () => {
     console.log('✅ App ready with screen recording permission');
   } else {
     console.log('⚠️  App ready but screen recording permission missing');
+  }
+  
+  // Auto-load desktop-agent config if it exists
+  try {
+    // Try multiple possible paths for the config file
+    const possiblePaths = [
+      path.join(__dirname, '../desktop-agent/config.json'),
+      path.join(__dirname, '../../desktop-agent/config.json'),
+      path.join(process.cwd(), 'desktop-agent/config.json'),
+      path.join(app.getAppPath(), 'desktop-agent/config.json')
+    ];
+    
+    let configPath = '';
+    let config: any = null;
+    
+    for (const testPath of possiblePaths) {
+      console.log('🔍 Checking config path:', testPath);
+      if (fs.existsSync(testPath)) {
+        configPath = testPath;
+        config = JSON.parse(fs.readFileSync(testPath, 'utf8'));
+        console.log('📋 Found desktop-agent config at:', configPath);
+        break;
+      }
+    }
+    
+    if (config && config.user_id && config.auto_start_tracking) {
+      console.log('🚀 Auto-starting activity monitoring for user:', config.user_id);
+      setUserId(config.user_id);
+      startActivityMonitoring(config.user_id);
+    } else if (!config) {
+      console.log('⚠️  No desktop-agent config found in any expected location');
+    }
+  } catch (error) {
+    console.log('⚠️  Could not load desktop-agent config:', error);
   }
   
   setupAutoLaunch().catch(err => console.error(err));

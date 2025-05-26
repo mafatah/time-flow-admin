@@ -116,7 +116,7 @@ SELECT
     das.avg_focus_percent,
     CASE 
         WHEN das.total_seconds > 0 THEN 
-            ROUND(((das.total_seconds - das.total_idle_seconds) / das.total_seconds::FLOAT) * 100, 2)
+            ROUND(((das.total_seconds - das.total_idle_seconds) / das.total_seconds::NUMERIC) * 100, 2)
         ELSE 0 
     END as productivity_score,
     CASE 
