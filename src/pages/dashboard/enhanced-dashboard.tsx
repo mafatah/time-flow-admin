@@ -127,13 +127,19 @@ export default function EnhancedDashboard() {
 
   const createUnusualActivityRecord = async (rule: string, confidence: number, duration: string) => {
     try {
+      // Ensure we have a valid user ID
+      if (!userDetails?.id) {
+        console.error('No user ID available for creating unusual activity record');
+        return;
+      }
+
       // Ensure confidence is within the valid range (0.00 to 99.99) for the new schema
       const validConfidence = Math.min(Math.max(confidence, 0), 99.99);
       
       const { data, error } = await supabase
         .from('unusual_activity')
         .insert({
-          user_id: userDetails?.id,
+          user_id: userDetails.id,
           rule_triggered: rule,
           confidence: validConfidence,
           duration_hm: duration,
@@ -308,3 +314,9 @@ export default function EnhancedDashboard() {
     </div>
   );
 }
+
+const formatTime = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours}h ${mins}m`;
+};
