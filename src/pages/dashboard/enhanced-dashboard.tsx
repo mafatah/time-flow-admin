@@ -37,10 +37,10 @@ interface UnusualActivity {
   id: string;
   user_id: string;
   rule_triggered: string;
-  confidence: number;
+  confidence: number | null;
   detected_at: string;
-  duration_hm: string;
-  notes: string;
+  duration_hm: string | null;
+  notes: string | null;
 }
 
 export default function EnhancedDashboard() {
@@ -127,8 +127,8 @@ export default function EnhancedDashboard() {
 
   const createUnusualActivityRecord = async (rule: string, confidence: number, duration: string) => {
     try {
-      // Ensure confidence is within the valid range (0.00 to 9.99)
-      const validConfidence = Math.min(Math.max(confidence, 0), 9.99);
+      // Ensure confidence is within the valid range (0.00 to 99.99) for the new schema
+      const validConfidence = Math.min(Math.max(confidence, 0), 99.99);
       
       const { data, error } = await supabase
         .from('unusual_activity')
@@ -287,12 +287,12 @@ export default function EnhancedDashboard() {
                       <AlertTriangle className="h-4 w-4 text-orange-500" />
                       <div>
                         <p className="font-medium">{activity.rule_triggered}</p>
-                        <p className="text-sm text-muted-foreground">{activity.notes}</p>
+                        <p className="text-sm text-muted-foreground">{activity.notes || 'No notes available'}</p>
                       </div>
                     </div>
                     <div className="text-right">
                       <Badge variant="outline">
-                        {Math.round(activity.confidence * 100)}% confidence
+                        {activity.confidence ? Math.round(activity.confidence) : 0}% confidence
                       </Badge>
                       <p className="text-xs text-muted-foreground mt-1">
                         {new Date(activity.detected_at).toLocaleString()}

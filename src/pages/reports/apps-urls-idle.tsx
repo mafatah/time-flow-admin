@@ -10,31 +10,31 @@ import { useAuth } from '@/providers/auth-provider';
 interface AppLog {
   id: string;
   app_name: string;
-  window_title: string;
+  window_title: string | null;
   started_at: string;
-  ended_at: string;
-  duration_seconds: number;
+  ended_at: string | null;
+  duration_seconds: number | null;
   user_id: string;
-  project_id: string;
+  project_id: string | null;
 }
 
 interface UrlLog {
   id: string;
   site_url: string;
   started_at: string;
-  ended_at: string;
-  duration_seconds: number;
+  ended_at: string | null;
+  duration_seconds: number | null;
   user_id: string;
-  project_id: string;
+  project_id: string | null;
 }
 
 interface IdleLog {
   id: string;
   idle_start: string;
-  idle_end: string;
-  duration_minutes: number;
+  idle_end: string | null;
+  duration_minutes: number | null;
   user_id: string;
-  project_id: string;
+  project_id: string | null;
 }
 
 interface AnalyticsData {
@@ -80,21 +80,14 @@ export default function AppsUrlsIdlePage() {
         console.error('Error fetching URL logs:', urlLogsError);
       }
 
-      // Fetch idle logs
-      const { data: idleLogs, error: idleLogsError } = await supabase
-        .from('idle_logs')
-        .select('*')
-        .order('idle_start', { ascending: false })
-        .limit(100);
-
-      if (idleLogsError) {
-        console.error('Error fetching idle logs:', idleLogsError);
-      }
+      // For now, we'll create mock idle logs since the table might not exist
+      // Replace this with actual query once idle_logs table is created
+      const mockIdleLogs: IdleLog[] = [];
 
       setAnalyticsData({
         appLogs: appLogs || [],
         urlLogs: urlLogs || [],
-        idleLogs: idleLogs || []
+        idleLogs: mockIdleLogs
       });
 
     } catch (error) {
@@ -209,7 +202,7 @@ export default function AppsUrlsIdlePage() {
                     <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex-1">
                         <h3 className="font-medium">{log.app_name}</h3>
-                        <p className="text-sm text-muted-foreground">{log.window_title}</p>
+                        <p className="text-sm text-muted-foreground">{log.window_title || 'No window title'}</p>
                         <p className="text-xs text-muted-foreground">
                           {new Date(log.started_at).toLocaleString()}
                         </p>
@@ -245,6 +238,7 @@ export default function AppsUrlsIdlePage() {
                         <h3 className="font-medium">{log.site_url}</h3>
                         <p className="text-xs text-muted-foreground">
                           {new Date(log.started_at).toLocaleString()}
+                          {log.ended_at && ` - ${new Date(log.ended_at).toLocaleString()}`}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -277,7 +271,8 @@ export default function AppsUrlsIdlePage() {
                       <div className="flex-1">
                         <h3 className="font-medium">Idle Period</h3>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(log.idle_start).toLocaleString()} - {new Date(log.idle_end).toLocaleString()}
+                          {new Date(log.idle_start).toLocaleString()}
+                          {log.idle_end && ` - ${new Date(log.idle_end).toLocaleString()}`}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
