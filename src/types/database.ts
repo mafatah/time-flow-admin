@@ -1,4 +1,3 @@
-
 export type Json =
   | string
   | number
@@ -107,26 +106,29 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          project_id: string
+          project_id: string | null
           idle_start: string
           idle_end: string | null
           duration_minutes: number | null
+          created_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          project_id: string
+          project_id?: string | null
           idle_start: string
           idle_end?: string | null
           duration_minutes?: number | null
+          created_at?: string
         }
         Update: {
           id?: string
           user_id?: string
-          project_id?: string
+          project_id?: string | null
           idle_start?: string
           idle_end?: string | null
           duration_minutes?: number | null
+          created_at?: string
         }
         Relationships: []
       }
@@ -221,7 +223,6 @@ export type Database = {
           activity_percent: number | null
           focus_percent: number | null
           classification: string | null
-          task_id: string | null
         }
         Insert: {
           id?: string
@@ -232,7 +233,6 @@ export type Database = {
           activity_percent?: number | null
           focus_percent?: number | null
           classification?: string | null
-          task_id?: string | null
         }
         Update: {
           id?: string
@@ -243,7 +243,6 @@ export type Database = {
           activity_percent?: number | null
           focus_percent?: number | null
           classification?: string | null
-          task_id?: string | null
         }
         Relationships: []
       }
@@ -274,30 +273,6 @@ export type Database = {
           blur_screenshots?: boolean
           created_at?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      tasks: {
-        Row: {
-          id: string
-          name: string
-          project_id: string
-          user_id: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          project_id: string
-          user_id: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          project_id?: string
-          user_id?: string
-          created_at?: string
         }
         Relationships: []
       }
