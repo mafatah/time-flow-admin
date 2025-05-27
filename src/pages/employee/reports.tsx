@@ -94,10 +94,19 @@ const EmployeeReports = () => {
       console.log('Fetching time logs for user:', userDetails.id);
       console.log('Date range:', start.toISOString(), 'to', end.toISOString());
 
-      // Fetch time logs without any embedding - completely separate queries
+      // Now we can use the clean foreign key relationship to embed projects
       const { data: timeLogsData, error: timeLogsError } = await supabase
         .from('time_logs')
-        .select('id, start_time, end_time, is_idle, project_id')
+        .select(`
+          id,
+          start_time,
+          end_time,
+          is_idle,
+          project_id,
+          projects!fk_time_logs_project (
+            name
+          )
+        `)
         .eq('user_id', userDetails.id)
         .gte('start_time', start.toISOString())
         .lte('start_time', end.toISOString())
@@ -110,33 +119,10 @@ const EmployeeReports = () => {
       }
 
       console.log('Time logs fetched:', timeLogsData?.length || 0);
-
-      // Fetch all projects separately
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('id, name');
-
-      if (projectsError) {
-        console.error('Projects error:', projectsError);
-        throw projectsError;
-      }
-
-      console.log('Projects fetched:', projectsData?.length || 0);
-
-      // Combine the data manually
-      const entries = (timeLogsData || []).map(timeLog => {
-        const project = projectsData?.find(p => p.id === timeLog.project_id);
-        return {
-          ...timeLog,
-          projects: project ? { name: project.name } : { name: 'Unknown Project' }
-        };
-      });
-
-      console.log('Combined entries:', entries.length);
-      setTimeEntries(entries);
+      setTimeEntries(timeLogsData || []);
 
       // Calculate statistics
-      calculateStats(entries);
+      calculateStats(timeLogsData || []);
 
     } catch (error: any) {
       console.error('Error fetching reports:', error);
