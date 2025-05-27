@@ -14,7 +14,10 @@ import {
   AlertTriangle,
   Target,
   Calendar,
-  BarChart3
+  BarChart3,
+  TestTube2,
+  Play,
+  Square
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
@@ -62,6 +65,8 @@ const EmployeeIdleTime = () => {
   });
   const [hourlyData, setHourlyData] = useState<HourlyIdleData[]>([]);
   const [dailyData, setDailyData] = useState<DailyIdleData[]>([]);
+  const [testingIdle, setTestingIdle] = useState(false);
+  const [testIdleStart, setTestIdleStart] = useState<Date | null>(null);
 
   useEffect(() => {
     if (userDetails?.id) {
@@ -205,6 +210,121 @@ const EmployeeIdleTime = () => {
     setDailyData(dailyArray);
   };
 
+  const startIdleTest = () => {
+    if (!userDetails?.id) return;
+    
+    setTestingIdle(true);
+    setTestIdleStart(new Date());
+    
+    toast({
+      title: 'Idle Time Test Started',
+      description: 'Manual idle period simulation has begun. Click "Stop Test" to end.',
+    });
+  };
+
+  const stopIdleTest = async () => {
+    if (!testIdleStart || !userDetails?.id) return;
+    
+    const idleEnd = new Date();
+    const durationSeconds = Math.floor((idleEnd.getTime() - testIdleStart.getTime()) / 1000);
+    const durationMinutes = Math.floor(durationSeconds / 60);
+    
+    try {
+      // Try to create a test idle log entry using screenshots table (since idle_logs doesn't exist)
+      const testIdleData = {
+        user_id: userDetails.id,
+        project_id: '00000000-0000-0000-0000-000000000001',
+        image_url: `idle_test_${Date.now()}.png`,
+        captured_at: testIdleStart.toISOString(),
+        activity_percent: 0, // 0% indicates idle
+        focus_percent: 0,
+        classification: 'productive',
+        keystrokes: 0,
+        mouse_clicks: 0,
+        mouse_movements: 0,
+        is_blurred: false
+      };
+      
+      const { data, error } = await supabase
+        .from('screenshots')
+        .insert(testIdleData)
+        .select();
+      
+      if (error) {
+        console.error('Error creating test idle log:', error);
+        toast({
+          title: 'Test Failed',
+          description: `Failed to log test idle period: ${error.message}`,
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Idle Test Completed',
+          description: `Test idle period recorded: ${durationMinutes} minutes (${durationSeconds}s)`,
+        });
+        
+        // Create a mock idle period for display
+        const mockIdlePeriod: IdlePeriod = {
+          id: data[0]?.id || 'test',
+          idle_start: testIdleStart.toISOString(),
+          idle_end: idleEnd.toISOString(),
+          duration_minutes: durationMinutes
+        };
+        
+        // Add to current periods and recalculate stats
+        const updatedPeriods = [mockIdlePeriod, ...idlePeriods];
+        setIdlePeriods(updatedPeriods);
+        calculateIdleStats(updatedPeriods);
+        calculateHourlyData(updatedPeriods);
+        calculateDailyData(updatedPeriods);
+      }
+    } catch (error) {
+      console.error('Error in idle test:', error);
+      toast({
+        title: 'Test Error',
+        description: 'An unexpected error occurred during the idle test.',
+        variant: 'destructive'
+      });
+    }
+    
+    setTestingIdle(false);
+    setTestIdleStart(null);
+  };
+
+  const createSampleIdleData = () => {
+    const now = new Date();
+    const samplePeriods: IdlePeriod[] = [
+      {
+        id: 'sample-1',
+        idle_start: new Date(now.getTime() - 60 * 60 * 1000).toISOString(), // 1 hour ago
+        idle_end: new Date(now.getTime() - 55 * 60 * 1000).toISOString(),   // 55 min ago
+        duration_minutes: 5
+      },
+      {
+        id: 'sample-2',
+        idle_start: new Date(now.getTime() - 40 * 60 * 1000).toISOString(), // 40 min ago
+        idle_end: new Date(now.getTime() - 38 * 60 * 1000).toISOString(),   // 38 min ago
+        duration_minutes: 2
+      },
+      {
+        id: 'sample-3',
+        idle_start: new Date(now.getTime() - 25 * 60 * 1000).toISOString(), // 25 min ago
+        idle_end: new Date(now.getTime() - 15 * 60 * 1000).toISOString(),   // 15 min ago
+        duration_minutes: 10
+      }
+    ];
+    
+    setIdlePeriods(samplePeriods);
+    calculateIdleStats(samplePeriods);
+    calculateHourlyData(samplePeriods);
+    calculateDailyData(samplePeriods);
+    
+    toast({
+      title: 'Sample Data Loaded',
+      description: 'Sample idle periods have been loaded for demonstration.',
+    });
+  };
+
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -250,6 +370,40 @@ const EmployeeIdleTime = () => {
           <p className="text-gray-600">Track and analyze your idle time patterns</p>
         </div>
         <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={createSampleIdleData}
+              className="flex items-center space-x-2"
+            >
+              <TestTube2 className="h-4 w-4" />
+              <span>Load Sample Data</span>
+            </Button>
+            
+            {!testingIdle ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={startIdleTest}
+                className="flex items-center space-x-2"
+              >
+                <Play className="h-4 w-4" />
+                <span>Start Idle Test</span>
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={stopIdleTest}
+                className="flex items-center space-x-2"
+              >
+                <Square className="h-4 w-4" />
+                <span>Stop Test ({testIdleStart ? Math.floor((Date.now() - testIdleStart.getTime()) / 1000) : 0}s)</span>
+              </Button>
+            )}
+          </div>
+          
           <Select value={dateRange} onValueChange={setDateRange}>
             <SelectTrigger className="w-48">
               <SelectValue />
@@ -262,6 +416,44 @@ const EmployeeIdleTime = () => {
           </Select>
         </div>
       </div>
+
+      {/* Test Status & Information */}
+      {testingIdle && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="animate-pulse">
+                <div className="h-3 w-3 bg-yellow-500 rounded-full"></div>
+              </div>
+              <div>
+                <p className="font-medium text-yellow-800">Idle Time Test In Progress</p>
+                <p className="text-sm text-yellow-700">
+                  Started at {testIdleStart?.toLocaleTimeString()} - Duration: {testIdleStart ? Math.floor((Date.now() - testIdleStart.getTime()) / 1000) : 0} seconds
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-blue-200 bg-blue-50">
+        <CardContent className="p-4">
+          <div className="flex items-start space-x-3">
+            <TestTube2 className="h-5 w-5 text-blue-600 mt-0.5" />
+            <div>
+              <p className="font-medium text-blue-800">Testing Idle Time Functionality</p>
+              <p className="text-sm text-blue-700 mt-1">
+                Since the idle_logs table doesn't exist yet, you can test idle time tracking manually:
+              </p>
+              <ul className="text-sm text-blue-700 mt-2 list-disc list-inside space-y-1">
+                <li><strong>Load Sample Data:</strong> View demo idle periods with realistic data</li>
+                <li><strong>Start Idle Test:</strong> Manually simulate an idle period and see it logged</li>
+                <li><strong>Desktop Agent:</strong> Real idle detection is running in the background</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
