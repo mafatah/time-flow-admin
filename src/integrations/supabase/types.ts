@@ -258,6 +258,10 @@ export type Database = {
           focus_percent: number | null
           id: string
           image_url: string
+          is_blurred: boolean | null
+          keystrokes: number | null
+          mouse_clicks: number | null
+          mouse_movements: number | null
           project_id: string | null
           task_id: string | null
           user_id: string | null
@@ -269,6 +273,10 @@ export type Database = {
           focus_percent?: number | null
           id?: string
           image_url: string
+          is_blurred?: boolean | null
+          keystrokes?: number | null
+          mouse_clicks?: number | null
+          mouse_movements?: number | null
           project_id?: string | null
           task_id?: string | null
           user_id?: string | null
@@ -280,6 +288,10 @@ export type Database = {
           focus_percent?: number | null
           id?: string
           image_url?: string
+          is_blurred?: boolean | null
+          keystrokes?: number | null
+          mouse_clicks?: number | null
+          mouse_movements?: number | null
           project_id?: string | null
           task_id?: string | null
           user_id?: string | null
@@ -391,6 +403,7 @@ export type Database = {
           is_idle: boolean
           project_id: string
           start_time: string
+          task_id: string | null
           user_id: string
         }
         Insert: {
@@ -399,6 +412,7 @@ export type Database = {
           is_idle?: boolean
           project_id: string
           start_time?: string
+          task_id?: string | null
           user_id: string
         }
         Update: {
@@ -407,6 +421,7 @@ export type Database = {
           is_idle?: boolean
           project_id?: string
           start_time?: string
+          task_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -436,6 +451,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
