@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,11 +23,9 @@ interface TimeEntry {
   start_time: string;
   end_time: string | null;
   is_idle: boolean;
-  task: {
+  project_id: string;
+  projects?: {
     name: string;
-    project: {
-      name: string;
-    };
   };
 }
 
@@ -100,10 +99,8 @@ const EmployeeReports = () => {
           start_time,
           end_time,
           is_idle,
-          tasks!fk_time_logs_tasks(
-            name,
-            projects!fk_tasks_projects(name)
-          )
+          project_id,
+          projects(name)
         `)
         .eq('user_id', userDetails.id)
         .gte('start_time', start.toISOString())
@@ -153,7 +150,7 @@ const EmployeeReports = () => {
       }
 
       // Project stats
-      const projectName = entry.task?.project?.name || 'Unknown Project';
+      const projectName = entry.projects?.name || 'Unknown Project';
       projectHours[projectName] = (projectHours[projectName] || 0) + hours;
 
       // Daily stats
@@ -211,11 +208,10 @@ const EmployeeReports = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ['Date', 'Project', 'Task', 'Start Time', 'End Time', 'Duration', 'Status'];
+    const headers = ['Date', 'Project', 'Start Time', 'End Time', 'Duration', 'Status'];
     const csvData = timeEntries.map(entry => [
       format(new Date(entry.start_time), 'yyyy-MM-dd'),
-      entry.task?.project?.name || 'Unknown',
-      entry.task?.name || 'Unknown',
+      entry.projects?.name || 'Unknown',
       format(new Date(entry.start_time), 'HH:mm:ss'),
       entry.end_time ? format(new Date(entry.end_time), 'HH:mm:ss') : 'Active',
       entry.end_time ? formatTime(differenceInMinutes(new Date(entry.end_time), new Date(entry.start_time)) / 60) : 'Active',
@@ -439,4 +435,4 @@ const EmployeeReports = () => {
   );
 };
 
-export default EmployeeReports; 
+export default EmployeeReports;

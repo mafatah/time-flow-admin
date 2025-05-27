@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,16 +96,12 @@ export default function ReportsPage() {
           start_time,
           end_time,
           user_id,
-          task_id,
-          tasks!inner (
+          project_id,
+          projects(
             id,
-            name,
-            projects (
-              id,
-              name
-            )
+            name
           ),
-          users!inner (
+          users(
             id,
             full_name,
             email
@@ -162,8 +159,8 @@ export default function ReportsPage() {
         userHours[userId].hours += hours;
 
         // Project hours
-        const projectId = log.tasks?.projects?.id || 'no-project';
-        const projectName = log.tasks?.projects?.name || 'No Project';
+        const projectId = log.project_id || 'no-project';
+        const projectName = log.projects?.name || 'No Project';
         if (!projectHours[projectId]) {
           projectHours[projectId] = { name: projectName, hours: 0 };
         }
@@ -446,52 +443,22 @@ export default function ReportsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            Daily Activity
+            Daily Activity Summary
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {reportData.dailyActivity.slice(-7).map((day, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded">
-                <div className="flex items-center gap-3">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{format(new Date(day.date), 'MMM dd, yyyy')}</span>
+            {reportData.dailyActivity.map((day, index) => (
+              <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium">{format(new Date(day.date), 'EEEE, MMM dd')}</p>
+                  <p className="text-sm text-gray-500">{day.users} active users</p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="text-sm font-bold">{day.hours.toFixed(1)}h</div>
-                    <div className="text-xs text-muted-foreground">Total hours</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold">{day.users}</div>
-                    <div className="text-xs text-muted-foreground">Active users</div>
-                  </div>
+                <div className="text-right">
+                  <p className="font-semibold">{day.hours.toFixed(1)}h</p>
                 </div>
               </div>
             ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Productivity Metrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Productivity Metrics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="text-center p-4 border rounded">
-              <div className="text-2xl font-bold text-green-600">{reportData.productivityMetrics.activeTime.toFixed(1)}h</div>
-              <div className="text-sm text-muted-foreground">Active Time</div>
-            </div>
-            <div className="text-center p-4 border rounded">
-              <div className="text-2xl font-bold text-orange-600">{reportData.productivityMetrics.idleTime.toFixed(1)}h</div>
-              <div className="text-sm text-muted-foreground">Idle Time</div>
-            </div>
-            <div className="text-center p-4 border rounded">
-              <div className="text-2xl font-bold text-blue-600">{reportData.productivityMetrics.focusScore.toFixed(0)}%</div>
-              <div className="text-sm text-muted-foreground">Focus Score</div>
-            </div>
           </div>
         </CardContent>
       </Card>
