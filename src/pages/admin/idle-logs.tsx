@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,10 +15,11 @@ import { Calendar as CalendarIcon, User, Briefcase, Clock } from "lucide-react";
 interface IdleLog {
   id: string;
   user_id: string;
-  project_id: string;
+  project_id: string | null;
   idle_start: string;
   idle_end: string | null;
   duration_minutes: number | null;
+  created_at: string;
   users?: {
     full_name: string;
     email: string;
@@ -77,7 +79,7 @@ export default function AdminIdleLogs() {
       // Manually join user and project data
       const enrichedLogs = (idleLogsData || []).map(log => {
         const user = usersResponse.data?.find(u => u.id === log.user_id);
-        const project = projectsResponse.data?.find(p => p.id === log.project_id);
+        const project = log.project_id ? projectsResponse.data?.find(p => p.id === log.project_id) : null;
         
         return {
           ...log,
@@ -137,7 +139,7 @@ export default function AdminIdleLogs() {
             <SelectValue placeholder="All Users" />
           </SelectTrigger>
           <SelectContent>
-                          <SelectItem value="all">All Users</SelectItem>
+            <SelectItem value="all">All Users</SelectItem>
             {users.map((user) => (
               <SelectItem key={user.id} value={user.id}>
                 {user.full_name}
@@ -152,7 +154,7 @@ export default function AdminIdleLogs() {
             <SelectValue placeholder="All Projects" />
           </SelectTrigger>
           <SelectContent>
-                          <SelectItem value="all">All Projects</SelectItem>
+            <SelectItem value="all">All Projects</SelectItem>
             {projects.map((project) => (
               <SelectItem key={project.id} value={project.id}>
                 {project.name}
@@ -192,9 +194,9 @@ export default function AdminIdleLogs() {
                   {idleLogs.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell className="font-medium">
-                        {log.users?.full_name}
+                        {log.users?.full_name || 'Unknown User'}
                       </TableCell>
-                      <TableCell>{log.projects?.name}</TableCell>
+                      <TableCell>{log.projects?.name || 'No Project'}</TableCell>
                       <TableCell>
                         {format(new Date(log.idle_start), 'HH:mm:ss')}
                       </TableCell>
