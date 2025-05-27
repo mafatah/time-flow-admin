@@ -91,32 +91,39 @@ const EmployeeReports = () => {
       setLoading(true);
       const { start, end } = getDateRange();
 
-      // First fetch time logs
+      console.log('Fetching time logs for user:', userDetails.id);
+      console.log('Date range:', start.toISOString(), 'to', end.toISOString());
+
+      // Fetch time logs without any embedding - completely separate queries
       const { data: timeLogsData, error: timeLogsError } = await supabase
         .from('time_logs')
-        .select(`
-          id,
-          start_time,
-          end_time,
-          is_idle,
-          project_id
-        `)
+        .select('id, start_time, end_time, is_idle, project_id')
         .eq('user_id', userDetails.id)
         .gte('start_time', start.toISOString())
         .lte('start_time', end.toISOString())
         .not('end_time', 'is', null)
         .order('start_time', { ascending: false });
 
-      if (timeLogsError) throw timeLogsError;
+      if (timeLogsError) {
+        console.error('Time logs error:', timeLogsError);
+        throw timeLogsError;
+      }
 
-      // Then fetch projects separately
+      console.log('Time logs fetched:', timeLogsData?.length || 0);
+
+      // Fetch all projects separately
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('id, name');
 
-      if (projectsError) throw projectsError;
+      if (projectsError) {
+        console.error('Projects error:', projectsError);
+        throw projectsError;
+      }
 
-      // Combine the data
+      console.log('Projects fetched:', projectsData?.length || 0);
+
+      // Combine the data manually
       const entries = (timeLogsData || []).map(timeLog => {
         const project = projectsData?.find(p => p.id === timeLog.project_id);
         return {
@@ -125,6 +132,7 @@ const EmployeeReports = () => {
         };
       });
 
+      console.log('Combined entries:', entries.length);
       setTimeEntries(entries);
 
       // Calculate statistics
