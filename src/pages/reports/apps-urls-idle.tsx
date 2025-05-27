@@ -1,56 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Clock, Globe, PauseCircle, Activity } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/providers/auth-provider';
 
-interface AppLog {
-  id: string;
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { format } from "date-fns";
+import { Monitor, Globe, Clock, Activity } from "lucide-react";
+
+interface AppUsage {
   app_name: string;
-  window_title: string | null;
-  started_at: string;
-  ended_at: string | null;
-  duration_seconds: number | null;
-  user_id: string;
-  project_id: string | null;
+  total_duration: number;
+  session_count: number;
+  category: string;
 }
 
-interface UrlLog {
-  id: string;
+interface UrlUsage {
   site_url: string;
-  started_at: string;
-  ended_at: string | null;
-  duration_seconds: number | null;
-  user_id: string;
-  project_id: string | null;
+  total_duration: number;
+  visit_count: number;
+  category: string;
 }
 
-interface IdleLog {
-  id: string;
-  user_id: string;
-  project_id: string | null;
-  idle_start: string;
-  idle_end: string | null;
-  duration_minutes: number | null;
+interface IdleTime {
+  date: string;
+  total_idle_minutes: number;
+  idle_sessions: number;
 }
 
-interface AnalyticsData {
-  appLogs: AppLog[];
-  urlLogs: UrlLog[];
-  idleLogs: IdleLog[];
-}
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
-export default function AppsUrlsIdlePage() {
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
-    appLogs: [],
-    urlLogs: [],
-    idleLogs: []
-  });
+export default function AppsUrlsIdle() {
+  const [appUsage, setAppUsage] = useState<AppUsage[]>([]);
+  const [urlUsage, setUrlUsage] = useState<UrlUsage[]>([]);
+  const [idleTime, setIdleTime] = useState<IdleTime[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { userDetails } = useAuth();
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, []);
 
   const fetchAnalyticsData = async () => {
     try {
@@ -58,91 +48,164 @@ export default function AppsUrlsIdlePage() {
       setError(null);
 
       // Fetch app logs
-      const { data: appLogs, error: appLogsError } = await supabase
+      const { data: appLogs, error: appError } = await supabase
         .from('app_logs')
         .select('*')
-        .order('started_at', { ascending: false })
-        .limit(100);
+        .gte('started_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-      if (appLogsError) {
-        console.error('Error fetching app logs:', appLogsError);
+      if (appError) {
+        console.error('Error fetching app logs:', appError);
+        setError('Failed to fetch app usage data');
+      } else {
+        processAppUsage(appLogs || []);
       }
 
       // Fetch URL logs
-      const { data: urlLogs, error: urlLogsError } = await supabase
+      const { data: urlLogs, error: urlError } = await supabase
         .from('url_logs')
         .select('*')
-        .order('started_at', { ascending: false })
-        .limit(100);
+        .gte('started_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-      if (urlLogsError) {
-        console.error('Error fetching URL logs:', urlLogsError);
+      if (urlError) {
+        console.error('Error fetching URL logs:', urlError);
+        setError('Failed to fetch URL usage data');
+      } else {
+        processUrlUsage(urlLogs || []);
       }
 
-      // Fetch idle logs (now that the table exists)
-      const { data: idleLogs, error: idleLogsError } = await supabase
-        .from('idle_logs')
-        .select('*')
-        .order('idle_start', { ascending: false })
-        .limit(100);
+      // Fetch idle logs with error handling
+      try {
+        const { data: idleLogs, error: idleError } = await supabase
+          .from('idle_logs')
+          .select('*')
+          .gte('idle_start', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-      if (idleLogsError) {
-        console.error('Error fetching idle logs:', idleLogsError);
-        // Don't throw the error, just log it and continue with empty idle logs
+        if (idleError) {
+          console.error('Error fetching idle logs:', idleError);
+          // Don't set error state for idle logs as it's not critical
+          setIdleTime([]);
+        } else {
+          processIdleTime(idleLogs || []);
+        }
+      } catch (err) {
+        console.error('Idle logs table not accessible:', err);
+        setIdleTime([]);
       }
-
-      setAnalyticsData({
-        appLogs: appLogs || [],
-        urlLogs: urlLogs || [],
-        idleLogs: idleLogs || []
-      });
 
     } catch (error) {
-      console.error('Failed to fetch analytics data:', error);
+      console.error('Error fetching analytics data:', error);
       setError('Failed to load analytics data');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (userDetails) {
-      fetchAnalyticsData();
-    }
-  }, [userDetails]);
-
-  const formatDuration = (seconds: number | null) => {
-    if (!seconds) return '0s';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
+  const processAppUsage = (logs: any[]) => {
+    const appData: { [key: string]: { duration: number; count: number; category: string } } = {};
     
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${remainingSeconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    } else {
-      return `${remainingSeconds}s`;
-    }
+    logs.forEach(log => {
+      const duration = log.duration_seconds || 0;
+      if (!appData[log.app_name]) {
+        appData[log.app_name] = { 
+          duration: 0, 
+          count: 0, 
+          category: log.category || 'other' 
+        };
+      }
+      appData[log.app_name].duration += duration;
+      appData[log.app_name].count += 1;
+    });
+
+    const processed = Object.entries(appData)
+      .map(([app, data]) => ({
+        app_name: app,
+        total_duration: Math.round(data.duration / 60), // Convert to minutes
+        session_count: data.count,
+        category: data.category
+      }))
+      .sort((a, b) => b.total_duration - a.total_duration)
+      .slice(0, 10);
+
+    setAppUsage(processed);
   };
 
-  const formatDurationMinutes = (minutes: number | null) => {
-    if (!minutes) return '0m';
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
+  const processUrlUsage = (logs: any[]) => {
+    const urlData: { [key: string]: { duration: number; count: number; category: string } } = {};
     
-    if (hours > 0) {
-      return `${hours}h ${remainingMinutes}m`;
-    } else {
-      return `${remainingMinutes}m`;
-    }
+    logs.forEach(log => {
+      const duration = log.duration_seconds || 0;
+      const domain = new URL(log.site_url).hostname;
+      
+      if (!urlData[domain]) {
+        urlData[domain] = { 
+          duration: 0, 
+          count: 0, 
+          category: log.category || 'other' 
+        };
+      }
+      urlData[domain].duration += duration;
+      urlData[domain].count += 1;
+    });
+
+    const processed = Object.entries(urlData)
+      .map(([url, data]) => ({
+        site_url: url,
+        total_duration: Math.round(data.duration / 60), // Convert to minutes
+        visit_count: data.count,
+        category: data.category
+      }))
+      .sort((a, b) => b.total_duration - a.total_duration)
+      .slice(0, 10);
+
+    setUrlUsage(processed);
+  };
+
+  const processIdleTime = (logs: any[]) => {
+    const idleData: { [key: string]: { minutes: number; sessions: number } } = {};
+    
+    logs.forEach(log => {
+      const date = format(new Date(log.idle_start), 'yyyy-MM-dd');
+      const duration = log.duration_minutes || 0;
+      
+      if (!idleData[date]) {
+        idleData[date] = { minutes: 0, sessions: 0 };
+      }
+      idleData[date].minutes += duration;
+      idleData[date].sessions += 1;
+    });
+
+    const processed = Object.entries(idleData)
+      .map(([date, data]) => ({
+        date,
+        total_idle_minutes: data.minutes,
+        idle_sessions: data.sessions
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    setIdleTime(processed);
+  };
+
+  const getCategoryColor = (category: string) => {
+    const colors: { [key: string]: string } = {
+      'development': 'bg-blue-500',
+      'communication': 'bg-green-500',
+      'entertainment': 'bg-purple-500',
+      'research': 'bg-yellow-500',
+      'social': 'bg-pink-500',
+      'system': 'bg-gray-500',
+      'other': 'bg-gray-400'
+    };
+    return colors[category] || colors['other'];
   };
 
   if (loading) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading analytics data...</p>
+          </div>
         </div>
       </div>
     );
@@ -151,149 +214,228 @@ export default function AppsUrlsIdlePage() {
   if (error) {
     return (
       <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-red-500">Error: {error}</p>
-            <button 
-              onClick={fetchAnalyticsData}
-              className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
-            >
-              Retry
-            </button>
-          </CardContent>
-        </Card>
+        <div className="text-center text-red-600">
+          <p>{error}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Apps, URLs & Idle Time Analytics</h1>
-        <button 
-          onClick={fetchAnalyticsData}
-          className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
-        >
-          Refresh Data
-        </button>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Apps, URLs & Idle Time</h1>
+          <p className="text-gray-600">Detailed analysis of application usage, website visits, and idle periods</p>
+        </div>
       </div>
 
-      <Tabs defaultValue="apps" className="space-y-4">
+      <Tabs defaultValue="apps" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="apps" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Applications ({analyticsData.appLogs.length})
-          </TabsTrigger>
-          <TabsTrigger value="urls" className="flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            URLs ({analyticsData.urlLogs.length})
-          </TabsTrigger>
-          <TabsTrigger value="idle" className="flex items-center gap-2">
-            <PauseCircle className="h-4 w-4" />
-            Idle Time ({analyticsData.idleLogs.length})
-          </TabsTrigger>
+          <TabsTrigger value="apps">Applications</TabsTrigger>
+          <TabsTrigger value="urls">Websites</TabsTrigger>
+          <TabsTrigger value="idle">Idle Time</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="apps">
-          <Card>
-            <CardHeader>
-              <CardTitle>Application Usage</CardTitle>
-              <CardDescription>Recent application activity and usage patterns</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {analyticsData.appLogs.length === 0 ? (
-                  <p className="text-muted-foreground">No application logs found</p>
-                ) : (
-                  analyticsData.appLogs.map((log) => (
-                    <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
+        <TabsContent value="apps" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Monitor className="h-5 w-5" />
+                  Top Applications (Last 7 Days)
+                </CardTitle>
+                <CardDescription>Most used applications by time spent</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={appUsage}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="app_name" 
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [`${value} minutes`, 'Duration']} />
+                    <Bar dataKey="total_duration" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Application Details</CardTitle>
+                <CardDescription>Usage statistics and categories</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {appUsage.slice(0, 8).map((app, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex-1">
-                        <h3 className="font-medium">{log.app_name}</h3>
-                        <p className="text-sm text-muted-foreground">{log.window_title || 'No window title'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(log.started_at).toLocaleString()}
-                        </p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium truncate">{app.app_name}</span>
+                          <Badge variant="outline" className={getCategoryColor(app.category)}>
+                            {app.category}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {app.session_count} sessions
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {formatDuration(log.duration_seconds)}
-                        </Badge>
+                      <div className="text-right">
+                        <div className="font-medium">{app.total_duration} min</div>
+                        <div className="text-sm text-gray-500">
+                          {Math.round(app.total_duration / app.session_count)} min/session
+                        </div>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
-        <TabsContent value="urls">
-          <Card>
-            <CardHeader>
-              <CardTitle>URL Activity</CardTitle>
-              <CardDescription>Recent website visits and browsing patterns</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {analyticsData.urlLogs.length === 0 ? (
-                  <p className="text-muted-foreground">No URL logs found</p>
-                ) : (
-                  analyticsData.urlLogs.map((log) => (
-                    <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
+        <TabsContent value="urls" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="h-5 w-5" />
+                  Top Websites (Last 7 Days)
+                </CardTitle>
+                <CardDescription>Most visited websites by time spent</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={urlUsage.slice(0, 5)}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ site_url, percent }) => `${site_url.slice(0, 15)}... ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="total_duration"
+                    >
+                      {urlUsage.slice(0, 5).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value} minutes`, 'Duration']} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Website Details</CardTitle>
+                <CardDescription>Visit statistics and categories</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {urlUsage.slice(0, 8).map((url, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex-1">
-                        <h3 className="font-medium">{log.site_url}</h3>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(log.started_at).toLocaleString()}
-                          {log.ended_at && ` - ${new Date(log.ended_at).toLocaleString()}`}
-                        </p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium truncate">{url.site_url}</span>
+                          <Badge variant="outline" className={getCategoryColor(url.category)}>
+                            {url.category}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {url.visit_count} visits
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {formatDuration(log.duration_seconds)}
-                        </Badge>
+                      <div className="text-right">
+                        <div className="font-medium">{url.total_duration} min</div>
+                        <div className="text-sm text-gray-500">
+                          {Math.round(url.total_duration / url.visit_count)} min/visit
+                        </div>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
-        <TabsContent value="idle">
-          <Card>
-            <CardHeader>
-              <CardTitle>Idle Time</CardTitle>
-              <CardDescription>Periods of inactivity and idle time tracking</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {analyticsData.idleLogs.length === 0 ? (
-                  <p className="text-muted-foreground">No idle time logs found</p>
+        <TabsContent value="idle" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Daily Idle Time
+                </CardTitle>
+                <CardDescription>Idle periods tracked over the last week</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {idleTime.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={idleTime}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="date"
+                        tickFormatter={(value) => format(new Date(value), 'MMM dd')}
+                      />
+                      <YAxis />
+                      <Tooltip 
+                        labelFormatter={(value) => format(new Date(value), 'MMM dd, yyyy')}
+                        formatter={(value) => [`${value} minutes`, 'Idle Time']}
+                      />
+                      <Bar dataKey="total_idle_minutes" fill="#ff7300" />
+                    </BarChart>
+                  </ResponsiveContainer>
                 ) : (
-                  analyticsData.idleLogs.map((log) => (
-                    <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <h3 className="font-medium">Idle Period</h3>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(log.idle_start).toLocaleString()}
-                          {log.idle_end && ` - ${new Date(log.idle_end).toLocaleString()}`}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                          <PauseCircle className="h-3 w-3 mr-1" />
-                          {formatDurationMinutes(log.duration_minutes)}
-                        </Badge>
-                      </div>
+                  <div className="flex items-center justify-center h-48 text-gray-500">
+                    <div className="text-center">
+                      <Activity className="h-8 w-8 mx-auto mb-2" />
+                      <p>No idle time data available</p>
+                      <p className="text-sm">Idle tracking may not be enabled</p>
                     </div>
-                  ))
+                  </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {idleTime.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Idle Time Summary</CardTitle>
+                  <CardDescription>Breakdown of idle periods</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {idleTime.map((day, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <div className="font-medium">
+                            {format(new Date(day.date), 'MMM dd, yyyy')}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {day.idle_sessions} idle sessions
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium">{day.total_idle_minutes} min</div>
+                          <div className="text-sm text-gray-500">
+                            {Math.round(day.total_idle_minutes / day.idle_sessions)} min/session
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
