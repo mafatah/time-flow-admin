@@ -147,6 +147,36 @@ export type Database = {
           },
         ]
       }
+      idle_logs: {
+        Row: {
+          created_at: string | null
+          duration_minutes: number | null
+          id: string
+          idle_end: string | null
+          idle_start: string
+          project_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          idle_end?: string | null
+          idle_start?: string
+          project_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          idle_end?: string | null
+          idle_start?: string
+          project_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
