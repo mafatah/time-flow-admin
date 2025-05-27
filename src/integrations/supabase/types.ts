@@ -258,6 +258,10 @@ export type Database = {
           focus_percent: number | null
           id: string
           image_url: string
+          is_blurred: boolean | null
+          keystrokes: number | null
+          mouse_clicks: number | null
+          mouse_movements: number | null
           project_id: string | null
           task_id: string | null
           user_id: string | null
@@ -269,6 +273,10 @@ export type Database = {
           focus_percent?: number | null
           id?: string
           image_url: string
+          is_blurred?: boolean | null
+          keystrokes?: number | null
+          mouse_clicks?: number | null
+          mouse_movements?: number | null
           project_id?: string | null
           task_id?: string | null
           user_id?: string | null
@@ -280,6 +288,10 @@ export type Database = {
           focus_percent?: number | null
           id?: string
           image_url?: string
+          is_blurred?: boolean | null
+          keystrokes?: number | null
+          mouse_clicks?: number | null
+          mouse_movements?: number | null
           project_id?: string | null
           task_id?: string | null
           user_id?: string | null

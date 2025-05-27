@@ -30,11 +30,11 @@ interface UrlLog {
 
 interface IdleLog {
   id: string;
+  user_id: string;
+  project_id: string | null;
   idle_start: string;
   idle_end: string | null;
   duration_minutes: number | null;
-  user_id: string;
-  project_id: string | null;
 }
 
 interface AnalyticsData {
@@ -80,14 +80,21 @@ export default function AppsUrlsIdlePage() {
         console.error('Error fetching URL logs:', urlLogsError);
       }
 
-      // For now, we'll create mock idle logs since the table might not exist
-      // Replace this with actual query once idle_logs table is created
-      const mockIdleLogs: IdleLog[] = [];
+      // Fetch idle logs
+      const { data: idleLogs, error: idleLogsError } = await supabase
+        .from('idle_logs')
+        .select('*')
+        .order('idle_start', { ascending: false })
+        .limit(100);
+
+      if (idleLogsError) {
+        console.error('Error fetching idle logs:', idleLogsError);
+      }
 
       setAnalyticsData({
         appLogs: appLogs || [],
         urlLogs: urlLogs || [],
-        idleLogs: mockIdleLogs
+        idleLogs: idleLogs || []
       });
 
     } catch (error) {
