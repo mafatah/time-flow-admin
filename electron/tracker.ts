@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 // Using crypto.randomUUID instead of nanoid for CommonJS compatibility
 import { randomUUID } from 'crypto';

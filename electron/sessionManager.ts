@@ -1,3 +1,4 @@
+
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -12,9 +13,9 @@ export interface SessionData {
 
 const SESSION_FILE_PATH = path.join(app.getPath('userData'), 'session.json');
 
-export function saveSession(data: SessionData) {
+export function saveSession(session: SessionData) {
   try {
-    fs.writeFileSync(SESSION_FILE_PATH, JSON.stringify(data));
+    fs.writeFileSync(SESSION_FILE_PATH, JSON.stringify(session));
   } catch (err) {
     console.error('Failed to save session:', err);
   }
@@ -23,10 +24,8 @@ export function saveSession(data: SessionData) {
 export function loadSession(): SessionData | null {
   try {
     if (fs.existsSync(SESSION_FILE_PATH)) {
-      const session = JSON.parse(fs.readFileSync(SESSION_FILE_PATH, 'utf8')) as SessionData;
-      if (!session.end_time) {
-        return session;
-      }
+      const data = fs.readFileSync(SESSION_FILE_PATH, 'utf8');
+      return JSON.parse(data) as SessionData;
     }
   } catch (err) {
     console.error('Failed to load session:', err);

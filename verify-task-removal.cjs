@@ -1,3 +1,4 @@
+
 #!/usr/bin/env node
 
 const fs = require('fs');
@@ -51,9 +52,8 @@ if (!foundIssues) {
   console.log('\n🎉 SUCCESS: All task references have been removed from the codebase!');
   console.log('\n📋 Next Steps:');
   console.log('1. Go to Supabase Dashboard → SQL Editor');
-  console.log('2. Run fix_url_logs_constraint.sql first');
-  console.log('3. Then run remove_tasks_completely.sql');
-  console.log('4. Restart your desktop app');
+  console.log('2. Run the complete task removal SQL script you provided');
+  console.log('3. Restart your desktop app');
 } else {
   console.log('\n⚠️  Some task references still exist. Please review and remove them.');
 }
@@ -70,4 +70,4 @@ try {
   }
 } catch (error) {
   console.log('✅ Build files are clean (no references found)');
-} 
+}
