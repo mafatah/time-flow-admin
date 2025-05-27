@@ -1,4 +1,3 @@
-
 import { supabase } from './supabase';
 // Using crypto.randomUUID instead of nanoid for CommonJS compatibility
 import { randomUUID } from 'crypto';
@@ -30,12 +29,6 @@ export function setUserId(id: string) {
 
 // Set the current project ID for tracking
 export function setProjectId(id: string) {
-  currentProjectId = id;
-}
-
-// Legacy function for backward compatibility - now just sets project ID
-export function setTaskId(id: string) {
-  // For backward compatibility, treat task ID as project ID
   currentProjectId = id;
 }
 

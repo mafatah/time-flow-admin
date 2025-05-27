@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -147,8 +146,8 @@ export default function TimeTracker() {
     }
   };
 
-  const startTracking = async () => {
-    if (!selectedProject || !userDetails?.id) {
+  const startTracking = () => {
+    if (!selectedProject) {
       toast({
         title: "Please select a project",
         description: "You need to select a project before starting time tracking.",
@@ -157,43 +156,15 @@ export default function TimeTracker() {
       return;
     }
 
-    try {
-      const startTime = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from('time_logs')
-        .insert({
-          user_id: userDetails.id,
-          project_id: selectedProject,
-          start_time: startTime
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setCurrentSession(data);
-      setIsTracking(true);
-      setElapsedTime(0);
-
-      // Notify Electron process if available
-      if (window.electron) {
-        window.electron.setUserId(userDetails.id);
-        window.electron.setTaskId(selectedProject);
-        window.electron.startTracking();
-      }
-
-      toast({
-        title: "Time tracking started",
-        description: "Successfully started tracking time for the selected project.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error starting tracking",
-        description: error.message,
-        variant: "destructive",
-      });
+    setIsTracking(true);
+    if (window.electron) {
+      window.electron.setUserId(userDetails?.id || '');
+      window.electron.startTracking();
     }
+    toast({
+      title: "Time tracking started",
+      description: "Successfully started tracking time for the selected project.",
+    });
   };
 
   const stopTracking = async () => {

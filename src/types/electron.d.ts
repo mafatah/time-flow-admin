@@ -1,6 +1,5 @@
 interface ElectronAPI {
   setUserId: (id: string) => void;
-  setTaskId: (id: string) => void;
   startTracking: () => void;
   stopTracking: () => void;
   syncOfflineData: () => void;
@@ -14,4 +13,10 @@ declare global {
   interface Window {
     electron: ElectronAPI;
   }
+}
+
+interface ScreenshotMeta {
+  user_id: string;
+  image_url: string;
+  captured_at: string;
 } 

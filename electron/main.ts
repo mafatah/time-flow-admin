@@ -1,9 +1,9 @@
 import 'dotenv/config';
-import { app, BrowserWindow, ipcMain, powerMonitor, screen, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, powerMonitor, screen, nativeImage, shell, Menu } from 'electron';
 import path from 'path';
 import http from 'http';
 import fs from 'fs';
-import { setUserId, setTaskId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } from './tracker';
+import { setUserId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } from './tracker';
 import { setupAutoLaunch } from './autoLaunch';
 import { initSystemMonitor } from './systemMonitor';
 import { startSyncLoop } from './unsyncedManager';
@@ -180,7 +180,6 @@ ipcMain.on('set-user-id', (_e, id) => {
   // Start always-on activity monitoring when user ID is set
   startActivityMonitoring(id);
 });
-ipcMain.on('set-task-id', (_e, id) => setTaskId(id));
 ipcMain.on('start-tracking', () => void startTracking());
 ipcMain.on('stop-tracking', () => void stopTracking());
 ipcMain.on('sync-offline-data', () => void syncOfflineData());

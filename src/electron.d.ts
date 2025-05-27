@@ -1,7 +1,5 @@
-
 interface ElectronAPI {
   setUserId: (id: string) => void;
-  setTaskId: (id: string) => void;
   startTracking: () => void;
   stopTracking: () => void;
   syncOfflineData: () => void;

@@ -173,7 +173,6 @@ electron_1.ipcMain.on('set-user-id', (_e, id) => {
     // Start always-on activity monitoring when user ID is set
     (0, activityMonitor_1.startActivityMonitoring)(id);
 });
-electron_1.ipcMain.on('set-task-id', (_e, id) => (0, tracker_1.setTaskId)(id));
 electron_1.ipcMain.on('start-tracking', () => void (0, tracker_1.startTracking)());
 electron_1.ipcMain.on('stop-tracking', () => void (0, tracker_1.stopTracking)());
 electron_1.ipcMain.on('sync-offline-data', () => void (0, tracker_1.syncOfflineData)());

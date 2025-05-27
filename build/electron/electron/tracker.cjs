@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setUserId = setUserId;
 exports.setProjectId = setProjectId;
-exports.setTaskId = setTaskId;
 exports.updateTimeLogStatus = updateTimeLogStatus;
 exports.startTracking = startTracking;
 exports.stopTracking = stopTracking;
@@ -31,11 +30,6 @@ function setUserId(id) {
 }
 // Set the current project ID for tracking
 function setProjectId(id) {
-    currentProjectId = id;
-}
-// Legacy function for backward compatibility
-function setTaskId(id) {
-    // For now, treat task ID as project ID
     currentProjectId = id;
 }
 // Update the current time log's idle status
