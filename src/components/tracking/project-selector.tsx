@@ -89,7 +89,7 @@ export function ProjectSelector() {
                 {projectsLoading ? (
                   <SelectItem value="loading" disabled>Loading projects...</SelectItem>
                 ) : projects && projects.length > 0 ? (
-                  projects.map((project: any) => (
+                  projects.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
                     </SelectItem>
@@ -103,19 +103,18 @@ export function ProjectSelector() {
           
           <div className="w-full sm:w-1/3">
             {isTracking ? (
-              <Button 
-                variant="destructive" 
-                className="w-full" 
+              <Button
                 onClick={handleStopTracking}
+                variant="destructive"
+                className="w-full"
                 disabled={!canTrack}
               >
                 Stop Tracking
               </Button>
             ) : (
-              <Button 
-                variant="default" 
-                className="w-full" 
+              <Button
                 onClick={handleStartTracking}
+                className="w-full"
                 disabled={!selectedProjectId || !canTrack}
               >
                 Start Tracking
@@ -123,19 +122,6 @@ export function ProjectSelector() {
             )}
           </div>
         </div>
-        
-        {isTracking && (
-          <div className="text-sm text-green-600 flex items-center">
-            <div className="h-2 w-2 rounded-full bg-green-600 mr-2 animate-pulse"></div>
-            Currently tracking activity
-          </div>
-        )}
-        
-        {!isTracking && canTrack && (
-          <div className="text-sm text-gray-500">
-            Select a project and start tracking to record your time
-          </div>
-        )}
       </div>
     </div>
   );

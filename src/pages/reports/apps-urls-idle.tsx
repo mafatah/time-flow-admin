@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -80,7 +79,7 @@ export default function AppsUrlsIdlePage() {
         console.error('Error fetching URL logs:', urlLogsError);
       }
 
-      // Fetch idle logs
+      // Fetch idle logs (now that the table exists)
       const { data: idleLogs, error: idleLogsError } = await supabase
         .from('idle_logs')
         .select('*')
@@ -89,6 +88,7 @@ export default function AppsUrlsIdlePage() {
 
       if (idleLogsError) {
         console.error('Error fetching idle logs:', idleLogsError);
+        // Don't throw the error, just log it and continue with empty idle logs
       }
 
       setAnalyticsData({

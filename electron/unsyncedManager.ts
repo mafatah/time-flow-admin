@@ -17,7 +17,7 @@ interface TimeLog {
 
 interface ScreenshotMeta {
   user_id: string;
-  task_id: string;
+  project_id: string;
   image_url: string;
   captured_at: string;
 }

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -92,29 +91,52 @@ const EmployeeReports = () => {
       setLoading(true);
       const { start, end } = getDateRange();
 
-      const { data, error } = await supabase
+      console.log('Fetching time logs for user:', userDetails.id);
+      console.log('Date range:', start.toISOString(), 'to', end.toISOString());
+
+      // Fetch time logs without embedding to avoid relationship issues
+      const { data: timeLogsData, error: timeLogsError } = await supabase
         .from('time_logs')
-        .select(`
-          id,
-          start_time,
-          end_time,
-          is_idle,
-          project_id,
-          projects(name)
-        `)
+        .select('id, start_time, end_time, is_idle, project_id')
         .eq('user_id', userDetails.id)
         .gte('start_time', start.toISOString())
         .lte('start_time', end.toISOString())
         .not('end_time', 'is', null)
         .order('start_time', { ascending: false });
 
-      if (error) throw error;
+      if (timeLogsError) {
+        console.error('Time logs error:', timeLogsError);
+        throw timeLogsError;
+      }
 
-      const entries = data || [];
-      setTimeEntries(entries as any);
+      console.log('Time logs fetched:', timeLogsData?.length || 0);
+
+      // Fetch all projects separately
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name');
+
+      if (projectsError) {
+        console.error('Projects error:', projectsError);
+        throw projectsError;
+      }
+
+      console.log('Projects fetched:', projectsData?.length || 0);
+
+      // Combine the data manually to match TimeEntry interface
+      const entries: TimeEntry[] = (timeLogsData || []).map(timeLog => {
+        const project = projectsData?.find(p => p.id === timeLog.project_id);
+        return {
+          ...timeLog,
+          projects: project ? { name: project.name } : { name: 'Unknown Project' }
+        };
+      });
+
+      console.log('Combined entries:', entries.length);
+      setTimeEntries(entries);
 
       // Calculate statistics
-      calculateStats(entries as any);
+      calculateStats(entries);
 
     } catch (error: any) {
       console.error('Error fetching reports:', error);

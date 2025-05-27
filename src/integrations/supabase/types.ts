@@ -147,6 +147,36 @@ export type Database = {
           },
         ]
       }
+      idle_logs: {
+        Row: {
+          created_at: string | null
+          duration_minutes: number | null
+          id: string
+          idle_end: string | null
+          idle_start: string
+          project_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          idle_end?: string | null
+          idle_start?: string
+          project_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          idle_end?: string | null
+          idle_start?: string
+          project_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -433,31 +463,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fk_time_logs_projects"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_time_logs_users"
+            foreignKeyName: "fk_time_logs_user"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fk_time_logs_users"
+            foreignKeyName: "fk_time_logs_user"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "v_dashboard"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "time_logs_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
