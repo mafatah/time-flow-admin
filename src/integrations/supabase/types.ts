@@ -426,20 +426,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fk_time_logs_project"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_time_logs_projects"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "fk_time_logs_users"
             columns: ["user_id"]
             isOneToOne: false
@@ -451,6 +437,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {

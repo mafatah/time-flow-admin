@@ -100,7 +100,7 @@ const EmployeeReports = () => {
           end_time,
           is_idle,
           project_id,
-          projects(name)
+          projects!inner(name)
         `)
         .eq('user_id', userDetails.id)
         .gte('start_time', start.toISOString())
