@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -92,15 +91,15 @@ const EmployeeReports = () => {
       setLoading(true);
       const { start, end } = getDateRange();
 
-      const { data, error } = await supabase
+      // First fetch time logs
+      const { data: timeLogsData, error: timeLogsError } = await supabase
         .from('time_logs')
         .select(`
           id,
           start_time,
           end_time,
           is_idle,
-          project_id,
-          projects!inner(name)
+          project_id
         `)
         .eq('user_id', userDetails.id)
         .gte('start_time', start.toISOString())
@@ -108,13 +107,28 @@ const EmployeeReports = () => {
         .not('end_time', 'is', null)
         .order('start_time', { ascending: false });
 
-      if (error) throw error;
+      if (timeLogsError) throw timeLogsError;
 
-      const entries = data || [];
-      setTimeEntries(entries as any);
+      // Then fetch projects separately
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name');
+
+      if (projectsError) throw projectsError;
+
+      // Combine the data
+      const entries = (timeLogsData || []).map(timeLog => {
+        const project = projectsData?.find(p => p.id === timeLog.project_id);
+        return {
+          ...timeLog,
+          projects: project ? { name: project.name } : { name: 'Unknown Project' }
+        };
+      });
+
+      setTimeEntries(entries);
 
       // Calculate statistics
-      calculateStats(entries as any);
+      calculateStats(entries);
 
     } catch (error: any) {
       console.error('Error fetching reports:', error);
