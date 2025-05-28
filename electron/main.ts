@@ -248,20 +248,27 @@ ipcMain.on('start-test-mode', () => {
 
 // Create tray icon
 function createTray() {
-  // Create a simple icon (16x16 for tray)
+  // Use the assets from the electron directory
   const iconPath = process.platform === 'darwin' 
-    ? path.join(__dirname, '../assets/tray-icon-Template.png')
+    ? path.join(__dirname, '../assets/tray-icon.png')  // macOS uses regular PNG
     : path.join(__dirname, '../assets/tray-icon.png');
+  
+  console.log('🔍 Loading tray icon from:', iconPath);
   
   // Create fallback icon if file doesn't exist
   if (!fs.existsSync(iconPath)) {
+    console.log('⚠️ Tray icon not found, creating fallback');
     // Create a simple 16x16 icon programmatically
     const icon = nativeImage.createFromBuffer(
       Buffer.from(createSimpleIcon(), 'base64')
     );
     tray = new Tray(icon);
   } else {
-    tray = new Tray(iconPath);
+    console.log('✅ Loading tray icon from file');
+    const icon = nativeImage.createFromPath(iconPath);
+    // Resize for tray (16x16 on macOS, 16x16 on Windows)
+    const resizedIcon = icon.resize({ width: 16, height: 16 });
+    tray = new Tray(resizedIcon);
   }
 
   // Set initial tooltip
@@ -288,7 +295,7 @@ function createTray() {
 // Create a simple icon as base64 (16x16 green circle)
 function createSimpleIcon(): string {
   // This is a simple 16x16 PNG icon encoded as base64
-  return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
+  return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
 }
 
 // Update tray menu
