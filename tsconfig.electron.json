@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022",
     "module": "CommonJS",
-    "lib": ["ES2020"],
+    "lib": ["ES2022"],
     "outDir": "./build/electron",
     "strict": true,
     "esModuleInterop": true,
@@ -18,15 +18,14 @@
   },
   "include": [
     "electron/**/*",
-    "src/lib/**/*",
-    "src/types/**/*",
-    "src/integrations/**/*"
+    "src/types/**/*"
   ],
   "exclude": [
     "node_modules",
     "build",
     "dist",
-    "src/lib/idleDetection.ts",
+    "src/integrations/**/*",
+    "src/lib/**/*",
     "src/**/*.test.ts",
     "src/**/*.spec.ts"
   ]

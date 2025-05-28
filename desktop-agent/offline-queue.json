@@ -1,0 +1,38 @@
+{
+  "screenshots": [
+    {
+      "id": "screenshot_1748426813236_mjowqifus",
+      "imageBuffer": "[object Object]",
+      "timestamp": "2025-05-28T10:06:53.236Z",
+      "retries": 4
+    },
+    {
+      "id": "screenshot_1748426843193_y7367foha",
+      "imageBuffer": "[object Object]",
+      "timestamp": "2025-05-28T10:07:23.193Z",
+      "retries": 3
+    },
+    {
+      "id": "screenshot_1748426873306_jabzi533f",
+      "imageBuffer": "[object Object]",
+      "timestamp": "2025-05-28T10:07:53.306Z",
+      "retries": 2
+    },
+    {
+      "id": "screenshot_1748426903117_94l7affvo",
+      "imageBuffer": "[object Object]",
+      "timestamp": "2025-05-28T10:08:23.117Z",
+      "retries": 1
+    },
+    {
+      "id": "screenshot_1748426933535_nexovbgvp",
+      "imageBuffer": "[object Object]",
+      "timestamp": "2025-05-28T10:08:53.535Z",
+      "retries": 0
+    }
+  ],
+  "appLogs": [],
+  "urlLogs": [],
+  "idleLogs": [],
+  "timeLogs": []
+}

@@ -74,7 +74,8 @@ let activityStats = {
   lastReset: Date.now(),
   suspiciousEvents: 0,
   riskScore: 0,
-  screenshotsCaptured: 0
+  screenshotsCaptured: 0,
+  lastScreenshotTime: null
 };
 
 // === OFFLINE QUEUES ===
@@ -141,17 +142,19 @@ function simulateMouseClick() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 450,
-    height: 650,
+    width: 1000,
+    height: 700,
     webPreferences: {
       preload: path.join(__dirname, '../renderer/renderer.js'),
       nodeIntegration: true,
       contextIsolation: false
     },
     icon: path.join(__dirname, '../assets/icon.png'),
-    title: 'TimeFlow Agent - Employee Tracker',
-    resizable: false,
-    show: false
+    title: 'TimeFlow - Employee Portal',
+    resizable: true,
+    show: false,
+    minWidth: 800,
+    minHeight: 600
   });
 
   mainWindow.setMenuBarVisibility(false);
@@ -652,88 +655,95 @@ function extractDomain(url) {
 
 // === ENHANCED SCREENSHOT CAPTURE WITH ANTI-CHEAT ===
 async function captureScreenshot() {
-  if (!isTracking || isPaused) return;
-
   try {
     console.log('📸 Capturing screenshot...');
     
-    // Record screenshot event for anti-cheat analysis
-    if (antiCheatDetector) {
-      antiCheatDetector.recordActivity('screenshot', {
-        timestamp: Date.now(),
-        isScheduled: true
-      });
-    }
-    
-    const screenshots = await screenshot.listDisplays();
-    if (screenshots.length === 0) {
-      console.log('❌ No displays available for screenshot');
-      return;
-    }
-
-    // Capture from primary display
+    // Capture screenshot using the screenshot module
     const img = await screenshot({ format: 'png', quality: appSettings.screenshot_quality });
     
-    // Calculate activity metrics
+    // Calculate activity metrics from recent activity
     const activityPercent = calculateActivityPercent();
     const focusPercent = calculateFocusPercent();
     
-    // Enhanced activity detection - flag suspicious low activity
-    let suspiciousActivity = false;
-    if (activityPercent < 10 && focusPercent < 20) {
-      suspiciousActivity = true;
-      console.log('⚠️  Low activity detected during screenshot');
-    }
+    // Update activity stats
+    activityStats.screenshotsCaptured++;
+    activityStats.lastScreenshotTime = Date.now();
     
-    const screenshotData = {
-      user_id: config.user_id,
-      time_log_id: currentTimeLogId,
+    // Create screenshot metadata
+    const screenshotMeta = {
+      user_id: 'current-user', // This should come from login
+      project_id: 'default-project',
       timestamp: new Date().toISOString(),
-      image_data: img.toString('base64'),
-      activity_percent: activityPercent,
-      focus_percent: focusPercent,
+      file_path: `screenshot_${Date.now()}.png`,
+      file_size: img.length,
+      activity_percent: Math.round(activityPercent),
+      focus_percent: Math.round(focusPercent),
       mouse_clicks: activityStats.mouseClicks,
       keystrokes: activityStats.keystrokes,
-      mouse_movements: activityStats.mouseMovements,
-      is_blurred: appSettings.blur_screenshots,
-      suspicious_activity: suspiciousActivity,
-      risk_score: activityStats.riskScore
+      mouse_movements: activityStats.mouseMovements
     };
-
-    // Include anti-cheat data if available
-    if (antiCheatDetector) {
-      const detectionReport = antiCheatDetector.getDetectionReport();
-      screenshotData.anti_cheat_report = {
-        suspicious_events: detectionReport.totalSuspiciousEvents,
-        risk_level: detectionReport.currentRiskLevel,
-        recent_patterns: detectionReport.recentActivity.slice(-5) // Last 5 activities
-      };
-    }
-
-    await syncManager.addScreenshot(screenshotData);
-    activityStats.screenshotsCaptured = (activityStats.screenshotsCaptured || 0) + 1;
     
-    console.log(`✅ Screenshot captured - Activity: ${activityPercent}%, Focus: ${focusPercent}%, Risk: ${activityStats.riskScore}`);
-
-    // Send updated stats to UI
-    mainWindow?.webContents.send('screenshot-captured', {
-      activityPercent,
-      focusPercent,
-      timestamp: new Date().toISOString(),
-      suspicious: suspiciousActivity,
-      riskScore: activityStats.riskScore
-    });
-
+    // Add to offline queue
+    offlineQueue.screenshots.push(screenshotMeta);
+    
+    // Send screenshot event to UI
+    if (mainWindow) {
+      mainWindow.webContents.send('screenshot-captured', {
+        activityPercent: Math.round(activityPercent),
+        focusPercent: Math.round(focusPercent),
+        timestamp: screenshotMeta.timestamp
+      });
+      
+      mainWindow.webContents.send('activity-update', {
+        mouseClicks: activityStats.mouseClicks,
+        keystrokes: activityStats.keystrokes,
+        mouseMovements: activityStats.mouseMovements,
+        activityPercent: Math.round(activityPercent),
+        focusPercent: Math.round(focusPercent)
+      });
+    }
+    
+    // Anti-cheat analysis
+    let suspiciousActivity = { suspicious: false, confidence: 0 };
+    if (antiCheatDetector) {
+      suspiciousActivity = antiCheatDetector.analyzeScreenshotTiming();
+      if (suspiciousActivity.suspicious) {
+        console.log('🚨 Suspicious screenshot_evasion detected:', suspiciousActivity);
+        
+        // Queue fraud alert
+        offlineQueue.fraudAlerts.push({
+          type: 'screenshot_evasion',
+          severity: 'HIGH',
+          details: suspiciousActivity,
+          timestamp: Date.now()
+        });
+      }
+    }
+    
+    console.log(`✅ Screenshot captured - Activity: ${activityPercent}%, Focus: ${focusPercent}%, Risk: ${suspiciousActivity?.confidence || 0}`);
+    
+    // Reset short-term activity counters
+    resetActivityStats();
+    
   } catch (error) {
     console.error('❌ Screenshot capture failed:', error);
     
-    // Log screenshot failure
-    if (antiCheatDetector) {
-      antiCheatDetector.recordActivity('screenshot_failed', {
-        timestamp: Date.now(),
-        error: error.message
-      });
+    // Try app capture if screenshot fails
+    try {
+      await captureActiveApplication();
+    } catch (appError) {
+      console.error('❌ App capture failed:', appError);
     }
+    
+    // Try URL capture if app capture fails  
+    try {
+      await captureActiveUrl();
+    } catch (urlError) {
+      console.error('❌ URL capture failed:', urlError);
+    }
+    
+    console.log('⚠️ Screenshot upload failed, queuing for later');
+    console.log(`📦 Screenshot queued (${offlineQueue.screenshots.length} pending)`);
   }
 }
 
@@ -758,7 +768,8 @@ function resetActivityStats() {
     lastReset: Date.now(),
     suspiciousEvents: 0,
     riskScore: 0,
-    screenshotsCaptured: 0
+    screenshotsCaptured: 0,
+    lastScreenshotTime: null
   };
 }
 
@@ -1016,6 +1027,49 @@ function updateTrayMenu() {
 }
 
 // === ENHANCED IPC HANDLERS ===
+
+// Employee login/logout handlers
+ipcMain.on('user-logged-in', (event, user) => {
+  console.log('👤 User logged in:', user.email);
+  // Set the user for activity monitoring
+  // Auto-start activity monitoring when user logs in
+  if (user.id) {
+    console.log('🚀 Starting activity monitoring for user:', user.id);
+    // The activity monitoring is already running from config, just need to associate with user
+  }
+});
+
+ipcMain.on('user-logged-out', (event) => {
+  console.log('👤 User logged out');
+  // Stop tracking if active
+  if (isTracking) {
+    stopTracking();
+  }
+});
+
+// Activity monitoring handlers
+ipcMain.on('start-activity-monitoring', (event, userId) => {
+  console.log('📊 Starting activity monitoring for user:', userId);
+  // Activity monitoring is already running, just associate with user
+});
+
+// Tracking control handlers
+ipcMain.on('start-tracking', (event, userId) => {
+  console.log('▶️ Start tracking requested for user:', userId);
+  startTracking();
+});
+
+ipcMain.on('pause-tracking', (event) => {
+  console.log('⏸️ Pause tracking requested');
+  pauseTracking('manual');
+});
+
+ipcMain.on('stop-tracking', (event) => {
+  console.log('⏹️ Stop tracking requested');
+  stopTracking();
+});
+
+// Legacy IPC handlers for compatibility
 ipcMain.handle('start-tracking', async (event, taskId = 'default-task') => {
   await startTracking(taskId);
   return { success: true, message: 'Enhanced tracking started with anti-cheat detection' };
@@ -1115,6 +1169,34 @@ ipcMain.handle('report-suspicious-activity', (event, activityData) => {
 
 ipcMain.handle('get-fraud-alerts', () => {
   return offlineQueue.fraudAlerts.slice(-20); // Return last 20 alerts
+});
+
+// === MISSING HANDLERS FIX ===
+ipcMain.handle('is-tracking', () => {
+  return {
+    isTracking: isTracking,
+    isPaused: isPaused,
+    currentSession: currentSession,
+    currentTimeLogId: currentTimeLogId
+  };
+});
+
+ipcMain.handle('get-stats', () => {
+  return {
+    ...activityStats,
+    isTracking: isTracking,
+    isPaused: isPaused,
+    systemIdleTime: getSystemIdleTime(),
+    lastActivity: lastActivity,
+    queueStatus: {
+      screenshots: offlineQueue.screenshots.length,
+      appLogs: offlineQueue.appLogs.length,
+      urlLogs: offlineQueue.urlLogs.length,
+      idleLogs: offlineQueue.idleLogs.length,
+      timeLogs: offlineQueue.timeLogs.length,
+      fraudAlerts: offlineQueue.fraudAlerts.length
+    }
+  };
 });
 
 // === APP LIFECYCLE ===

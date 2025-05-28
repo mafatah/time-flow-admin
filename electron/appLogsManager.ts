@@ -1,14 +1,15 @@
-
-import { supabase } from './supabase';
-import activeWin from 'active-win';
-import { queueAppLog } from './unsyncedManager';
-import { logError } from './errorHandler';
-import type { Database } from '../src/integrations/supabase/types';
+const fs = require('fs');
+const path = require('path');
+const { app } = require('electron');
+const { supabase } = require('./supabase');
+const activeWin = require('active-win');
+const { queueAppLog } = require('./unsyncedManager');
+const { logError } = require('./errorHandler');
 
 // Match the structure of the `app_logs` table from Supabase
-export type AppLog = Database['public']['Tables']['app_logs']['Insert'];
+type AppLog = any;
 
-export async function captureAppLog(userId: string, taskId: string) {
+async function captureAppLog(userId: string, taskId: string) {
   try {
     const win = await activeWin();
     if (!win) return;
@@ -28,3 +29,7 @@ export async function captureAppLog(userId: string, taskId: string) {
     logError('captureAppLog', err);
   }
 }
+
+module.exports = {
+  captureAppLog
+};

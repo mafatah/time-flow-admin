@@ -1,12 +1,6 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkScreenRecordingPermission = checkScreenRecordingPermission;
-exports.requestScreenRecordingPermission = requestScreenRecordingPermission;
-exports.ensureScreenRecordingPermission = ensureScreenRecordingPermission;
-exports.testScreenCapture = testScreenCapture;
-const electron_1 = require("electron");
-const errorHandler_1 = require("./errorHandler.cjs");
-async function checkScreenRecordingPermission() {
+import { systemPreferences, dialog, shell } from 'electron';
+import { logError } from './errorHandler';
+export async function checkScreenRecordingPermission() {
     if (process.platform !== 'darwin') {
         console.log('🟢 Not macOS, screen recording permission not required');
         return true;
@@ -14,7 +8,7 @@ async function checkScreenRecordingPermission() {
     console.log('🔍 Checking macOS Screen Recording permission...');
     try {
         // Check if we have screen recording permission
-        const hasPermission = electron_1.systemPreferences.getMediaAccessStatus('screen') === 'granted';
+        const hasPermission = systemPreferences.getMediaAccessStatus('screen') === 'granted';
         if (hasPermission) {
             console.log('✅ Screen Recording permission already granted');
             return true;
@@ -26,18 +20,18 @@ async function checkScreenRecordingPermission() {
     }
     catch (error) {
         console.error('❌ Failed to check screen recording permission:', error);
-        (0, errorHandler_1.logError)('checkScreenRecordingPermission', error);
+        logError('checkScreenRecordingPermission', error);
         return false;
     }
 }
-async function requestScreenRecordingPermission() {
+export async function requestScreenRecordingPermission() {
     if (process.platform !== 'darwin') {
         return true;
     }
     console.log('📱 Requesting macOS Screen Recording permission...');
     try {
         // Try to request permission (note: 'screen' may not be available in all Electron versions)
-        const hasPermission = await electron_1.systemPreferences.askForMediaAccess('camera'); // Fallback for now
+        const hasPermission = await systemPreferences.askForMediaAccess('camera'); // Fallback for now
         if (hasPermission) {
             console.log('✅ Screen Recording permission granted');
             return true;
@@ -50,13 +44,13 @@ async function requestScreenRecordingPermission() {
     }
     catch (error) {
         console.error('❌ Failed to request screen recording permission:', error);
-        (0, errorHandler_1.logError)('requestScreenRecordingPermission', error);
+        logError('requestScreenRecordingPermission', error);
         await showPermissionDialog();
         return false;
     }
 }
 async function showPermissionDialog() {
-    const result = await electron_1.dialog.showMessageBox({
+    const result = await dialog.showMessageBox({
         type: 'warning',
         title: 'Screen Recording Permission Required',
         message: 'Time Flow Admin needs Screen Recording permission to capture screenshots for activity monitoring.',
@@ -67,10 +61,10 @@ async function showPermissionDialog() {
     });
     if (result === 0) {
         console.log('🔧 Opening System Preferences for user...');
-        electron_1.shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
     }
 }
-async function ensureScreenRecordingPermission() {
+export async function ensureScreenRecordingPermission() {
     console.log('🚀 Ensuring Screen Recording permission...');
     // First check if we already have permission
     if (await checkScreenRecordingPermission()) {
@@ -85,7 +79,7 @@ async function ensureScreenRecordingPermission() {
     return true;
 }
 // Test function to verify permission is working
-async function testScreenCapture() {
+export async function testScreenCapture() {
     if (process.platform !== 'darwin') {
         console.log('🟢 Not macOS, screen capture test skipped');
         return true;
@@ -103,7 +97,7 @@ async function testScreenCapture() {
     }
     catch (error) {
         console.error('❌ Screen capture test failed:', error);
-        (0, errorHandler_1.logError)('testScreenCapture', error);
+        logError('testScreenCapture', error);
         return false;
     }
 }

@@ -1,17 +1,15 @@
 const { ipcRenderer } = require('electron');
 
 // === STATE MANAGEMENT ===
-let currentSession = null;
+let currentUser = null;
 let isTracking = false;
-let isPaused = false;
-let startTime = null;
-let timerInterval = null;
+let sessionStartTime = null;
 let activityStats = {
     mouseClicks: 0,
     keystrokes: 0,
     mouseMovements: 0,
-    activeSeconds: 0,
-    idleSeconds: 0
+    activityPercent: 0,
+    focusPercent: 100
 };
 let appSettings = {};
 let queueStatus = {};
@@ -47,187 +45,453 @@ const elements = {
 };
 
 // === INITIALIZATION ===
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 TimeFlow Agent UI initialized');
-    
-    // Setup event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
     setupEventListeners();
-    
-    // Load initial state
-    await loadInitialState();
-    
-    // Start update loops
-    startUpdateLoops();
-    
-    console.log('✅ UI ready');
+    setupIpcListeners();
 });
 
-function setupEventListeners() {
-    // Control buttons
-    elements.startBtn.addEventListener('click', startTracking);
-    elements.pauseBtn.addEventListener('click', pauseTracking);
-    elements.stopBtn.addEventListener('click', stopTracking);
-
-    // IPC listeners for main process events
-    ipcRenderer.on('tracking-started', (event, session) => {
-        console.log('📡 Tracking started:', session);
-        currentSession = session;
-        isTracking = true;
-        isPaused = false;
-        startTime = new Date(session.start_time);
-        updateUI();
-        showNotification('Time tracking started', 'success');
-    });
-
-    ipcRenderer.on('tracking-stopped', () => {
-        console.log('📡 Tracking stopped');
-        currentSession = null;
-        isTracking = false;
-        isPaused = false;
-        startTime = null;
-        updateUI();
-        showNotification('Time tracking stopped', 'info');
-    });
-
-    ipcRenderer.on('tracking-paused', (event, data) => {
-        console.log('📡 Tracking paused:', data.reason);
-        isPaused = true;
-        updateUI();
-        showNotification(`Tracking paused (${data.reason})`, 'warning');
-    });
-
-    ipcRenderer.on('tracking-resumed', () => {
-        console.log('📡 Tracking resumed');
-        isPaused = false;
-        updateUI();
-        showNotification('Tracking resumed', 'success');
-    });
-
-    ipcRenderer.on('idle-status-changed', (event, data) => {
-        console.log('📡 Idle status changed:', data);
-        if (data.isIdle) {
-            showNotification(`User idle for ${Math.floor(data.idleSeconds / 60)}m`, 'warning');
-        } else {
-            showNotification(`User active (was idle ${Math.floor(data.idleDuration / 60)}m)`, 'success');
+function initializeApp() {
+    // Check if user is already logged in
+    const savedUser = localStorage.getItem('timeflow_user');
+    if (savedUser) {
+        try {
+            currentUser = JSON.parse(savedUser);
+            showMainApp();
+        } catch (e) {
+            console.error('Error parsing saved user:', e);
+            showLogin();
         }
-        updateUI();
-    });
-
-    ipcRenderer.on('screenshot-captured', (event, data) => {
-        console.log('📡 Screenshot captured:', data);
-        elements.activityPercent.textContent = `${data.activityPercent}%`;
-        elements.focusPercent.textContent = `${data.focusPercent}%`;
-        elements.activityProgress.style.width = `${data.activityPercent}%`;
-        showNotification('Screenshot captured', 'info');
-    });
-
-    ipcRenderer.on('settings-updated', (event, settings) => {
-        console.log('📡 Settings updated:', settings);
-        appSettings = settings;
-        updateSettingsDisplay();
-        showNotification('Settings updated from server', 'info');
-    });
-}
-
-async function loadInitialState() {
-    try {
-        // Get current tracking status
-        const trackingStatus = await ipcRenderer.invoke('is-tracking');
-        isTracking = trackingStatus.isTracking;
-        isPaused = trackingStatus.isPaused;
-
-        // Get current session
-        currentSession = await ipcRenderer.invoke('get-session');
-        if (currentSession) {
-            startTime = new Date(currentSession.start_time);
-        }
-
-        // Get settings
-        appSettings = await ipcRenderer.invoke('get-settings');
-        updateSettingsDisplay();
-
-        // Get activity stats
-        activityStats = await ipcRenderer.invoke('get-stats');
-
-        console.log('📊 Initial state loaded:', {
-            isTracking,
-            isPaused,
-            currentSession,
-            appSettings
-        });
-
-        updateUI();
-
-    } catch (error) {
-        console.error('❌ Failed to load initial state:', error);
-        showNotification('Failed to load initial state', 'error');
+    } else {
+        showLogin();
     }
 }
 
-function startUpdateLoops() {
-    // Update timer every second
-    timerInterval = setInterval(() => {
-        if (isTracking && !isPaused && startTime) {
-            updateTimer();
+function setupEventListeners() {
+    // Login form
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+
+    // Quick login button
+    const quickLoginBtn = document.getElementById('quickLoginBtn');
+    if (quickLoginBtn) {
+        quickLoginBtn.addEventListener('click', handleQuickLogin);
+    }
+
+    // Navigation items
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            const page = e.target.closest('.nav-item').getAttribute('data-page');
+            navigateToPage(page);
+        });
+    });
+
+    // Control buttons
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    if (startBtn) startBtn.addEventListener('click', startTracking);
+    if (pauseBtn) pauseBtn.addEventListener('click', pauseTracking);
+    if (stopBtn) stopBtn.addEventListener('click', stopTracking);
+    if (logoutBtn) logoutBtn.addEventListener('click', logout);
+}
+
+function setupIpcListeners() {
+    // Listen for activity updates from main process
+    ipcRenderer.on('activity-update', (event, data) => {
+        updateActivityStats(data);
+    });
+
+    // Listen for session updates
+    ipcRenderer.on('session-update', (event, data) => {
+        updateSessionDisplay(data);
+    });
+
+    // Listen for notifications
+    ipcRenderer.on('notification', (event, message, type = 'info') => {
+        showNotification(message, type);
+    });
+
+    // Listen for screenshot events
+    ipcRenderer.on('screenshot-captured', (event, data) => {
+        addActivityFeedItem('screenshot', 'Screenshot captured', 'Just now');
+    });
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    const loginBtn = document.getElementById('loginBtn');
+    const errorDiv = document.getElementById('loginError');
+
+    // Reset error
+    errorDiv.style.display = 'none';
+    errorDiv.textContent = '';
+
+    // Disable button
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Signing in...';
+
+    try {
+        // For now, we'll use a simple demo login
+        // In production, this would authenticate with the backend
+        if (email && password) {
+            // Create demo user
+            currentUser = {
+                id: 'demo-user-' + Date.now(),
+                email: email,
+                name: email.split('@')[0],
+                role: 'employee'
+            };
+
+            // Save user to localStorage
+            localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
+
+            // Notify main process about user login
+            ipcRenderer.send('user-logged-in', currentUser);
+
+            showMainApp();
+        } else {
+            throw new Error('Please enter email and password');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        errorDiv.textContent = error.message || 'Login failed. Please try again.';
+        errorDiv.style.display = 'block';
+    } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Sign In';
+    }
+}
+
+async function handleQuickLogin() {
+    const emailInput = document.getElementById('loginEmail');
+    const passwordInput = document.getElementById('loginPassword');
+    const quickLoginBtn = document.getElementById('quickLoginBtn');
+    const errorDiv = document.getElementById('loginError');
+
+    // Reset error
+    errorDiv.style.display = 'none';
+    errorDiv.textContent = '';
+
+    // Set predefined credentials
+    emailInput.value = 'employee@timeflow.com';
+    passwordInput.value = 'password123';
+
+    // Disable button
+    quickLoginBtn.disabled = true;
+    quickLoginBtn.textContent = 'Logging in...';
+
+    try {
+        // Create employee user
+        currentUser = {
+            id: 'employee-' + Date.now(),
+            email: 'employee@timeflow.com',
+            name: 'John Employee',
+            role: 'employee'
+        };
+
+        // Save user to localStorage
+        localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
+
+        // Notify main process about user login
+        ipcRenderer.send('user-logged-in', currentUser);
+
+        showMainApp();
+        showNotification('Welcome back, John!', 'success');
+
+    } catch (error) {
+        console.error('Quick login error:', error);
+        errorDiv.textContent = 'Quick login failed. Please try again.';
+        errorDiv.style.display = 'block';
+    } finally {
+        quickLoginBtn.disabled = false;
+        quickLoginBtn.textContent = 'Quick Login as Employee';
+    }
+}
+
+function showLogin() {
+    document.getElementById('loginContainer').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'none';
+}
+
+function showMainApp() {
+    document.getElementById('loginContainer').style.display = 'none';
+    document.getElementById('appContainer').style.display = 'flex';
+    
+    // Update user info in sidebar
+    updateUserInfo();
+    
+    // Start activity monitoring
+    ipcRenderer.send('start-activity-monitoring', currentUser.id);
+    
+    // Initialize dashboard
+    navigateToPage('dashboard');
+}
+
+function updateUserInfo() {
+    if (!currentUser) return;
+    
+    const userNameEl = document.getElementById('userName');
+    const userAvatarEl = document.getElementById('userAvatar');
+    
+    if (userNameEl) {
+        userNameEl.textContent = currentUser.name || currentUser.email;
+    }
+    
+    if (userAvatarEl) {
+        const initial = (currentUser.name || currentUser.email).charAt(0).toUpperCase();
+        userAvatarEl.textContent = initial;
+    }
+}
+
+function navigateToPage(pageId) {
+    // Update navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    const activeNavItem = document.querySelector(`[data-page="${pageId}"]`);
+    if (activeNavItem) {
+        activeNavItem.classList.add('active');
+    }
+
+    // Update page content
+    document.querySelectorAll('.page-content').forEach(page => {
+        page.classList.remove('active');
+    });
+    
+    const activePage = document.getElementById(`${pageId}Page`);
+    if (activePage) {
+        activePage.classList.add('active');
+    }
+
+    // Update page title
+    const pageTitle = document.getElementById('pageTitle');
+    if (pageTitle) {
+        const pageTitles = {
+            'dashboard': 'Dashboard',
+            'time-tracker': 'Time Tracker',
+            'reports': 'Reports',
+            'screenshots': 'Screenshots',
+            'idle-time': 'Idle Time'
+        };
+        pageTitle.textContent = pageTitles[pageId] || 'Dashboard';
+    }
+}
+
+function startTracking() {
+    isTracking = true;
+    sessionStartTime = new Date();
+    
+    // Update UI
+    updateTrackingButtons();
+    updateSessionStatus('active');
+    
+    // Notify main process
+    ipcRenderer.send('start-tracking', currentUser.id);
+    
+    // Start timer update
+    startSessionTimer();
+    
+    showNotification('Time tracking started', 'success');
+    addActivityFeedItem('start', 'Started time tracking', 'Just now');
+}
+
+function pauseTracking() {
+    isTracking = false;
+    
+    // Update UI
+    updateTrackingButtons();
+    updateSessionStatus('paused');
+    
+    // Notify main process
+    ipcRenderer.send('pause-tracking');
+    
+    showNotification('Time tracking paused', 'warning');
+    addActivityFeedItem('pause', 'Paused time tracking', 'Just now');
+}
+
+function stopTracking() {
+    isTracking = false;
+    sessionStartTime = null;
+    
+    // Update UI
+    updateTrackingButtons();
+    updateSessionStatus('stopped');
+    updateSessionTime('00:00:00');
+    
+    // Notify main process
+    ipcRenderer.send('stop-tracking');
+    
+    showNotification('Time tracking stopped', 'info');
+    addActivityFeedItem('stop', 'Stopped time tracking', 'Just now');
+}
+
+function updateTrackingButtons() {
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
+
+    if (isTracking) {
+        startBtn.disabled = true;
+        pauseBtn.disabled = false;
+        stopBtn.disabled = false;
+        startBtn.textContent = 'Tracking...';
+    } else {
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        stopBtn.disabled = true;
+        startBtn.textContent = 'Start Tracking';
+    }
+}
+
+function updateSessionStatus(status) {
+    const statusBadge = document.getElementById('sessionStatus');
+    if (statusBadge) {
+        statusBadge.className = `status-badge ${status}`;
+        const statusTexts = {
+            'active': 'Active',
+            'paused': 'Paused',
+            'stopped': 'Stopped'
+        };
+        statusBadge.textContent = statusTexts[status] || 'Stopped';
+    }
+}
+
+function startSessionTimer() {
+    setInterval(() => {
+        if (isTracking && sessionStartTime) {
+            const elapsed = Date.now() - sessionStartTime.getTime();
+            const timeString = formatElapsedTime(elapsed);
+            updateSessionTime(timeString);
         }
     }, 1000);
-
-    // Update activity stats every 5 seconds
-    setInterval(async () => {
-        try {
-            const stats = await ipcRenderer.invoke('get-stats');
-            if (stats) {
-                activityStats = stats;
-                updateActivityStats();
-            }
-        } catch (error) {
-            console.error('❌ Failed to get stats:', error);
-        }
-    }, 5000);
-
-    // Update queue status every 10 seconds
-    setInterval(async () => {
-        // This would need to be implemented in main process
-        // For now, simulate queue status
-        updateQueueStatus();
-    }, 10000);
 }
 
-// === TRACKING CONTROLS ===
-async function startTracking() {
-    try {
-        elements.startBtn.disabled = true;
-        await ipcRenderer.invoke('start-tracking', 'default-task');
-        console.log('✅ Start tracking requested');
-    } catch (error) {
-        console.error('❌ Failed to start tracking:', error);
-        showNotification('Failed to start tracking', 'error');
-        elements.startBtn.disabled = false;
+function updateSessionTime(timeString) {
+    const sessionTimeEl = document.getElementById('sessionTime');
+    if (sessionTimeEl) {
+        sessionTimeEl.textContent = timeString;
     }
 }
 
-async function pauseTracking() {
-    try {
-        elements.pauseBtn.disabled = true;
-        await ipcRenderer.invoke('pause-tracking');
-        console.log('✅ Pause tracking requested');
-    } catch (error) {
-        console.error('❌ Failed to pause tracking:', error);
-        showNotification('Failed to pause tracking', 'error');
-        elements.pauseBtn.disabled = false;
+function formatElapsedTime(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+function updateActivityStats(data) {
+    // Update activity stats from main process
+    Object.assign(activityStats, data);
+    
+    // Update UI elements
+    const activityPercentEl = document.getElementById('activityPercent');
+    const focusPercentEl = document.getElementById('focusPercent');
+    const mouseClicksEl = document.getElementById('mouseClicks');
+
+    if (activityPercentEl) {
+        activityPercentEl.textContent = Math.round(activityStats.activityPercent) + '%';
+    }
+    
+    if (focusPercentEl) {
+        focusPercentEl.textContent = Math.round(activityStats.focusPercent) + '%';
+    }
+    
+    if (mouseClicksEl) {
+        mouseClicksEl.textContent = activityStats.mouseClicks || 0;
     }
 }
 
-async function stopTracking() {
-    try {
-        elements.stopBtn.disabled = true;
-        await ipcRenderer.invoke('stop-tracking');
-        console.log('✅ Stop tracking requested');
-    } catch (error) {
-        console.error('❌ Failed to stop tracking:', error);
-        showNotification('Failed to stop tracking', 'error');
-        elements.stopBtn.disabled = false;
+function addActivityFeedItem(type, title, time) {
+    const activityFeed = document.getElementById('activityFeed');
+    if (!activityFeed) return;
+
+    const activityItem = document.createElement('div');
+    activityItem.className = 'activity-item';
+    
+    const iconMap = {
+        'screenshot': '📸',
+        'start': '▶️',
+        'pause': '⏸️',
+        'stop': '⏹️',
+        'idle': '😴'
+    };
+    
+    const icon = iconMap[type] || '📋';
+    
+    activityItem.innerHTML = `
+        <div class="activity-icon ${type}">
+            ${icon}
+        </div>
+        <div class="activity-details">
+            <div class="activity-title">${title}</div>
+            <div class="activity-time">${time}</div>
+        </div>
+    `;
+    
+    // Add to top of feed
+    activityFeed.insertBefore(activityItem, activityFeed.firstChild);
+    
+    // Keep only last 10 items
+    while (activityFeed.children.length > 10) {
+        activityFeed.removeChild(activityFeed.lastChild);
     }
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element if it doesn't exist
+    let notification = document.getElementById('notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'notification';
+        notification.className = 'notification';
+        document.body.appendChild(notification);
+    }
+
+    // Set message and type
+    notification.textContent = message;
+    notification.className = `notification ${type}`;
+    
+    // Show notification
+    setTimeout(() => notification.classList.add('show'), 100);
+    
+    // Hide after 3 seconds
+    setTimeout(() => {
+        notification.classList.remove('show');
+    }, 3000);
+}
+
+function logout() {
+    // Clear user data
+    localStorage.removeItem('timeflow_user');
+    currentUser = null;
+    
+    // Stop tracking if active
+    if (isTracking) {
+        stopTracking();
+    }
+    
+    // Notify main process
+    ipcRenderer.send('user-logged-out');
+    
+    // Reset form
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    
+    // Show login screen
+    showLogin();
 }
 
 // === UI UPDATES ===
@@ -243,11 +507,11 @@ function updateStatus() {
         elements.statusIndicator.className = 'status-indicator stopped';
         elements.statusText.textContent = 'Not Tracking';
         elements.statusTime.textContent = 'Ready to start';
-    } else if (isPaused) {
-        elements.statusIndicator.className = 'status-indicator paused pulse';
-        elements.statusText.textContent = 'Paused';
-        elements.statusTime.textContent = 'Tracking paused';
-    } else {
+    } else if (isTracking && !sessionStartTime) {
+        elements.statusIndicator.className = 'status-indicator active pulse';
+        elements.statusText.textContent = 'Active';
+        elements.statusTime.textContent = 'Starting...';
+    } else if (isTracking && sessionStartTime) {
         elements.statusIndicator.className = 'status-indicator active pulse';
         elements.statusText.textContent = 'Active';
         elements.statusTime.textContent = 'Currently tracking';
@@ -260,56 +524,38 @@ function updateControls() {
         elements.pauseBtn.disabled = true;
         elements.stopBtn.disabled = true;
         elements.startBtn.textContent = 'Start Tracking';
-    } else if (isPaused) {
+    } else if (isTracking && !sessionStartTime) {
         elements.startBtn.disabled = false;
         elements.pauseBtn.disabled = true;
-        elements.stopBtn.disabled = false;
-        elements.startBtn.textContent = 'Resume';
-    } else {
+        elements.stopBtn.disabled = true;
+        elements.startBtn.textContent = 'Starting...';
+    } else if (isTracking && sessionStartTime) {
         elements.startBtn.disabled = true;
         elements.pauseBtn.disabled = false;
         elements.stopBtn.disabled = false;
-        elements.startBtn.textContent = 'Start Tracking';
+        elements.startBtn.textContent = 'Tracking...';
     }
 }
 
 function updateTimer() {
-    if (!isTracking || !startTime) {
+    if (!isTracking || !sessionStartTime) {
         elements.statusTime.textContent = 'Ready to start';
         return;
     }
 
     const now = new Date();
-    const elapsed = Math.floor((now - startTime) / 1000);
+    const elapsed = Math.floor((now - sessionStartTime) / 1000);
     const hours = Math.floor(elapsed / 3600);
     const minutes = Math.floor((elapsed % 3600) / 60);
     const seconds = elapsed % 60;
 
     const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     
-    if (isPaused) {
-        elements.statusTime.textContent = `Paused at ${timeString}`;
-    } else {
+    if (isTracking && sessionStartTime) {
         elements.statusTime.textContent = `Active for ${timeString}`;
+    } else {
+        elements.statusTime.textContent = `Ready to start`;
     }
-}
-
-function updateActivityStats() {
-    elements.mouseClicks.textContent = activityStats.mouseClicks || 0;
-    elements.keystrokes.textContent = activityStats.keystrokes || 0;
-    elements.mouseMovements.textContent = activityStats.mouseMovements || 0;
-    
-    const activeMinutes = Math.floor((activityStats.activeSeconds || 0) / 60);
-    const idleMinutes = Math.floor((activityStats.idleSeconds || 0) / 60);
-    
-    elements.activeTime.textContent = `${activeMinutes}m`;
-    elements.idleTime.textContent = `${idleMinutes}m`;
-
-    // Calculate activity percentage
-    const totalActivity = (activityStats.mouseClicks || 0) + (activityStats.keystrokes || 0) + Math.floor((activityStats.mouseMovements || 0) / 10);
-    const activityPercent = Math.min(100, totalActivity * 2);
-    
-    elements.activityProgress.style.width = `${activityPercent}%`;
 }
 
 function updateSettingsDisplay() {
@@ -343,42 +589,6 @@ function updateQueueStatus() {
     }
 }
 
-// === NOTIFICATIONS ===
-function showNotification(message, type = 'info') {
-    elements.notification.textContent = message;
-    elements.notification.className = `notification ${type} show`;
-    
-    // Auto-hide after 3 seconds
-    setTimeout(() => {
-        elements.notification.className = 'notification';
-    }, 3000);
-    
-    console.log(`🔔 Notification (${type}): ${message}`);
-}
-
-// === UTILITY FUNCTIONS ===
-function formatTime(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-        return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-        return `${minutes}m ${secs}s`;
-    } else {
-        return `${secs}s`;
-    }
-}
-
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
 // === ERROR HANDLING ===
 window.addEventListener('error', (event) => {
     console.error('❌ UI Error:', event.error);
@@ -392,8 +602,8 @@ window.addEventListener('unhandledrejection', (event) => {
 
 // === CLEANUP ===
 window.addEventListener('beforeunload', () => {
-    if (timerInterval) {
-        clearInterval(timerInterval);
+    if (sessionStartTime) {
+        clearInterval(sessionStartTime);
     }
 });
 

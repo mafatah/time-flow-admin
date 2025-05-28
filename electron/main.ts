@@ -1,16 +1,16 @@
-import 'dotenv/config';
-import { app, BrowserWindow, ipcMain, powerMonitor, screen, nativeImage, shell, Menu, Tray, Notification } from 'electron';
-import path from 'path';
-import http from 'http';
-import fs from 'fs';
-import { setUserId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } from './tracker';
-import { setupAutoLaunch } from './autoLaunch';
-import { initSystemMonitor } from './systemMonitor';
-import { startSyncLoop } from './unsyncedManager';
-import { startActivityMonitoring, stopActivityMonitoring, triggerActivityCapture, triggerDirectScreenshot } from './activityMonitor';
-import { ensureScreenRecordingPermission, testScreenCapture } from './permissionManager';
-import { screenshotIntervalSeconds } from './config';
-import { EventEmitter } from 'events';
+require('dotenv/config');
+const { app, BrowserWindow, ipcMain, powerMonitor, screen, nativeImage, shell, Menu, Tray, Notification } = require('electron');
+const path = require('path');
+const http = require('http');
+const fs = require('fs');
+const { setUserId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } = require('./tracker');
+const { setupAutoLaunch } = require('./autoLaunch');
+const { initSystemMonitor } = require('./systemMonitor');
+const { startSyncLoop } = require('./unsyncedManager');
+const { startActivityMonitoring, stopActivityMonitoring, triggerActivityCapture, triggerDirectScreenshot } = require('./activityMonitor');
+const { ensureScreenRecordingPermission, testScreenCapture } = require('./permissionManager');
+const { screenshotIntervalSeconds } = require('./config');
+const { EventEmitter } = require('events');
 
 // Create event emitter for internal communication
 export const appEvents = new EventEmitter();
@@ -20,8 +20,8 @@ console.log('🔧 Environment variables at startup:');
 console.log('   SCREENSHOT_INTERVAL_SECONDS:', process.env.SCREENSHOT_INTERVAL_SECONDS);
 console.log('   Config screenshotIntervalSeconds:', screenshotIntervalSeconds);
 
-let mainWindow: BrowserWindow | null = null;
-let tray: Tray | null = null;
+let mainWindow: typeof BrowserWindow | null = null;
+let tray: typeof Tray | null = null;
 let isTracking = false;
 let trackingStartTime: Date | null = null;
 let timerInterval: NodeJS.Timeout | null = null;
@@ -55,7 +55,7 @@ async function createWindow() {
         
         // Test if port is responding and serving Vite content
         await new Promise<void>((resolve, reject) => {
-          const req = http.get(testUrl, (res: http.IncomingMessage) => {
+          const req = http.get(testUrl, (res: any) => {
             if (res.statusCode === 200) {
               let data = '';
               res.on('data', chunk => {
@@ -295,7 +295,7 @@ function createTray() {
 // Create a simple icon as base64 (16x16 green circle)
 function createSimpleIcon(): string {
   // This is a simple 16x16 PNG icon encoded as base64
-  return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
+  return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
 }
 
 // Update tray menu

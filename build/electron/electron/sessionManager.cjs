@@ -1,27 +1,19 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveSession = saveSession;
-exports.loadSession = loadSession;
-exports.clearSession = clearSession;
-const electron_1 = require("electron");
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
-const SESSION_FILE_PATH = path_1.default.join(electron_1.app.getPath('userData'), 'session.json');
-function saveSession(session) {
+import { app } from 'electron';
+import fs from 'fs';
+import path from 'path';
+const SESSION_FILE_PATH = path.join(app.getPath('userData'), 'session.json');
+export function saveSession(session) {
     try {
-        fs_1.default.writeFileSync(SESSION_FILE_PATH, JSON.stringify(session));
+        fs.writeFileSync(SESSION_FILE_PATH, JSON.stringify(session));
     }
     catch (err) {
         console.error('Failed to save session:', err);
     }
 }
-function loadSession() {
+export function loadSession() {
     try {
-        if (fs_1.default.existsSync(SESSION_FILE_PATH)) {
-            const data = fs_1.default.readFileSync(SESSION_FILE_PATH, 'utf8');
+        if (fs.existsSync(SESSION_FILE_PATH)) {
+            const data = fs.readFileSync(SESSION_FILE_PATH, 'utf8');
             return JSON.parse(data);
         }
     }
@@ -30,10 +22,10 @@ function loadSession() {
     }
     return null;
 }
-function clearSession() {
+export function clearSession() {
     try {
-        if (fs_1.default.existsSync(SESSION_FILE_PATH)) {
-            fs_1.default.unlinkSync(SESSION_FILE_PATH);
+        if (fs.existsSync(SESSION_FILE_PATH)) {
+            fs.unlinkSync(SESSION_FILE_PATH);
         }
     }
     catch (err) {

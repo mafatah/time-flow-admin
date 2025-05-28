@@ -1,10 +1,8 @@
-
-import { app } from 'electron';
-import fs from 'fs';
-import path from 'path';
-import { supabase } from './supabase';
-import { logError } from './errorHandler';
-import type { Database } from '../src/integrations/supabase/types';
+const { app } = require('electron');
+const fs = require('fs');
+const path = require('path');
+const { supabase: supabaseClient } = require('./supabase');
+const { logError } = require('./errorHandler');
 
 interface TimeLog {
   id?: string;
@@ -31,7 +29,7 @@ const UNSYNCED_FILE_PATH = path.join(app.getPath('userData'), 'unsynced.json');
 const UNSYNCED_APP_LOG_PATH = path.join(app.getPath('userData'), 'unsynced_app_logs.json');
 
 // Offline queue type for inserting into the `app_logs` table
-export type AppLog = Database['public']['Tables']['app_logs']['Insert'];
+type AppLog = any;
 
 function loadAppLogs(): AppLog[] {
   try {
@@ -72,33 +70,33 @@ function saveData(data: UnsyncedData) {
   }
 }
 
-export function queueTimeLog(log: TimeLog) {
+function queueTimeLog(log: TimeLog) {
   const data = loadData();
   data.time_logs.push(log);
   saveData(data);
 }
 
-export function queueScreenshot(meta: ScreenshotMeta) {
+function queueScreenshot(meta: ScreenshotMeta) {
   const data = loadData();
   data.screenshots.push(meta);
   saveData(data);
 }
 
-export function queueAppLog(log: AppLog) {
+function queueAppLog(log: AppLog) {
   if (!log.app_name) return;
   const logs = loadAppLogs();
   logs.push(log);
   saveAppLogs(logs);
 }
 
-export async function processQueue() {
+async function processQueue() {
   const data = loadData();
   const appLogs = loadAppLogs();
 
   for (const log of [...data.time_logs]) {
     try {
       if (log.id) {
-        const { error } = await supabase
+        const { error } = await supabaseClient
           .from('time_logs')
           .update({
             end_time: log.end_time,
@@ -109,7 +107,7 @@ export async function processQueue() {
           data.time_logs = data.time_logs.filter(l => l !== log);
         }
       } else {
-        const { data: inserted, error } = await supabase
+        const { data: inserted, error } = await supabaseClient
           .from('time_logs')
           .insert({
             user_id: log.user_id,
@@ -130,7 +128,7 @@ export async function processQueue() {
 
   for (const shot of [...data.screenshots]) {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('screenshots')
         .insert(shot);
       if (!error) {
@@ -144,7 +142,7 @@ export async function processQueue() {
   for (const log of [...appLogs]) {
     if (!log.app_name) continue;
     try {
-      const { error } = await supabase.from('app_logs').insert(log);
+      const { error } = await supabaseClient.from('app_logs').insert(log);
       if (!error) {
         const idx = appLogs.indexOf(log);
         if (idx !== -1) appLogs.splice(idx, 1);
@@ -158,14 +156,23 @@ export async function processQueue() {
   saveAppLogs(appLogs);
 }
 
-export function startSyncLoop() {
+function startSyncLoop() {
   if (syncInterval) return;
   syncInterval = setInterval(processQueue, 30000);
 }
 
-export function stopSyncLoop() {
+function stopSyncLoop() {
   if (syncInterval) {
     clearInterval(syncInterval);
     syncInterval = null;
   }
 }
+
+module.exports = {
+  queueTimeLog,
+  queueScreenshot,
+  queueAppLog,
+  processQueue,
+  startSyncLoop,
+  stopSyncLoop
+};

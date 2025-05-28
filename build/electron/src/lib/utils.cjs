@@ -1,22 +1,13 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserRole = void 0;
-exports.cn = cn;
-exports.formatDate = formatDate;
-exports.formatDuration = formatDuration;
-exports.getInitials = getInitials;
-exports.getUserRoleLabel = getUserRoleLabel;
-exports.getUserRoleBadgeColor = getUserRoleBadgeColor;
-const clsx_1 = require("clsx");
-const tailwind_merge_1 = require("tailwind-merge");
-const date_fns_1 = require("date-fns");
-function cn(...inputs) {
-    return (0, tailwind_merge_1.twMerge)((0, clsx_1.clsx)(inputs));
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+import { format } from "date-fns";
+export function cn(...inputs) {
+    return twMerge(clsx(inputs));
 }
-function formatDate(date, formatString = "PPP") {
-    return (0, date_fns_1.format)(new Date(date), formatString);
+export function formatDate(date, formatString = "PPP") {
+    return format(new Date(date), formatString);
 }
-function formatDuration(durationMs) {
+export function formatDuration(durationMs) {
     const totalSeconds = Math.floor(durationMs / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -25,20 +16,20 @@ function formatDuration(durationMs) {
         .toString()
         .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
-function getInitials(name) {
+export function getInitials(name) {
     return name
         .split(" ")
         .map((n) => n[0])
         .join("")
         .toUpperCase();
 }
-var UserRole;
+export var UserRole;
 (function (UserRole) {
     UserRole["ADMIN"] = "admin";
     UserRole["MANAGER"] = "manager";
     UserRole["EMPLOYEE"] = "employee";
-})(UserRole || (exports.UserRole = UserRole = {}));
-function getUserRoleLabel(role) {
+})(UserRole || (UserRole = {}));
+export function getUserRoleLabel(role) {
     switch (role) {
         case UserRole.ADMIN:
             return "Admin";
@@ -50,7 +41,7 @@ function getUserRoleLabel(role) {
             return "Unknown";
     }
 }
-function getUserRoleBadgeColor(role) {
+export function getUserRoleBadgeColor(role) {
     switch (role) {
         case UserRole.ADMIN:
             return "bg-red-100 text-red-800";
