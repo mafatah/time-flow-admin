@@ -19,7 +19,7 @@ interface IdleLog {
   idle_start: string;
   idle_end: string | null;
   duration_minutes: number | null;
-  created_at: string;
+  created_at: string | null;
   users?: {
     full_name: string;
     email: string;
@@ -77,7 +77,7 @@ export default function AdminIdleLogs() {
       if (error) throw error;
 
       // Manually join user and project data
-      const enrichedLogs = (idleLogsData || []).map(log => {
+      const enrichedLogs: IdleLog[] = (idleLogsData || []).map(log => {
         const user = usersResponse.data?.find(u => u.id === log.user_id);
         const project = log.project_id ? projectsResponse.data?.find(p => p.id === log.project_id) : null;
         
@@ -85,7 +85,7 @@ export default function AdminIdleLogs() {
           ...log,
           users: user ? { full_name: user.full_name, email: user.email } : undefined,
           projects: project ? { name: project.name } : undefined
-        };
+        } as IdleLog;
       });
 
       setIdleLogs(enrichedLogs);
