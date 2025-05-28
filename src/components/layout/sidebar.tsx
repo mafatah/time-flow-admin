@@ -22,15 +22,14 @@ import {
 const Sidebar = () => {
   const location = useLocation();
   const { userDetails } = useAuth();
-  const isAdminOnly = import.meta.env.VITE_ADMIN_ONLY === 'true';
   
   // Determine user role
   const userRole = userDetails?.role || 'employee';
   const isAdmin = userRole === 'admin' || userRole === 'manager';
   const isEmployee = userRole === 'employee';
 
-  // Employee navigation items - only show for employees and if not admin-only mode
-  const employeeNavItems = (isEmployee && !isAdminOnly) ? [
+  // Employee navigation items
+  const employeeNavItems = isEmployee ? [
     {
       title: "Employee",
       items: [
@@ -58,7 +57,7 @@ const Sidebar = () => {
     }
   ] : [];
 
-  // Admin navigation items - only show for admins
+  // Admin navigation items
   const adminNavItems = isAdmin ? [
     {
       title: "Admin",

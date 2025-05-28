@@ -48,8 +48,6 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
 }
 
 function AppRoutes() {
-  const isAdminOnly = import.meta.env.VITE_ADMIN_ONLY === 'true';
-
   return (
     <Routes>
       <Route path="/" element={<Index />} />
@@ -59,43 +57,39 @@ function AppRoutes() {
       <Route element={<MainLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         
-        {/* Employee routes - only show if not admin-only mode */}
-        {!isAdminOnly && (
-          <>
-            <Route 
-              path="/employee/dashboard" 
-              element={
-                <ProtectedRoute allowedRoles={['employee']}>
-                  <EmployeeDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/employee/reports" 
-              element={
-                <ProtectedRoute allowedRoles={['employee']}>
-                  <EmployeeReports />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/employee/time-tracker" 
-              element={
-                <ProtectedRoute allowedRoles={['employee']}>
-                  <EmployeeTimeTracker />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/employee/idle-time" 
-              element={
-                <ProtectedRoute allowedRoles={['employee']}>
-                  <EmployeeIdleTime />
-                </ProtectedRoute>
-              } 
-            />
-          </>
-        )}
+        {/* Employee routes */}
+        <Route 
+          path="/employee/dashboard" 
+          element={
+            <ProtectedRoute allowedRoles={['employee']}>
+              <EmployeeDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/employee/reports" 
+          element={
+            <ProtectedRoute allowedRoles={['employee']}>
+              <EmployeeReports />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/employee/time-tracker" 
+          element={
+            <ProtectedRoute allowedRoles={['employee']}>
+              <EmployeeTimeTracker />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/employee/idle-time" 
+          element={
+            <ProtectedRoute allowedRoles={['employee']}>
+              <EmployeeIdleTime />
+            </ProtectedRoute>
+          } 
+        />
         
         {/* Admin routes - require admin or manager role */}
         <Route 
