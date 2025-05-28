@@ -355,7 +355,7 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
     console.log('⚠️ No user ID available, queuing screenshot for later upload');
     queueScreenshot({
       user_id: 'unknown',
-      task_id: ACTIVITY_MONITORING_TASK_ID,
+      project_id: '00000000-0000-0000-0000-000000000001',
       image_url: `local://${filePath}`,
       captured_at: new Date().toISOString()
     });
@@ -383,7 +383,7 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
       console.log('❌ Storage upload failed:', uploadError);
       queueScreenshot({
         user_id: currentUserId,
-        task_id: taskId,
+        project_id: '00000000-0000-0000-0000-000000000001',
         image_url: `local://${filePath}`,
         captured_at: new Date().toISOString()
       });
@@ -400,7 +400,7 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
       .from('screenshots')
       .insert({
         user_id: currentUserId,
-        task_id: taskId,
+        project_id: '00000000-0000-0000-0000-000000000001',
         image_url: publicUrl,
         captured_at: new Date().toISOString(),
         activity_percent: Math.round(activityMetrics.activity_score),
@@ -414,7 +414,7 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
       console.log('❌ Database save failed:', dbError);
       queueScreenshot({
         user_id: currentUserId,
-        task_id: taskId,
+        project_id: '00000000-0000-0000-0000-000000000001',
         image_url: publicUrl,
         captured_at: new Date().toISOString()
       });
@@ -434,7 +434,7 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
     console.log('❌ Activity screenshot upload error:', error);
     queueScreenshot({
       user_id: currentUserId,
-      task_id: taskId,
+      project_id: '00000000-0000-0000-0000-000000000001',
       image_url: `local://${filePath}`,
       captured_at: new Date().toISOString()
     });
@@ -654,7 +654,7 @@ async function saveURLActivity(appActivity: AppActivity) {
 
 function getURLCategory(url: string): string {
   if (url.includes('github.com') || url.includes('stackoverflow.com') || url.includes('docs.')) {
-    return 'development';
+    return 'other'; // Use 'other' instead of 'development' until constraint is fixed
   }
   if (url.includes('youtube.com') || url.includes('netflix.com') || url.includes('spotify.com')) {
     return 'entertainment';
@@ -663,7 +663,7 @@ function getURLCategory(url: string): string {
     return 'social';
   }
   if (url.includes('google.com') || url.includes('wikipedia.org')) {
-    return 'research';
+    return 'other'; // Use 'other' instead of 'research' until constraint is fixed
   }
   return 'other';
 }

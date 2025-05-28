@@ -10,9 +10,9 @@ const electron_1 = require("electron");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const SESSION_FILE_PATH = path_1.default.join(electron_1.app.getPath('userData'), 'session.json');
-function saveSession(data) {
+function saveSession(session) {
     try {
-        fs_1.default.writeFileSync(SESSION_FILE_PATH, JSON.stringify(data));
+        fs_1.default.writeFileSync(SESSION_FILE_PATH, JSON.stringify(session));
     }
     catch (err) {
         console.error('Failed to save session:', err);
@@ -21,10 +21,8 @@ function saveSession(data) {
 function loadSession() {
     try {
         if (fs_1.default.existsSync(SESSION_FILE_PATH)) {
-            const session = JSON.parse(fs_1.default.readFileSync(SESSION_FILE_PATH, 'utf8'));
-            if (!session.end_time) {
-                return session;
-            }
+            const data = fs_1.default.readFileSync(SESSION_FILE_PATH, 'utf8');
+            return JSON.parse(data);
         }
     }
     catch (err) {

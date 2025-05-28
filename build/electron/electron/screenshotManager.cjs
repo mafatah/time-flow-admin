@@ -34,66 +34,40 @@ function saveQueue(items) {
 }
 const queue = loadQueue();
 let retryInterval = null;
-async function captureAndUpload(userId, taskId) {
+if (queue.length > 0) {
+    startRetry();
+}
+async function captureAndUpload(userId, projectId) {
+    const primaryDisplay = electron_1.screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.workAreaSize;
+    const sources = await electron_1.desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width, height }
+    });
+    if (sources.length === 0)
+        return;
+    const buffer = sources[0].thumbnail.toPNG();
+    const filename = `screenshot_${(0, crypto_1.randomUUID)()}.png`;
+    const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
+    fs_1.default.writeFileSync(tempPath, buffer);
     try {
-        console.log('📸 Starting screenshot capture for user:', userId, 'task:', taskId);
-        const primaryDisplay = electron_1.screen.getPrimaryDisplay();
-        const { width, height } = primaryDisplay.workAreaSize;
-        console.log(`🖥️  Display size: ${width} x ${height}`);
-        const sources = await electron_1.desktopCapturer.getSources({
-            types: ['screen'],
-            thumbnailSize: { width: Math.min(width, 1920), height: Math.min(height, 1080) }
-        });
-        console.log(`📺 Available sources: ${sources.length}`);
-        if (sources.length === 0) {
-            console.log('❌ No screen sources available');
-            return;
-        }
-        const buffer = sources[0].thumbnail.toPNG();
-        const filename = `screenshot_${(0, crypto_1.randomUUID)()}.png`;
-        const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
-        fs_1.default.writeFileSync(tempPath, buffer);
-        console.log('💾 Screenshot saved to temp path:', tempPath);
-        try {
-            // Upload to Supabase
-            console.log('☁️  Uploading screenshot...');
-            await uploadScreenshot(tempPath, userId, taskId, Date.now());
-            console.log('✅ Screenshot uploaded successfully');
-        }
-        catch (uploadError) {
-            console.error('❌ Screenshot upload failed:', uploadError);
-            // Save to local queue for retry
-            const unsyncedDir = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_screenshots');
-            fs_1.default.mkdirSync(unsyncedDir, { recursive: true });
-            const localPath = path_1.default.join(unsyncedDir, filename);
-            fs_1.default.copyFileSync(tempPath, localPath);
-            // Add to retry queue
-            queue.push({
-                path: localPath,
-                userId: userId,
-                taskId: taskId,
-                timestamp: Date.now()
-            });
-            saveQueue(queue);
-            startRetry();
-            console.log('📦 Screenshot queued for later upload:', filename);
-        }
-        // Also save to test directory for debugging
-        const testDir = path_1.default.join(electron_1.app.getPath('userData'), 'test_screenshots');
-        fs_1.default.mkdirSync(testDir, { recursive: true });
-        const testPath = path_1.default.join(testDir, filename);
-        fs_1.default.copyFileSync(tempPath, testPath);
-        console.log('✅ Test screenshot saved successfully to:', testPath);
-        console.log('📊 Screenshot size:', buffer.length, 'bytes');
-        // Clean up temp file
+        await uploadScreenshot(tempPath, userId, projectId, Date.now());
         fs_1.default.unlink(tempPath, () => { });
     }
-    catch (error) {
-        console.error('❌ Screenshot capture failed:', error);
-        (0, errorHandler_1.logError)('captureAndUpload', error);
+    catch (err) {
+        (0, errorHandler_1.logError)('captureAndUpload', err);
+        (0, errorHandler_1.showError)('Screenshot Error', 'Failed to upload screenshot. It will be retried.');
+        const unsyncedDir = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_screenshots');
+        fs_1.default.mkdirSync(unsyncedDir, { recursive: true });
+        const dest = path_1.default.join(unsyncedDir, filename);
+        fs_1.default.copyFileSync(tempPath, dest);
+        fs_1.default.unlink(tempPath, () => { });
+        queue.push({ path: dest, userId, projectId, timestamp: Date.now() });
+        saveQueue(queue);
+        startRetry();
     }
 }
-async function uploadScreenshot(filePath, userId, taskId, ts) {
+async function uploadScreenshot(filePath, userId, projectId, ts) {
     const fileData = fs_1.default.readFileSync(filePath);
     const filename = path_1.default.basename(filePath);
     const { error: uploadError } = await supabase_1.supabase.storage
@@ -107,11 +81,16 @@ async function uploadScreenshot(filePath, userId, taskId, ts) {
     const imageUrl = publicUrlData.publicUrl;
     const { error: dbError } = await supabase_1.supabase
         .from('screenshots')
-        .insert({ user_id: userId, task_id: taskId, image_url: imageUrl, captured_at: new Date(ts).toISOString() });
+        .insert({
+        user_id: userId,
+        project_id: projectId,
+        image_url: imageUrl,
+        captured_at: new Date(ts).toISOString()
+    });
     if (dbError) {
         (0, unsyncedManager_1.queueScreenshot)({
             user_id: userId,
-            task_id: taskId,
+            project_id: projectId,
             image_url: imageUrl,
             captured_at: new Date(ts).toISOString(),
         });
@@ -123,14 +102,10 @@ function startRetry() {
         return;
     retryInterval = setInterval(processQueue, 30000);
 }
-// Initialize retry if there are items in queue
-if (queue.length > 0) {
-    startRetry();
-}
 async function processQueue() {
     for (const item of [...queue]) {
         try {
-            await uploadScreenshot(item.path, item.userId, item.taskId, item.timestamp);
+            await uploadScreenshot(item.path, item.userId, item.projectId, item.timestamp);
             fs_1.default.unlink(item.path, () => { });
             const index = queue.indexOf(item);
             if (index !== -1)

@@ -390,8 +390,17 @@ const InsightsPage = () => {
           notes: `Productivity: ${Math.round(pattern.productivity_score)}%, Idle: ${Math.round((pattern.idle_time / pattern.total_time) * 100)}%`
         });
 
-      if (error && !error.message.includes('duplicate')) {
-        console.error('Error creating unusual activity record:', error);
+      if (error) {
+        if (error.message.includes('duplicate')) {
+          // Ignore duplicate entries
+          return;
+        } else if (error.message.includes('row-level security') || error.message.includes('confidence_check')) {
+          console.warn('⚠️ Database constraint issue - unusual activity not saved:', error.message);
+          console.log('📋 Please apply the database fixes from apply-constraint-fixes.cjs');
+          return;
+        } else {
+          console.error('Error creating unusual activity record:', error);
+        }
       }
     } catch (error) {
       console.error('Error creating unusual activity record:', error);
@@ -411,7 +420,8 @@ const InsightsPage = () => {
     
     if (pattern.total_time > 14400) confidence += 10; // Long sessions are more concerning
     
-    return Math.min(95, confidence);
+    // Ensure confidence is within valid range (0.00 to 100.00)
+    return Math.min(100.00, Math.max(0.00, confidence));
   };
 
   const formatDuration = (seconds: number): string => {

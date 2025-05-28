@@ -108,22 +108,72 @@ const EmployeeIdleTime = () => {
       const { start, end } = getDateRange();
 
       console.log('Fetching idle data for user:', userDetails.id);
+      console.log('Date range:', { start: start.toISOString(), end: end.toISOString() });
 
-      // Create a mock idle_logs table since it doesn't exist
-      const mockIdleData: IdlePeriod[] = [];
+      // Fetch real idle data from idle_logs table
+      const { data: idleData, error } = await supabase
+        .from('idle_logs')
+        .select('*')
+        .eq('user_id', userDetails.id)
+        .gte('idle_start', start.toISOString())
+        .lte('idle_start', end.toISOString())
+        .order('idle_start', { ascending: false });
 
-      setIdlePeriods(mockIdleData);
-      calculateIdleStats(mockIdleData);
-      calculateHourlyData(mockIdleData);
-      calculateDailyData(mockIdleData);
+      if (error) {
+        console.error('Error fetching idle data:', error);
+        
+        // If table doesn't exist, create sample data for demonstration
+        if (error.code === '42P01') {
+          console.log('idle_logs table not found, creating sample data...');
+          const sampleData = createSampleIdleData();
+          setIdlePeriods(sampleData);
+          calculateIdleStats(sampleData);
+          calculateHourlyData(sampleData);
+          calculateDailyData(sampleData);
+          
+          toast({
+            title: 'Using sample data',
+            description: 'The idle_logs table is not available. Showing sample data for demonstration.',
+            variant: 'default'
+          });
+        } else {
+          throw error;
+        }
+      } else {
+        console.log('Fetched idle data:', idleData);
+        const formattedData: IdlePeriod[] = idleData.map(item => ({
+          id: item.id,
+          idle_start: item.idle_start,
+          idle_end: item.idle_end,
+          duration_minutes: item.duration_minutes
+        }));
+
+        setIdlePeriods(formattedData);
+        calculateIdleStats(formattedData);
+        calculateHourlyData(formattedData);
+        calculateDailyData(formattedData);
+
+        toast({
+          title: 'Idle data loaded',
+          description: `Found ${formattedData.length} idle periods for the selected time range.`,
+          variant: 'default'
+        });
+      }
 
     } catch (error: any) {
       console.error('Error fetching idle data:', error);
       toast({
         title: 'Error loading idle data',
-        description: 'The idle logs table does not exist yet. This feature will be available once tracking is set up.',
+        description: error.message || 'Failed to load idle time data.',
         variant: 'destructive'
       });
+      
+      // Fallback to sample data
+      const sampleData = createSampleIdleData();
+      setIdlePeriods(sampleData);
+      calculateIdleStats(sampleData);
+      calculateHourlyData(sampleData);
+      calculateDailyData(sampleData);
     } finally {
       setLoading(false);
     }
@@ -238,7 +288,7 @@ const EmployeeIdleTime = () => {
         captured_at: testIdleStart.toISOString(),
         activity_percent: 0, // 0% indicates idle
         focus_percent: 0,
-        classification: 'productive',
+        classification: 'core', // Use 'core' instead of 'productive' until constraint is fixed
         keystrokes: 0,
         mouse_clicks: 0,
         mouse_movements: 0,
@@ -291,7 +341,7 @@ const EmployeeIdleTime = () => {
     setTestIdleStart(null);
   };
 
-  const createSampleIdleData = () => {
+  const createSampleIdleData = (): IdlePeriod[] => {
     const now = new Date();
     const samplePeriods: IdlePeriod[] = [
       {
@@ -314,6 +364,11 @@ const EmployeeIdleTime = () => {
       }
     ];
     
+    return samplePeriods;
+  };
+
+  const loadSampleData = () => {
+    const samplePeriods = createSampleIdleData();
     setIdlePeriods(samplePeriods);
     calculateIdleStats(samplePeriods);
     calculateHourlyData(samplePeriods);
@@ -374,7 +429,7 @@ const EmployeeIdleTime = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={createSampleIdleData}
+              onClick={loadSampleData}
               className="flex items-center space-x-2"
             >
               <TestTube2 className="h-4 w-4" />
