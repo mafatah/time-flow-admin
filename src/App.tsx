@@ -1,3 +1,4 @@
+
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/providers/auth-provider';
 import { MainLayout } from '@/components/layout/main-layout';
@@ -22,6 +23,9 @@ import Insights from '@/pages/insights';
 import NotFound from '@/pages/not-found';
 
 function App() {
+  // Check if we're in admin-only mode
+  const isAdminOnly = import.meta.env.VITE_ADMIN_ONLY === 'true';
+
   return (
     <AuthProvider>
       <Routes>
@@ -31,10 +35,18 @@ function App() {
         {/* Protected routes with sidebar */}
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
-          <Route path="/employee/reports" element={<EmployeeReports />} />
-          <Route path="/employee/time-tracker" element={<EmployeeTimeTracker />} />
-          <Route path="/employee/idle-time" element={<EmployeeIdleTime />} />
+          
+          {/* Employee routes - only show if not admin-only mode */}
+          {!isAdminOnly && (
+            <>
+              <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
+              <Route path="/employee/reports" element={<EmployeeReports />} />
+              <Route path="/employee/time-tracker" element={<EmployeeTimeTracker />} />
+              <Route path="/employee/idle-time" element={<EmployeeIdleTime />} />
+            </>
+          )}
+          
+          {/* Admin routes - always available */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/users" element={<Users />} />
