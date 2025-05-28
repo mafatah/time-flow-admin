@@ -16,12 +16,13 @@ import {
   UserCheck,
   Timer,
   Coffee,
-  TrendingUp
+  TrendingUp,
+  LogOut
 } from "lucide-react";
 
 const Sidebar = () => {
   const location = useLocation();
-  const { userDetails } = useAuth();
+  const { userDetails, signOut } = useAuth();
   
   // Determine user role
   const userRole = userDetails?.role || 'employee';
@@ -198,6 +199,17 @@ const Sidebar = () => {
             </div>
           </div>
         ))}
+        
+        {/* Logout Button */}
+        <div className="mt-8 border-t pt-4">
+          <button
+            onClick={signOut}
+            className="w-full flex items-center px-2 py-2 text-sm font-medium rounded-md text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+          >
+            <LogOut className="mr-3 h-5 w-5" />
+            Sign Out
+          </button>
+        </div>
       </nav>
     </div>
   );

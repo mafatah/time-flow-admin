@@ -137,6 +137,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     try {
       await supabase.auth.signOut();
+      
+      // If running in Electron, also clear the Electron session
+      if (typeof window !== 'undefined' && (window as any).electron) {
+        (window as any).electron.logout();
+      }
+      
       toast({
         title: "Successfully signed out",
       });

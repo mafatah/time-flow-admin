@@ -1,24 +1,27 @@
-import { dialog, powerMonitor } from 'electron';
-import { stopTracking, startTracking, loadSession } from './tracker';
-export function initSystemMonitor() {
-    powerMonitor.on('suspend', () => {
-        if (loadSession()) {
-            stopTracking();
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.initSystemMonitor = initSystemMonitor;
+const electron_1 = require("electron");
+const tracker_1 = require("./tracker.cjs");
+function initSystemMonitor() {
+    electron_1.powerMonitor.on('suspend', () => {
+        if ((0, tracker_1.loadSession)()) {
+            (0, tracker_1.stopTracking)();
         }
     });
-    powerMonitor.on('resume', () => {
-        const session = loadSession();
+    electron_1.powerMonitor.on('resume', () => {
+        const session = (0, tracker_1.loadSession)();
         if (session) {
-            const result = dialog.showMessageBoxSync({
+            const result = electron_1.dialog.showMessageBoxSync({
                 type: 'question',
                 message: 'Do you want to resume tracking?',
                 buttons: ['Resume', 'Stop']
             });
             if (result === 0) {
-                startTracking();
+                (0, tracker_1.startTracking)();
             }
             else {
-                stopTracking();
+                (0, tracker_1.stopTracking)();
             }
         }
     });

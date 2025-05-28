@@ -1,8 +1,8 @@
-const { app } = require('electron');
-const fs = require('fs');
-const path = require('path');
-const { supabase: supabaseClient } = require('./supabase');
-const { logError } = require('./errorHandler');
+import { app } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
+import { supabase as supabaseClient } from './supabase';
+import { logError } from './errorHandler';
 
 interface TimeLog {
   id?: string;
@@ -168,7 +168,7 @@ function stopSyncLoop() {
   }
 }
 
-module.exports = {
+export {
   queueTimeLog,
   queueScreenshot,
   queueAppLog,

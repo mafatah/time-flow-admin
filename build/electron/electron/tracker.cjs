@@ -1,12 +1,22 @@
-import { supabase } from './supabase';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.setUserId = setUserId;
+exports.setProjectId = setProjectId;
+exports.updateTimeLogStatus = updateTimeLogStatus;
+exports.startTracking = startTracking;
+exports.stopTracking = stopTracking;
+exports.syncOfflineData = syncOfflineData;
+exports.loadSession = loadSession;
+exports.clearSavedSession = clearSavedSession;
+const supabase_1 = require("./supabase.cjs");
 // Using crypto.randomUUID instead of nanoid for CommonJS compatibility
-import { randomUUID } from 'crypto';
-import { startIdleMonitoring, stopIdleMonitoring } from './idleMonitor';
-import { captureAndUpload, processQueue as processScreenshotQueue } from './screenshotManager';
-import { queueTimeLog, processQueue as processUnsyncedQueue } from './unsyncedManager';
-import { captureAppLog } from './appLogsManager';
-import { screenshotIntervalSeconds } from './config';
-import { saveSession as storeSession, loadSession as getSession, clearSession } from './sessionManager';
+const crypto_1 = require("crypto");
+const idleMonitor_1 = require("./idleMonitor.cjs");
+const screenshotManager_1 = require("./screenshotManager.cjs");
+const unsyncedManager_1 = require("./unsyncedManager.cjs");
+const appLogsManager_1 = require("./appLogsManager.cjs");
+const config_1 = require("./config.cjs");
+const sessionManager_1 = require("./sessionManager.cjs");
 let screenshotInterval;
 let appInterval;
 let trackingActive = false;
@@ -15,24 +25,24 @@ let currentProjectId = null;
 // Session persistence handled by sessionManager
 let currentTimeLogId = null;
 // Set the current user ID for tracking
-export function setUserId(id) {
+function setUserId(id) {
     userId = id;
 }
 // Set the current project ID for tracking
-export function setProjectId(id) {
+function setProjectId(id) {
     currentProjectId = id;
 }
 // Update the current time log's idle status
-export async function updateTimeLogStatus(idle) {
+async function updateTimeLogStatus(idle) {
     if (!currentTimeLogId)
         return;
     try {
-        const { error } = await supabase
+        const { error } = await supabase_1.supabase
             .from('time_logs')
             .update({ is_idle: idle })
             .eq('id', currentTimeLogId);
         if (error) {
-            queueTimeLog({
+            (0, unsyncedManager_1.queueTimeLog)({
                 id: currentTimeLogId,
                 user_id: userId,
                 project_id: currentProjectId,
@@ -42,7 +52,7 @@ export async function updateTimeLogStatus(idle) {
     }
     catch (err) {
         console.error('Failed to update idle status:', err);
-        queueTimeLog({
+        (0, unsyncedManager_1.queueTimeLog)({
             id: currentTimeLogId,
             user_id: userId,
             project_id: currentProjectId,
@@ -51,7 +61,7 @@ export async function updateTimeLogStatus(idle) {
     }
 }
 // Start tracking activities
-export async function startTracking() {
+async function startTracking() {
     console.log('🚀 startTracking() called');
     console.log(`📊 Current state - trackingActive: ${trackingActive}, userId: ${userId}, projectId: ${currentProjectId}`);
     if (trackingActive) {
@@ -67,7 +77,7 @@ export async function startTracking() {
     console.log('✅ Starting tracking...');
     trackingActive = true;
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabase_1.supabase
             .from('time_logs')
             .insert({
             user_id: userId,
@@ -78,8 +88,8 @@ export async function startTracking() {
             .select('id')
             .single();
         if (error || !data) {
-            currentTimeLogId = randomUUID();
-            queueTimeLog({
+            currentTimeLogId = (0, crypto_1.randomUUID)();
+            (0, unsyncedManager_1.queueTimeLog)({
                 user_id: userId,
                 project_id: currentProjectId,
                 start_time: new Date().toISOString(),
@@ -92,8 +102,8 @@ export async function startTracking() {
     }
     catch (err) {
         console.error('Failed to start time log:', err);
-        currentTimeLogId = randomUUID();
-        queueTimeLog({
+        currentTimeLogId = (0, crypto_1.randomUUID)();
+        (0, unsyncedManager_1.queueTimeLog)({
             user_id: userId,
             project_id: currentProjectId,
             start_time: new Date().toISOString(),
@@ -106,10 +116,10 @@ export async function startTracking() {
         start_time: new Date().toISOString(),
         time_log_id: currentTimeLogId
     };
-    storeSession(session);
-    startIdleMonitoring();
+    (0, sessionManager_1.saveSession)(session);
+    (0, idleMonitor_1.startIdleMonitoring)();
     if (!screenshotInterval) {
-        console.log(`🚀 Setting up screenshot interval: ${screenshotIntervalSeconds} seconds`);
+        console.log(`🚀 Setting up screenshot interval: ${config_1.screenshotIntervalSeconds} seconds`);
         console.log(`📊 Current state - userId: ${userId}, projectId: ${currentProjectId}`);
         screenshotInterval = setInterval(() => {
             console.log(`⏰ Screenshot interval triggered - userId: ${userId}, projectId: ${currentProjectId}`);
@@ -118,20 +128,20 @@ export async function startTracking() {
                 return;
             }
             console.log('📸 Calling captureAndUpload...');
-            captureAndUpload(userId, currentProjectId);
-        }, screenshotIntervalSeconds * 1000);
-        console.log(`✅ Screenshot interval set up successfully - will capture every ${screenshotIntervalSeconds}s`);
+            (0, screenshotManager_1.captureAndUpload)(userId, currentProjectId);
+        }, config_1.screenshotIntervalSeconds * 1000);
+        console.log(`✅ Screenshot interval set up successfully - will capture every ${config_1.screenshotIntervalSeconds}s`);
     }
     if (!appInterval) {
         appInterval = setInterval(() => {
             if (!userId || !currentProjectId)
                 return;
-            void captureAppLog(userId, currentProjectId);
+            void (0, appLogsManager_1.captureAppLog)(userId, currentProjectId);
         }, 10000);
     }
 }
 // Stop tracking activities
-export async function stopTracking() {
+async function stopTracking() {
     if (!trackingActive)
         return;
     trackingActive = false;
@@ -143,15 +153,15 @@ export async function stopTracking() {
         clearInterval(appInterval);
         appInterval = undefined;
     }
-    stopIdleMonitoring();
+    (0, idleMonitor_1.stopIdleMonitoring)();
     if (currentTimeLogId) {
         try {
-            const { error } = await supabase
+            const { error } = await supabase_1.supabase
                 .from('time_logs')
                 .update({ end_time: new Date().toISOString() })
                 .eq('id', currentTimeLogId);
             if (error) {
-                queueTimeLog({
+                (0, unsyncedManager_1.queueTimeLog)({
                     id: currentTimeLogId,
                     user_id: userId,
                     project_id: currentProjectId,
@@ -161,7 +171,7 @@ export async function stopTracking() {
         }
         catch (err) {
             console.error('Failed to stop time log:', err);
-            queueTimeLog({
+            (0, unsyncedManager_1.queueTimeLog)({
                 id: currentTimeLogId,
                 user_id: userId,
                 project_id: currentProjectId,
@@ -169,19 +179,19 @@ export async function stopTracking() {
             });
         }
     }
-    clearSession();
+    (0, sessionManager_1.clearSession)();
     currentTimeLogId = null;
 }
 // Sync offline data when online
-export async function syncOfflineData() {
-    await processUnsyncedQueue();
-    await processScreenshotQueue();
+async function syncOfflineData() {
+    await (0, unsyncedManager_1.processQueue)();
+    await (0, screenshotManager_1.processQueue)();
 }
 // Load a saved session from disk
-export function loadSession() {
-    return getSession();
+function loadSession() {
+    return (0, sessionManager_1.loadSession)();
 }
 // Clear the saved session
-export function clearSavedSession() {
-    clearSession();
+function clearSavedSession() {
+    (0, sessionManager_1.clearSession)();
 }

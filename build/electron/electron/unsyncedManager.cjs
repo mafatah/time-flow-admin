@@ -1,10 +1,51 @@
-import { app } from 'electron';
-import fs from 'fs';
-import path from 'path';
-import { supabase } from './supabase';
-import { logError } from './errorHandler';
-const UNSYNCED_FILE_PATH = path.join(app.getPath('userData'), 'unsynced.json');
-const UNSYNCED_APP_LOG_PATH = path.join(app.getPath('userData'), 'unsynced_app_logs.json');
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.queueTimeLog = queueTimeLog;
+exports.queueScreenshot = queueScreenshot;
+exports.queueAppLog = queueAppLog;
+exports.processQueue = processQueue;
+exports.startSyncLoop = startSyncLoop;
+exports.stopSyncLoop = stopSyncLoop;
+const electron_1 = require("electron");
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const supabase_1 = require("./supabase.cjs");
+const errorHandler_1 = require("./errorHandler.cjs");
+const UNSYNCED_FILE_PATH = path.join(electron_1.app.getPath('userData'), 'unsynced.json');
+const UNSYNCED_APP_LOG_PATH = path.join(electron_1.app.getPath('userData'), 'unsynced_app_logs.json');
 function loadAppLogs() {
     try {
         if (fs.existsSync(UNSYNCED_APP_LOG_PATH)) {
@@ -12,7 +53,7 @@ function loadAppLogs() {
         }
     }
     catch (err) {
-        logError('loadAppLogs', err);
+        (0, errorHandler_1.logError)('loadAppLogs', err);
     }
     return [];
 }
@@ -21,7 +62,7 @@ function saveAppLogs(logs) {
         fs.writeFileSync(UNSYNCED_APP_LOG_PATH, JSON.stringify(logs));
     }
     catch (err) {
-        logError('saveAppLogs', err);
+        (0, errorHandler_1.logError)('saveAppLogs', err);
     }
 }
 let syncInterval = null;
@@ -44,30 +85,30 @@ function saveData(data) {
         console.error('Failed to save unsynced data:', err);
     }
 }
-export function queueTimeLog(log) {
+function queueTimeLog(log) {
     const data = loadData();
     data.time_logs.push(log);
     saveData(data);
 }
-export function queueScreenshot(meta) {
+function queueScreenshot(meta) {
     const data = loadData();
     data.screenshots.push(meta);
     saveData(data);
 }
-export function queueAppLog(log) {
+function queueAppLog(log) {
     if (!log.app_name)
         return;
     const logs = loadAppLogs();
     logs.push(log);
     saveAppLogs(logs);
 }
-export async function processQueue() {
+async function processQueue() {
     const data = loadData();
     const appLogs = loadAppLogs();
     for (const log of [...data.time_logs]) {
         try {
             if (log.id) {
-                const { error } = await supabase
+                const { error } = await supabase_1.supabase
                     .from('time_logs')
                     .update({
                     end_time: log.end_time,
@@ -79,7 +120,7 @@ export async function processQueue() {
                 }
             }
             else {
-                const { data: inserted, error } = await supabase
+                const { data: inserted, error } = await supabase_1.supabase
                     .from('time_logs')
                     .insert({
                     user_id: log.user_id,
@@ -100,7 +141,7 @@ export async function processQueue() {
     }
     for (const shot of [...data.screenshots]) {
         try {
-            const { error } = await supabase
+            const { error } = await supabase_1.supabase
                 .from('screenshots')
                 .insert(shot);
             if (!error) {
@@ -115,7 +156,7 @@ export async function processQueue() {
         if (!log.app_name)
             continue;
         try {
-            const { error } = await supabase.from('app_logs').insert(log);
+            const { error } = await supabase_1.supabase.from('app_logs').insert(log);
             if (!error) {
                 const idx = appLogs.indexOf(log);
                 if (idx !== -1)
@@ -123,18 +164,18 @@ export async function processQueue() {
             }
         }
         catch (err) {
-            logError('sync app log', err);
+            (0, errorHandler_1.logError)('sync app log', err);
         }
     }
     saveData(data);
     saveAppLogs(appLogs);
 }
-export function startSyncLoop() {
+function startSyncLoop() {
     if (syncInterval)
         return;
     syncInterval = setInterval(processQueue, 30000);
 }
-export function stopSyncLoop() {
+function stopSyncLoop() {
     if (syncInterval) {
         clearInterval(syncInterval);
         syncInterval = null;

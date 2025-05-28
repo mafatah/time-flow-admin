@@ -1,10 +1,16 @@
-import { supabase } from './supabase';
-import activeWin from 'active-win';
-import { queueAppLog } from './unsyncedManager';
-import { logError } from './errorHandler';
-export async function captureAppLog(userId, taskId) {
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.captureAppLog = captureAppLog;
+const supabase_1 = require("./supabase.cjs");
+const active_win_1 = __importDefault(require("active-win"));
+const unsyncedManager_1 = require("./unsyncedManager.cjs");
+const errorHandler_1 = require("./errorHandler.cjs");
+async function captureAppLog(userId, taskId) {
     try {
-        const win = await activeWin();
+        const win = await (0, active_win_1.default)();
         if (!win)
             return;
         const log = {
@@ -14,13 +20,13 @@ export async function captureAppLog(userId, taskId) {
             started_at: new Date().toISOString(),
             category: 'core'
         };
-        const { error } = await supabase.from('app_logs').insert(log);
+        const { error } = await supabase_1.supabase.from('app_logs').insert(log);
         if (error) {
-            queueAppLog(log);
-            logError('insert app_log', error);
+            (0, unsyncedManager_1.queueAppLog)(log);
+            (0, errorHandler_1.logError)('insert app_log', error);
         }
     }
     catch (err) {
-        logError('captureAppLog', err);
+        (0, errorHandler_1.logError)('captureAppLog', err);
     }
 }

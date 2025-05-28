@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electron', {
   syncOfflineData: () => ipcRenderer.send('sync-offline-data'),
   loadSession: () => ipcRenderer.invoke('load-session'),
   clearSavedSession: () => ipcRenderer.send('clear-session'),
+  logout: () => ipcRenderer.send('logout'),
   send: (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
   invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args)
 });

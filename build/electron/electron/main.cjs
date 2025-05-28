@@ -1,33 +1,69 @@
-import 'dotenv/config';
-import { app, BrowserWindow, ipcMain, nativeImage, Menu, Tray, Notification } from 'electron';
-import path from 'path';
-import http from 'http';
-import fs from 'fs';
-import { setUserId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } from './tracker';
-import { setupAutoLaunch } from './autoLaunch';
-import { initSystemMonitor } from './systemMonitor';
-import { startSyncLoop } from './unsyncedManager';
-import { startActivityMonitoring, triggerActivityCapture, triggerDirectScreenshot } from './activityMonitor';
-import { ensureScreenRecordingPermission, testScreenCapture } from './permissionManager';
-import { screenshotIntervalSeconds } from './config';
-import { EventEmitter } from 'events';
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.appEvents = void 0;
+require("dotenv/config");
+const electron_1 = require("electron");
+const path = __importStar(require("path"));
+const http = __importStar(require("http"));
+const fs = __importStar(require("fs"));
+const tracker_1 = require("./tracker.cjs");
+const autoLaunch_1 = require("./autoLaunch.cjs");
+const systemMonitor_1 = require("./systemMonitor.cjs");
+const unsyncedManager_1 = require("./unsyncedManager.cjs");
+const activityMonitor_1 = require("./activityMonitor.cjs");
+const permissionManager_1 = require("./permissionManager.cjs");
+const config_1 = require("./config.cjs");
+const events_1 = require("events");
 // Create event emitter for internal communication
-export const appEvents = new EventEmitter();
+exports.appEvents = new events_1.EventEmitter();
 // Debug environment variables
 console.log('🔧 Environment variables at startup:');
 console.log('   SCREENSHOT_INTERVAL_SECONDS:', process.env.SCREENSHOT_INTERVAL_SECONDS);
-console.log('   Config screenshotIntervalSeconds:', screenshotIntervalSeconds);
+console.log('   Config screenshotIntervalSeconds:', config_1.screenshotIntervalSeconds);
 let mainWindow = null;
 let tray = null;
 let isTracking = false;
 let trackingStartTime = null;
 let timerInterval = null;
 // Listen for screenshot events from activity monitor
-appEvents.on('screenshot-captured', () => {
+exports.appEvents.on('screenshot-captured', () => {
     showScreenshotNotification();
 });
 async function createWindow() {
-    mainWindow = new BrowserWindow({
+    mainWindow = new electron_1.BrowserWindow({
         width: 1000,
         height: 800,
         webPreferences: {
@@ -35,7 +71,7 @@ async function createWindow() {
         },
     });
     // In development, load from Vite dev server, in production load from file
-    const isDev = process.env.NODE_ENV !== 'production';
+    const isDev = true; // Force dev mode to use Vite server
     if (isDev) {
         // Try multiple ports to find where Vite is running
         const tryPorts = [8080, 8081, 8082, 8083];
@@ -49,7 +85,7 @@ async function createWindow() {
                     const req = http.get(testUrl, (res) => {
                         if (res.statusCode === 200) {
                             let data = '';
-                            res.on('data', chunk => {
+                            res.on('data', (chunk) => {
                                 data += chunk;
                             });
                             res.on('end', () => {
@@ -98,7 +134,7 @@ async function createWindow() {
             .catch(err => console.error('Failed to load UI from dev server:', err));
     }
     else {
-        const indexPath = path.join(__dirname, '../../dist/index.html');
+        const indexPath = path.join(__dirname, '../../../dist/index.html');
         console.log('Loading UI from:', indexPath);
         mainWindow.loadFile(indexPath)
             .then(() => {
@@ -117,16 +153,16 @@ async function createWindow() {
     // Open DevTools for debugging
     mainWindow.webContents.openDevTools();
 }
-app.whenReady().then(async () => {
+electron_1.app.whenReady().then(async () => {
     await createWindow();
     // Create system tray
     createTray();
     // Request screen recording permission on startup
     console.log('🚀 App ready, checking permissions...');
-    const hasPermission = await ensureScreenRecordingPermission();
+    const hasPermission = await (0, permissionManager_1.ensureScreenRecordingPermission)();
     if (hasPermission) {
         // Test screen capture capability
-        await testScreenCapture();
+        await (0, permissionManager_1.testScreenCapture)();
         console.log('✅ App ready with screen recording permission');
     }
     else {
@@ -139,7 +175,7 @@ app.whenReady().then(async () => {
             path.join(__dirname, '../desktop-agent/config.json'),
             path.join(__dirname, '../../desktop-agent/config.json'),
             path.join(process.cwd(), 'desktop-agent/config.json'),
-            path.join(app.getAppPath(), 'desktop-agent/config.json')
+            path.join(electron_1.app.getAppPath(), 'desktop-agent/config.json')
         ];
         let configPath = '';
         let config = null;
@@ -154,8 +190,8 @@ app.whenReady().then(async () => {
         }
         if (config && config.user_id && config.auto_start_tracking) {
             console.log('🚀 Auto-starting activity monitoring for user:', config.user_id);
-            setUserId(config.user_id);
-            startActivityMonitoring(config.user_id);
+            (0, tracker_1.setUserId)(config.user_id);
+            (0, activityMonitor_1.startActivityMonitoring)(config.user_id);
             // Start the tracking timer as well
             startTrackingTimer();
         }
@@ -166,59 +202,71 @@ app.whenReady().then(async () => {
     catch (error) {
         console.log('⚠️  Could not load desktop-agent config:', error);
     }
-    setupAutoLaunch().catch(err => console.error(err));
-    initSystemMonitor();
-    startSyncLoop();
-    app.on('activate', async () => {
-        if (BrowserWindow.getAllWindows().length === 0)
+    (0, autoLaunch_1.setupAutoLaunch)().catch(err => console.error(err));
+    (0, systemMonitor_1.initSystemMonitor)();
+    (0, unsyncedManager_1.startSyncLoop)();
+    electron_1.app.on('activate', async () => {
+        if (electron_1.BrowserWindow.getAllWindows().length === 0)
             await createWindow();
     });
 });
-app.on('window-all-closed', () => {
+electron_1.app.on('window-all-closed', () => {
     // On macOS, keep the app running in the background (tray mode)
     if (process.platform !== 'darwin') {
-        app.quit();
+        electron_1.app.quit();
     }
 });
 // Prevent app from quitting when all windows are closed (keep in tray)
-app.on('before-quit', () => {
+electron_1.app.on('before-quit', () => {
     if (timerInterval) {
         clearInterval(timerInterval);
     }
 });
-ipcMain.on('set-user-id', (_e, id) => {
-    setUserId(id);
+electron_1.ipcMain.on('set-user-id', (_e, id) => {
+    (0, tracker_1.setUserId)(id);
     // Start always-on activity monitoring when user ID is set
-    startActivityMonitoring(id);
+    (0, activityMonitor_1.startActivityMonitoring)(id);
     // Start tracking timer
     startTrackingTimer();
 });
-ipcMain.on('start-tracking', () => {
-    startTracking();
+electron_1.ipcMain.on('start-tracking', () => {
+    (0, tracker_1.startTracking)();
     startTrackingTimer();
 });
-ipcMain.on('stop-tracking', () => {
-    stopTracking();
+electron_1.ipcMain.on('stop-tracking', () => {
+    (0, tracker_1.stopTracking)();
     stopTrackingTimer();
 });
-ipcMain.on('sync-offline-data', () => void syncOfflineData());
-ipcMain.handle('load-session', () => loadSession());
-ipcMain.on('clear-session', () => clearSavedSession());
-ipcMain.on('trigger-activity-capture', () => {
-    triggerActivityCapture();
+electron_1.ipcMain.on('sync-offline-data', () => void (0, tracker_1.syncOfflineData)());
+electron_1.ipcMain.handle('load-session', () => (0, tracker_1.loadSession)());
+electron_1.ipcMain.on('clear-session', () => (0, tracker_1.clearSavedSession)());
+electron_1.ipcMain.on('logout', () => {
+    console.log('🚪 Logout requested from UI');
+    // Clear session and stop tracking
+    (0, tracker_1.clearSavedSession)();
+    stopTrackingTimer();
+    (0, activityMonitor_1.stopActivityMonitoring)();
+    // Reload the window to show login screen
+    if (mainWindow) {
+        mainWindow.reload();
+    }
+    console.log('🚪 User logged out - session cleared and tracking stopped');
+});
+electron_1.ipcMain.on('trigger-activity-capture', () => {
+    (0, activityMonitor_1.triggerActivityCapture)();
     showScreenshotNotification();
 });
-ipcMain.handle('trigger-direct-screenshot', async () => {
-    const result = await triggerDirectScreenshot();
+electron_1.ipcMain.handle('trigger-direct-screenshot', async () => {
+    const result = await (0, activityMonitor_1.triggerDirectScreenshot)();
     showScreenshotNotification();
     return result;
 });
 // Add test mode for development
-ipcMain.on('start-test-mode', () => {
+electron_1.ipcMain.on('start-test-mode', () => {
     console.log('🧪 Starting test mode - simulating user login...');
     const testUserId = 'test-user-12345';
-    setUserId(testUserId);
-    startActivityMonitoring(testUserId);
+    (0, tracker_1.setUserId)(testUserId);
+    (0, activityMonitor_1.startActivityMonitoring)(testUserId);
     startTrackingTimer();
     console.log('✅ Test mode started - activity monitoring should begin');
 });
@@ -233,15 +281,15 @@ function createTray() {
     if (!fs.existsSync(iconPath)) {
         console.log('⚠️ Tray icon not found, creating fallback');
         // Create a simple 16x16 icon programmatically
-        const icon = nativeImage.createFromBuffer(Buffer.from(createSimpleIcon(), 'base64'));
-        tray = new Tray(icon);
+        const icon = electron_1.nativeImage.createFromBuffer(Buffer.from(createSimpleIcon(), 'base64'));
+        tray = new electron_1.Tray(icon);
     }
     else {
         console.log('✅ Loading tray icon from file');
-        const icon = nativeImage.createFromPath(iconPath);
+        const icon = electron_1.nativeImage.createFromPath(iconPath);
         // Resize for tray (16x16 on macOS, 16x16 on Windows)
         const resizedIcon = icon.resize({ width: 16, height: 16 });
-        tray = new Tray(resizedIcon);
+        tray = new electron_1.Tray(resizedIcon);
     }
     // Set initial tooltip
     tray.setToolTip('TimeFlow - Not tracking');
@@ -264,11 +312,11 @@ function createTray() {
 // Create a simple icon as base64 (16x16 green circle)
 function createSimpleIcon() {
     // This is a simple 16x16 PNG icon encoded as base64
-    return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
+    return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
 }
 // Update tray menu
 function updateTrayMenu() {
-    const contextMenu = Menu.buildFromTemplate([
+    const contextMenu = electron_1.Menu.buildFromTemplate([
         {
             label: isTracking ? '⏸ Stop Tracking' : '▶️ Start Tracking',
             click: () => {
@@ -293,12 +341,29 @@ function updateTrayMenu() {
         {
             label: '📸 Take Screenshot',
             click: () => {
-                triggerActivityCapture();
+                (0, activityMonitor_1.triggerActivityCapture)();
                 showScreenshotNotification();
             }
         },
         { type: 'separator' },
-        { label: '❌ Quit', click: () => app.quit() }
+        {
+            label: '🚪 Logout',
+            click: () => {
+                // Clear session and stop tracking
+                (0, tracker_1.clearSavedSession)();
+                stopTrackingTimer();
+                (0, activityMonitor_1.stopActivityMonitoring)();
+                // Refresh the window to show login screen
+                if (mainWindow) {
+                    mainWindow.reload();
+                    mainWindow.show();
+                    mainWindow.focus();
+                }
+                console.log('🚪 User logged out - session cleared');
+            }
+        },
+        { type: 'separator' },
+        { label: '❌ Quit', click: () => electron_1.app.quit() }
     ]);
     if (tray) {
         tray.setContextMenu(contextMenu);
@@ -348,8 +413,8 @@ function updateTrayTimer() {
 }
 // Show screenshot notification
 function showScreenshotNotification() {
-    if (Notification.isSupported()) {
-        const notification = new Notification({
+    if (electron_1.Notification.isSupported()) {
+        const notification = new electron_1.Notification({
             title: '📸 Screenshot Captured',
             body: 'Activity screenshot has been taken and uploaded',
             icon: path.join(__dirname, '../assets/icon.png'),

@@ -1,28 +1,35 @@
-import { desktopCapturer, screen, app } from 'electron';
-import fs from 'fs';
-import path from 'path';
-import { randomUUID } from 'crypto';
-import { supabase } from './supabase';
-import { queueScreenshot } from './unsyncedManager';
-import { logError, showError } from './errorHandler';
-const UNSYNCED_LIST_PATH = path.join(app.getPath('userData'), 'unsynced_screenshots.json');
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.captureAndUpload = captureAndUpload;
+exports.processQueue = processQueue;
+const electron_1 = require("electron");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const crypto_1 = require("crypto");
+const supabase_1 = require("./supabase.cjs");
+const unsyncedManager_1 = require("./unsyncedManager.cjs");
+const errorHandler_1 = require("./errorHandler.cjs");
+const UNSYNCED_LIST_PATH = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_screenshots.json');
 function loadQueue() {
     try {
-        if (fs.existsSync(UNSYNCED_LIST_PATH)) {
-            return JSON.parse(fs.readFileSync(UNSYNCED_LIST_PATH, 'utf8'));
+        if (fs_1.default.existsSync(UNSYNCED_LIST_PATH)) {
+            return JSON.parse(fs_1.default.readFileSync(UNSYNCED_LIST_PATH, 'utf8'));
         }
     }
     catch (err) {
-        logError('loadQueue', err);
+        (0, errorHandler_1.logError)('loadQueue', err);
     }
     return [];
 }
 function saveQueue(items) {
     try {
-        fs.writeFileSync(UNSYNCED_LIST_PATH, JSON.stringify(items));
+        fs_1.default.writeFileSync(UNSYNCED_LIST_PATH, JSON.stringify(items));
     }
     catch (err) {
-        logError('saveQueue', err);
+        (0, errorHandler_1.logError)('saveQueue', err);
     }
 }
 const queue = loadQueue();
@@ -30,49 +37,49 @@ let retryInterval = null;
 if (queue.length > 0) {
     startRetry();
 }
-export async function captureAndUpload(userId, projectId) {
-    const primaryDisplay = screen.getPrimaryDisplay();
+async function captureAndUpload(userId, projectId) {
+    const primaryDisplay = electron_1.screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
-    const sources = await desktopCapturer.getSources({
+    const sources = await electron_1.desktopCapturer.getSources({
         types: ['screen'],
         thumbnailSize: { width, height }
     });
     if (sources.length === 0)
         return;
     const buffer = sources[0].thumbnail.toPNG();
-    const filename = `screenshot_${randomUUID()}.png`;
-    const tempPath = path.join(app.getPath('temp'), filename);
-    fs.writeFileSync(tempPath, buffer);
+    const filename = `screenshot_${(0, crypto_1.randomUUID)()}.png`;
+    const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
+    fs_1.default.writeFileSync(tempPath, buffer);
     try {
         await uploadScreenshot(tempPath, userId, projectId, Date.now());
-        fs.unlink(tempPath, () => { });
+        fs_1.default.unlink(tempPath, () => { });
     }
     catch (err) {
-        logError('captureAndUpload', err);
-        showError('Screenshot Error', 'Failed to upload screenshot. It will be retried.');
-        const unsyncedDir = path.join(app.getPath('userData'), 'unsynced_screenshots');
-        fs.mkdirSync(unsyncedDir, { recursive: true });
-        const dest = path.join(unsyncedDir, filename);
-        fs.copyFileSync(tempPath, dest);
-        fs.unlink(tempPath, () => { });
+        (0, errorHandler_1.logError)('captureAndUpload', err);
+        (0, errorHandler_1.showError)('Screenshot Error', 'Failed to upload screenshot. It will be retried.');
+        const unsyncedDir = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_screenshots');
+        fs_1.default.mkdirSync(unsyncedDir, { recursive: true });
+        const dest = path_1.default.join(unsyncedDir, filename);
+        fs_1.default.copyFileSync(tempPath, dest);
+        fs_1.default.unlink(tempPath, () => { });
         queue.push({ path: dest, userId, projectId, timestamp: Date.now() });
         saveQueue(queue);
         startRetry();
     }
 }
 async function uploadScreenshot(filePath, userId, projectId, ts) {
-    const fileData = fs.readFileSync(filePath);
-    const filename = path.basename(filePath);
-    const { error: uploadError } = await supabase.storage
+    const fileData = fs_1.default.readFileSync(filePath);
+    const filename = path_1.default.basename(filePath);
+    const { error: uploadError } = await supabase_1.supabase.storage
         .from('screenshots')
         .upload(`${userId}/${filename}`, fileData);
     if (uploadError)
         throw uploadError;
-    const { data: publicUrlData } = supabase.storage
+    const { data: publicUrlData } = supabase_1.supabase.storage
         .from('screenshots')
         .getPublicUrl(`${userId}/${filename}`);
     const imageUrl = publicUrlData.publicUrl;
-    const { error: dbError } = await supabase
+    const { error: dbError } = await supabase_1.supabase
         .from('screenshots')
         .insert({
         user_id: userId,
@@ -81,7 +88,7 @@ async function uploadScreenshot(filePath, userId, projectId, ts) {
         captured_at: new Date(ts).toISOString()
     });
     if (dbError) {
-        queueScreenshot({
+        (0, unsyncedManager_1.queueScreenshot)({
             user_id: userId,
             project_id: projectId,
             image_url: imageUrl,
@@ -95,18 +102,18 @@ function startRetry() {
         return;
     retryInterval = setInterval(processQueue, 30000);
 }
-export async function processQueue() {
+async function processQueue() {
     for (const item of [...queue]) {
         try {
             await uploadScreenshot(item.path, item.userId, item.projectId, item.timestamp);
-            fs.unlink(item.path, () => { });
+            fs_1.default.unlink(item.path, () => { });
             const index = queue.indexOf(item);
             if (index !== -1)
                 queue.splice(index, 1);
             saveQueue(queue);
         }
         catch (err) {
-            logError('processQueue', err);
+            (0, errorHandler_1.logError)('processQueue', err);
             // keep in queue
         }
     }

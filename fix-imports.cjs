@@ -29,6 +29,12 @@ function findAndFixFiles(dir) {
     
     if (stat.isDirectory()) {
       findAndFixFiles(fullPath);
+    } else if (file.endsWith('.js')) {
+      // Rename .js to .cjs and fix imports
+      const cjsPath = fullPath.replace(/\.js$/, '.cjs');
+      fs.renameSync(fullPath, cjsPath);
+      fixImportsInFile(cjsPath);
+      console.log(`Renamed and fixed ${fullPath} -> ${cjsPath}`);
     } else if (file.endsWith('.cjs')) {
       fixImportsInFile(fullPath);
     }

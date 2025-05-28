@@ -1,16 +1,16 @@
-require('dotenv/config');
-const { app, BrowserWindow, ipcMain, powerMonitor, screen, nativeImage, shell, Menu, Tray, Notification } = require('electron');
-const path = require('path');
-const http = require('http');
-const fs = require('fs');
-const { setUserId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } = require('./tracker');
-const { setupAutoLaunch } = require('./autoLaunch');
-const { initSystemMonitor } = require('./systemMonitor');
-const { startSyncLoop } = require('./unsyncedManager');
-const { startActivityMonitoring, stopActivityMonitoring, triggerActivityCapture, triggerDirectScreenshot } = require('./activityMonitor');
-const { ensureScreenRecordingPermission, testScreenCapture } = require('./permissionManager');
-const { screenshotIntervalSeconds } = require('./config');
-const { EventEmitter } = require('events');
+import 'dotenv/config';
+import { app, BrowserWindow, ipcMain, powerMonitor, screen, nativeImage, shell, Menu, Tray, Notification } from 'electron';
+import * as path from 'path';
+import * as http from 'http';
+import * as fs from 'fs';
+import { setUserId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } from './tracker';
+import { setupAutoLaunch } from './autoLaunch';
+import { initSystemMonitor } from './systemMonitor';
+import { startSyncLoop } from './unsyncedManager';
+import { startActivityMonitoring, stopActivityMonitoring, triggerActivityCapture, triggerDirectScreenshot } from './activityMonitor';
+import { ensureScreenRecordingPermission, testScreenCapture } from './permissionManager';
+import { screenshotIntervalSeconds } from './config';
+import { EventEmitter } from 'events';
 
 // Create event emitter for internal communication
 export const appEvents = new EventEmitter();
@@ -20,8 +20,8 @@ console.log('🔧 Environment variables at startup:');
 console.log('   SCREENSHOT_INTERVAL_SECONDS:', process.env.SCREENSHOT_INTERVAL_SECONDS);
 console.log('   Config screenshotIntervalSeconds:', screenshotIntervalSeconds);
 
-let mainWindow: typeof BrowserWindow | null = null;
-let tray: typeof Tray | null = null;
+let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
 let isTracking = false;
 let trackingStartTime: Date | null = null;
 let timerInterval: NodeJS.Timeout | null = null;
@@ -41,7 +41,7 @@ async function createWindow() {
   });
 
   // In development, load from Vite dev server, in production load from file
-  const isDev = process.env.NODE_ENV !== 'production';
+  const isDev = true; // Force dev mode to use Vite server
   
   if (isDev) {
     // Try multiple ports to find where Vite is running
@@ -58,7 +58,7 @@ async function createWindow() {
           const req = http.get(testUrl, (res: any) => {
             if (res.statusCode === 200) {
               let data = '';
-              res.on('data', chunk => {
+              res.on('data', (chunk: any) => {
                 data += chunk;
               });
               res.on('end', () => {
@@ -106,7 +106,7 @@ async function createWindow() {
       })
       .catch(err => console.error('Failed to load UI from dev server:', err));
   } else {
-    const indexPath = path.join(__dirname, '../../dist/index.html');
+    const indexPath = path.join(__dirname, '../../../dist/index.html');
     console.log('Loading UI from:', indexPath);
     mainWindow.loadFile(indexPath)
       .then(() => {
@@ -225,6 +225,19 @@ ipcMain.on('sync-offline-data', () => void syncOfflineData());
 ipcMain.handle('load-session', () => loadSession());
 ipcMain.on('clear-session', () => clearSavedSession());
 
+ipcMain.on('logout', () => {
+  console.log('🚪 Logout requested from UI');
+  // Clear session and stop tracking
+  clearSavedSession();
+  stopTrackingTimer();
+  stopActivityMonitoring();
+  // Reload the window to show login screen
+  if (mainWindow) {
+    mainWindow.reload();
+  }
+  console.log('🚪 User logged out - session cleared and tracking stopped');
+});
+
 ipcMain.on('trigger-activity-capture', () => {
   triggerActivityCapture();
   showScreenshotNotification();
@@ -326,6 +339,23 @@ function updateTrayMenu() {
       click: () => {
         triggerActivityCapture();
         showScreenshotNotification();
+      }
+    },
+    { type: 'separator' },
+    { 
+      label: '🚪 Logout', 
+      click: () => {
+        // Clear session and stop tracking
+        clearSavedSession();
+        stopTrackingTimer();
+        stopActivityMonitoring();
+        // Refresh the window to show login screen
+        if (mainWindow) {
+          mainWindow.reload();
+          mainWindow.show();
+          mainWindow.focus();
+        }
+        console.log('🚪 User logged out - session cleared');
       }
     },
     { type: 'separator' },

@@ -1,11 +1,22 @@
-import { app, desktopCapturer, screen, Notification } from 'electron';
-import fs from 'fs';
-import path from 'path';
-import { randomUUID } from 'crypto';
-import { supabase } from './supabase';
-import { queueScreenshot, queueAppLog } from './unsyncedManager';
-import { logError } from './errorHandler';
-import { screenshotIntervalSeconds, idleTimeoutMinutes } from './config';
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.startActivityMonitoring = startActivityMonitoring;
+exports.stopActivityMonitoring = stopActivityMonitoring;
+exports.fetchSettings = fetchSettings;
+exports.triggerActivityCapture = triggerActivityCapture;
+exports.triggerDirectScreenshot = triggerDirectScreenshot;
+exports.getActivityMetrics = getActivityMetrics;
+const electron_1 = require("electron");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const crypto_1 = require("crypto");
+const supabase_1 = require("./supabase.cjs");
+const unsyncedManager_1 = require("./unsyncedManager.cjs");
+const errorHandler_1 = require("./errorHandler.cjs");
+const config_1 = require("./config.cjs");
 // Import app events for communication with main process
 let appEvents = null;
 try {
@@ -16,13 +27,13 @@ catch (e) {
     // Fallback if main is not available
     console.log('Main events not available yet');
 }
-const UNSYNCED_ACTIVITY_PATH = path.join(app.getPath('userData'), 'unsynced_activity.json');
+const UNSYNCED_ACTIVITY_PATH = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_activity.json');
 // Special UUID for activity monitoring - this represents a virtual "task" for general activity monitoring
 const ACTIVITY_MONITORING_TASK_ID = '00000000-0000-0000-0000-000000000001';
 let appSettings = {
     blur_screenshots: false,
-    screenshot_interval_seconds: screenshotIntervalSeconds,
-    idle_threshold_seconds: idleTimeoutMinutes * 60
+    screenshot_interval_seconds: config_1.screenshotIntervalSeconds,
+    idle_threshold_seconds: config_1.idleTimeoutMinutes * 60
 };
 let activityInterval;
 let appTrackingInterval;
@@ -41,7 +52,7 @@ let activityMetrics = {
     activity_score: 0
 };
 // Always-on activity monitoring - starts when app launches
-export async function startActivityMonitoring(userId) {
+async function startActivityMonitoring(userId) {
     if (isMonitoring) {
         console.log('🔄 Activity monitoring already running');
         return;
@@ -62,7 +73,7 @@ export async function startActivityMonitoring(userId) {
     await fetchSettings();
     // Create new activity session
     currentActivitySession = {
-        id: randomUUID(),
+        id: (0, crypto_1.randomUUID)(),
         user_id: userId,
         start_time: new Date().toISOString(),
         is_active: true,
@@ -98,7 +109,7 @@ export async function startActivityMonitoring(userId) {
     }, 60000);
     console.log(`✅ Activity monitoring started - Screenshots every ${appSettings.screenshot_interval_seconds}s, App tracking every 5s, Activity metrics every 1s`);
 }
-export function stopActivityMonitoring() {
+function stopActivityMonitoring() {
     if (!isMonitoring)
         return;
     console.log('🛑 Stopping activity monitoring');
@@ -193,16 +204,16 @@ async function trackActivityMetrics() {
     }
     catch (error) {
         console.error('❌ Activity metrics tracking failed:', error);
-        logError('trackActivityMetrics', error);
+        (0, errorHandler_1.logError)('trackActivityMetrics', error);
     }
 }
 // Add settings fetch function
-export async function fetchSettings() {
+async function fetchSettings() {
     try {
         // Try to load from config file first
-        const configPath = path.join(process.cwd(), 'desktop-agent', 'config.json');
-        if (fs.existsSync(configPath)) {
-            const configContent = fs.readFileSync(configPath, 'utf8');
+        const configPath = path_1.default.join(process.cwd(), 'desktop-agent', 'config.json');
+        if (fs_1.default.existsSync(configPath)) {
+            const configContent = fs_1.default.readFileSync(configPath, 'utf8');
             const config = JSON.parse(configContent);
             appSettings = {
                 blur_screenshots: config.blur_screenshots || false,
@@ -213,7 +224,7 @@ export async function fetchSettings() {
             return;
         }
         // Fallback to database settings if config file doesn't exist
-        const { data, error } = await supabase
+        const { data, error } = await supabase_1.supabase
             .from('settings')
             .select('*')
             .single();
@@ -232,7 +243,7 @@ export async function fetchSettings() {
     }
     catch (error) {
         console.error('❌ Settings fetch error:', error);
-        logError('fetchSettings', error);
+        (0, errorHandler_1.logError)('fetchSettings', error);
     }
 }
 // Add blur function using Canvas API
@@ -256,9 +267,9 @@ async function captureActivityScreenshot() {
         return;
     try {
         console.log('📸 Capturing activity screenshot...');
-        const primaryDisplay = screen.getPrimaryDisplay();
+        const primaryDisplay = electron_1.screen.getPrimaryDisplay();
         const { width, height } = primaryDisplay.workAreaSize;
-        const sources = await desktopCapturer.getSources({
+        const sources = await electron_1.desktopCapturer.getSources({
             types: ['screen'],
             thumbnailSize: { width: Math.min(width, 1920), height: Math.min(height, 1080) }
         });
@@ -272,9 +283,9 @@ async function captureActivityScreenshot() {
             console.log('🔄 Applying blur to screenshot...');
             buffer = await blurImage(buffer);
         }
-        const filename = `activity_${randomUUID()}.png`;
-        const tempPath = path.join(app.getPath('temp'), filename);
-        fs.writeFileSync(tempPath, buffer);
+        const filename = `activity_${(0, crypto_1.randomUUID)()}.png`;
+        const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
+        fs_1.default.writeFileSync(tempPath, buffer);
         console.log('💾 Activity screenshot saved:', filename);
         // Upload to Supabase with activity metrics
         await uploadActivityScreenshot(tempPath, filename);
@@ -285,13 +296,13 @@ async function captureActivityScreenshot() {
     }
     catch (error) {
         console.error('❌ Activity screenshot failed:', error);
-        logError('captureActivityScreenshot', error);
+        (0, errorHandler_1.logError)('captureActivityScreenshot', error);
     }
 }
 async function uploadActivityScreenshot(filePath, filename) {
     if (!currentUserId) {
         console.log('⚠️ No user ID available, queuing screenshot for later upload');
-        queueScreenshot({
+        (0, unsyncedManager_1.queueScreenshot)({
             user_id: 'unknown',
             project_id: '00000000-0000-0000-0000-000000000001',
             image_url: `local://${filePath}`,
@@ -304,9 +315,9 @@ async function uploadActivityScreenshot(filePath, filename) {
     const taskId = ACTIVITY_MONITORING_TASK_ID;
     console.log(`☁️ Uploading activity screenshot - user: ${currentUserId}, task: ${taskId}`);
     try {
-        const fileBuffer = fs.readFileSync(filePath);
+        const fileBuffer = fs_1.default.readFileSync(filePath);
         // Upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { data: uploadData, error: uploadError } = await supabase_1.supabase.storage
             .from('screenshots')
             .upload(`${currentUserId}/${filename}`, fileBuffer, {
             contentType: 'image/png',
@@ -314,7 +325,7 @@ async function uploadActivityScreenshot(filePath, filename) {
         });
         if (uploadError) {
             console.log('❌ Storage upload failed:', uploadError);
-            queueScreenshot({
+            (0, unsyncedManager_1.queueScreenshot)({
                 user_id: currentUserId,
                 project_id: '00000000-0000-0000-0000-000000000001',
                 image_url: `local://${filePath}`,
@@ -323,11 +334,11 @@ async function uploadActivityScreenshot(filePath, filename) {
             return;
         }
         // Get public URL
-        const { data: { publicUrl } } = supabase.storage
+        const { data: { publicUrl } } = supabase_1.supabase.storage
             .from('screenshots')
             .getPublicUrl(`${currentUserId}/${filename}`);
         // Save to database with activity metrics
-        const { error: dbError } = await supabase
+        const { error: dbError } = await supabase_1.supabase
             .from('screenshots')
             .insert({
             user_id: currentUserId,
@@ -342,7 +353,7 @@ async function uploadActivityScreenshot(filePath, filename) {
         });
         if (dbError) {
             console.log('❌ Database save failed:', dbError);
-            queueScreenshot({
+            (0, unsyncedManager_1.queueScreenshot)({
                 user_id: currentUserId,
                 project_id: '00000000-0000-0000-0000-000000000001',
                 image_url: publicUrl,
@@ -366,7 +377,7 @@ async function uploadActivityScreenshot(filePath, filename) {
         }
         // Clean up local file
         try {
-            fs.unlinkSync(filePath);
+            fs_1.default.unlinkSync(filePath);
         }
         catch (err) {
             console.log('⚠️ Could not delete local file:', err.message);
@@ -374,7 +385,7 @@ async function uploadActivityScreenshot(filePath, filename) {
     }
     catch (error) {
         console.log('❌ Activity screenshot upload error:', error);
-        queueScreenshot({
+        (0, unsyncedManager_1.queueScreenshot)({
             user_id: currentUserId,
             project_id: '00000000-0000-0000-0000-000000000001',
             image_url: `local://${filePath}`,
@@ -515,7 +526,7 @@ async function trackCurrentApp() {
     }
     catch (error) {
         console.error('❌ App tracking failed:', error);
-        logError('trackCurrentApp', error);
+        (0, errorHandler_1.logError)('trackCurrentApp', error);
     }
 }
 async function saveAppActivity() {
@@ -529,19 +540,19 @@ async function saveAppActivity() {
             app_name: currentApp.app_name,
             window_title: currentApp.window_title
         };
-        const { error } = await supabase
+        const { error } = await supabase_1.supabase
             .from('app_logs')
             .insert(appLogData);
         if (error) {
             // Queue for later upload if database fails
-            queueAppLog(appLogData);
+            (0, unsyncedManager_1.queueAppLog)(appLogData);
             throw error;
         }
         console.log('✅ App activity saved:', currentApp.app_name);
     }
     catch (error) {
         console.error('❌ Failed to save app activity:', error);
-        logError('saveAppActivity', error);
+        (0, errorHandler_1.logError)('saveAppActivity', error);
     }
 }
 function getAppCategory(appName) {
@@ -643,7 +654,7 @@ async function saveURLActivity(appActivity) {
             site_url: appActivity.url,
             category: getURLCategory(appActivity.url)
         };
-        const { error } = await supabase
+        const { error } = await supabase_1.supabase
             .from('url_logs')
             .insert(urlLogData);
         if (error) {
@@ -656,7 +667,7 @@ async function saveURLActivity(appActivity) {
     }
     catch (error) {
         console.error('❌ Failed to save URL activity:', error);
-        logError('saveURLActivity', error);
+        (0, errorHandler_1.logError)('saveURLActivity', error);
     }
 }
 function getURLCategory(url) {
@@ -700,22 +711,22 @@ async function saveActivitySession() {
             app_name: 'Activity Monitor',
             window_title: `${currentActivitySession.is_active ? 'Active' : 'Ended'} Session - Screenshots: ${currentActivitySession.total_screenshots}`
         };
-        const { error } = await supabase
+        const { error } = await supabase_1.supabase
             .from('app_logs')
             .insert(sessionLogData);
         if (error) {
             console.error('❌ Failed to save activity session:', error);
             // Queue for later upload using existing queue system
-            queueAppLog(sessionLogData);
+            (0, unsyncedManager_1.queueAppLog)(sessionLogData);
         }
     }
     catch (error) {
         console.error('❌ Failed to save activity session:', error);
-        logError('saveActivitySession', error);
+        (0, errorHandler_1.logError)('saveActivitySession', error);
     }
 }
 // Manual activity trigger (for testing)
-export function triggerActivityCapture() {
+function triggerActivityCapture() {
     console.log('🧪 triggerActivityCapture() called');
     console.log('📊 Activity monitoring state - isMonitoring:', isMonitoring, 'currentUserId:', currentUserId);
     // Use the real task ID from active tracking if available, otherwise skip
@@ -727,13 +738,13 @@ export function triggerActivityCapture() {
     captureActivityScreenshot();
 }
 // Direct screenshot test function (for testing without activity monitoring)
-export async function triggerDirectScreenshot() {
+async function triggerDirectScreenshot() {
     console.log('🧪 triggerDirectScreenshot() called - testing basic screenshot functionality');
     try {
-        const primaryDisplay = screen.getPrimaryDisplay();
+        const primaryDisplay = electron_1.screen.getPrimaryDisplay();
         const { width, height } = primaryDisplay.workAreaSize;
         console.log(`🖥️ Display size: ${width}x${height}`);
-        const sources = await desktopCapturer.getSources({
+        const sources = await electron_1.desktopCapturer.getSources({
             types: ['screen'],
             thumbnailSize: { width: Math.min(width, 1920), height: Math.min(height, 1080) }
         });
@@ -743,23 +754,23 @@ export async function triggerDirectScreenshot() {
             return false;
         }
         const buffer = sources[0].thumbnail.toPNG();
-        const filename = `test_direct_${randomUUID()}.png`;
-        const tempPath = path.join(app.getPath('temp'), filename);
-        fs.writeFileSync(tempPath, buffer);
+        const filename = `test_direct_${(0, crypto_1.randomUUID)()}.png`;
+        const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
+        fs_1.default.writeFileSync(tempPath, buffer);
         console.log(`💾 Test screenshot saved to: ${tempPath}`);
         console.log(`📊 Screenshot size: ${buffer.length} bytes`);
         // For testing, let's just save locally and not upload to avoid DB issues
-        const testDir = path.join(app.getPath('userData'), 'test_screenshots');
-        fs.mkdirSync(testDir, { recursive: true });
-        const finalPath = path.join(testDir, filename);
-        fs.copyFileSync(tempPath, finalPath);
-        fs.unlinkSync(tempPath);
+        const testDir = path_1.default.join(electron_1.app.getPath('userData'), 'test_screenshots');
+        fs_1.default.mkdirSync(testDir, { recursive: true });
+        const finalPath = path_1.default.join(testDir, filename);
+        fs_1.default.copyFileSync(tempPath, finalPath);
+        fs_1.default.unlinkSync(tempPath);
         console.log(`✅ Test screenshot saved successfully to: ${finalPath}`);
         return true;
     }
     catch (error) {
         console.error('❌ Direct screenshot test failed:', error);
-        logError('triggerDirectScreenshot', error);
+        (0, errorHandler_1.logError)('triggerDirectScreenshot', error);
         return false;
     }
 }
@@ -767,7 +778,7 @@ async function checkNotifications() {
     if (!currentUserId)
         return;
     try {
-        const { data: notifications, error } = await supabase
+        const { data: notifications, error } = await supabase_1.supabase
             .from('notifications')
             .select('*')
             .eq('user_id', currentUserId)
@@ -782,7 +793,7 @@ async function checkNotifications() {
             for (const notification of notifications) {
                 showNotification(notification);
                 // Mark as read
-                await supabase
+                await supabase_1.supabase
                     .from('notifications')
                     .update({ read_at: new Date().toISOString() })
                     .eq('id', notification.id);
@@ -791,16 +802,16 @@ async function checkNotifications() {
     }
     catch (error) {
         console.error('❌ Notification check failed:', error);
-        logError('checkNotifications', error);
+        (0, errorHandler_1.logError)('checkNotifications', error);
     }
 }
 function showNotification(notification) {
     try {
-        if (Notification.isSupported()) {
-            const notif = new Notification({
+        if (electron_1.Notification.isSupported()) {
+            const notif = new electron_1.Notification({
                 title: 'Time Flow',
                 body: getNotificationMessage(notification),
-                icon: path.join(__dirname, '../assets/icon.png'), // Add app icon
+                icon: path_1.default.join(__dirname, '../assets/icon.png'), // Add app icon
                 silent: false
             });
             notif.show();
@@ -830,6 +841,6 @@ function getNotificationMessage(notification) {
     }
 }
 // Export activity metrics for external access
-export function getActivityMetrics() {
+function getActivityMetrics() {
     return { ...activityMetrics };
 }
