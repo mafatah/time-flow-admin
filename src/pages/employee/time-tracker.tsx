@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +15,7 @@ interface Project {
 interface TimeLog {
   id: string;
   start_time: string;
-  end_time?: string;
+  end_time: string | null;
   is_idle: boolean;
   project_id: string;
   project_name?: string;
@@ -175,7 +174,7 @@ export default function EmployeeTimeTracker() {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatDuration = (startTime: string, endTime?: string) => {
+  const formatDuration = (startTime: string, endTime?: string | null) => {
     const start = new Date(startTime).getTime();
     const end = endTime ? new Date(endTime).getTime() : new Date().getTime();
     const durationSeconds = Math.floor((end - start) / 1000);
