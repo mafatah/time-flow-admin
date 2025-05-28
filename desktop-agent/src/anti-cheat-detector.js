@@ -1,4 +1,5 @@
-const robot = require('robotjs');
+// Removed robotjs dependency - using simplified detection
+// const robot = require('robotjs');
 const { powerMonitor } = require('electron');
 
 class AntiCheatDetector {

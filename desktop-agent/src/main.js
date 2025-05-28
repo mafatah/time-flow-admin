@@ -2,9 +2,7 @@ const { app, BrowserWindow, powerMonitor, screen, ipcMain, Notification, Tray, M
 const path = require('path');
 const fs = require('fs');
 const screenshot = require('screenshot-desktop');
-const idle = require('desktop-idle');
 const activeWin = require('active-win');
-const robot = require('robotjs');
 const cron = require('node-cron');
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
@@ -29,6 +27,13 @@ let idleStart = null;
 let lastActivity = Date.now();
 let lastMousePos = { x: 0, y: 0 };
 let systemSleepStart = null;
+
+// Simplified mouse tracking without robotjs
+let mouseTracker = {
+  x: 0,
+  y: 0,
+  lastUpdate: Date.now()
+};
 
 // === INTERVALS ===
 let screenshotInterval = null;
@@ -81,6 +86,58 @@ let offlineQueue = {
   timeLogs: [],
   fraudAlerts: []
 };
+
+// === SIMPLIFIED IDLE DETECTION ===
+function getSystemIdleTime() {
+  // Use Electron's built-in idle time detection
+  try {
+    return powerMonitor.getSystemIdleTime() * 1000; // Convert to milliseconds
+  } catch (error) {
+    console.log('⚠️ PowerMonitor idle time not available, using manual tracking');
+    return Date.now() - lastActivity;
+  }
+}
+
+function getCurrentMousePosition() {
+  // Simplified mouse position tracking without robotjs
+  try {
+    const displays = screen.getAllDisplays();
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const point = screen.getCursorScreenPoint();
+    return { x: point.x, y: point.y };
+  } catch (error) {
+    console.log('⚠️ Screen API not available for mouse tracking');
+    return mouseTracker;
+  }
+}
+
+function simulateKeyboardActivity() {
+  // Simulate keyboard activity detection
+  activityStats.keystrokes++;
+  lastActivity = Date.now();
+  
+  if (antiCheatDetector) {
+    antiCheatDetector.recordActivity('keyboard', {
+      timestamp: Date.now(),
+      key: 'simulated_activity',
+      code: 'ActivityDetected'
+    });
+  }
+}
+
+function simulateMouseClick() {
+  // Simulate mouse click detection
+  activityStats.mouseClicks++;
+  lastActivity = Date.now();
+  
+  if (antiCheatDetector) {
+    antiCheatDetector.recordActivity('mouse_click', {
+      x: mouseTracker.x,
+      y: mouseTracker.y,
+      timestamp: Date.now()
+    });
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -227,12 +284,12 @@ function startIdleMonitoring() {
   startKeyboardTracking();
   
   idleCheckInterval = setInterval(() => {
-    const idleTimeMs = idle.getIdleTime();
+    const idleTimeMs = getSystemIdleTime();
     const idleTimeSeconds = Math.floor(idleTimeMs / 1000);
     const now = Date.now();
 
     // Enhanced activity detection
-    const currentMousePos = robot.getMousePos();
+    const currentMousePos = getCurrentMousePosition();
     const mouseMoved = currentMousePos.x !== lastMousePos.x || currentMousePos.y !== lastMousePos.y;
     
     if (mouseMoved) {
@@ -355,7 +412,7 @@ function startMouseTracking() {
   mouseTrackingInterval = setInterval(() => {
     try {
       // This is a simplified approach - in production you'd use native mouse hooks
-      const currentPos = robot.getMousePos();
+      const currentPos = getCurrentMousePosition();
       
       // Detect if mouse button is pressed (simplified detection)
       // In production, you'd use mouse event listeners
@@ -386,11 +443,11 @@ function startKeyboardTracking() {
   
   // This is a simplified approach - in production you'd use global keyboard hooks
   // For now, we'll simulate keyboard detection based on system idle time changes
-  let lastIdleCheck = idle.getIdleTime();
+  let lastIdleCheck = getSystemIdleTime();
   
   keyboardTrackingInterval = setInterval(() => {
     try {
-      const currentIdle = idle.getIdleTime();
+      const currentIdle = getSystemIdleTime();
       
       // If idle time decreased significantly, keyboard/mouse activity occurred
       if (currentIdle < lastIdleCheck - 1000) { // 1 second tolerance
