@@ -261,6 +261,22 @@ async function trackActivityMetrics() {
 // Add settings fetch function
 export async function fetchSettings() {
   try {
+    // Try to load from config file first
+    const configPath = path.join(process.cwd(), 'desktop-agent', 'config.json');
+    if (fs.existsSync(configPath)) {
+      const configContent = fs.readFileSync(configPath, 'utf8');
+      const config = JSON.parse(configContent);
+      
+      appSettings = {
+        blur_screenshots: config.blur_screenshots || false,
+        screenshot_interval_seconds: config.screenshot_interval_seconds || 60,
+        idle_threshold_seconds: config.idle_threshold_seconds || 300
+      };
+      console.log('✅ Settings loaded from config:', appSettings);
+      return;
+    }
+
+    // Fallback to database settings if config file doesn't exist
     const { data, error } = await supabase
       .from('settings')
       .select('*')
@@ -275,9 +291,9 @@ export async function fetchSettings() {
       appSettings = {
         blur_screenshots: data.blur_screenshots || false,
         screenshot_interval_seconds: data.screenshot_interval_seconds || 60,
-        idle_threshold_seconds: data.idle_threshold_seconds || 180
+        idle_threshold_seconds: data.idle_threshold_seconds || 300
       };
-      console.log('✅ Settings loaded:', appSettings);
+      console.log('✅ Settings loaded from database:', appSettings);
     }
   } catch (error) {
     console.error('❌ Settings fetch error:', error);
@@ -442,52 +458,95 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
 }
 
 async function getCurrentAppName(): Promise<string> {
-  // Simplified implementation - would need native module for real app detection
-  // For demo purposes, simulate different apps
-  const apps = ['VS Code', 'Chrome', 'Slack', 'Terminal', 'Finder', 'Safari', 'Zoom', 'Spotify'];
-  return apps[Math.floor(Math.random() * apps.length)];
+  try {
+    // For macOS, we need to use native calls to get real app names
+    // This is a simplified implementation - in production you'd use native modules
+    
+    // Disable fake data generation and return a more realistic detection
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    
+    try {
+      // Get the frontmost application on macOS
+      const { stdout } = await execAsync(`osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true'`);
+      const appName = stdout.trim();
+      return appName || 'Unknown Application';
+    } catch (error) {
+      console.log('⚠️ Could not detect real app, using fallback');
+      return 'System Application';
+    }
+  } catch (error) {
+    console.error('❌ App detection failed:', error);
+    return 'Unknown Application';
+  }
 }
 
 async function getCurrentWindowTitle(): Promise<string> {
-  // Simplified implementation - would need native module for real window title
-  const titles = [
-    'time-flow-admin - VS Code',
-    'GitHub - Chrome',
-    'Slack - Team Chat',
-    'Terminal',
-    'Documents - Finder',
-    'YouTube - Safari',
-    'Zoom Meeting',
-    'Spotify - Music'
-  ];
-  return titles[Math.floor(Math.random() * titles.length)];
+  try {
+    // For macOS, get the window title of the frontmost application
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    
+    try {
+      // Get the window title of the frontmost window
+      const { stdout } = await execAsync(`osascript -e 'tell application "System Events" to get title of front window of first application process whose frontmost is true'`);
+      const windowTitle = stdout.trim();
+      return windowTitle || 'Unknown Window';
+    } catch (error) {
+      // Fallback to app name if window title not available
+      const appName = await getCurrentAppName();
+      return `${appName} Window`;
+    }
+  } catch (error) {
+    console.error('❌ Window title detection failed:', error);
+    return 'Unknown Window';
+  }
 }
 
 async function getCurrentURL(): Promise<string | undefined> {
   try {
-    // This would need native implementation to get browser URLs
-    // For demo purposes, simulate URLs for browser apps
-    const urls = [
-      'https://github.com/user/time-flow-admin',
-      'https://stackoverflow.com/questions/react',
-      'https://youtube.com/watch?v=example',
-      'https://google.com/search?q=typescript',
-      'https://supabase.com/docs',
-      'https://tailwindcss.com/docs',
-      'https://facebook.com',
-      'https://twitter.com',
-      'https://linkedin.com'
-    ];
+    // Only try to get URLs from actual browser applications
+    const appName = await getCurrentAppName();
     
-    // Only return URL for browser-like apps
-    const currentApp = await getCurrentAppName();
-    if (currentApp.includes('Chrome') || currentApp.includes('Safari')) {
-      return urls[Math.floor(Math.random() * urls.length)];
+    // Check if it's actually a browser
+    const browsers = ['Google Chrome', 'Safari', 'Firefox', 'Microsoft Edge', 'Arc'];
+    const isBrowser = browsers.some(browser => appName.includes(browser));
+    
+    if (!isBrowser) {
+      return undefined;
     }
+
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
     
-    return undefined;
+    try {
+      let script = '';
+      
+      if (appName.includes('Chrome') || appName.includes('Arc')) {
+        script = `osascript -e 'tell application "Google Chrome" to get URL of active tab of front window'`;
+      } else if (appName.includes('Safari')) {
+        script = `osascript -e 'tell application "Safari" to get URL of front document'`;
+      } else {
+        return undefined;
+      }
+      
+      const { stdout } = await execAsync(script);
+      const url = stdout.trim();
+      
+      // Only return valid URLs
+      if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+        return url;
+      }
+      
+      return undefined;
+    } catch (error) {
+      // Don't log URL detection errors as they're common when browser isn't open
+      return undefined;
+    }
   } catch (error) {
-    console.error('❌ URL capture failed:', error);
     return undefined;
   }
 }
@@ -579,18 +638,75 @@ async function saveAppActivity() {
 
 function getAppCategory(appName: string): string {
   const categories: { [key: string]: string } = {
-    'VS Code': 'development',
-    'Chrome': 'browser',
-    'Safari': 'browser',
-    'Slack': 'communication',
-    'Zoom': 'communication',
+    // Development tools
+    'Visual Studio Code': 'development',
+    'Xcode': 'development',
     'Terminal': 'development',
+    'iTerm': 'development',
+    'Android Studio': 'development',
+    'IntelliJ IDEA': 'development',
+    
+    // Browsers
+    'Google Chrome': 'browser',
+    'Safari': 'browser',
+    'Firefox': 'browser',
+    'Microsoft Edge': 'browser',
+    'Arc': 'browser',
+    
+    // Communication
+    'Slack': 'communication',
+    'Zoho Cliq': 'communication',
+    'Microsoft Teams': 'communication',
+    'Zoom': 'communication',
+    'Skype': 'communication',
+    'Discord': 'communication',
+    'WhatsApp': 'communication',
+    'Telegram': 'communication',
+    'Mail': 'communication',
+    
+    // System
     'Finder': 'system',
+    'System Preferences': 'system',
+    'Activity Monitor': 'system',
+    'Console': 'system',
+    
+    // Entertainment
     'Spotify': 'entertainment',
-    'YouTube': 'entertainment'
+    'Apple Music': 'entertainment',
+    'VLC': 'entertainment',
+    'QuickTime Player': 'entertainment',
+    'Netflix': 'entertainment',
+    
+    // Productivity
+    'Microsoft Word': 'productivity',
+    'Microsoft Excel': 'productivity',
+    'Microsoft PowerPoint': 'productivity',
+    'Google Docs': 'productivity',
+    'Notion': 'productivity',
+    'Obsidian': 'productivity',
+    'Bear': 'productivity',
+    
+    // Design
+    'Figma': 'design',
+    'Adobe Photoshop': 'design',
+    'Adobe Illustrator': 'design',
+    'Sketch': 'design'
   };
   
-  return categories[appName] || 'other';
+  // Check for exact matches first
+  if (categories[appName]) {
+    return categories[appName];
+  }
+  
+  // Check for partial matches
+  const lowerAppName = appName.toLowerCase();
+  for (const [app, category] of Object.entries(categories)) {
+    if (lowerAppName.includes(app.toLowerCase()) || app.toLowerCase().includes(lowerAppName)) {
+      return category;
+    }
+  }
+  
+  return 'other';
 }
 
 function calculateProductivityScore(app: AppActivity): number {
