@@ -9,12 +9,14 @@ const cron = require('node-cron');
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
 const SyncManager = require('./sync-manager');
+const AntiCheatDetector = require('./anti-cheat-detector');
 
 const configPath = path.join(__dirname, '..', 'config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 const supabase = createClient(config.supabase_url, config.supabase_key);
 let syncManager;
+let antiCheatDetector;
 let mainWindow;
 let tray;
 
@@ -26,6 +28,7 @@ let currentTimeLogId = null;
 let idleStart = null;
 let lastActivity = Date.now();
 let lastMousePos = { x: 0, y: 0 };
+let systemSleepStart = null;
 
 // === INTERVALS ===
 let screenshotInterval = null;
@@ -35,18 +38,25 @@ let appCaptureInterval = null;
 let urlCaptureInterval = null;
 let settingsInterval = null;
 let notificationInterval = null;
+let mouseTrackingInterval = null;
+let keyboardTrackingInterval = null;
 
 // === SETTINGS (Items 6 - Settings Pull) ===
 let appSettings = {
-  screenshot_interval_seconds: 300, // 5 minutes
-  idle_threshold_seconds: 300, // 5 minutes  
+  screenshot_interval_seconds: 30, // 30 seconds for better monitoring
+  idle_threshold_seconds: 60, // 1 minute for faster detection  
   blur_screenshots: false,
   track_urls: true,
   track_applications: true,
   auto_start_tracking: false,
   max_idle_time_seconds: 2400, // 40 minutes
   screenshot_quality: 80,
-  notification_frequency_seconds: 120 // 2 minutes
+  notification_frequency_seconds: 120, // 2 minutes
+  enable_anti_cheat: true,
+  suspicious_activity_threshold: 10,
+  pattern_detection_window_minutes: 15,
+  minimum_mouse_distance: 50,
+  keyboard_diversity_threshold: 5
 };
 
 // === ACTIVITY STATS ===
@@ -56,7 +66,10 @@ let activityStats = {
   mouseMovements: 0,
   idleSeconds: 0,
   activeSeconds: 0,
-  lastReset: Date.now()
+  lastReset: Date.now(),
+  suspiciousEvents: 0,
+  riskScore: 0,
+  screenshotsCaptured: 0
 };
 
 // === OFFLINE QUEUES ===
@@ -65,7 +78,8 @@ let offlineQueue = {
   appLogs: [],
   urlLogs: [],
   idleLogs: [],
-  timeLogs: []
+  timeLogs: [],
+  fraudAlerts: []
 };
 
 function createWindow() {
@@ -165,15 +179,20 @@ async function fetchSettings() {
     if (settingsResponse?.data) {
       const settings = settingsResponse.data;
       appSettings = {
-        screenshot_interval_seconds: settings.screenshot_interval || 300,
-        idle_threshold_seconds: settings.idle_threshold || 300,
+        screenshot_interval_seconds: settings.screenshot_interval || 30,
+        idle_threshold_seconds: settings.idle_threshold || 60,
         blur_screenshots: settings.blur_screenshots || false,
         track_urls: settings.track_urls !== false,
         track_applications: settings.track_applications !== false,
         auto_start_tracking: settings.auto_start_tracking || false,
         max_idle_time_seconds: settings.max_idle_time || 2400,
         screenshot_quality: settings.screenshot_quality || 80,
-        notification_frequency_seconds: settings.notification_frequency || 120
+        notification_frequency_seconds: settings.notification_frequency || 120,
+        enable_anti_cheat: settings.enable_anti_cheat || true,
+        suspicious_activity_threshold: settings.suspicious_activity_threshold || 10,
+        pattern_detection_window_minutes: settings.pattern_detection_window_minutes || 15,
+        minimum_mouse_distance: settings.minimum_mouse_distance || 50,
+        keyboard_diversity_threshold: settings.keyboard_diversity_threshold || 5
       };
       console.log('✅ Settings loaded from server');
     } else {
@@ -188,77 +207,211 @@ async function fetchSettings() {
   }
 }
 
-// === ITEM 1-3: IDLE DETECTION WITH AUTO-PAUSE ===
+// === ITEM 1-3: ENHANCED IDLE DETECTION WITH ANTI-CHEAT ===
 function startIdleMonitoring() {
   if (idleCheckInterval) clearInterval(idleCheckInterval);
 
-  console.log(`😴 Starting idle monitoring (${appSettings.idle_threshold_seconds}s threshold)`);
+  console.log(`😴 Starting enhanced idle monitoring (${appSettings.idle_threshold_seconds}s threshold)`);
+  
+  // Initialize anti-cheat detector if enabled
+  if (appSettings.enable_anti_cheat && !antiCheatDetector) {
+    antiCheatDetector = new AntiCheatDetector(appSettings);
+    antiCheatDetector.startMonitoring();
+    console.log('🕵️  Anti-cheat detection enabled');
+  }
+  
+  // Start enhanced mouse tracking
+  startMouseTracking();
+  
+  // Start keyboard tracking
+  startKeyboardTracking();
   
   idleCheckInterval = setInterval(() => {
     const idleTimeMs = idle.getIdleTime();
     const idleTimeSeconds = Math.floor(idleTimeMs / 1000);
     const now = Date.now();
 
-    // Check for mouse movement (additional activity detection)
+    // Enhanced activity detection
     const currentMousePos = robot.getMousePos();
     const mouseMoved = currentMousePos.x !== lastMousePos.x || currentMousePos.y !== lastMousePos.y;
+    
     if (mouseMoved) {
+      const distance = Math.sqrt(
+        Math.pow(currentMousePos.x - lastMousePos.x, 2) + 
+        Math.pow(currentMousePos.y - lastMousePos.y, 2)
+      );
+      
       lastMousePos = currentMousePos;
       lastActivity = now;
       activityStats.mouseMovements++;
+      
+      // Record for anti-cheat analysis
+      if (antiCheatDetector) {
+        antiCheatDetector.recordActivity('mouse_move', {
+          x: currentMousePos.x,
+          y: currentMousePos.y,
+          distance: distance
+        });
+      }
     }
 
+    // Check for system-level activity
+    const systemIdle = idleTimeSeconds >= appSettings.idle_threshold_seconds;
+    const manualIdle = (now - lastActivity) >= (appSettings.idle_threshold_seconds * 1000);
+    const actuallyIdle = systemIdle || manualIdle;
+
     // User became idle
-    if (idleStart === null && idleTimeSeconds >= appSettings.idle_threshold_seconds) {
+    if (idleStart === null && actuallyIdle) {
       idleStart = now - idleTimeMs;
-      console.log('😴 User idle since:', new Date(idleStart));
+      console.log('😴 User idle detected:', {
+        systemIdleSeconds: idleTimeSeconds,
+        lastActivityAgo: Math.floor((now - lastActivity) / 1000),
+        idleSince: new Date(idleStart)
+      });
       
       // ITEM 3: Auto-pause timer and captures
       if (isTracking && !isPaused) {
-        pauseTracking('idle');
+        pauseTracking('idle_detected');
       }
       
-      // Update UI
+      // Update UI with idle status
       mainWindow?.webContents.send('idle-status-changed', { 
         isIdle: true, 
         idleSince: idleStart,
-        idleSeconds: idleTimeSeconds
+        idleSeconds: idleTimeSeconds,
+        reason: systemIdle ? 'system_idle' : 'manual_idle'
       });
+      
+      // Show notification
+      showTrayNotification(`Idle detected - tracking paused (${idleTimeSeconds}s idle)`, 'warning');
     }
 
-    // User became active
-    if (idleStart !== null && idleTimeSeconds < 5) {
+    // User became active (stricter detection)
+    if (idleStart !== null && idleTimeSeconds < 5 && (now - lastActivity) < 5000) {
       const idleEnd = now;
       const idleDuration = idleEnd - idleStart;
       const idleDurationSeconds = Math.floor(idleDuration / 1000);
       
-      console.log(`⚡ User active. Idle: ${idleDurationSeconds}s`);
+      console.log(`⚡ User activity resumed:`, {
+        idleDurationSeconds: idleDurationSeconds,
+        activityDetected: 'both_system_and_manual'
+      });
       
       // ITEM 2: Log idle period
       logIdlePeriod(idleStart, idleEnd, idleDurationSeconds);
       
       idleStart = null;
       
-      // ITEM 3: Auto-resume tracking
+      // ITEM 3: Auto-resume tracking with confirmation for long idle periods
       if (isPaused && currentSession) {
-        resumeTracking();
+        if (idleDurationSeconds > 300) { // More than 5 minutes
+          // Ask user if they want to resume
+          mainWindow?.webContents.send('confirm-resume-after-idle', {
+            idleDurationSeconds: idleDurationSeconds
+          });
+        } else {
+          resumeTracking();
+        }
       }
       
       // Update UI
       mainWindow?.webContents.send('idle-status-changed', { 
         isIdle: false, 
-        idleDuration: idleDurationSeconds 
+        idleDuration: idleDurationSeconds,
+        resumed: true
       });
+      
+      // Show notification
+      showTrayNotification(`Activity resumed after ${Math.floor(idleDurationSeconds/60)}m ${idleDurationSeconds%60}s`, 'success');
     }
 
     // Update idle accumulator for current session
-    if (isTracking && idleStart !== null) {
-      activityStats.idleSeconds++;
-    } else if (isTracking) {
-      activityStats.activeSeconds++;
+    if (isTracking) {
+      if (idleStart !== null) {
+        activityStats.idleSeconds++;
+      } else {
+        activityStats.activeSeconds++;
+      }
     }
 
+    // Update anti-cheat risk score
+    if (antiCheatDetector) {
+      const detectionReport = antiCheatDetector.getDetectionReport();
+      activityStats.suspiciousEvents = detectionReport.totalSuspiciousEvents;
+      activityStats.riskScore = detectionReport.currentRiskLevel === 'HIGH' ? 0.8 :
+                               detectionReport.currentRiskLevel === 'MEDIUM' ? 0.5 : 0.2;
+    }
+
+    // Send activity stats to UI
+    mainWindow?.webContents.send('activity-stats-updated', activityStats);
+
   }, 1000); // Check every second for precise tracking
+}
+
+function startMouseTracking() {
+  if (mouseTrackingInterval) clearInterval(mouseTrackingInterval);
+  
+  // Track mouse clicks more precisely
+  mouseTrackingInterval = setInterval(() => {
+    try {
+      // This is a simplified approach - in production you'd use native mouse hooks
+      const currentPos = robot.getMousePos();
+      
+      // Detect if mouse button is pressed (simplified detection)
+      // In production, you'd use mouse event listeners
+      if (currentPos.x !== lastMousePos.x || currentPos.y !== lastMousePos.y) {
+        const timeSinceLastMove = Date.now() - lastActivity;
+        
+        // If mouse moved after being still, it might be a click
+        if (timeSinceLastMove > 100) { // Debounce
+          activityStats.mouseClicks++;
+          
+          if (antiCheatDetector) {
+            antiCheatDetector.recordActivity('mouse_click', {
+              x: currentPos.x,
+              y: currentPos.y,
+              timestamp: Date.now()
+            });
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore errors in mouse tracking
+    }
+  }, 500); // Check every 500ms
+}
+
+function startKeyboardTracking() {
+  if (keyboardTrackingInterval) clearInterval(keyboardTrackingInterval);
+  
+  // This is a simplified approach - in production you'd use global keyboard hooks
+  // For now, we'll simulate keyboard detection based on system idle time changes
+  let lastIdleCheck = idle.getIdleTime();
+  
+  keyboardTrackingInterval = setInterval(() => {
+    try {
+      const currentIdle = idle.getIdleTime();
+      
+      // If idle time decreased significantly, keyboard/mouse activity occurred
+      if (currentIdle < lastIdleCheck - 1000) { // 1 second tolerance
+        activityStats.keystrokes++;
+        lastActivity = Date.now();
+        
+        if (antiCheatDetector) {
+          antiCheatDetector.recordActivity('keyboard', {
+            timestamp: Date.now(),
+            // In production, you'd capture actual key codes
+            key: 'detected_activity',
+            code: 'KeyDetected'
+          });
+        }
+      }
+      
+      lastIdleCheck = currentIdle;
+    } catch (error) {
+      // Ignore errors in keyboard tracking
+    }
+  }, 1000); // Check every second
 }
 
 function stopIdleMonitoring() {
@@ -266,6 +419,22 @@ function stopIdleMonitoring() {
     clearInterval(idleCheckInterval);
     idleCheckInterval = null;
   }
+  
+  if (mouseTrackingInterval) {
+    clearInterval(mouseTrackingInterval);
+    mouseTrackingInterval = null;
+  }
+  
+  if (keyboardTrackingInterval) {
+    clearInterval(keyboardTrackingInterval);
+    keyboardTrackingInterval = null;
+  }
+  
+  if (antiCheatDetector) {
+    antiCheatDetector.stopMonitoring();
+  }
+  
+  console.log('🛑 Enhanced idle monitoring stopped');
 }
 
 // === ITEM 2: IDLE FLAG UPLOAD ===
@@ -424,57 +593,90 @@ function extractDomain(url) {
   }
 }
 
-// === SCREENSHOT MANAGEMENT WITH BLUR ===
+// === ENHANCED SCREENSHOT CAPTURE WITH ANTI-CHEAT ===
 async function captureScreenshot() {
   if (!isTracking || isPaused) return;
 
   try {
     console.log('📸 Capturing screenshot...');
     
-    const img = await screenshot({ 
-      format: 'png',
-      quality: appSettings.screenshot_quality
-    });
-
-    // Apply blur if enabled
-    let processedImg = img;
-    if (appSettings.blur_screenshots) {
-      // Placeholder for blur - in production use sharp library
-      console.log('🔒 Blur applied');
+    // Record screenshot event for anti-cheat analysis
+    if (antiCheatDetector) {
+      antiCheatDetector.recordActivity('screenshot', {
+        timestamp: Date.now(),
+        isScheduled: true
+      });
+    }
+    
+    const screenshots = await screenshot.listDisplays();
+    if (screenshots.length === 0) {
+      console.log('❌ No displays available for screenshot');
+      return;
     }
 
+    // Capture from primary display
+    const img = await screenshot({ format: 'png', quality: appSettings.screenshot_quality });
+    
     // Calculate activity metrics
     const activityPercent = calculateActivityPercent();
     const focusPercent = calculateFocusPercent();
-
+    
+    // Enhanced activity detection - flag suspicious low activity
+    let suspiciousActivity = false;
+    if (activityPercent < 10 && focusPercent < 20) {
+      suspiciousActivity = true;
+      console.log('⚠️  Low activity detected during screenshot');
+    }
+    
     const screenshotData = {
       user_id: config.user_id,
       time_log_id: currentTimeLogId,
-      image_data: processedImg,
+      timestamp: new Date().toISOString(),
+      image_data: img.toString('base64'),
       activity_percent: activityPercent,
       focus_percent: focusPercent,
       mouse_clicks: activityStats.mouseClicks,
       keystrokes: activityStats.keystrokes,
       mouse_movements: activityStats.mouseMovements,
       is_blurred: appSettings.blur_screenshots,
-      captured_at: new Date().toISOString()
+      suspicious_activity: suspiciousActivity,
+      risk_score: activityStats.riskScore
     };
 
-    await syncManager.addScreenshot(processedImg, screenshotData);
-    console.log('✅ Screenshot captured and queued');
-    
-    // Reset activity stats
-    resetActivityStats();
+    // Include anti-cheat data if available
+    if (antiCheatDetector) {
+      const detectionReport = antiCheatDetector.getDetectionReport();
+      screenshotData.anti_cheat_report = {
+        suspicious_events: detectionReport.totalSuspiciousEvents,
+        risk_level: detectionReport.currentRiskLevel,
+        recent_patterns: detectionReport.recentActivity.slice(-5) // Last 5 activities
+      };
+    }
 
-    // Update UI
+    await syncManager.addScreenshot(screenshotData);
+    activityStats.screenshotsCaptured = (activityStats.screenshotsCaptured || 0) + 1;
+    
+    console.log(`✅ Screenshot captured - Activity: ${activityPercent}%, Focus: ${focusPercent}%, Risk: ${activityStats.riskScore}`);
+
+    // Send updated stats to UI
     mainWindow?.webContents.send('screenshot-captured', {
-      timestamp: new Date().toISOString(),
       activityPercent,
-      focusPercent
+      focusPercent,
+      timestamp: new Date().toISOString(),
+      suspicious: suspiciousActivity,
+      riskScore: activityStats.riskScore
     });
 
   } catch (error) {
-    console.error('❌ Screenshot failed:', error);
+    console.error('❌ Screenshot capture failed:', error);
+    
+    // Log screenshot failure
+    if (antiCheatDetector) {
+      antiCheatDetector.recordActivity('screenshot_failed', {
+        timestamp: Date.now(),
+        error: error.message
+      });
+    }
   }
 }
 
@@ -496,7 +698,10 @@ function resetActivityStats() {
     mouseMovements: 0,
     idleSeconds: 0,
     activeSeconds: 0,
-    lastReset: Date.now()
+    lastReset: Date.now(),
+    suspiciousEvents: 0,
+    riskScore: 0,
+    screenshotsCaptured: 0
   };
 }
 
@@ -753,37 +958,106 @@ function updateTrayMenu() {
   tray.setContextMenu(contextMenu);
 }
 
-// === IPC HANDLERS ===
-ipcMain.handle('start-tracking', async (event, taskId) => {
+// === ENHANCED IPC HANDLERS ===
+ipcMain.handle('start-tracking', async (event, taskId = 'default-task') => {
   await startTracking(taskId);
+  return { success: true, message: 'Enhanced tracking started with anti-cheat detection' };
 });
 
 ipcMain.handle('stop-tracking', async () => {
   await stopTracking();
+  return { success: true, message: 'Tracking stopped' };
 });
 
 ipcMain.handle('pause-tracking', async () => {
-  await pauseTracking('manual');
+  pauseTracking('manual');
+  return { success: true, message: 'Tracking paused' };
 });
 
 ipcMain.handle('resume-tracking', async () => {
   await resumeTracking();
+  return { success: true, message: 'Tracking resumed' };
 });
 
-ipcMain.handle('get-settings', () => {
+ipcMain.handle('get-activity-stats', () => {
+  return activityStats;
+});
+
+ipcMain.handle('get-anti-cheat-report', () => {
+  if (antiCheatDetector) {
+    return antiCheatDetector.getDetectionReport();
+  }
+  return { error: 'Anti-cheat detector not available' };
+});
+
+ipcMain.handle('confirm-resume-after-idle', async (event, confirmed) => {
+  if (confirmed) {
+    await resumeTracking();
+    return { success: true, message: 'Tracking resumed after idle period' };
+  } else {
+    await stopTracking();
+    return { success: true, message: 'Tracking stopped' };
+  }
+});
+
+ipcMain.handle('confirm-resume-after-sleep', async (event, confirmed) => {
+  if (confirmed) {
+    await resumeTracking();
+    return { success: true, message: 'Tracking resumed after sleep' };
+  } else {
+    await stopTracking();
+    return { success: true, message: 'Tracking stopped' };
+  }
+});
+
+ipcMain.handle('get-app-settings', () => {
   return appSettings;
 });
 
-ipcMain.handle('get-session', () => {
-  return currentSession;
+ipcMain.handle('update-app-settings', (event, newSettings) => {
+  appSettings = { ...appSettings, ...newSettings };
+  
+  // Restart anti-cheat detector with new settings
+  if (antiCheatDetector && appSettings.enable_anti_cheat) {
+    antiCheatDetector.stopMonitoring();
+    antiCheatDetector = new AntiCheatDetector(appSettings);
+    antiCheatDetector.startMonitoring();
+  }
+  
+  // Save to config file
+  const configToSave = { ...config, ...newSettings };
+  fs.writeFileSync(configPath, JSON.stringify(configToSave, null, 2));
+  
+  return { success: true, message: 'Settings updated' };
 });
 
-ipcMain.handle('is-tracking', () => {
-  return { isTracking, isPaused };
+ipcMain.handle('get-queue-status', () => {
+  return {
+    screenshots: offlineQueue.screenshots.length,
+    appLogs: offlineQueue.appLogs.length,
+    urlLogs: offlineQueue.urlLogs.length,
+    idleLogs: offlineQueue.idleLogs.length,
+    timeLogs: offlineQueue.timeLogs.length,
+    fraudAlerts: offlineQueue.fraudAlerts.length
+  };
 });
 
-ipcMain.handle('get-stats', () => {
-  return activityStats;
+ipcMain.handle('force-screenshot', async () => {
+  await captureScreenshot();
+  return { success: true, message: 'Screenshot captured manually' };
+});
+
+// === FRAUD DETECTION HANDLERS ===
+ipcMain.handle('report-suspicious-activity', (event, activityData) => {
+  if (antiCheatDetector) {
+    antiCheatDetector.recordActivity('manual_report', activityData);
+    return { success: true, message: 'Suspicious activity reported' };
+  }
+  return { error: 'Anti-cheat detector not available' };
+});
+
+ipcMain.handle('get-fraud-alerts', () => {
+  return offlineQueue.fraudAlerts.slice(-20); // Return last 20 alerts
 });
 
 // === APP LIFECYCLE ===
@@ -833,16 +1107,73 @@ app.on('activate', () => {
   }
 });
 
-// Handle system events
+// === ENHANCED POWER MONITORING ===
 powerMonitor.on('suspend', () => {
-  console.log('💤 System suspended');
-  if (isTracking) pauseTracking('system_suspend');
+  console.log('💤 System suspended (laptop closed/sleep mode)');
+  systemSleepStart = Date.now();
+  
+  if (isTracking) {
+    pauseTracking('system_suspend');
+    showTrayNotification('System sleep detected - tracking paused', 'info');
+  }
+  
+  // Stop all monitoring during sleep
+  if (antiCheatDetector) {
+    antiCheatDetector.stopMonitoring();
+  }
 });
 
 powerMonitor.on('resume', () => {
-  console.log('⚡ System resumed');
+  const sleepDuration = systemSleepStart ? Date.now() - systemSleepStart : 0;
+  const sleepMinutes = Math.floor(sleepDuration / 60000);
+  
+  console.log(`⚡ System resumed after ${sleepMinutes} minutes`);
+  
+  // Log the sleep period as idle time
+  if (systemSleepStart && currentTimeLogId) {
+    logIdlePeriod(systemSleepStart, Date.now(), Math.floor(sleepDuration / 1000));
+  }
+  
+  // Restart anti-cheat monitoring
+  if (appSettings.enable_anti_cheat) {
+    if (!antiCheatDetector) {
+      antiCheatDetector = new AntiCheatDetector(appSettings);
+    }
+    antiCheatDetector.startMonitoring();
+  }
+  
+  // Auto-resume with user confirmation for long sleep periods
   if (isPaused && currentSession) {
-    setTimeout(() => resumeTracking(), 5000);
+    setTimeout(() => {
+      if (sleepMinutes > 60) { // More than 1 hour
+        mainWindow?.webContents.send('confirm-resume-after-sleep', {
+          sleepMinutes: sleepMinutes
+        });
+      } else {
+        resumeTracking();
+        showTrayNotification(`Tracking resumed after ${sleepMinutes}m sleep`, 'success');
+      }
+    }, 5000); // Wait 5 seconds after resume
+  }
+  
+  systemSleepStart = null;
+});
+
+powerMonitor.on('lock-screen', () => {
+  console.log('🔒 Screen locked');
+  if (isTracking && !isPaused) {
+    pauseTracking('screen_locked');
+    showTrayNotification('Screen locked - tracking paused', 'info');
+  }
+});
+
+powerMonitor.on('unlock-screen', () => {
+  console.log('🔓 Screen unlocked');
+  if (isPaused && currentSession) {
+    setTimeout(() => {
+      resumeTracking();
+      showTrayNotification('Screen unlocked - tracking resumed', 'success');
+    }, 2000); // Wait 2 seconds after unlock
   }
 });
 

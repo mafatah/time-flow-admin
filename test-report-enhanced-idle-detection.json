@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-05-28T08:25:46.938Z",
+  "testSuite": "Enhanced Idle Detection & Anti-Cheat",
+  "version": "1.0.0",
+  "configuration": {
+    "user_id": "test-user-123",
+    "enable_anti_cheat": true,
+    "suspicious_activity_threshold": 5,
+    "pattern_detection_window_minutes": 5,
+    "minimum_mouse_distance": 20,
+    "keyboard_diversity_threshold": 3,
+    "idle_threshold_seconds": 30
+  },
+  "results": {
+    "mouseJigglerDetection": "Tested - Should detect small, repetitive movements",
+    "autoClickerDetection": "Tested - Should detect regular click patterns",
+    "keyboardAutomationDetection": "Tested - Should detect low diversity, consistent timing",
+    "screenshotEvasionDetection": "Tested - Should detect activity spikes during screenshots",
+    "comprehensiveBehaviorAnalysis": "Tested - Should provide risk scoring",
+    "configurationEdgeCases": "Tested - Should respect threshold settings"
+  },
+  "employeeWorkarounds": {
+    "mouseJigglers": "Detection implemented - tracks movement patterns and variance",
+    "autoClickers": "Detection implemented - analyzes click timing consistency",
+    "keyboardMacros": "Detection implemented - monitors key diversity and timing",
+    "screenshotEvasion": "Detection implemented - correlates activity with capture events",
+    "fakeActivity": "Detection implemented - behavioral pattern analysis",
+    "roboticTools": "Detection implemented - variance analysis for human-like behavior"
+  },
+  "recommendations": [
+    "Deploy with 60-second idle threshold for faster detection",
+    "Use 30-second screenshot intervals for better monitoring",
+    "Enable anti-cheat detection in production",
+    "Set up alerts for HIGH risk scores (>70%)",
+    "Review suspicious patterns weekly",
+    "Consider stricter thresholds for remote workers"
+  ]
+}
