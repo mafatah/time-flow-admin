@@ -1,0 +1,1 @@
+{"buildCommand":"VITE_ADMIN_ONLY=true npx vite build --mode production","outputDirectory":"dist","rewrites":[{"source":"/(.*)", "destination":"/index.html"}]}
