@@ -14,8 +14,6 @@ import {
   AlertTriangle,
   Target,
   Calendar,
-  BarChart3,
-  TestTube2,
   Play,
   Square
 } from 'lucide-react';
@@ -121,44 +119,32 @@ const EmployeeIdleTime = () => {
 
       if (error) {
         console.error('Error fetching idle data:', error);
-        
-        // If table doesn't exist, create sample data for demonstration
-        if (error.code === '42P01') {
-          console.log('idle_logs table not found, creating sample data...');
-          const sampleData = createSampleIdleData();
-          setIdlePeriods(sampleData);
-          calculateIdleStats(sampleData);
-          calculateHourlyData(sampleData);
-          calculateDailyData(sampleData);
-          
-          toast({
-            title: 'Using sample data',
-            description: 'The idle_logs table is not available. Showing sample data for demonstration.',
-            variant: 'default'
-          });
-        } else {
-          throw error;
-        }
-      } else {
-        console.log('Fetched idle data:', idleData);
-        const formattedData: IdlePeriod[] = idleData.map(item => ({
-          id: item.id,
-          idle_start: item.idle_start,
-          idle_end: item.idle_end,
-          duration_minutes: item.duration_minutes
-        }));
-
-        setIdlePeriods(formattedData);
-        calculateIdleStats(formattedData);
-        calculateHourlyData(formattedData);
-        calculateDailyData(formattedData);
-
         toast({
-          title: 'Idle data loaded',
-          description: `Found ${formattedData.length} idle periods for the selected time range.`,
-          variant: 'default'
+          title: 'Error loading idle data',
+          description: error.message || 'Failed to load idle time data.',
+          variant: 'destructive'
         });
+        return;
       }
+
+      console.log('Fetched idle data:', idleData);
+      const formattedData: IdlePeriod[] = idleData.map(item => ({
+        id: item.id,
+        idle_start: item.idle_start,
+        idle_end: item.idle_end,
+        duration_minutes: item.duration_minutes
+      }));
+
+      setIdlePeriods(formattedData);
+      calculateIdleStats(formattedData);
+      calculateHourlyData(formattedData);
+      calculateDailyData(formattedData);
+
+      toast({
+        title: 'Idle data loaded',
+        description: `Found ${formattedData.length} idle periods for the selected time range.`,
+        variant: 'default'
+      });
 
     } catch (error: any) {
       console.error('Error fetching idle data:', error);
@@ -167,13 +153,6 @@ const EmployeeIdleTime = () => {
         description: error.message || 'Failed to load idle time data.',
         variant: 'destructive'
       });
-      
-      // Fallback to sample data
-      const sampleData = createSampleIdleData();
-      setIdlePeriods(sampleData);
-      calculateIdleStats(sampleData);
-      calculateHourlyData(sampleData);
-      calculateDailyData(sampleData);
     } finally {
       setLoading(false);
     }
@@ -280,23 +259,17 @@ const EmployeeIdleTime = () => {
     const durationMinutes = Math.floor(durationSeconds / 60);
     
     try {
-      // Try to create a test idle log entry using screenshots table (since idle_logs doesn't exist)
+      // Create a test idle log entry in the proper idle_logs table
       const testIdleData = {
         user_id: userDetails.id,
-        project_id: '00000000-0000-0000-0000-000000000001',
-        image_url: `idle_test_${Date.now()}.png`,
-        captured_at: testIdleStart.toISOString(),
-        activity_percent: 0, // 0% indicates idle
-        focus_percent: 0,
-        classification: 'core', // Use 'core' instead of 'productive' until constraint is fixed
-        keystrokes: 0,
-        mouse_clicks: 0,
-        mouse_movements: 0,
-        is_blurred: false
+        project_id: null, // Can be null for test entries
+        idle_start: testIdleStart.toISOString(),
+        idle_end: idleEnd.toISOString(),
+        duration_minutes: durationMinutes
       };
       
       const { data, error } = await supabase
-        .from('screenshots')
+        .from('idle_logs')
         .insert(testIdleData)
         .select();
       
@@ -313,20 +286,8 @@ const EmployeeIdleTime = () => {
           description: `Test idle period recorded: ${durationMinutes} minutes (${durationSeconds}s)`,
         });
         
-        // Create a mock idle period for display
-        const mockIdlePeriod: IdlePeriod = {
-          id: data[0]?.id || 'test',
-          idle_start: testIdleStart.toISOString(),
-          idle_end: idleEnd.toISOString(),
-          duration_minutes: durationMinutes
-        };
-        
-        // Add to current periods and recalculate stats
-        const updatedPeriods = [mockIdlePeriod, ...idlePeriods];
-        setIdlePeriods(updatedPeriods);
-        calculateIdleStats(updatedPeriods);
-        calculateHourlyData(updatedPeriods);
-        calculateDailyData(updatedPeriods);
+        // Refresh the data to show the new test entry
+        await fetchIdleData();
       }
     } catch (error) {
       console.error('Error in idle test:', error);
@@ -341,43 +302,63 @@ const EmployeeIdleTime = () => {
     setTestIdleStart(null);
   };
 
-  const createSampleIdleData = (): IdlePeriod[] => {
+  const createSampleData = async () => {
+    if (!userDetails?.id) return;
+
     const now = new Date();
-    const samplePeriods: IdlePeriod[] = [
+    const samplePeriods = [
       {
-        id: 'sample-1',
+        user_id: userDetails.id,
+        project_id: null,
         idle_start: new Date(now.getTime() - 60 * 60 * 1000).toISOString(), // 1 hour ago
         idle_end: new Date(now.getTime() - 55 * 60 * 1000).toISOString(),   // 55 min ago
         duration_minutes: 5
       },
       {
-        id: 'sample-2',
+        user_id: userDetails.id,
+        project_id: null,
         idle_start: new Date(now.getTime() - 40 * 60 * 1000).toISOString(), // 40 min ago
         idle_end: new Date(now.getTime() - 38 * 60 * 1000).toISOString(),   // 38 min ago
         duration_minutes: 2
       },
       {
-        id: 'sample-3',
+        user_id: userDetails.id,
+        project_id: null,
         idle_start: new Date(now.getTime() - 25 * 60 * 1000).toISOString(), // 25 min ago
         idle_end: new Date(now.getTime() - 15 * 60 * 1000).toISOString(),   // 15 min ago
         duration_minutes: 10
       }
     ];
-    
-    return samplePeriods;
-  };
 
-  const loadSampleData = () => {
-    const samplePeriods = createSampleIdleData();
-    setIdlePeriods(samplePeriods);
-    calculateIdleStats(samplePeriods);
-    calculateHourlyData(samplePeriods);
-    calculateDailyData(samplePeriods);
-    
-    toast({
-      title: 'Sample Data Loaded',
-      description: 'Sample idle periods have been loaded for demonstration.',
-    });
+    try {
+      const { error } = await supabase
+        .from('idle_logs')
+        .insert(samplePeriods);
+
+      if (error) {
+        console.error('Error creating sample data:', error);
+        toast({
+          title: 'Sample Data Error',
+          description: `Failed to create sample data: ${error.message}`,
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Sample Data Created',
+          description: 'Sample idle periods have been created and will appear in your data.',
+        });
+        
+        // Refresh the data to show the new sample entries
+        await fetchIdleData();
+      }
+    } catch (error) {
+      console.error('Error creating sample data:', error);
+      toast({
+        title: 'Sample Data Error',
+        description: 'An unexpected error occurred while creating sample data.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const formatDuration = (seconds: number) => {
@@ -429,11 +410,11 @@ const EmployeeIdleTime = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={loadSampleData}
+              onClick={createSampleData}
               className="flex items-center space-x-2"
             >
-              <TestTube2 className="h-4 w-4" />
-              <span>Load Sample Data</span>
+              <Calendar className="h-4 w-4" />
+              <span>Create Sample Data</span>
             </Button>
             
             {!testingIdle ? (
@@ -472,7 +453,7 @@ const EmployeeIdleTime = () => {
         </div>
       </div>
 
-      {/* Test Status & Information */}
+      {/* Test Status */}
       {testingIdle && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="p-4">
@@ -490,25 +471,6 @@ const EmployeeIdleTime = () => {
           </CardContent>
         </Card>
       )}
-
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="p-4">
-          <div className="flex items-start space-x-3">
-            <TestTube2 className="h-5 w-5 text-blue-600 mt-0.5" />
-            <div>
-              <p className="font-medium text-blue-800">Testing Idle Time Functionality</p>
-              <p className="text-sm text-blue-700 mt-1">
-                Since the idle_logs table doesn't exist yet, you can test idle time tracking manually:
-              </p>
-              <ul className="text-sm text-blue-700 mt-2 list-disc list-inside space-y-1">
-                <li><strong>Load Sample Data:</strong> View demo idle periods with realistic data</li>
-                <li><strong>Start Idle Test:</strong> Manually simulate an idle period and see it logged</li>
-                <li><strong>Desktop Agent:</strong> Real idle detection is running in the background</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -670,7 +632,7 @@ const EmployeeIdleTime = () => {
         </CardContent>
       </Card>
 
-      {/* Tips and Insights */}
+      {/* Productivity Tips */}
       <Card>
         <CardHeader>
           <CardTitle>Productivity Tips</CardTitle>
