@@ -296,6 +296,11 @@ class AntiCheatDetector {
     };
   }
 
+  // Add missing analyzeScreenshotTiming method
+  analyzeScreenshotTiming() {
+    return this.detectScreenshotEvasion();
+  }
+
   performDeepAnalysis() {
     console.log('🔍 Performing deep anti-cheat analysis...');
     

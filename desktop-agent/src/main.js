@@ -500,34 +500,36 @@ function stopIdleMonitoring() {
 // === ITEM 2: IDLE FLAG UPLOAD ===
 async function logIdlePeriod(start, end, durationSeconds) {
   try {
-    const idleLog = {
-      user_id: config.user_id,
-      time_log_id: currentTimeLogId,
+    const durationMs = end - start;
+    const durationMinutes = Math.round(durationMs / 60000); // Convert ms to minutes
+
+    // Add to offline queue
+    const idleLogData = {
+      user_id: config.user_id || 'demo-user',
+      project_id: '00000000-0000-0000-0000-000000000001',
       idle_start: new Date(start).toISOString(),
       idle_end: new Date(end).toISOString(),
-      duration_seconds: durationSeconds,
-      created_at: new Date().toISOString()
+      duration_minutes: durationMinutes
     };
 
     // Update current time_log with idle flag
     if (currentTimeLogId) {
-      await updateTimeLogIdleStatus(true, durationSeconds);
+      await updateTimeLogIdleStatus(true, durationMinutes);
     }
 
     // Queue for offline support
-    await syncManager.addIdleLog(idleLog);
-    console.log(`📝 Idle period logged: ${durationSeconds}s`);
+    await syncManager.addIdleLog(idleLogData);
+    console.log(`📝 Idle period logged: ${durationMinutes}m`);
 
   } catch (error) {
     console.error('❌ Failed to log idle period:', error);
   }
 }
 
-async function updateTimeLogIdleStatus(isIdle, idleSeconds = 0) {
+async function updateTimeLogIdleStatus(isIdle, idleMinutes = 0) {
   try {
     const updateData = {
       is_idle: isIdle,
-      idle_seconds: idleSeconds,
       updated_at: new Date().toISOString()
     };
 
@@ -671,8 +673,9 @@ async function captureScreenshot() {
     
     // Create screenshot metadata
     const screenshotMeta = {
-      user_id: 'current-user', // This should come from login
-      project_id: 'default-project',
+      user_id: config.user_id || 'demo-user', // Ensure user_id is set
+      project_id: '00000000-0000-0000-0000-000000000001',
+      time_log_id: currentTimeLogId || 'no-session',
       timestamp: new Date().toISOString(),
       file_path: `screenshot_${Date.now()}.png`,
       file_size: img.length,
@@ -680,11 +683,20 @@ async function captureScreenshot() {
       focus_percent: Math.round(focusPercent),
       mouse_clicks: activityStats.mouseClicks,
       keystrokes: activityStats.keystrokes,
-      mouse_movements: activityStats.mouseMovements
+      mouse_movements: activityStats.mouseMovements,
+      captured_at: new Date().toISOString(),
+      is_blurred: appSettings.blur_screenshots || false
     };
     
-    // Add to offline queue
-    offlineQueue.screenshots.push(screenshotMeta);
+    // Add to offline queue and attempt sync
+    try {
+      await syncManager.addScreenshot(img, screenshotMeta);
+    } catch (syncError) {
+      console.log('⚠️ Screenshot upload failed, queuing for later');
+      offlineQueue.screenshots.push(screenshotMeta);
+    }
+    
+    console.log(`📦 Screenshot queued (${offlineQueue.screenshots.length} pending)`);
     
     // Send screenshot event to UI
     if (mainWindow) {
@@ -724,7 +736,7 @@ async function captureScreenshot() {
     
     // Reset short-term activity counters
     resetActivityStats();
-    
+      
   } catch (error) {
     console.error('❌ Screenshot capture failed:', error);
     
@@ -871,8 +883,7 @@ async function startTracking(taskId = 'default-task') {
         task_id: taskId,
         start_time: new Date().toISOString(),
         status: 'active',
-        is_idle: false,
-        idle_seconds: 0
+        is_idle: false
       })
       .select('id')
       .single();
@@ -1199,12 +1210,61 @@ ipcMain.handle('get-stats', () => {
   };
 });
 
+// === MISSING CAPTURE FUNCTIONS ===
+async function captureActiveApplication() {
+  try {
+    const activeWindow = await activeWin();
+    if (!activeWindow) return null;
+
+    const appData = {
+      user_id: config.user_id || 'demo-user',
+      time_log_id: currentTimeLogId,
+      application_name: activeWindow.name || 'Unknown',
+      window_title: activeWindow.title || 'Unknown',
+      captured_at: new Date().toISOString()
+    };
+
+    // Add to offline queue
+    offlineQueue.appLogs.push(appData);
+    console.log(`📱 App captured: ${appData.application_name}`);
+    return appData;
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function captureActiveUrl() {
+  try {
+    const activeWindow = await activeWin();
+    if (!activeWindow || !isBrowserApp(activeWindow.name)) return null;
+
+    const url = extractUrlFromTitle(activeWindow.title);
+    if (!url) return null;
+
+    const urlData = {
+      user_id: config.user_id || 'demo-user',
+      time_log_id: currentTimeLogId,
+      url: url,
+      domain: extractDomain(url),
+      application_name: activeWindow.name,
+      captured_at: new Date().toISOString()
+    };
+
+    // Add to offline queue
+    offlineQueue.urlLogs.push(urlData);
+    console.log(`🌐 URL captured: ${urlData.domain}`);
+    return urlData;
+  } catch (error) {
+    throw error;
+  }
+}
+
 // === APP LIFECYCLE ===
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
   console.log('🚀 TimeFlow Desktop Agent starting...');
   
-  // Initialize sync manager
-  syncManager = new SyncManager(config);
+  // Initialize components
+  initializeComponents();
   
   // Create tray
   createTray();
@@ -1212,11 +1272,13 @@ app.whenReady().then(async () => {
   // Create window
   createWindow();
   
-  // Fetch settings immediately and then every 10 minutes
-  await fetchSettings();
-  settingsInterval = setInterval(fetchSettings, 10 * 60 * 1000);
+  // Initialize anti-cheat detector
+  antiCheatDetector = new AntiCheatDetector(config);
   
-  // Start notification checking
+  // Fetch settings from server
+  fetchSettings();
+  
+  // Start notification checking  
   startNotificationChecking();
   
   // Auto-start if enabled
@@ -1317,3 +1379,9 @@ powerMonitor.on('unlock-screen', () => {
 });
 
 console.log('📱 TimeFlow Desktop Agent initialized');
+
+// Initialize components
+function initializeComponents() {
+  syncManager = new SyncManager(config, supabase);
+  console.log('📱 TimeFlow Desktop Agent initialized');
+}

@@ -89,7 +89,7 @@ function setupEventListeners() {
         });
     });
 
-    // Control buttons
+    // Dashboard control buttons
     const startBtn = document.getElementById('startBtn');
     const pauseBtn = document.getElementById('pauseBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -99,6 +99,32 @@ function setupEventListeners() {
     if (pauseBtn) pauseBtn.addEventListener('click', pauseTracking);
     if (stopBtn) stopBtn.addEventListener('click', stopTracking);
     if (logoutBtn) logoutBtn.addEventListener('click', logout);
+
+    // Time Tracker page control buttons
+    const trackerStartBtn = document.getElementById('trackerStartBtn');
+    const trackerPauseBtn = document.getElementById('trackerPauseBtn');
+    const trackerStopBtn = document.getElementById('trackerStopBtn');
+
+    if (trackerStartBtn) trackerStartBtn.addEventListener('click', startTracking);
+    if (trackerPauseBtn) trackerPauseBtn.addEventListener('click', pauseTracking);
+    if (trackerStopBtn) trackerStopBtn.addEventListener('click', stopTracking);
+
+    // Current task input
+    const currentTaskInput = document.getElementById('currentTaskInput');
+    if (currentTaskInput) {
+        currentTaskInput.addEventListener('change', (e) => {
+            // Save current task
+            localStorage.setItem('currentTask', e.target.value);
+            showNotification('Task updated', 'success');
+        });
+    }
+
+    // Screenshot date filter
+    const screenshotDate = document.getElementById('screenshotDate');
+    if (screenshotDate) {
+        screenshotDate.value = new Date().toISOString().split('T')[0];
+        screenshotDate.addEventListener('change', filterScreenshots);
+    }
 }
 
 function setupIpcListeners() {
@@ -229,6 +255,12 @@ function showMainApp() {
     // Update user info in sidebar
     updateUserInfo();
     
+    // Update current date
+    updateCurrentDate();
+    
+    // Load saved task
+    loadCurrentTask();
+    
     // Start activity monitoring
     ipcRenderer.send('start-activity-monitoring', currentUser.id);
     
@@ -336,33 +368,69 @@ function stopTracking() {
 }
 
 function updateTrackingButtons() {
+    // Dashboard buttons
     const startBtn = document.getElementById('startBtn');
     const pauseBtn = document.getElementById('pauseBtn');
     const stopBtn = document.getElementById('stopBtn');
 
+    // Time Tracker page buttons
+    const trackerStartBtn = document.getElementById('trackerStartBtn');
+    const trackerPauseBtn = document.getElementById('trackerPauseBtn');
+    const trackerStopBtn = document.getElementById('trackerStopBtn');
+
     if (isTracking) {
-        startBtn.disabled = true;
-        pauseBtn.disabled = false;
-        stopBtn.disabled = false;
-        startBtn.textContent = 'Tracking...';
+        // Dashboard buttons
+        if (startBtn) {
+            startBtn.disabled = true;
+            startBtn.textContent = 'Tracking...';
+        }
+        if (pauseBtn) pauseBtn.disabled = false;
+        if (stopBtn) stopBtn.disabled = false;
+
+        // Time tracker buttons
+        if (trackerStartBtn) {
+            trackerStartBtn.disabled = true;
+            trackerStartBtn.textContent = 'Tracking...';
+        }
+        if (trackerPauseBtn) trackerPauseBtn.disabled = false;
+        if (trackerStopBtn) trackerStopBtn.disabled = false;
     } else {
-        startBtn.disabled = false;
-        pauseBtn.disabled = true;
-        stopBtn.disabled = true;
-        startBtn.textContent = 'Start Tracking';
+        // Dashboard buttons
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.textContent = 'Start Tracking';
+        }
+        if (pauseBtn) pauseBtn.disabled = true;
+        if (stopBtn) stopBtn.disabled = true;
+
+        // Time tracker buttons
+        if (trackerStartBtn) {
+            trackerStartBtn.disabled = false;
+            trackerStartBtn.textContent = 'Start Session';
+        }
+        if (trackerPauseBtn) trackerPauseBtn.disabled = true;
+        if (trackerStopBtn) trackerStopBtn.disabled = true;
     }
 }
 
 function updateSessionStatus(status) {
     const statusBadge = document.getElementById('sessionStatus');
+    const trackerStatusBadge = document.getElementById('trackerSessionStatus');
+    
+    const statusTexts = {
+        'active': 'Active',
+        'paused': 'Paused',
+        'stopped': 'Stopped'
+    };
+    
     if (statusBadge) {
         statusBadge.className = `status-badge ${status}`;
-        const statusTexts = {
-            'active': 'Active',
-            'paused': 'Paused',
-            'stopped': 'Stopped'
-        };
         statusBadge.textContent = statusTexts[status] || 'Stopped';
+    }
+    
+    if (trackerStatusBadge) {
+        trackerStatusBadge.className = `status-badge ${status}`;
+        trackerStatusBadge.textContent = statusTexts[status] || 'Stopped';
     }
 }
 
@@ -378,8 +446,14 @@ function startSessionTimer() {
 
 function updateSessionTime(timeString) {
     const sessionTimeEl = document.getElementById('sessionTime');
+    const trackerSessionTimeEl = document.getElementById('trackerSessionTime');
+    
     if (sessionTimeEl) {
         sessionTimeEl.textContent = timeString;
+    }
+    
+    if (trackerSessionTimeEl) {
+        trackerSessionTimeEl.textContent = timeString;
     }
 }
 
@@ -587,6 +661,33 @@ function updateQueueStatus() {
         elements.connectionDot.className = 'connection-dot offline';
         elements.connectionText.textContent = 'Syncing...';
     }
+}
+
+function updateCurrentDate() {
+    const todayDateEl = document.getElementById('todayDate');
+    if (todayDateEl) {
+        const now = new Date();
+        const options = { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        };
+        todayDateEl.textContent = now.toLocaleDateString('en-US', options);
+    }
+}
+
+function loadCurrentTask() {
+    const currentTaskInput = document.getElementById('currentTaskInput');
+    const savedTask = localStorage.getItem('currentTask');
+    if (currentTaskInput && savedTask) {
+        currentTaskInput.value = savedTask;
+    }
+}
+
+function filterScreenshots() {
+    const selectedDate = document.getElementById('screenshotDate').value;
+    showNotification(`Filtering screenshots for ${selectedDate}`, 'info');
+    // In a real implementation, this would filter the screenshot grid
 }
 
 // === ERROR HANDLING ===
