@@ -7,6 +7,16 @@ import { queueScreenshot, queueAppLog } from './unsyncedManager';
 import { logError, showError } from './errorHandler';
 import { screenshotIntervalSeconds, idleTimeoutMinutes } from './config';
 
+// Import app events for communication with main process
+let appEvents: any = null;
+try {
+  // Use dynamic import to avoid circular dependency
+  appEvents = require('./main').appEvents;
+} catch (e) {
+  // Fallback if main is not available
+  console.log('Main events not available yet');
+}
+
 const UNSYNCED_ACTIVITY_PATH = path.join(app.getPath('userData'), 'unsynced_activity.json');
 
 // Special UUID for activity monitoring - this represents a virtual "task" for general activity monitoring
@@ -438,6 +448,19 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
     }
 
     console.log('✅ Activity screenshot uploaded successfully with metrics');
+    
+    // Emit event to trigger notification in main process
+    try {
+      if (!appEvents) {
+        // Try to get app events again in case it wasn't available during initialization
+        appEvents = require('./main').appEvents;
+      }
+      if (appEvents) {
+        appEvents.emit('screenshot-captured');
+      }
+    } catch (e) {
+      // Silent fail if events not available
+    }
     
     // Clean up local file
     try {
