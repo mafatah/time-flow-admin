@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -71,8 +72,8 @@ export function IdleStatusPanel({ className }: IdleStatusPanelProps) {
   const [lastScreenshot, setLastScreenshot] = useState<any>(null);
 
   useEffect(() => {
-    // Listen for activity stats updates from Electron
-    if (window.electron) {
+    // Only try to access Electron API if it exists and has the required methods
+    if (window.electron && typeof window.electron.getActivityStats === 'function') {
       const handleActivityStats = (stats: ActivityStats) => {
         setActivityStats(stats);
       };
@@ -85,19 +86,25 @@ export function IdleStatusPanel({ className }: IdleStatusPanelProps) {
         setLastScreenshot(screenshot);
       };
 
-      // Set up listeners (assuming these are available via window.electron)
-      window.electron.onActivityStatsUpdate?.(handleActivityStats);
-      window.electron.onIdleStatusChange?.(handleIdleStatus);
-      window.electron.onScreenshotCaptured?.(handleScreenshot);
+      // Set up listeners if they exist
+      if (window.electron.onActivityStatsUpdate) {
+        window.electron.onActivityStatsUpdate(handleActivityStats);
+      }
+      if (window.electron.onIdleStatusChange) {
+        window.electron.onIdleStatusChange(handleIdleStatus);
+      }
+      if (window.electron.onScreenshotCaptured) {
+        window.electron.onScreenshotCaptured(handleScreenshot);
+      }
       
       // Fetch initial data
-      window.electron.getActivityStats?.().then(setActivityStats);
-      window.electron.getAntiCheatReport?.().then(setAntiCheatReport);
+      window.electron.getActivityStats?.().then(setActivityStats).catch(() => {});
+      window.electron.getAntiCheatReport?.().then(setAntiCheatReport).catch(() => {});
       
       // Periodic updates
       const interval = setInterval(() => {
-        window.electron.getActivityStats?.().then(setActivityStats);
-        window.electron.getAntiCheatReport?.().then(setAntiCheatReport);
+        window.electron?.getActivityStats?.().then(setActivityStats).catch(() => {});
+        window.electron?.getAntiCheatReport?.().then(setAntiCheatReport).catch(() => {});
       }, 5000);
       
       return () => {

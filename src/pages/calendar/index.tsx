@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { TimeLog, CalendarEvent } from '@/types/timeLog';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 const locales = {
@@ -22,25 +23,6 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales,
 });
-
-interface TimeLog {
-  id: string;
-  start_time: string;
-  end_time: string | null;
-  project_id: string;
-  user_id: string;
-  is_idle: boolean;
-  project_name?: string;
-  user_name?: string;
-}
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  start: Date;
-  end: Date;
-  resource: TimeLog;
-}
 
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -81,9 +63,9 @@ export default function CalendarPage() {
         return;
       }
 
-      // Get unique user IDs and project IDs
+      // Get unique user IDs and project IDs (filter out nulls)
       const userIds = [...new Set(timeLogData.map(log => log.user_id))];
-      const projectIds = [...new Set(timeLogData.map(log => log.project_id))];
+      const projectIds = [...new Set(timeLogData.map(log => log.project_id).filter(Boolean))];
 
       // Fetch user data
       const { data: userData } = await supabase
@@ -98,10 +80,10 @@ export default function CalendarPage() {
         .in('id', projectIds);
 
       // Enrich time logs with user and project names
-      const enrichedLogs = timeLogData.map(log => ({
+      const enrichedLogs: TimeLog[] = timeLogData.map(log => ({
         ...log,
         user_name: userData?.find(u => u.id === log.user_id)?.full_name || 'Unknown User',
-        project_name: projectData?.find(p => p.id === log.project_id)?.name || 'Unknown Project'
+        project_name: log.project_id ? (projectData?.find(p => p.id === log.project_id)?.name || 'Unknown Project') : 'No Project'
       }));
 
       setTimeLog(enrichedLogs);

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,19 +7,11 @@ import { Play, Pause, Square } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { TimeLog } from '@/types/timeLog';
 
 interface Project {
   id: string;
   name: string;
-}
-
-interface TimeLog {
-  id: string;
-  start_time: string;
-  end_time: string | null;
-  is_idle: boolean;
-  project_id: string;
-  project_name?: string;
 }
 
 export default function EmployeeTimeTracker() {
@@ -79,9 +72,9 @@ export default function EmployeeTimeTracker() {
 
       if (error) throw error;
       
-      const logsWithProjectNames = data?.map(log => ({
+      const logsWithProjectNames: TimeLog[] = data?.map(log => ({
         ...log,
-        project_name: log.projects?.name || 'Unknown Project'
+        project_name: log.projects?.name || 'No Project'
       })) || [];
       
       setRecentLogs(logsWithProjectNames);
@@ -105,9 +98,10 @@ export default function EmployeeTimeTracker() {
       if (error) throw error;
       
       if (data && data.length > 0) {
-        setCurrentSession(data[0]);
+        const session = data[0] as TimeLog;
+        setCurrentSession(session);
         setIsTracking(true);
-        setSelectedProjectId(data[0].project_id);
+        setSelectedProjectId(session.project_id || '');
       }
     } catch (error) {
       console.error('Error checking active session:', error);
@@ -134,7 +128,8 @@ export default function EmployeeTimeTracker() {
 
       if (error) throw error;
       
-      setCurrentSession(data);
+      const session = data as TimeLog;
+      setCurrentSession(session);
       setIsTracking(true);
       setElapsedTime(0);
       toast.success('Time tracking started');
