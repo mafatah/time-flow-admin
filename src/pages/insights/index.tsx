@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +11,7 @@ import { format } from "date-fns";
 interface UnusualActivity {
   id: string;
   rule_triggered: string;
-  confidence: number;
+  confidence: number | null;
   detected_at: string;
   duration_hm: string | null;
   notes: string | null;
@@ -184,13 +183,15 @@ export default function Insights() {
     }
   };
 
-  const getConfidenceColor = (confidence: number) => {
+  const getConfidenceColor = (confidence: number | null) => {
+    if (!confidence) return "bg-gray-500";
     if (confidence >= 80) return "bg-red-500";
     if (confidence >= 60) return "bg-yellow-500";
     return "bg-green-500";
   };
 
-  const getSeverityBadge = (confidence: number) => {
+  const getSeverityBadge = (confidence: number | null) => {
+    if (!confidence) return <Badge variant="outline">Unknown</Badge>;
     if (confidence >= 80) return <Badge variant="destructive">High</Badge>;
     if (confidence >= 60) return <Badge variant="secondary">Medium</Badge>;
     return <Badge variant="outline">Low</Badge>;
@@ -259,8 +260,8 @@ export default function Insights() {
                       
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">Confidence:</span>
-                        <Progress value={activity.confidence} className="flex-1 max-w-32" />
-                        <span className="text-sm font-medium">{activity.confidence}%</span>
+                        <Progress value={activity.confidence || 0} className="flex-1 max-w-32" />
+                        <span className="text-sm font-medium">{activity.confidence || 0}%</span>
                       </div>
                       
                       {activity.notes && (
