@@ -10,6 +10,8 @@ import EmployeeReports from '@/pages/employee/reports';
 import EmployeeTimeTracker from '@/pages/employee/time-tracker';
 import EmployeeIdleTime from '@/pages/employee/idle-time';
 import AdminDashboard from '@/pages/admin';
+import AdminIdleLogs from '@/pages/admin/idle-logs';
+import AdminScreenshots from '@/pages/admin/screenshots';
 import Projects from '@/pages/projects';
 import Users from '@/pages/users';
 import Settings from '@/pages/settings';
@@ -48,6 +50,8 @@ function App() {
           
           {/* Admin routes - always available */}
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/idle-logs" element={<AdminIdleLogs />} />
+          <Route path="/admin/screenshots" element={<AdminScreenshots />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/users" element={<Users />} />
           <Route path="/settings" element={<Settings />} />

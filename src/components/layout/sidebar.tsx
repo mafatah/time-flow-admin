@@ -134,13 +134,13 @@ const Sidebar = () => {
   const allNavItems = [...employeeNavItems, ...adminNavItems];
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 h-screen overflow-y-auto">
+    <div className="w-64 bg-white border-r border-gray-200 h-screen overflow-y-auto fixed left-0 top-0 z-50">
       <div className="p-6">
         <h1 className="text-2xl font-bold text-gray-900">TimeFlow</h1>
         <p className="text-sm text-gray-600 mt-1">Employee Tracking</p>
       </div>
       
-      <nav className="px-4 space-y-6">
+      <nav className="px-4 space-y-6 pb-6">
         {allNavItems.map((section) => (
           <div key={section.title}>
             <h3 className="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">

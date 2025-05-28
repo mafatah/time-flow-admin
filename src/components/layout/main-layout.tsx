@@ -9,10 +9,10 @@ interface MainLayoutProps {
 
 export function MainLayout({ className }: MainLayoutProps) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex">
       <Sidebar />
-      <div className="lg:pl-64">
-        <main className={cn("container py-6", className)}>
+      <div className="flex-1 ml-64">
+        <main className={cn("w-full min-h-screen", className)}>
           <Outlet />
         </main>
       </div>
