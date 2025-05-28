@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,17 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Calendar, Filter, Clock, Edit } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { toast } from 'sonner';
-
-interface TimeLog {
-  id: string;
-  user_id: string;
-  project_id: string;
-  start_time: string;
-  end_time: string | null;
-  is_idle: boolean;
-  user_name?: string;
-  project_name?: string;
-}
+import { TimeLog } from '@/types/timeLog';
 
 interface User {
   id: string;
@@ -130,7 +119,7 @@ export default function TimeLogs() {
       }
 
       // Enrich with user and project names
-      const enrichedLogs = timeLogData.map(log => {
+      const enrichedLogs: TimeLog[] = timeLogData.map(log => {
         const user = users.find(u => u.id === log.user_id);
         const project = projects.find(p => p.id === log.project_id);
         

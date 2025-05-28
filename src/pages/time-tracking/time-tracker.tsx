@@ -8,9 +8,10 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/providers/auth-provider";
 import { Play, Square, Clock, Calendar } from "lucide-react";
 import { format } from "date-fns";
+import { TimeLog } from "@/types/timeLog";
 
 export default function TimeTracker() {
-  const [currentSession, setCurrentSession] = useState<any>(null);
+  const [currentSession, setCurrentSession] = useState<TimeLog | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [projects, setProjects] = useState<any[]>([]);
@@ -104,7 +105,7 @@ export default function TimeTracker() {
       if (data) {
         setCurrentSession(data);
         setIsTracking(true);
-        setSelectedProject(data.project_id);
+        setSelectedProject(data.project_id || '');
         
         // Calculate elapsed time
         const startTime = new Date(data.start_time).getTime();

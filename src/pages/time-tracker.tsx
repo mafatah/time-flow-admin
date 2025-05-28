@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,20 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Play, Square, Clock, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { TimeLog } from '@/types/timeLog';
 
 interface Project {
   id: string;
   name: string;
   description?: string;
-}
-
-interface TimeLog {
-  id: string;
-  user_id: string;
-  project_id: string;
-  start_time: string;
-  end_time: string | null;
-  is_idle: boolean;
 }
 
 export default function TimeTracker() {
@@ -111,7 +102,7 @@ export default function TimeTracker() {
 
       if (session) {
         setCurrentSession(session);
-        setSelectedProject(session.project_id);
+        setSelectedProject(session.project_id || '');
       }
     } catch (error) {
       console.error('Error checking active session:', error);
@@ -204,7 +195,8 @@ export default function TimeTracker() {
     return `${hours}h ${minutes}m`;
   };
 
-  const getProjectName = (projectId: string): string => {
+  const getProjectName = (projectId: string | null): string => {
+    if (!projectId) return 'No Project';
     return projects.find(p => p.id === projectId)?.name || 'Unknown Project';
   };
 
