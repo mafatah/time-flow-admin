@@ -1,6 +1,7 @@
 
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/providers/auth-provider";
 import { 
   LayoutDashboard, 
   Users, 
@@ -20,10 +21,16 @@ import {
 
 const Sidebar = () => {
   const location = useLocation();
+  const { userDetails } = useAuth();
   const isAdminOnly = import.meta.env.VITE_ADMIN_ONLY === 'true';
+  
+  // Determine user role
+  const userRole = userDetails?.role || 'employee';
+  const isAdmin = userRole === 'admin' || userRole === 'manager';
+  const isEmployee = userRole === 'employee';
 
-  // Employee navigation items - only show if not admin-only
-  const employeeNavItems = !isAdminOnly ? [
+  // Employee navigation items - only show for employees and if not admin-only mode
+  const employeeNavItems = (isEmployee && !isAdminOnly) ? [
     {
       title: "Employee",
       items: [
@@ -51,8 +58,8 @@ const Sidebar = () => {
     }
   ] : [];
 
-  // Admin navigation items - always available
-  const adminNavItems = [
+  // Admin navigation items - only show for admins
+  const adminNavItems = isAdmin ? [
     {
       title: "Admin",
       items: [
@@ -119,6 +126,21 @@ const Sidebar = () => {
       ]
     },
     {
+      title: "Monitoring",
+      items: [
+        {
+          title: "Idle Logs",
+          href: "/admin/idle-logs",
+          icon: Coffee
+        },
+        {
+          title: "Screenshots",
+          href: "/admin/screenshots",
+          icon: Camera
+        }
+      ]
+    },
+    {
       title: "System",
       items: [
         {
@@ -128,16 +150,23 @@ const Sidebar = () => {
         }
       ]
     }
-  ];
+  ] : [];
 
-  // Combine navigation items
+  // Combine navigation items based on role
   const allNavItems = [...employeeNavItems, ...adminNavItems];
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-screen overflow-y-auto fixed left-0 top-0 z-50">
       <div className="p-6">
         <h1 className="text-2xl font-bold text-gray-900">TimeFlow</h1>
-        <p className="text-sm text-gray-600 mt-1">Employee Tracking</p>
+        <p className="text-sm text-gray-600 mt-1">
+          {isAdmin ? 'Admin Panel' : 'Employee Tracking'}
+        </p>
+        {userDetails && (
+          <p className="text-xs text-gray-500 mt-1">
+            {userDetails.full_name} ({userDetails.role})
+          </p>
+        )}
       </div>
       
       <nav className="px-4 space-y-6 pb-6">

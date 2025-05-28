@@ -20,7 +20,25 @@ const Index = () => {
         }
         
         if (data.session) {
-          navigate("/dashboard");
+          // Get user details to determine role
+          const { data: userDetails, error: userError } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", data.session.user.id)
+            .single();
+          
+          if (userError) {
+            console.error("Error fetching user role:", userError);
+            navigate("/login");
+            return;
+          }
+          
+          // Redirect based on role
+          if (userDetails?.role === 'admin' || userDetails?.role === 'manager') {
+            navigate("/admin");
+          } else {
+            navigate("/employee/dashboard");
+          }
         } else {
           navigate("/login");
         }
@@ -46,7 +64,7 @@ const Index = () => {
           <h2 className="text-2xl font-semibold mb-4">Welcome to TrackHub</h2>
           <p className="mb-6">
             Employee time tracking and productivity monitoring platform.
-            Redirecting to login page...
+            Redirecting based on your role...
           </p>
           <div className="flex justify-center">
             <Button variant="default" onClick={() => navigate("/login")}>
