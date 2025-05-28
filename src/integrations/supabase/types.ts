@@ -77,34 +77,43 @@ export type Database = {
       app_logs: {
         Row: {
           app_name: string
+          app_path: string | null
           category: string | null
           duration_seconds: number | null
           ended_at: string | null
           id: string
           project_id: string | null
           started_at: string
+          time_log_id: string | null
+          timestamp: string | null
           user_id: string
           window_title: string | null
         }
         Insert: {
           app_name: string
+          app_path?: string | null
           category?: string | null
           duration_seconds?: number | null
           ended_at?: string | null
           id?: string
           project_id?: string | null
           started_at?: string
+          time_log_id?: string | null
+          timestamp?: string | null
           user_id: string
           window_title?: string | null
         }
         Update: {
           app_name?: string
+          app_path?: string | null
           category?: string | null
           duration_seconds?: number | null
           ended_at?: string | null
           id?: string
           project_id?: string | null
           started_at?: string
+          time_log_id?: string | null
+          timestamp?: string | null
           user_id?: string
           window_title?: string | null
         }
@@ -431,7 +440,7 @@ export type Database = {
           end_time: string | null
           id: string
           is_idle: boolean
-          project_id: string
+          project_id: string | null
           start_time: string
           task_id: string | null
           user_id: string
@@ -440,7 +449,7 @@ export type Database = {
           end_time?: string | null
           id?: string
           is_idle?: boolean
-          project_id: string
+          project_id?: string | null
           start_time?: string
           task_id?: string | null
           user_id: string
@@ -449,7 +458,7 @@ export type Database = {
           end_time?: string | null
           id?: string
           is_idle?: boolean
-          project_id?: string
+          project_id?: string | null
           start_time?: string
           task_id?: string | null
           user_id?: string
@@ -600,33 +609,51 @@ export type Database = {
       }
       url_logs: {
         Row: {
+          browser: string | null
           category: string | null
+          domain: string | null
           duration_seconds: number | null
           ended_at: string | null
           id: string
           project_id: string | null
           site_url: string
           started_at: string
+          time_log_id: string | null
+          timestamp: string | null
+          title: string | null
+          url: string | null
           user_id: string
         }
         Insert: {
+          browser?: string | null
           category?: string | null
+          domain?: string | null
           duration_seconds?: number | null
           ended_at?: string | null
           id?: string
           project_id?: string | null
           site_url: string
           started_at?: string
+          time_log_id?: string | null
+          timestamp?: string | null
+          title?: string | null
+          url?: string | null
           user_id: string
         }
         Update: {
+          browser?: string | null
           category?: string | null
+          domain?: string | null
           duration_seconds?: number | null
           ended_at?: string | null
           id?: string
           project_id?: string | null
           site_url?: string
           started_at?: string
+          time_log_id?: string | null
+          timestamp?: string | null
+          title?: string | null
+          url?: string | null
           user_id?: string
         }
         Relationships: [
