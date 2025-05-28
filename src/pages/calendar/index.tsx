@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
@@ -65,7 +64,7 @@ export default function CalendarPage() {
 
       // Get unique user IDs and project IDs (filter out nulls)
       const userIds = [...new Set(timeLogData.map(log => log.user_id))];
-      const projectIds = [...new Set(timeLogData.map(log => log.project_id).filter(Boolean))];
+      const projectIds = [...new Set(timeLogData.map(log => log.project_id).filter((id): id is string => id !== null))];
 
       // Fetch user data
       const { data: userData } = await supabase
@@ -74,10 +73,14 @@ export default function CalendarPage() {
         .in('id', userIds);
 
       // Fetch project data
-      const { data: projectData } = await supabase
-        .from('projects')
-        .select('id, name')
-        .in('id', projectIds);
+      let projectData: any[] = [];
+      if (projectIds.length > 0) {
+        const { data } = await supabase
+          .from('projects')
+          .select('id, name')
+          .in('id', projectIds);
+        projectData = data || [];
+      }
 
       // Enrich time logs with user and project names
       const enrichedLogs: TimeLog[] = timeLogData.map(log => ({

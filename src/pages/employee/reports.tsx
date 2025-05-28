@@ -22,7 +22,7 @@ interface TimeEntry {
   start_time: string;
   end_time: string | null;
   is_idle: boolean;
-  project_id: string;
+  project_id: string | null;
   projects?: {
     name: string;
   };
