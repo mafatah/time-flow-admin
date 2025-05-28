@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +13,7 @@ import { toast } from 'sonner';
 interface TimeReport {
   id: string;
   user_id: string;
-  project_id: string;
+  project_id: string | null; // Updated to allow null
   start_time: string;
   end_time: string | null;
   is_idle: boolean;
