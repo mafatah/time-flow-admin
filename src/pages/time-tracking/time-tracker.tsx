@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -69,11 +70,13 @@ export default function TimeTrackerPage() {
   };
 
   const fetchActiveLogs = async () => {
+    if (!userDetails?.id) return;
+    
     try {
       const { data, error } = await supabase
         .from('time_logs')
         .select('id, start_time, end_time, project_id')
-        .eq('user_id', userDetails?.id)
+        .eq('user_id', userDetails.id)
         .is('end_time', null);
 
       if (error) {
@@ -102,11 +105,13 @@ export default function TimeTrackerPage() {
   };
 
   const fetchRecentLogs = async () => {
+    if (!userDetails?.id) return;
+    
     try {
       const { data, error } = await supabase
         .from('time_logs')
         .select('id, start_time, end_time, project_id')
-        .eq('user_id', userDetails?.id)
+        .eq('user_id', userDetails.id)
         .not('end_time', 'is', null)
         .order('start_time', { ascending: false })
         .limit(5);
@@ -152,10 +157,19 @@ export default function TimeTrackerPage() {
       return;
     }
 
+    if (!userDetails?.id) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please log in to start tracking.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('time_logs')
-        .insert([{ user_id: userDetails?.id, project_id: selectedProjectId }])
+        .insert({ user_id: userDetails.id, project_id: selectedProjectId })
         .select()
         .single();
 
@@ -187,11 +201,13 @@ export default function TimeTrackerPage() {
   };
 
   const stopTracking = async () => {
+    if (!userDetails?.id) return;
+    
     try {
       const { data: activeLog } = await supabase
         .from('time_logs')
         .select('id')
-        .eq('user_id', userDetails?.id)
+        .eq('user_id', userDetails.id)
         .is('end_time', null)
         .single();
 

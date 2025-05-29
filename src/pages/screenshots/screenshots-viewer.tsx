@@ -61,7 +61,21 @@ export default function ScreenshotsViewer() {
         .order('captured_at', { ascending: false });
 
       if (screenshotsError) throw screenshotsError;
-      setScreenshots(screenshotsData || []);
+      
+      // Map database fields to interface, filtering out null user_ids
+      const mappedScreenshots: Screenshot[] = (screenshotsData || [])
+        .filter((screenshot: any) => screenshot.user_id !== null)
+        .map((screenshot: any) => ({
+          id: screenshot.id,
+          user_id: screenshot.user_id,
+          project_id: screenshot.project_id,
+          captured_at: screenshot.captured_at,
+          image_url: screenshot.image_url,
+          activity_percent: screenshot.activity_percent || 0,
+          focus_percent: screenshot.focus_percent || 0
+        }));
+
+      setScreenshots(mappedScreenshots);
 
       // Fetch users
       let { data: usersData, error: usersError } = await supabase

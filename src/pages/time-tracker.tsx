@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +32,7 @@ const TimeTracker = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       fetchProjects();
       fetchActiveSessions();
       fetchRecentSessions();
@@ -62,11 +63,13 @@ const TimeTracker = () => {
   };
 
   const fetchActiveSessions = async () => {
+    if (!user?.id) return;
+    
     try {
       const { data, error } = await supabase
         .from('time_logs')
         .select('id, start_time, end_time, project_id')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .is('end_time', null);
 
       if (error) {
@@ -90,11 +93,13 @@ const TimeTracker = () => {
   };
 
   const fetchRecentSessions = async () => {
+    if (!user?.id) return;
+    
     try {
       const { data, error } = await supabase
         .from('time_logs')
         .select('id, start_time, end_time, project_id')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .not('end_time', 'is', null)
         .order('start_time', { ascending: false })
         .limit(5);
@@ -129,16 +134,23 @@ const TimeTracker = () => {
       return;
     }
 
+    if (!user?.id) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please log in to start tracking',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('time_logs')
-        .insert([
-          {
-            user_id: user?.id,
-            project_id: selectedProjectId,
-            start_time: new Date().toISOString(),
-          },
-        ])
+        .insert({
+          user_id: user.id,
+          project_id: selectedProjectId,
+          start_time: new Date().toISOString(),
+        })
         .select('id, start_time, end_time, project_id');
 
       if (error) {
@@ -253,10 +265,10 @@ const TimeTracker = () => {
                 <div>
                   <p>
                     {format(new Date(session.start_time), 'MMM dd, yyyy HH:mm')} -{' '}
-                    {format(new Date(session.end_time), 'MMM dd, yyyy HH:mm')}
+                    {session.end_time ? format(new Date(session.end_time), 'MMM dd, yyyy HH:mm') : 'Active'}
                   </p>
                   <p>
-                    {differenceInMinutes(new Date(session.end_time), new Date(session.start_time))} minutes
+                    {session.end_time ? differenceInMinutes(new Date(session.end_time), new Date(session.start_time)) : 0} minutes
                   </p>
                 </div>
                 <div>
