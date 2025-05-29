@@ -37,14 +37,14 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       if (isSignUp) {
-        // Handle signup
+        // Handle signup with secure default role
         const { error } = await supabase.auth.signUp({
           email: values.email,
           password: values.password,
           options: {
             data: {
-              full_name: values.email.split('@')[0], // Default name from email
-              role: 'admin', // Default role changed to admin for testing
+              full_name: values.email.split('@')[0],
+              role: 'employee', // Secure default role - no privilege escalation
             }
           }
         });
@@ -56,7 +56,7 @@ export default function LoginPage() {
           description: "Please check your email for verification instructions.",
         });
         
-        setIsSignUp(false); // Switch back to login view
+        setIsSignUp(false);
       } else {
         // Handle login
         await signIn(values.email, values.password);
@@ -128,37 +128,6 @@ export default function LoginPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
-          {/* Quick Login Buttons for Testing */}
-          {!isSignUp && (
-            <div className="w-full space-y-2">
-              <p className="text-xs text-center text-gray-500">Quick Login (Testing)</p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => {
-                    form.setValue('email', 'admin@timeflow.com');
-                    form.setValue('password', 'admin123456');
-                  }}
-                >
-                  Admin Login
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => {
-                    form.setValue('email', 'employee@timeflow.com');
-                    form.setValue('password', 'employee123456');
-                  }}
-                >
-                  Employee Login
-                </Button>
-              </div>
-            </div>
-          )}
-          
           <Button
             variant="link"
             className="w-full"
