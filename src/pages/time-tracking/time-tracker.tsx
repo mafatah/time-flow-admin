@@ -51,6 +51,18 @@ export default function TimeTracker() {
     try {
       setLoading(true);
       
+      // Validate user ID first
+      const validUserId = validateUserId(userDetails?.id || null);
+      if (!validUserId) {
+        console.error('Invalid user ID:', userDetails?.id);
+        toast({
+          title: "Authentication Error",
+          description: "Invalid user session. Please log out and log back in.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // Load projects
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
@@ -66,10 +78,19 @@ export default function TimeTracker() {
       console.log('User role:', userDetails?.role);
       console.log('User ID:', userDetails?.id);
       
-      setProjects(projectsData || []);
+      // Filter out any projects with invalid UUIDs
+      const validProjects = projectsData?.filter(project => {
+        const isValid = validateProjectId(project.id) !== null;
+        if (!isValid) {
+          console.warn('Filtering out project with invalid UUID:', project.id);
+        }
+        return isValid;
+      }) || [];
+      
+      setProjects(validProjects);
       
       // If no projects found, show a helpful message
-      if (!projectsData || projectsData.length === 0) {
+      if (!validProjects || validProjects.length === 0) {
         toast({
           title: "No projects available",
           description: "Contact your administrator to create projects for time tracking.",
@@ -81,7 +102,7 @@ export default function TimeTracker() {
       console.error('Error loading projects:', error);
       toast({
         title: "Error loading data",
-        description: error.message,
+        description: error.message || "Failed to load projects",
         variant: "destructive",
       });
     } finally {
@@ -125,6 +146,16 @@ export default function TimeTracker() {
           setElapsedTime(now - startTime);
         } else {
           console.warn('Active session has invalid project ID:', activeSession.project_id);
+          // Clean up invalid session
+          try {
+            await supabase
+              .from('time_logs')
+              .update({ end_time: new Date().toISOString() })
+              .eq('id', activeSession.id);
+            console.log('Cleaned up session with invalid project ID');
+          } catch (cleanupError) {
+            console.error('Failed to cleanup invalid session:', cleanupError);
+          }
         }
       }
     } catch (error: any) {
@@ -163,7 +194,7 @@ export default function TimeTracker() {
     }
   };
 
-  const startTracking = () => {
+  const startTracking = async () => {
     const validProjectId = validateProjectId(selectedProject);
     const validUserId = validateUserId(userDetails?.id || null);
     
@@ -185,15 +216,45 @@ export default function TimeTracker() {
       return;
     }
 
-    setIsTracking(true);
-    if (window.electron) {
-      window.electron.setUserId(validUserId);
-      window.electron.startTracking();
+    try {
+      // Create new time log entry
+      const { data, error } = await supabase
+        .from('time_logs')
+        .insert({
+          user_id: validUserId,
+          project_id: validProjectId,
+          start_time: new Date().toISOString(),
+          is_idle: false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      const session = data as TimeLog;
+      setCurrentSession(session);
+      setIsTracking(true);
+      setElapsedTime(0);
+
+      // Notify Electron process if available
+      if (window.electron) {
+        window.electron.setUserId(validUserId);
+        window.electron.setProjectId(validProjectId);
+        window.electron.startTracking();
+      }
+
+      toast({
+        title: "Time tracking started",
+        description: "Successfully started tracking time for the selected project.",
+      });
+    } catch (error: any) {
+      console.error('Error starting tracking:', error);
+      toast({
+        title: "Error starting tracking",
+        description: error.message || "Failed to start time tracking",
+        variant: "destructive",
+      });
     }
-    toast({
-      title: "Time tracking started",
-      description: "Successfully started tracking time for the selected project.",
-    });
   };
 
   const stopTracking = async () => {
@@ -226,9 +287,10 @@ export default function TimeTracker() {
         description: "Successfully stopped time tracking and saved the session.",
       });
     } catch (error: any) {
+      console.error('Error stopping tracking:', error);
       toast({
         title: "Error stopping tracking",
-        description: error.message,
+        description: error.message || "Failed to stop time tracking",
         variant: "destructive",
       });
     }
@@ -274,7 +336,20 @@ export default function TimeTracker() {
             <label className="text-sm font-medium">Select Project</label>
             <Select
               value={selectedProject}
-              onValueChange={setSelectedProject}
+              onValueChange={(value) => {
+                // Validate the selected project ID
+                const validId = validateProjectId(value);
+                if (validId) {
+                  setSelectedProject(validId);
+                } else {
+                  console.warn('Invalid project ID selected:', value);
+                  toast({
+                    title: "Invalid Project",
+                    description: "The selected project is invalid. Please choose another.",
+                    variant: "destructive",
+                  });
+                }
+              }}
               disabled={isTracking}
             >
               <SelectTrigger className="w-full">
