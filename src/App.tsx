@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { MainLayout } from "@/components/layout/main-layout";
@@ -17,6 +17,8 @@ import Screenshots from "@/pages/screenshots";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
 import AdminIndex from "@/pages/admin";
+import InsightsPage from "@/pages/insights";
+import TimeReports from "@/pages/time-reports";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -133,6 +135,22 @@ function AppRoutes() {
           </MainLayout>
         </ProtectedRoute>
       } />
+
+      <Route path="/time-reports" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <TimeReports />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/insights" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <InsightsPage />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
       
       <Route path="/settings" element={
         <ProtectedRoute>
@@ -160,13 +178,11 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <BrowserRouter>
-            <AuthProvider>
-              <AppRoutes />
-              <Toaster />
-              <Sonner />
-            </AuthProvider>
-          </BrowserRouter>
+          <AuthProvider>
+            <AppRoutes />
+            <Toaster />
+            <Sonner />
+          </AuthProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>

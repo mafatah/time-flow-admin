@@ -39,17 +39,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
   });
 
   // Add connection test with proper error handling
-  supabaseClient.from('users').select('count', { count: 'exact', head: true })
-    .then(({ error }) => {
+  const testConnection = async () => {
+    try {
+      const { error } = await supabaseClient.from('users').select('count', { count: 'exact', head: true });
       if (error) {
         console.error('Supabase connection test failed:', error.message);
       } else {
         console.log('Supabase connection successful');
       }
-    })
-    .catch((error: any) => {
+    } catch (error: any) {
       console.error('Supabase connection error:', error);
-    });
+    }
+  };
+
+  testConnection();
 }
 
 export const supabase = supabaseClient;

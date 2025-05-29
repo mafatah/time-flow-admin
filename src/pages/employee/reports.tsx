@@ -13,12 +13,12 @@ import { Calendar, Clock, Download, Filter, Search } from 'lucide-react';
 interface TimeLog {
   id: string;
   start_time: string;
-  end_time: string | null;
+  end_time: string;
   user_id: string;
-  project_id: string | null;
+  project_id: string;
   projects: {
     name: string;
-  } | null;
+  };
 }
 
 interface Project {
@@ -27,7 +27,7 @@ interface Project {
 }
 
 export default function EmployeeReports() {
-  const { userDetails } = useAuth();
+  const { userDetails, user } = useAuth();
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [dateRange, setDateRange] = useState('today');
@@ -71,7 +71,7 @@ export default function EmployeeReports() {
           project_id,
           projects (name)
         `)
-        .eq('user_id', userDetails?.id)
+        .eq('user_id', user?.id)
         .gte('start_time', startDate.toISOString())
         .lte('start_time', endDate.toISOString())
         .order('start_time', { ascending: false });
@@ -80,10 +80,26 @@ export default function EmployeeReports() {
         query = query.ilike('projects.name', `%${searchTerm}%`);
       }
 
-      const { data, error } = await query;
+      const { data: timeLogsData, error: timeLogsError } = await query;
 
-      if (error) throw error;
-      setTimeLogs(data || []);
+      if (timeLogsError) {
+        console.error('Error fetching time logs:', timeLogsError);
+        return;
+      }
+
+      // Transform the data to match our interface
+      const transformedLogs: TimeLog[] = (timeLogsData || []).map((log: any) => ({
+        id: log.id,
+        start_time: log.start_time,
+        end_time: log.end_time,
+        user_id: log.user_id,
+        project_id: log.project_id,
+        projects: {
+          name: log.projects?.name || 'Unknown Project'
+        }
+      }));
+
+      setTimeLogs(transformedLogs);
     } catch (error) {
       console.error('Error fetching time logs:', error);
     } finally {
