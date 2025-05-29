@@ -31,6 +31,40 @@ appEvents.on('screenshot-captured', () => {
   showScreenshotNotification();
 });
 
+// Listen for auto-stop events from activity monitor
+appEvents.on('auto-stop-tracking', (data) => {
+  console.log('🛑 Auto-stop tracking triggered:', data);
+  
+  // Stop the tracking timer
+  stopTrackingTimer();
+  
+  // Stop time tracking in the tracker module
+  stopTracking();
+  
+  // Show notification with reason
+  try {
+    let message = 'Tracking stopped automatically';
+    if (data.reason === 'screenshot_failures') {
+      message = `Tracking stopped due to screenshot failures (${data.failures} consecutive failures). This usually means your laptop is closed or the system is sleeping.`;
+    } else if (data.reason === 'system_unavailable') {
+      const minutes = Math.round(data.unavailableTime / 60000);
+      message = `Tracking stopped due to system inactivity (${minutes} minutes without successful monitoring).`;
+    }
+    
+    new Notification({
+      title: 'TimeFlow - Auto-Stop',
+      body: message
+    }).show();
+    
+    console.log(`📢 Auto-stop notification shown: ${message}`);
+  } catch (e) {
+    console.log('⚠️ Could not show auto-stop notification:', e);
+  }
+  
+  // Update tray menu to reflect stopped state
+  updateTrayMenu();
+});
+
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1000,
@@ -308,7 +342,7 @@ function createTray() {
 // Create a simple icon as base64 (16x16 green circle)
 function createSimpleIcon(): string {
   // This is a simple 16x16 PNG icon encoded as base64
-  return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
+  return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
 }
 
 // Update tray menu

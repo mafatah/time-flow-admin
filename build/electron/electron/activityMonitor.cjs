@@ -51,6 +51,13 @@ let activityMetrics = {
     last_activity_time: Date.now(),
     activity_score: 0
 };
+// Add new variables for enhanced idle detection
+let consecutiveScreenshotFailures = 0;
+let lastSuccessfulScreenshot = Date.now();
+let systemUnavailableStart = null;
+const MAX_SCREENSHOT_FAILURES = 3; // Stop after 3 consecutive failures
+const MAX_SYSTEM_UNAVAILABLE_TIME = 2 * 60 * 1000; // 2 minutes
+const SCREENSHOT_TIMEOUT_MS = 10000; // 10 seconds timeout for screenshot capture
 // Always-on activity monitoring - starts when app launches
 async function startActivityMonitoring(userId) {
     if (isMonitoring) {
@@ -154,7 +161,19 @@ function stopActivityMonitoring() {
 }
 function isUserActive() {
     const idleTimeMs = appSettings.idle_threshold_seconds * 1000;
-    return (Date.now() - lastActivityTime) < idleTimeMs;
+    const timeSinceLastActivity = Date.now() - lastActivityTime;
+    const timeSinceLastScreenshot = Date.now() - lastSuccessfulScreenshot;
+    // Check if we've had too many screenshot failures or been too long without successful capture
+    if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
+        console.log(`❌ Too many consecutive screenshot failures (${consecutiveScreenshotFailures}), user considered inactive`);
+        return false;
+    }
+    // If we haven't had a successful screenshot in a while, consider user inactive
+    if (timeSinceLastScreenshot > MAX_SYSTEM_UNAVAILABLE_TIME) {
+        console.log(`❌ No successful screenshot in ${Math.round(timeSinceLastScreenshot / 1000)}s, user considered inactive`);
+        return false;
+    }
+    return timeSinceLastActivity < idleTimeMs;
 }
 function updateLastActivity() {
     lastActivityTime = Date.now();
@@ -267,36 +286,98 @@ async function captureActivityScreenshot() {
         return;
     try {
         console.log('📸 Capturing activity screenshot...');
-        const primaryDisplay = electron_1.screen.getPrimaryDisplay();
-        const { width, height } = primaryDisplay.workAreaSize;
-        const sources = await electron_1.desktopCapturer.getSources({
-            types: ['screen'],
-            thumbnailSize: { width: Math.min(width, 1920), height: Math.min(height, 1080) }
+        // Add timeout to screenshot capture
+        const screenshotPromise = new Promise(async (resolve, reject) => {
+            try {
+                const primaryDisplay = electron_1.screen.getPrimaryDisplay();
+                const { width, height } = primaryDisplay.workAreaSize;
+                const sources = await electron_1.desktopCapturer.getSources({
+                    types: ['screen'],
+                    thumbnailSize: { width: Math.min(width, 1920), height: Math.min(height, 1080) }
+                });
+                if (sources.length === 0) {
+                    throw new Error('No screen sources available - check macOS Screen Recording permissions');
+                }
+                let buffer = sources[0].thumbnail.toPNG();
+                // Apply blur if enabled in settings
+                if (appSettings.blur_screenshots) {
+                    console.log('🔄 Applying blur to screenshot...');
+                    buffer = await blurImage(buffer);
+                }
+                const filename = `activity_${(0, crypto_1.randomUUID)()}.png`;
+                const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
+                fs_1.default.writeFileSync(tempPath, buffer);
+                console.log('💾 Activity screenshot saved:', filename);
+                resolve({ tempPath, filename });
+            }
+            catch (error) {
+                reject(error);
+            }
         });
-        if (sources.length === 0) {
-            console.log('❌ No screen sources available - check macOS Screen Recording permissions');
-            return;
-        }
-        let buffer = sources[0].thumbnail.toPNG();
-        // Apply blur if enabled in settings
-        if (appSettings.blur_screenshots) {
-            console.log('🔄 Applying blur to screenshot...');
-            buffer = await blurImage(buffer);
-        }
-        const filename = `activity_${(0, crypto_1.randomUUID)()}.png`;
-        const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
-        fs_1.default.writeFileSync(tempPath, buffer);
-        console.log('💾 Activity screenshot saved:', filename);
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Screenshot capture timeout')), SCREENSHOT_TIMEOUT_MS);
+        });
+        const { tempPath, filename } = await Promise.race([screenshotPromise, timeoutPromise]);
         // Upload to Supabase with activity metrics
         await uploadActivityScreenshot(tempPath, filename);
         // Update session stats
         currentActivitySession.total_screenshots++;
         saveActivitySession();
+        // Reset failure count on success
+        consecutiveScreenshotFailures = 0;
+        lastSuccessfulScreenshot = Date.now();
+        // Reset system unavailable tracking
+        if (systemUnavailableStart) {
+            console.log('✅ System available again after being unavailable');
+            systemUnavailableStart = null;
+        }
         console.log('✅ Activity screenshot uploaded successfully with metrics');
     }
     catch (error) {
-        console.error('❌ Activity screenshot failed:', error);
+        consecutiveScreenshotFailures++;
+        console.error(`❌ Activity screenshot failed (${consecutiveScreenshotFailures}/${MAX_SCREENSHOT_FAILURES}):`, error);
         (0, errorHandler_1.logError)('captureActivityScreenshot', error);
+        // Track when system became unavailable
+        if (!systemUnavailableStart) {
+            systemUnavailableStart = Date.now();
+            console.log('⚠️ System appears to be unavailable, starting timer');
+        }
+        // Check if we should stop tracking due to consecutive failures or timeout
+        const shouldStopTracking = consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES ||
+            (systemUnavailableStart && (Date.now() - systemUnavailableStart) > MAX_SYSTEM_UNAVAILABLE_TIME);
+        if (shouldStopTracking) {
+            console.log('🛑 Stopping tracking due to system unavailability or screenshot failures');
+            // Stop all monitoring
+            stopActivityMonitoring();
+            // Notify main process to stop timer tracking
+            try {
+                if (!appEvents) {
+                    appEvents = require('./main').appEvents;
+                }
+                if (appEvents) {
+                    appEvents.emit('auto-stop-tracking', {
+                        reason: consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES ? 'screenshot_failures' : 'system_unavailable',
+                        failures: consecutiveScreenshotFailures,
+                        unavailableTime: systemUnavailableStart ? Date.now() - systemUnavailableStart : 0
+                    });
+                }
+            }
+            catch (e) {
+                console.log('⚠️ Could not notify main process:', e);
+            }
+            // Show notification if possible
+            try {
+                new electron_1.Notification({
+                    title: 'TimeFlow - Tracking Stopped',
+                    body: consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES
+                        ? 'Tracking stopped due to screenshot capture issues (laptop closed?)'
+                        : 'Tracking stopped due to system inactivity'
+                }).show();
+            }
+            catch (e) {
+                // Silent fail for notifications
+            }
+        }
     }
 }
 async function uploadActivityScreenshot(filePath, filename) {
