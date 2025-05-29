@@ -86,15 +86,19 @@ export default function EmployeeTimeTracker() {
     if (!userDetails?.id) return;
 
     try {
+      // Use a more specific query to avoid RLS issues
       const { data, error } = await supabase
         .from('time_logs')
         .select('*')
         .eq('user_id', userDetails.id)
-        .filter('end_time', 'is', null)
+        .is('end_time', null)
         .order('start_time', { ascending: false })
         .limit(1);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error checking active session:', error);
+        return;
+      }
       
       if (data && data.length > 0) {
         const session = data[0] as TimeLog;
