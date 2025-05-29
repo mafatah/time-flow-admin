@@ -41,6 +41,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(true);
         setError(null);
         
+        // Check if Supabase is properly configured
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseAnonKey) {
+          setError('Supabase environment variables are not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+          setLoading(false);
+          return;
+        }
+        
         // Set up auth state listener FIRST
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
@@ -142,6 +152,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signIn(email: string, password: string) {
     try {
       setError(null);
+      
+      // Check if Supabase is properly configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Supabase is not configured. Please set up your environment variables.');
+      }
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,

@@ -55,6 +55,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
         return <FallbackComponent error={this.state.error!} retry={this.handleRetry} />;
       }
 
+      // Check for environment variable errors
+      const isEnvError = this.state.error?.message?.includes('environment variables') ||
+                        this.state.error?.message?.includes('VITE_SUPABASE');
+
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
           <Card className="w-full max-w-md">
@@ -62,12 +66,26 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               <div className="mx-auto mb-4 p-3 bg-destructive/10 rounded-full w-fit">
                 <AlertTriangle className="h-6 w-6 text-destructive" />
               </div>
-              <CardTitle>Something went wrong</CardTitle>
+              <CardTitle>
+                {isEnvError ? 'Configuration Error' : 'Something went wrong'}
+              </CardTitle>
               <CardDescription>
-                An unexpected error occurred. Please try refreshing the page.
+                {isEnvError 
+                  ? 'The application is not properly configured. Please set up your Supabase environment variables.'
+                  : 'An unexpected error occurred. Please try refreshing the page.'
+                }
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {isEnvError && (
+                <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                  <p className="font-semibold mb-2">Required environment variables:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>VITE_SUPABASE_URL</li>
+                    <li>VITE_SUPABASE_ANON_KEY</li>
+                  </ul>
+                </div>
+              )}
               {process.env.NODE_ENV === 'development' && this.state.error && (
                 <div className="text-xs text-muted-foreground p-3 bg-muted rounded-md overflow-auto max-h-32">
                   <pre>{this.state.error.toString()}</pre>
