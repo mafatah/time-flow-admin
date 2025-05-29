@@ -1,11 +1,11 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-let supabaseClient;
+let supabaseClient: SupabaseClient<Database>;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables');
@@ -14,7 +14,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Please set these environment variables in your .env file or project settings');
   
   // Create a dummy client to prevent app crashes during development
-  supabaseClient = createClient('https://placeholder.supabase.co', 'placeholder-key', {
+  supabaseClient = createClient<Database>('https://placeholder.supabase.co', 'placeholder-key', {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
