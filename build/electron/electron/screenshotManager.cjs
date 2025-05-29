@@ -12,6 +12,7 @@ const crypto_1 = require("crypto");
 const supabase_1 = require("./supabase.cjs");
 const unsyncedManager_1 = require("./unsyncedManager.cjs");
 const errorHandler_1 = require("./errorHandler.cjs");
+const uuid_validator_1 = require("./utils/uuid-validator.cjs");
 const UNSYNCED_LIST_PATH = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_screenshots.json');
 function loadQueue() {
     try {
@@ -38,6 +39,15 @@ if (queue.length > 0) {
     startRetry();
 }
 async function captureAndUpload(userId, projectId) {
+    // Validate UUIDs before processing
+    const validUserId = (0, uuid_validator_1.validateAndGetUUID)(userId, (0, crypto_1.randomUUID)());
+    const validProjectId = (0, uuid_validator_1.validateAndGetUUID)(projectId, (0, uuid_validator_1.generateDefaultProjectUUID)());
+    if (validUserId !== userId) {
+        console.warn(`Screenshot: Invalid user ID corrected: ${userId} -> ${validUserId}`);
+    }
+    if (validProjectId !== projectId) {
+        console.warn(`Screenshot: Invalid project ID corrected: ${projectId} -> ${validProjectId}`);
+    }
     const primaryDisplay = electron_1.screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
     const sources = await electron_1.desktopCapturer.getSources({
@@ -51,7 +61,7 @@ async function captureAndUpload(userId, projectId) {
     const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
     fs_1.default.writeFileSync(tempPath, buffer);
     try {
-        await uploadScreenshot(tempPath, userId, projectId, Date.now());
+        await uploadScreenshot(tempPath, validUserId, validProjectId, Date.now());
         fs_1.default.unlink(tempPath, () => { });
     }
     catch (err) {
@@ -62,7 +72,7 @@ async function captureAndUpload(userId, projectId) {
         const dest = path_1.default.join(unsyncedDir, filename);
         fs_1.default.copyFileSync(tempPath, dest);
         fs_1.default.unlink(tempPath, () => { });
-        queue.push({ path: dest, userId, projectId, timestamp: Date.now() });
+        queue.push({ path: dest, userId: validUserId, projectId: validProjectId, timestamp: Date.now() });
         saveQueue(queue);
         startRetry();
     }
