@@ -5,6 +5,8 @@ import type { Database } from './types';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+let supabaseClient;
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables');
   console.error('VITE_SUPABASE_URL:', supabaseUrl ? 'Set' : 'Missing');
@@ -12,15 +14,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Please set these environment variables in your .env file or project settings');
   
   // Create a dummy client to prevent app crashes during development
-  const dummyClient = createClient('https://placeholder.supabase.co', 'placeholder-key', {
+  supabaseClient = createClient('https://placeholder.supabase.co', 'placeholder-key', {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false
     }
   });
-  
-  export const supabase = dummyClient;
 } else {
   // Validate URL format
   try {
@@ -30,7 +30,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Invalid Supabase URL format');
   }
 
-  const supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: true,
       persistSession: true,
@@ -50,6 +50,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
     .catch((error: any) => {
       console.error('Supabase connection error:', error);
     });
-
-  export const supabase = supabaseClient;
 }
+
+export const supabase = supabaseClient;
