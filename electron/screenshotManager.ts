@@ -1,3 +1,4 @@
+
 import { desktopCapturer, screen, app } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -5,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { supabase } from './supabase';
 import { queueScreenshot } from './unsyncedManager';
 import { logError, showError } from './errorHandler';
+import { validateAndGetUUID, generateDefaultProjectUUID } from './utils/uuid-validator';
 
 interface QueuedItem {
   path: string;
@@ -42,6 +44,18 @@ if (queue.length > 0) {
 }
 
 export async function captureAndUpload(userId: string, projectId: string) {
+  // Validate UUIDs before processing
+  const validUserId = validateAndGetUUID(userId, randomUUID());
+  const validProjectId = validateAndGetUUID(projectId, generateDefaultProjectUUID());
+  
+  if (validUserId !== userId) {
+    console.warn(`Screenshot: Invalid user ID corrected: ${userId} -> ${validUserId}`);
+  }
+  
+  if (validProjectId !== projectId) {
+    console.warn(`Screenshot: Invalid project ID corrected: ${projectId} -> ${validProjectId}`);
+  }
+
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
   
@@ -59,7 +73,7 @@ export async function captureAndUpload(userId: string, projectId: string) {
   fs.writeFileSync(tempPath, buffer);
   
   try {
-    await uploadScreenshot(tempPath, userId, projectId, Date.now());
+    await uploadScreenshot(tempPath, validUserId, validProjectId, Date.now());
     fs.unlink(tempPath, () => {});
   } catch (err) {
     logError('captureAndUpload', err);
@@ -72,7 +86,7 @@ export async function captureAndUpload(userId: string, projectId: string) {
     fs.copyFileSync(tempPath, dest);
     fs.unlink(tempPath, () => {});
     
-    queue.push({ path: dest, userId, projectId, timestamp: Date.now() });
+    queue.push({ path: dest, userId: validUserId, projectId: validProjectId, timestamp: Date.now() });
     saveQueue(queue);
     startRetry();
   }

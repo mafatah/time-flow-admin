@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { Play, Square, Clock, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { TimeLog } from "@/types/timeLog";
+import { validateProjectId, validateUserId } from "@/utils/uuid-validation";
 
 export default function TimeTracker() {
   const [currentSession, setCurrentSession] = useState<TimeLog | null>(null);
@@ -88,14 +90,18 @@ export default function TimeTracker() {
   };
 
   const loadActiveSession = async () => {
-    if (!userDetails?.id) return;
+    const validUserId = validateUserId(userDetails?.id || null);
+    if (!validUserId) {
+      console.warn('Invalid user ID, cannot load active session');
+      return;
+    }
     
     try {
       // Use simpler approach to avoid 406 errors
       const { data, error } = await supabase
         .from('time_logs')
         .select('*')
-        .eq('user_id', userDetails.id)
+        .eq('user_id', validUserId)
         .order('start_time', { ascending: false });
       
       if (error) {
@@ -107,14 +113,19 @@ export default function TimeTracker() {
       const activeSession = data?.find(log => !log.end_time);
       
       if (activeSession) {
-        setCurrentSession(activeSession);
-        setIsTracking(true);
-        setSelectedProject(activeSession.project_id || '');
-        
-        // Calculate elapsed time
-        const startTime = new Date(activeSession.start_time).getTime();
-        const now = new Date().getTime();
-        setElapsedTime(now - startTime);
+        const validProjectId = validateProjectId(activeSession.project_id);
+        if (validProjectId) {
+          setCurrentSession(activeSession);
+          setIsTracking(true);
+          setSelectedProject(validProjectId);
+          
+          // Calculate elapsed time
+          const startTime = new Date(activeSession.start_time).getTime();
+          const now = new Date().getTime();
+          setElapsedTime(now - startTime);
+        } else {
+          console.warn('Active session has invalid project ID:', activeSession.project_id);
+        }
       }
     } catch (error: any) {
       console.error('Error loading active session:', error);
@@ -122,7 +133,8 @@ export default function TimeTracker() {
   };
 
   const calculateTodayTime = async () => {
-    if (!userDetails) return;
+    const validUserId = validateUserId(userDetails?.id || null);
+    if (!validUserId) return;
     
     try {
       const today = new Date();
@@ -132,7 +144,7 @@ export default function TimeTracker() {
       const { data, error } = await supabase
         .from('time_logs')
         .select('start_time, end_time')
-        .eq('user_id', userDetails.id)
+        .eq('user_id', validUserId)
         .gte('start_time', startOfDay.toISOString())
         .lt('start_time', endOfDay.toISOString());
       
@@ -152,10 +164,22 @@ export default function TimeTracker() {
   };
 
   const startTracking = () => {
-    if (!selectedProject) {
+    const validProjectId = validateProjectId(selectedProject);
+    const validUserId = validateUserId(userDetails?.id || null);
+    
+    if (!validProjectId) {
       toast({
-        title: "Please select a project",
-        description: "You need to select a project before starting time tracking.",
+        title: "Please select a valid project",
+        description: "You need to select a valid project before starting time tracking.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!validUserId) {
+      toast({
+        title: "Invalid user session",
+        description: "Please log out and log back in.",
         variant: "destructive",
       });
       return;
@@ -163,7 +187,7 @@ export default function TimeTracker() {
 
     setIsTracking(true);
     if (window.electron) {
-      window.electron.setUserId(userDetails?.id || '');
+      window.electron.setUserId(validUserId);
       window.electron.startTracking();
     }
     toast({

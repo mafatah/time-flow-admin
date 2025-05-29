@@ -17,6 +17,8 @@ const unsyncedManager_1 = require("./unsyncedManager.cjs");
 const appLogsManager_1 = require("./appLogsManager.cjs");
 const config_1 = require("./config.cjs");
 const sessionManager_1 = require("./sessionManager.cjs");
+const uuid_validator_1 = require("./utils/uuid-validator.cjs");
+
 let screenshotInterval;
 let appInterval;
 let trackingActive = false;
@@ -24,14 +26,21 @@ let userId = null;
 let currentProjectId = null;
 // Session persistence handled by sessionManager
 let currentTimeLogId = null;
+
 // Set the current user ID for tracking
 function setUserId(id) {
-    userId = id;
+    const validatedId = (0, uuid_validator_1.validateAndGetUUID)(id, (0, crypto_1.randomUUID)());
+    userId = validatedId;
+    console.log(`Set user ID: ${userId}`);
 }
+
 // Set the current project ID for tracking
 function setProjectId(id) {
-    currentProjectId = id;
+    const validatedId = (0, uuid_validator_1.validateAndGetUUID)(id, (0, uuid_validator_1.generateDefaultProjectUUID)());
+    currentProjectId = validatedId;
+    console.log(`Set project ID: ${currentProjectId}`);
 }
+
 // Update the current time log's idle status
 async function updateTimeLogStatus(idle) {
     if (!currentTimeLogId)
@@ -60,6 +69,7 @@ async function updateTimeLogStatus(idle) {
         });
     }
 }
+
 // Start tracking activities
 async function startTracking() {
     console.log('🚀 startTracking() called');
@@ -74,8 +84,24 @@ async function startTracking() {
         console.log(`   - currentProjectId: ${currentProjectId}`);
         return;
     }
+    
+    // Validate UUIDs before starting
+    const validUserId = (0, uuid_validator_1.validateAndGetUUID)(userId, (0, crypto_1.randomUUID)());
+    const validProjectId = (0, uuid_validator_1.validateAndGetUUID)(currentProjectId, (0, uuid_validator_1.generateDefaultProjectUUID)());
+    
+    if (validUserId !== userId) {
+        console.warn(`Invalid user ID corrected: ${userId} -> ${validUserId}`);
+        userId = validUserId;
+    }
+    
+    if (validProjectId !== currentProjectId) {
+        console.warn(`Invalid project ID corrected: ${currentProjectId} -> ${validProjectId}`);
+        currentProjectId = validProjectId;
+    }
+
     console.log('✅ Starting tracking...');
     trackingActive = true;
+    
     try {
         const { data, error } = await supabase_1.supabase
             .from('time_logs')
@@ -88,6 +114,7 @@ async function startTracking() {
             .select('id')
             .single();
         if (error || !data) {
+            console.error('Failed to create time log:', error);
             currentTimeLogId = (0, crypto_1.randomUUID)();
             (0, unsyncedManager_1.queueTimeLog)({
                 user_id: userId,
@@ -110,6 +137,7 @@ async function startTracking() {
             is_idle: false
         });
     }
+    
     const session = {
         project_id: currentProjectId,
         user_id: userId,
@@ -118,6 +146,7 @@ async function startTracking() {
     };
     (0, sessionManager_1.saveSession)(session);
     (0, idleMonitor_1.startIdleMonitoring)();
+    
     if (!screenshotInterval) {
         console.log(`🚀 Setting up screenshot interval: ${config_1.screenshotIntervalSeconds} seconds`);
         console.log(`📊 Current state - userId: ${userId}, projectId: ${currentProjectId}`);
@@ -140,6 +169,7 @@ async function startTracking() {
         }, 10000);
     }
 }
+
 // Stop tracking activities
 async function stopTracking() {
     if (!trackingActive)
@@ -182,15 +212,18 @@ async function stopTracking() {
     (0, sessionManager_1.clearSession)();
     currentTimeLogId = null;
 }
+
 // Sync offline data when online
 async function syncOfflineData() {
     await (0, unsyncedManager_1.processQueue)();
     await (0, screenshotManager_1.processQueue)();
 }
+
 // Load a saved session from disk
 function loadSession() {
     return (0, sessionManager_1.loadSession)();
 }
+
 // Clear the saved session
 function clearSavedSession() {
     (0, sessionManager_1.clearSession)();

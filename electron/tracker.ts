@@ -1,4 +1,3 @@
-
 import { supabase } from './supabase';
 // Using crypto.randomUUID instead of nanoid for CommonJS compatibility
 import { randomUUID } from 'crypto';
@@ -7,6 +6,7 @@ import { captureAndUpload, processQueue as processScreenshotQueue } from './scre
 import { queueTimeLog, processQueue as processUnsyncedQueue } from './unsyncedManager';
 import { captureAppLog } from './appLogsManager';
 import { screenshotIntervalSeconds } from './config';
+import { validateAndGetUUID, generateDefaultProjectUUID } from './utils/uuid-validator';
 import {
   saveSession as storeSession,
   loadSession as getSession,
@@ -25,12 +25,16 @@ let currentTimeLogId: string | null = null;
 
 // Set the current user ID for tracking
 export function setUserId(id: string) {
-  userId = id;
+  const validatedId = validateAndGetUUID(id, randomUUID());
+  userId = validatedId;
+  console.log(`Set user ID: ${userId}`);
 }
 
 // Set the current project ID for tracking
 export function setProjectId(id: string) {
-  currentProjectId = id;
+  const validatedId = validateAndGetUUID(id, generateDefaultProjectUUID());
+  currentProjectId = validatedId;
+  console.log(`Set project ID: ${currentProjectId}`);
 }
 
 // Update the current time log's idle status
@@ -76,8 +80,23 @@ export async function startTracking() {
     return;
   }
 
+  // Validate UUIDs before starting
+  const validUserId = validateAndGetUUID(userId, randomUUID());
+  const validProjectId = validateAndGetUUID(currentProjectId, generateDefaultProjectUUID());
+  
+  if (validUserId !== userId) {
+    console.warn(`Invalid user ID corrected: ${userId} -> ${validUserId}`);
+    userId = validUserId;
+  }
+  
+  if (validProjectId !== currentProjectId) {
+    console.warn(`Invalid project ID corrected: ${currentProjectId} -> ${validProjectId}`);
+    currentProjectId = validProjectId;
+  }
+
   console.log('✅ Starting tracking...');
   trackingActive = true;
+  
   try {
     const { data, error } = await supabase
       .from('time_logs')
@@ -91,6 +110,7 @@ export async function startTracking() {
       .single();
 
     if (error || !data) {
+      console.error('Failed to create time log:', error);
       currentTimeLogId = randomUUID();
       queueTimeLog({
         user_id: userId,
