@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +65,7 @@ export default function DashboardContent() {
         .select('start_time, end_time')
         .gte('start_time', weekStart.toISOString())
         .lte('start_time', weekEnd.toISOString())
-        .not('end_time', 'is', null);
+        .filter('end_time', 'not.is', null);
 
       let totalHours = 0;
       timeLogsData?.forEach(log => {

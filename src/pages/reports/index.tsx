@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,21 +92,22 @@ export default function ReportsPage() {
         .from('time_logs')
         .select(`
           id,
-          start_time,
-          end_time,
           user_id,
           project_id,
-          projects(
+          start_time,
+          end_time,
+          is_idle,
+          projects (
             id,
             name
           ),
-          users(
+          users (
             id,
             full_name,
             email
           )
         `)
-        .not('end_time', 'is', null)
+        .filter('end_time', 'not.is', null)
         .gte('start_time', startDate.toISOString())
         .lte('start_time', endDate.toISOString());
 

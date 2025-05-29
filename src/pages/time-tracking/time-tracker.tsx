@@ -95,7 +95,7 @@ export default function TimeTracker() {
         .from('time_logs')
         .select('*')
         .eq('user_id', userDetails.id)
-        .is('end_time', null)
+        .filter('end_time', 'is', null)
         .single();
       
       if (error && error.code !== 'PGRST116') {

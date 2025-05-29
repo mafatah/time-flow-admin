@@ -33,7 +33,7 @@ async function checkDatabase() {
     const { data: timeLogs, error: timeLogsError } = await supabase
       .from('time_logs')
       .select('*')
-      .is('end_time', null)
+      .filter('end_time', 'is', null)
       .order('start_time', { ascending: false });
     
     if (timeLogsError) {

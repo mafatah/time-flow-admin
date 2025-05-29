@@ -102,9 +102,9 @@ export default function TimeLogs() {
       }
 
       if (filters.status === 'active') {
-        query = query.is('end_time', null);
+        query = query.filter('end_time', 'is', null);
       } else if (filters.status === 'completed') {
-        query = query.not('end_time', 'is', null);
+        query = query.filter('end_time', 'not.is', null);
       }
 
       const { data: timeLogData, error } = await query

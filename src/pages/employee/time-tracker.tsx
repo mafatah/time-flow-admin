@@ -90,7 +90,7 @@ export default function EmployeeTimeTracker() {
         .from('time_logs')
         .select('*')
         .eq('user_id', userDetails.id)
-        .is('end_time', null)
+        .filter('end_time', 'is', null)
         .order('start_time', { ascending: false })
         .limit(1);
 

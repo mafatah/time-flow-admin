@@ -101,7 +101,7 @@ const EmployeeReports = () => {
         .eq('user_id', userDetails.id)
         .gte('start_time', start.toISOString())
         .lte('start_time', end.toISOString())
-        .not('end_time', 'is', null)
+        .filter('end_time', 'not.is', null)
         .order('start_time', { ascending: false });
 
       if (timeLogsError) {

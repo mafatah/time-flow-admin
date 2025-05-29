@@ -93,7 +93,7 @@ export default function TimeTracker() {
       const { data: session, error } = await supabase
         .from('time_logs')
         .select('*')
-        .is('end_time', null)
+        .filter('end_time', 'is', null)
         .single();
 
       if (error && error.code !== 'PGRST116') {
@@ -121,7 +121,7 @@ export default function TimeTracker() {
       const { data: existingSession } = await supabase
         .from('time_logs')
         .select('*')
-        .is('end_time', null)
+        .filter('end_time', 'is', null)
         .single();
 
       if (existingSession) {
