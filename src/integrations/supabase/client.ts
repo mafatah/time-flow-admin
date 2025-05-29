@@ -12,13 +12,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Please set these environment variables in your .env file or project settings');
   
   // Create a dummy client to prevent app crashes during development
-  export const supabase = createClient('https://placeholder.supabase.co', 'placeholder-key', {
+  const dummyClient = createClient('https://placeholder.supabase.co', 'placeholder-key', {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false
     }
   });
+  
+  export { dummyClient as supabase };
 } else {
   // Validate URL format
   try {
@@ -28,7 +30,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Invalid Supabase URL format');
   }
 
-  export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  const supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: true,
       persistSession: true,
@@ -37,7 +39,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   });
 
   // Add connection test with proper error handling
-  supabase.from('users').select('count', { count: 'exact', head: true })
+  supabaseClient.from('users').select('count', { count: 'exact', head: true })
     .then(({ error }) => {
       if (error) {
         console.error('Supabase connection test failed:', error.message);
@@ -48,4 +50,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
     .catch((error: any) => {
       console.error('Supabase connection error:', error);
     });
+
+  export { supabaseClient as supabase };
 }

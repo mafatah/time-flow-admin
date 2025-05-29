@@ -9,6 +9,12 @@ import { useToast } from '@/components/ui/use-toast';
 import { Download } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
+interface Project {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export function ProjectSelector() {
   const { isTracking, currentProjectId, startTracking, stopTracking, canTrack } = useTracker();
   const { user } = useAuth();
@@ -33,7 +39,7 @@ export function ProjectSelector() {
         return [];
       }
       
-      return data;
+      return data as Project[];
     },
     enabled: !!user,
   });
@@ -89,7 +95,7 @@ export function ProjectSelector() {
                 {projectsLoading ? (
                   <SelectItem value="loading" disabled>Loading projects...</SelectItem>
                 ) : projects && projects.length > 0 ? (
-                  projects.map((project) => (
+                  projects.map((project: Project) => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
                     </SelectItem>

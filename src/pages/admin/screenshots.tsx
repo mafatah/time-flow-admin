@@ -23,6 +23,17 @@ interface Screenshot {
   project_name?: string;
 }
 
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+}
+
 export default function AdminScreenshots() {
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,8 +68,8 @@ export default function AdminScreenshots() {
       }
 
       // Get unique user IDs and project IDs, filtering out nulls
-      const userIds = [...new Set(screenshotData.map(s => s.user_id).filter(Boolean))] as string[];
-      const projectIds = [...new Set(screenshotData.map(s => s.project_id).filter(Boolean))] as string[];
+      const userIds = [...new Set(screenshotData.map((s: any) => s.user_id).filter(Boolean))] as string[];
+      const projectIds = [...new Set(screenshotData.map((s: any) => s.project_id).filter(Boolean))] as string[];
 
       // Fetch user data
       const { data: userData } = await supabase
@@ -73,11 +84,11 @@ export default function AdminScreenshots() {
         .in('id', projectIds);
 
       // Combine data
-      const enrichedScreenshots = screenshotData.map(screenshot => ({
+      const enrichedScreenshots = screenshotData.map((screenshot: any) => ({
         ...screenshot,
-        user_name: userData?.find(u => u.id === screenshot.user_id)?.full_name || 'Unknown',
-        user_email: userData?.find(u => u.id === screenshot.user_id)?.email || 'Unknown',
-        project_name: projectData?.find(p => p.id === screenshot.project_id)?.name || 'Unknown Project'
+        user_name: userData?.find((u: User) => u.id === screenshot.user_id)?.full_name || 'Unknown',
+        user_email: userData?.find((u: User) => u.id === screenshot.user_id)?.email || 'Unknown',
+        project_name: projectData?.find((p: Project) => p.id === screenshot.project_id)?.name || 'Unknown Project'
       }));
 
       setScreenshots(enrichedScreenshots);
@@ -154,7 +165,7 @@ export default function AdminScreenshots() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {screenshots.map((screenshot) => (
+                {screenshots.map((screenshot: Screenshot) => (
                   <TableRow key={screenshot.id}>
                     <TableCell>
                       {format(new Date(screenshot.captured_at), 'HH:mm:ss')}

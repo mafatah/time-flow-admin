@@ -29,10 +29,21 @@ interface IdleLog {
   };
 }
 
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+}
+
 export default function AdminIdleLogs() {
   const [idleLogs, setIdleLogs] = useState<IdleLog[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -77,9 +88,9 @@ export default function AdminIdleLogs() {
       if (error) throw error;
 
       // Manually join user and project data
-      const enrichedLogs: IdleLog[] = (idleLogsData || []).map(log => {
-        const user = usersResponse.data?.find(u => u.id === log.user_id);
-        const project = log.project_id ? projectsResponse.data?.find(p => p.id === log.project_id) : null;
+      const enrichedLogs: IdleLog[] = (idleLogsData || []).map((log: any) => {
+        const user = usersResponse.data?.find((u: User) => u.id === log.user_id);
+        const project = log.project_id ? projectsResponse.data?.find((p: Project) => p.id === log.project_id) : null;
         
         return {
           ...log,

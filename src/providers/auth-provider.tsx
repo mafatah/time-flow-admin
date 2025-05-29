@@ -2,7 +2,7 @@
 import * as React from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { User, Session } from "@supabase/supabase-js";
+import type { User, Session, AuthChangeEvent } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
 import { validateUserId } from "@/utils/uuid-validation";
 
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Set up auth state listener FIRST
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
+          async (event: AuthChangeEvent, session: Session | null) => {
             console.log('Auth state change:', event, session?.user?.email);
             setSession(session);
             setUser(session?.user ?? null);

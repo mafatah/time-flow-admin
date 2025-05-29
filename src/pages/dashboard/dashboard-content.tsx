@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,20 @@ interface DashboardStats {
   idleTime: number;
 }
 
+interface TimeLog {
+  id: string;
+  start_time: string;
+  end_time: string | null;
+  user_id: string;
+  project_id: string | null;
+  users?: {
+    full_name: string;
+  };
+  projects?: {
+    name: string;
+  };
+}
+
 export default function DashboardContent() {
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
@@ -30,7 +45,7 @@ export default function DashboardContent() {
     idleTime: 0
   });
   const [loading, setLoading] = useState(true);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<TimeLog[]>([]);
   
   const { userDetails } = useAuth();
 
@@ -57,7 +72,7 @@ export default function DashboardContent() {
         .gte('start_time', weekStart.toISOString())
         .lte('start_time', weekEnd.toISOString());
 
-      const activeUsers = new Set(activeUsersData?.map(log => log.user_id)).size;
+      const activeUsers = new Set(activeUsersData?.map((log: any) => log.user_id)).size;
 
       // Get total hours this week
       const { data: timeLogsData } = await supabase
@@ -68,7 +83,7 @@ export default function DashboardContent() {
         .filter('end_time', 'not.is', null);
 
       let totalHours = 0;
-      timeLogsData?.forEach(log => {
+      timeLogsData?.forEach((log: any) => {
         if (log.end_time) {
           const start = new Date(log.start_time).getTime();
           const end = new Date(log.end_time).getTime();
@@ -211,7 +226,7 @@ export default function DashboardContent() {
         <CardContent>
           {recentActivity.length > 0 ? (
             <div className="space-y-4">
-              {recentActivity.map(activity => (
+              {recentActivity.map((activity: TimeLog) => (
                 <div key={activity.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
                   <div>
                     <div className="font-medium">
