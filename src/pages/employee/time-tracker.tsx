@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,25 +86,25 @@ export default function EmployeeTimeTracker() {
     if (!userDetails?.id) return;
 
     try {
-      // Use PostgREST syntax for null check
+      // Use a simpler approach - get all time logs for user and filter in memory
       const { data, error } = await supabase
         .from('time_logs')
         .select('*')
         .eq('user_id', userDetails.id)
-        .filter('end_time', 'is', null)
-        .order('start_time', { ascending: false })
-        .limit(1);
+        .order('start_time', { ascending: false });
 
       if (error) {
         console.error('Error checking active session:', error);
         return;
       }
       
-      if (data && data.length > 0) {
-        const session = data[0] as TimeLog;
-        setCurrentSession(session);
+      // Find active session (no end_time) in memory to avoid RLS issues
+      const activeSession = data?.find(log => !log.end_time);
+      
+      if (activeSession) {
+        setCurrentSession(activeSession);
         setIsTracking(true);
-        setSelectedProjectId(session.project_id || '');
+        setSelectedProjectId(activeSession.project_id || '');
       }
     } catch (error) {
       console.error('Error checking active session:', error);

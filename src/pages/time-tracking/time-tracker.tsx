@@ -91,24 +91,28 @@ export default function TimeTracker() {
     if (!userDetails?.id) return;
     
     try {
+      // Use simpler approach to avoid 406 errors
       const { data, error } = await supabase
         .from('time_logs')
         .select('*')
         .eq('user_id', userDetails.id)
-        .filter('end_time', 'is', null)
-        .single();
+        .order('start_time', { ascending: false });
       
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      if (error) {
+        console.error('Error loading active session:', error);
+        return;
       }
       
-      if (data) {
-        setCurrentSession(data);
+      // Find active session in memory
+      const activeSession = data?.find(log => !log.end_time);
+      
+      if (activeSession) {
+        setCurrentSession(activeSession);
         setIsTracking(true);
-        setSelectedProject(data.project_id || '');
+        setSelectedProject(activeSession.project_id || '');
         
         // Calculate elapsed time
-        const startTime = new Date(data.start_time).getTime();
+        const startTime = new Date(activeSession.start_time).getTime();
         const now = new Date().getTime();
         setElapsedTime(now - startTime);
       }

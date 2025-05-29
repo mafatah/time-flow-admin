@@ -90,19 +90,23 @@ export default function TimeTracker() {
 
   const checkActiveSession = async () => {
     try {
-      const { data: session, error } = await supabase
+      // Use simpler approach to avoid 406 errors
+      const { data, error } = await supabase
         .from('time_logs')
         .select('*')
-        .filter('end_time', 'is', null)
-        .single();
+        .order('start_time', { ascending: false });
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      if (error) {
+        console.error('Error checking active session:', error);
+        return;
       }
 
-      if (session) {
-        setCurrentSession(session);
-        setSelectedProject(session.project_id || '');
+      // Find active session in memory
+      const activeSession = data?.find(session => !session.end_time);
+      
+      if (activeSession) {
+        setCurrentSession(activeSession);
+        setSelectedProject(activeSession.project_id || '');
       }
     } catch (error) {
       console.error('Error checking active session:', error);
@@ -117,14 +121,15 @@ export default function TimeTracker() {
 
     setLoading(true);
     try {
-      // Check if there's already an active session
-      const { data: existingSession } = await supabase
+      // Check if there's already an active session by getting all and filtering
+      const { data: allSessions } = await supabase
         .from('time_logs')
         .select('*')
-        .filter('end_time', 'is', null)
-        .single();
+        .order('start_time', { ascending: false });
 
-      if (existingSession) {
+      const existingActiveSession = allSessions?.find(session => !session.end_time);
+
+      if (existingActiveSession) {
         toast.error('There is already an active tracking session');
         return;
       }

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -101,12 +102,6 @@ export default function TimeLogs() {
         query = query.lte('start_time', endDate.toISOString());
       }
 
-      if (filters.status === 'active') {
-        query = query.filter('end_time', 'is', null);
-      } else if (filters.status === 'completed') {
-        query = query.filter('end_time', 'not.is', null);
-      }
-
       const { data: timeLogData, error } = await query
         .order('start_time', { ascending: false })
         .limit(100);
@@ -118,8 +113,16 @@ export default function TimeLogs() {
         return;
       }
 
+      // Filter by status in memory to avoid 406 errors
+      let filteredLogs = timeLogData;
+      if (filters.status === 'active') {
+        filteredLogs = timeLogData.filter(log => !log.end_time);
+      } else if (filters.status === 'completed') {
+        filteredLogs = timeLogData.filter(log => !!log.end_time);
+      }
+
       // Enrich with user and project names
-      const enrichedLogs: TimeLog[] = timeLogData.map(log => {
+      const enrichedLogs: TimeLog[] = filteredLogs.map(log => {
         const user = users.find(u => u.id === log.user_id);
         const project = projects.find(p => p.id === log.project_id);
         
