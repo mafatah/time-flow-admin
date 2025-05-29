@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,11 @@ export default function EmployeeReports() {
   };
 
   const fetchTimeLogs = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const startDate = getStartDate();
@@ -71,7 +77,7 @@ export default function EmployeeReports() {
           project_id,
           projects (name)
         `)
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .gte('start_time', startDate.toISOString())
         .lte('start_time', endDate.toISOString())
         .order('start_time', { ascending: false });

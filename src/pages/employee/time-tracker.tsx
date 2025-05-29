@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,12 +41,17 @@ export default function EmployeeTimeTracker() {
   }, [userDetails?.id]);
 
   const fetchActiveSessions = async () => {
+    if (!userDetails?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('time_logs')
         .select('*')
-        .eq('user_id', userDetails?.id)
+        .eq('user_id', userDetails.id)
         .is('end_time', null);
 
       if (error) {
@@ -57,7 +63,16 @@ export default function EmployeeTimeTracker() {
         });
       }
 
-      setActiveSessions(data || []);
+      // Map to TimeLog interface
+      const mappedSessions: TimeLog[] = (data || []).map((log: any) => ({
+        id: log.id,
+        start_time: log.start_time,
+        end_time: log.end_time,
+        project_id: log.project_id,
+        duration: differenceInMinutes(new Date(), new Date(log.start_time))
+      }));
+
+      setActiveSessions(mappedSessions);
     } catch (error) {
       console.error('Error fetching active sessions:', error);
       toast({
@@ -71,12 +86,17 @@ export default function EmployeeTimeTracker() {
   };
 
   const fetchRecentSessions = async () => {
+    if (!userDetails?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('time_logs')
         .select('*')
-        .eq('user_id', userDetails?.id)
+        .eq('user_id', userDetails.id)
         .not('end_time', 'is', null)
         .order('start_time', { ascending: false })
         .limit(5);
@@ -90,7 +110,7 @@ export default function EmployeeTimeTracker() {
         });
       }
 
-      const recentLogs = data?.map((log: any) => ({
+      const recentLogs: TimeLog[] = (data || []).map((log: any) => ({
         id: log.id,
         start_time: log.start_time,
         end_time: log.end_time,
@@ -98,7 +118,7 @@ export default function EmployeeTimeTracker() {
         duration: log.end_time 
           ? differenceInMinutes(new Date(log.end_time), new Date(log.start_time))
           : differenceInMinutes(new Date(), new Date(log.start_time))
-      })) || [];
+      }));
 
       setRecentSessions(recentLogs);
     } catch (error) {

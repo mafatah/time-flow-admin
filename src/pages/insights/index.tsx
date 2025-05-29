@@ -65,7 +65,18 @@ export default function InsightsPage() {
       if (usersRes.error) throw usersRes.error;
       if (projectsRes.error) throw projectsRes.error;
 
-      setScreenshots(screenshotsRes.data || []);
+      // Map screenshots to match our interface
+      const mappedScreenshots: Screenshot[] = (screenshotsRes.data || []).map((screenshot: any) => ({
+        id: screenshot.id,
+        user_id: screenshot.user_id || '', // Handle null user_id
+        project_id: screenshot.project_id || '',
+        captured_at: screenshot.captured_at,
+        file_url: screenshot.image_url, // Map image_url to file_url
+        activity_percent: screenshot.activity_percent || 0,
+        focus_percent: screenshot.focus_percent || 0
+      }));
+
+      setScreenshots(mappedScreenshots);
       setUsers(usersRes.data || []);
       setProjects(projectsRes.data || []);
     } catch (error) {

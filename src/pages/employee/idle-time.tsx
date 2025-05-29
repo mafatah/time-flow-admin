@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { useAuth } from '@/providers/auth-provider';
@@ -27,7 +28,7 @@ const IdleTimePage = () => {
   }, [user, startDate, endDate]);
 
   const fetchIdleLogs = async () => {
-    if (!user) return;
+    if (!user?.id) return;
 
     const startDateObj = startOfDay(new Date(startDate));
     const endDateObj = endOfDay(new Date(endDate));
@@ -35,17 +36,28 @@ const IdleTimePage = () => {
     const { data: idleLogsData, error: idleLogsError } = await supabase
       .from('idle_logs')
       .select('*')
-      .eq('user_id', user?.id)
-      .gte('start_time', startDateObj.toISOString())
-      .lte('start_time', endDateObj.toISOString())
-      .order('start_time', { ascending: false });
+      .eq('user_id', user.id)
+      .gte('idle_start', startDateObj.toISOString())
+      .lte('idle_start', endDateObj.toISOString())
+      .order('idle_start', { ascending: false });
 
     if (idleLogsError) {
       console.error('Error fetching idle logs:', idleLogsError);
       return;
     }
 
-    setIdleLogs(idleLogsData || []);
+    // Map database fields to interface
+    const mappedLogs: IdleLog[] = (idleLogsData || []).map(log => ({
+      id: log.id,
+      user_id: log.user_id,
+      start_time: log.idle_start,
+      end_time: log.idle_end,
+      duration_minutes: log.duration_minutes,
+      activity_type: 'idle', // Default activity type
+      created_at: log.created_at || log.idle_start
+    }));
+
+    setIdleLogs(mappedLogs);
   };
 
   return (
