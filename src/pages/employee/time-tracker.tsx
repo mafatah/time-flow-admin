@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,12 +87,12 @@ export default function EmployeeTimeTracker() {
     if (!userDetails?.id) return;
 
     try {
-      // Use a more specific query to avoid RLS issues
+      // Use PostgREST syntax for null check
       const { data, error } = await supabase
         .from('time_logs')
         .select('*')
         .eq('user_id', userDetails.id)
-        .is('end_time', null)
+        .filter('end_time', 'is', null)
         .order('start_time', { ascending: false })
         .limit(1);
 
