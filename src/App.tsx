@@ -1,214 +1,175 @@
 
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from '@/providers/auth-provider';
-import { MainLayout } from '@/components/layout/main-layout';
-import LoginPage from '@/pages/auth/login';
-import Index from '@/pages/Index';
-import Dashboard from '@/pages/dashboard';
-import EmployeeDashboard from '@/pages/employee/dashboard';
-import EmployeeReports from '@/pages/employee/reports';
-import EmployeeTimeTracker from '@/pages/employee/time-tracker';
-import EmployeeIdleTime from '@/pages/employee/idle-time';
-import AdminDashboard from '@/pages/admin';
-import AdminIdleLogs from '@/pages/admin/idle-logs';
-import AdminScreenshots from '@/pages/admin/screenshots';
-import Projects from '@/pages/projects';
-import Users from '@/pages/users';
-import Settings from '@/pages/settings';
-import Reports from '@/pages/reports';
-import TimeReports from '@/pages/time-reports';
-import AppsUrlsIdle from '@/pages/reports/apps-urls-idle';
-import Screenshots from '@/pages/screenshots';
-import TimeTracking from '@/pages/time-tracking';
-import Calendar from '@/pages/calendar';
-import Insights from '@/pages/insights';
-import NotFound from '@/pages/not-found';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/providers/auth-provider";
+import { ErrorBoundary } from "@/components/error-boundary";
+import MainLayout from "@/components/layout/main-layout";
+import LoginPage from "@/pages/auth/login";
+import Index from "@/pages/Index";
+import TimeTracker from "@/pages/time-tracking/time-tracker";
+import TimeLogs from "@/pages/time-tracking/time-logs";
+import Projects from "@/pages/projects";
+import Users from "@/pages/users";
+import Screenshots from "@/pages/screenshots";
+import Reports from "@/pages/reports";
+import Settings from "@/pages/settings";
+import AdminIndex from "@/pages/admin";
+import NotFound from "@/pages/not-found";
 
-// Role-based route protection component
-function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
-  const { userDetails, loading } = useAuth();
-  
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: any) => {
+        // Don't retry on 4xx errors
+        if (error?.status >= 400 && error?.status < 500) {
+          return false;
+        }
+        return failureCount < 3;
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading, error } = useAuth();
+
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
   }
-  
-  if (!userDetails) {
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Authentication Error</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-primary text-primary-foreground px-4 py-2 rounded"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
-  if (!allowedRoles.includes(userDetails.role)) {
-    // Redirect to appropriate dashboard based on role
-    const redirectPath = userDetails.role === 'admin' || userDetails.role === 'manager' 
-      ? '/admin' 
-      : '/employee/dashboard';
-    return <Navigate to={redirectPath} replace />;
-  }
-  
+
   return <>{children}</>;
 }
 
 function AppRoutes() {
+  const { user } = useAuth();
+
   return (
     <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/login" element={
+        user ? <Navigate to="/" replace /> : <LoginPage />
+      } />
       
-      {/* Protected routes with sidebar */}
-      <Route element={<MainLayout />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        
-        {/* Employee routes */}
-        <Route 
-          path="/employee/dashboard" 
-          element={
-            <ProtectedRoute allowedRoles={['employee']}>
-              <EmployeeDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/employee/reports" 
-          element={
-            <ProtectedRoute allowedRoles={['employee']}>
-              <EmployeeReports />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/employee/time-tracker" 
-          element={
-            <ProtectedRoute allowedRoles={['employee']}>
-              <EmployeeTimeTracker />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/employee/idle-time" 
-          element={
-            <ProtectedRoute allowedRoles={['employee']}>
-              <EmployeeIdleTime />
-            </ProtectedRoute>
-          } 
-        />
-        
-        {/* Admin routes - require admin or manager role */}
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/admin/idle-logs" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <AdminIdleLogs />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/admin/screenshots" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <AdminScreenshots />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/projects" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <Projects />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/users" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <Users />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/settings" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <Settings />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/reports" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <Reports />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/time-reports" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <TimeReports />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/reports/apps-urls-idle" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <AppsUrlsIdle />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/screenshots" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <Screenshots />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/time-tracking" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <TimeTracking />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/calendar" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <Calendar />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/insights" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'manager']}>
-              <Insights />
-            </ProtectedRoute>
-          } 
-        />
-      </Route>
+      <Route path="/" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <Index />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
       
-      <Route path="/404" element={<NotFound />} />
-      <Route path="*" element={<Navigate to="/404" replace />} />
+      <Route path="/time-tracker" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <TimeTracker />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/time-logs" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <TimeLogs />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/projects" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <Projects />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/users" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <Users />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/screenshots" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <Screenshots />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/reports" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <Reports />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <Settings />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <AdminIndex />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <BrowserRouter>
+            <AuthProvider>
+              <AppRoutes />
+              <Toaster />
+              <Sonner />
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

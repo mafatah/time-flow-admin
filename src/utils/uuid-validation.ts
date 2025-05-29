@@ -15,7 +15,7 @@ export function validateProjectId(projectId: string | null | undefined): string 
   }
   
   // Sanitize input - remove any potential injection attempts
-  const sanitized = projectId.trim().toLowerCase();
+  const sanitized = projectId.trim();
   
   // Check for common invalid values and potential security issues
   if (sanitized === 'activity-tracking' || 
@@ -44,7 +44,7 @@ export function validateUserId(userId: string | null | undefined): string | null
   }
   
   // Sanitize input - remove any potential injection attempts
-  const sanitized = userId.trim().toLowerCase();
+  const sanitized = userId.trim();
   
   // Check for common invalid values and potential security issues
   if (sanitized === 'activity-tracking' || 
@@ -72,7 +72,7 @@ export function sanitizeUUID(value: string | null | undefined): string | null {
   }
   
   // Remove any non-UUID characters and normalize
-  const cleaned = value.trim().toLowerCase().replace(/[^0-9a-f-]/gi, '');
+  const cleaned = value.trim().replace(/[^0-9a-f-]/gi, '');
   
   if (isValidUUID(cleaned)) {
     return cleaned;
@@ -111,4 +111,35 @@ export function rateLimit(identifier: string): boolean {
   attempts.count++;
   attempts.lastAttempt = now;
   return true;
+}
+
+// Generate a valid fallback UUID if needed
+export function generateFallbackUUID(): string {
+  return '00000000-0000-4000-8000-000000000001';
+}
+
+// Safe database operation wrapper
+export function withUUIDValidation<T>(
+  operation: () => Promise<T>,
+  entityType: string,
+  entityId: string | null | undefined
+): Promise<T | null> {
+  // Validate the UUID before proceeding
+  const validId = sanitizeUUID(entityId);
+  
+  if (!validId) {
+    console.error(`Invalid ${entityType} ID provided: ${entityId}`);
+    return Promise.resolve(null);
+  }
+  
+  // Rate limit the operation
+  if (!rateLimit(`${entityType}:${validId}`)) {
+    console.error(`Rate limit exceeded for ${entityType} operation`);
+    return Promise.resolve(null);
+  }
+  
+  return operation().catch((error) => {
+    console.error(`Database operation failed for ${entityType}:`, error);
+    return null;
+  });
 }
