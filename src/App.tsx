@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,6 +10,8 @@ import LoginPage from "@/pages/auth/login";
 import Index from "@/pages/Index";
 import TimeTracker from "@/pages/time-tracking/time-tracker";
 import TimeLogs from "@/pages/time-tracking/time-logs";
+import TimeTrackingPage from "@/pages/time-tracking";
+import CalendarPage from "@/pages/calendar";
 import Projects from "@/pages/projects";
 import Users from "@/pages/users";
 import Screenshots from "@/pages/screenshots";
@@ -20,6 +21,19 @@ import AdminIndex from "@/pages/admin";
 import InsightsPage from "@/pages/insights";
 import TimeReports from "@/pages/time-reports";
 import NotFound from "@/pages/not-found";
+
+// Employee pages
+import EmployeeDashboard from "@/pages/employee/dashboard";
+import EmployeeTimeTracker from "@/pages/employee/time-tracker";
+import EmployeeReports from "@/pages/employee/reports";
+import EmployeeIdleTime from "@/pages/employee/idle-time";
+
+// Admin pages
+import AdminIdleLogs from "@/pages/admin/idle-logs";
+import AdminScreenshots from "@/pages/admin/screenshots";
+
+// Reports pages
+import AppsUrlsIdle from "@/pages/reports/apps-urls-idle";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -96,10 +110,26 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
+      <Route path="/time-tracking" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <TimeTrackingPage />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
       <Route path="/time-logs" element={
         <ProtectedRoute>
           <MainLayout>
             <TimeLogs />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/calendar" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <CalendarPage />
           </MainLayout>
         </ProtectedRoute>
       } />
@@ -164,6 +194,65 @@ function AppRoutes() {
         <ProtectedRoute>
           <MainLayout>
             <AdminIndex />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      {/* Employee Routes */}
+      <Route path="/employee/dashboard" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <EmployeeDashboard />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/employee/time-tracker" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <EmployeeTimeTracker />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/employee/reports" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <EmployeeReports />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/employee/idle-time" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <EmployeeIdleTime />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      {/* Admin Routes */}
+      <Route path="/admin/idle-logs" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <AdminIdleLogs />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin/screenshots" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <AdminScreenshots />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      {/* Reports Routes */}
+      <Route path="/reports/apps-urls-idle" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <AppsUrlsIdle />
           </MainLayout>
         </ProtectedRoute>
       } />
