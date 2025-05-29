@@ -1,148 +1,160 @@
-import { useState, useEffect } from 'react';
-import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay } from 'date-fns';
-import { enUS } from 'date-fns/locale';
+import React, { useState, useEffect } from 'react';
+import { Calendar, momentLocalizer, View } from 'react-big-calendar';
+import moment from 'moment';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useAuth } from '@/providers/auth-provider';
 import { toast } from 'sonner';
-import { TimeLog, CalendarEvent } from '@/types/timeLog';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
-const locales = {
-  'en-US': enUS,
-};
+const localizer = momentLocalizer(moment);
 
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek,
-  getDay,
-  locales,
-});
+interface TimeLog {
+  id: string;
+  start_time: string;
+  end_time: string | null;
+  user_id: string;
+  project_id: string | null;
+}
+
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+}
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  resource: {
+    user: string;
+    project: string;
+    duration: string;
+  };
+}
 
 export default function CalendarPage() {
+  const { userDetails } = useAuth();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [timeLog, setTimeLog] = useState<TimeLog[]>([]);
+  const [selectedUser, setSelectedUser] = useState<string>('all');
+  const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentView, setCurrentView] = useState<View>('week');
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
-    fetchTimeData();
-  }, []);
+    if (userDetails?.role === 'admin') {
+      fetchUsers();
+      fetchProjects();
+    }
+  }, [userDetails]);
 
-  const fetchTimeData = async () => {
-    setLoading(true);
+  useEffect(() => {
+    if (userDetails?.role === 'admin') {
+      fetchTimeLogs();
+    }
+  }, [selectedUser, selectedProject, currentDate, currentView, userDetails]);
+
+  const fetchUsers = async () => {
     try {
-      // Get time logs for the current month
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-      
-      const endOfMonth = new Date();
-      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-      endOfMonth.setDate(0);
-      endOfMonth.setHours(23, 59, 59, 999);
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .eq('role', 'employee');
 
-      const { data: timeLogData, error: timeLogError } = await supabase
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users');
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name');
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      toast.error('Failed to fetch projects');
+    }
+  };
+
+  const fetchTimeLogs = async () => {
+    try {
+      setLoading(true);
+      
+      let query = supabase
         .from('time_logs')
         .select('*')
-        .gte('start_time', startOfMonth.toISOString())
-        .lte('start_time', endOfMonth.toISOString())
+        .not('end_time', 'is', null)
         .order('start_time', { ascending: false });
 
-      if (timeLogError) throw timeLogError;
-
-      if (!timeLogData || timeLogData.length === 0) {
-        setTimeLog([]);
-        setEvents([]);
-        return;
+      if (selectedUser !== 'all') {
+        query = query.eq('user_id', selectedUser);
       }
 
-      // Get unique user IDs and project IDs (filter out nulls)
-      const userIds = [...new Set(timeLogData.map(log => log.user_id))];
-      const projectIds = [...new Set(timeLogData.map(log => log.project_id).filter((id): id is string => id !== null))];
-
-      // Fetch user data
-      const { data: userData } = await supabase
-        .from('users')
-        .select('id, full_name')
-        .in('id', userIds);
-
-      // Fetch project data
-      let projectData: any[] = [];
-      if (projectIds.length > 0) {
-        const { data } = await supabase
-          .from('projects')
-          .select('id, name')
-          .in('id', projectIds);
-        projectData = data || [];
+      if (selectedProject !== 'all') {
+        query = query.eq('project_id', selectedProject);
       }
 
-      // Enrich time logs with user and project names
-      const enrichedLogs: TimeLog[] = timeLogData.map(log => ({
-        ...log,
-        user_name: userData?.find(u => u.id === log.user_id)?.full_name || 'Unknown User',
-        project_name: log.project_id ? (projectData?.find(p => p.id === log.project_id)?.name || 'Unknown Project') : 'No Project'
-      }));
+      const { data: timeLogs, error } = await query;
 
-      setTimeLog(enrichedLogs);
+      if (error) throw error;
 
-      // Convert to calendar events
-      const calendarEvents: CalendarEvent[] = enrichedLogs
-        .filter(log => log.end_time) // Only show completed sessions
-        .map(log => ({
+      // Transform time logs into calendar events
+      const calendarEvents: CalendarEvent[] = (timeLogs || []).map((log: TimeLog) => {
+        const user = users.find((u: User) => u.id === log.user_id);
+        const project = projects.find((p: Project) => p.id === log.project_id);
+        
+        const startTime = new Date(log.start_time);
+        const endTime = log.end_time ? new Date(log.end_time) : new Date();
+        const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+
+        return {
           id: log.id,
-          title: `${log.user_name} - ${log.project_name}`,
-          start: new Date(log.start_time),
-          end: new Date(log.end_time!),
-          resource: log
-        }));
+          title: `${user?.full_name || 'Unknown'} - ${project?.name || 'No Project'}`,
+          start: startTime,
+          end: endTime,
+          resource: {
+            user: user?.full_name || 'Unknown',
+            project: project?.name || 'No Project',
+            duration: `${Math.floor(duration / 60)}h ${duration % 60}m`
+          }
+        };
+      });
 
       setEvents(calendarEvents);
     } catch (error) {
-      console.error('Error fetching time data:', error);
-      toast.error('Failed to fetch time tracking data');
+      console.error('Error fetching time logs:', error);
+      toast.error('Failed to fetch time logs');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectEvent = (event: CalendarEvent) => {
-    setSelectedEvent(event);
-    setDialogOpen(true);
-  };
+  
 
-  const formatDuration = (start: string, end: string) => {
-    const startTime = new Date(start);
-    const endTime = new Date(end);
-    const diffMs = endTime.getTime() - startTime.getTime();
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
-  };
-
-  const eventStyleGetter = (event: CalendarEvent) => {
-    const isIdle = event.resource.is_idle;
-    return {
-      style: {
-        backgroundColor: isIdle ? '#f59e0b' : '#10b981',
-        borderRadius: '4px',
-        opacity: 0.8,
-        color: 'white',
-        border: '0px',
-        display: 'block'
-      }
-    };
-  };
-
-  if (loading) {
+  if (userDetails?.role !== 'admin') {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Loading calendar...</div>
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Access denied. Admin privileges required.</p>
       </div>
     );
   }
@@ -150,115 +162,83 @@ export default function CalendarPage() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Time Tracking Calendar</h1>
-        <Button onClick={fetchTimeData} variant="outline">
-          Refresh
-        </Button>
-      </div>
+        <h1 className="text-3xl font-bold">Calendar View</h1>
+        <div className="flex items-center space-x-4">
+          <Select value={selectedUser} onValueChange={setSelectedUser}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select User" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Users</SelectItem>
+              {users.map((user: User) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Calendar View</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div style={{ height: '600px' }}>
-                <Calendar
-                  localizer={localizer}
-                  events={events}
-                  startAccessor="start"
-                  endAccessor="end"
-                  style={{ height: '100%' }}
-                  onSelectEvent={handleSelectEvent}
-                  eventPropGetter={eventStyleGetter}
-                  views={['month', 'week', 'day']}
-                  defaultView="month"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Legend</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-emerald-500 rounded"></div>
-                <span className="text-sm">Active Time</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-amber-500 rounded"></div>
-                <span className="text-sm">Idle Time</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="mt-4">
-            <CardHeader>
-              <CardTitle>Quick Stats</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="text-sm">
-                  <span className="font-medium">Total Sessions:</span> {events.length}
-                </div>
-                <div className="text-sm">
-                  <span className="font-medium">Active Sessions:</span>{' '}
-                  {events.filter(e => !e.resource.is_idle).length}
-                </div>
-                <div className="text-sm">
-                  <span className="font-medium">Idle Sessions:</span>{' '}
-                  {events.filter(e => e.resource.is_idle).length}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <Select value={selectedProject} onValueChange={setSelectedProject}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select Project" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Projects</SelectItem>
+              {projects.map((project: Project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Time Log Details</DialogTitle>
-          </DialogHeader>
-          {selectedEvent && (
-            <div className="space-y-4">
-              <div>
-                <strong>User:</strong> {selectedEvent.resource.user_name}
-              </div>
-              <div>
-                <strong>Project:</strong> {selectedEvent.resource.project_name}
-              </div>
-              <div>
-                <strong>Start Time:</strong>{' '}
-                {format(new Date(selectedEvent.resource.start_time), 'PPpp')}
-              </div>
-              <div>
-                <strong>End Time:</strong>{' '}
-                {selectedEvent.resource.end_time
-                  ? format(new Date(selectedEvent.resource.end_time), 'PPpp')
-                  : 'Ongoing'}
-              </div>
-              <div>
-                <strong>Duration:</strong>{' '}
-                {selectedEvent.resource.end_time
-                  ? formatDuration(selectedEvent.resource.start_time, selectedEvent.resource.end_time)
-                  : 'Ongoing'}
-              </div>
-              <div>
-                <strong>Status:</strong>{' '}
-                <Badge variant={selectedEvent.resource.is_idle ? 'secondary' : 'default'}>
-                  {selectedEvent.resource.is_idle ? 'Idle' : 'Active'}
-                </Badge>
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Time Tracking Calendar</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">Loading calendar data...</div>
+          ) : (
+            <div style={{ height: '600px' }}>
+              <Calendar
+                localizer={localizer}
+                events={events}
+                startAccessor="start"
+                endAccessor="end"
+                view={currentView}
+                onView={setCurrentView}
+                date={currentDate}
+                onNavigate={setCurrentDate}
+                style={{ height: '100%' }}
+                eventPropGetter={() => ({
+                  style: {
+                    backgroundColor: '#3b82f6',
+                    borderRadius: '4px',
+                    opacity: 0.8,
+                    color: 'white',
+                    border: '0px',
+                    display: 'block'
+                  }
+                })}
+                components={{
+                  event: ({ event }) => (
+                    <div className="text-xs">
+                      <div className="font-medium">{event.resource.user}</div>
+                      <div>{event.resource.project}</div>
+                      <Badge variant="secondary" className="text-xs">
+                        {event.resource.duration}
+                      </Badge>
+                    </div>
+                  )
+                }}
+              />
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
     </div>
   );
 }
