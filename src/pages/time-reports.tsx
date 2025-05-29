@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Download, Filter, Calendar } from 'lucide-react';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
-import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useAuth } from '@/providers/auth-provider';
+import { format, subDays, parseISO } from 'date-fns';
+import { Calendar, Clock, Download, Filter, Search } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface TimeReport {
   id: string;
@@ -45,6 +46,8 @@ export default function TimeReports() {
     endDate: format(new Date(), 'yyyy-MM-dd'),
     includeIdle: true
   });
+
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchUsers();
@@ -202,6 +205,13 @@ export default function TimeReports() {
     return `${hours}h ${minutes}m`;
   };
 
+  const filteredReports = reports.filter(report => {
+    if (filters.userId && filters.userId !== 'all' && report.user_id !== filters.userId) return false;
+    if (filters.projectId && filters.projectId !== 'all' && report.project_id !== filters.projectId) return false;
+    if (!filters.includeIdle && report.is_idle) return false;
+    return true;
+  });
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -348,7 +358,7 @@ export default function TimeReports() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {reports.map((report) => (
+                {filteredReports.map((report: any) => (
                   <TableRow key={report.id}>
                     <TableCell>
                       <div>

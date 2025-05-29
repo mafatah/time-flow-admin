@@ -1,362 +1,256 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/providers/auth-provider';
+import { useToast } from '@/components/ui/use-toast';
+import { format, differenceInMinutes } from 'date-fns';
+import { Play, Square, Clock, Calendar } from 'lucide-react';
 
-import { useState, useEffect } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/providers/auth-provider";
-import { Play, Square, Clock, Calendar } from "lucide-react";
-import { format } from "date-fns";
-import { TimeLog } from "@/types/timeLog";
-import { validateProjectId, validateUserId } from "@/utils/uuid-validation";
+interface Project {
+  id: string;
+  name: string;
+}
 
-export default function TimeTracker() {
-  const [currentSession, setCurrentSession] = useState<TimeLog | null>(null);
-  const [isTracking, setIsTracking] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<string>('');
-  const [projects, setProjects] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [todayTime, setTodayTime] = useState(0);
+interface TimeLog {
+  id: string;
+  start_time: string;
+  end_time: string | null;
+  project_id: string | null;
+}
+
+export default function TimeTrackerPage() {
   const { userDetails } = useAuth();
   const { toast } = useToast();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeLogs, setActiveLogs] = useState<TimeLog[]>([]);
+  const [recentLogs, setRecentLogs] = useState<
+    { id: string; start_time: string; end_time: string | null; project_id: string | null; duration: number }[]
+  >([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [isTracking, setIsTracking] = useState(false);
 
-  // Timer effect
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isTracking && currentSession) {
-      interval = setInterval(() => {
-        const startTime = new Date(currentSession.start_time).getTime();
-        const now = new Date().getTime();
-        setElapsedTime(now - startTime);
-      }, 1000);
+    if (userDetails?.id) {
+      fetchProjects();
+      fetchActiveLogs();
+      fetchRecentLogs();
     }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isTracking, currentSession]);
-
-  // Load initial data
-  useEffect(() => {
-    loadInitialData();
-    loadActiveSession();
-    calculateTodayTime();
   }, [userDetails]);
 
-  const loadInitialData = async () => {
+  const fetchProjects = async () => {
     try {
-      setLoading(true);
-      
-      // Validate user ID first
-      const validUserId = validateUserId(userDetails?.id || null);
-      if (!validUserId) {
-        console.error('Invalid user ID:', userDetails?.id);
-        toast({
-          title: "Authentication Error",
-          description: "Invalid user session. Please log out and log back in.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Load projects
-      const { data: projectsData, error: projectsError } = await supabase
+      const { data, error } = await supabase
         .from('projects')
-        .select('id, name, description')
+        .select('id, name')
         .order('name');
-      
-      if (projectsError) {
-        console.error('Projects query error:', projectsError);
-        throw projectsError;
-      }
-      
-      console.log('Loaded projects:', projectsData);
-      console.log('User role:', userDetails?.role);
-      console.log('User ID:', userDetails?.id);
-      
-      // Filter out any projects with invalid UUIDs
-      const validProjects = projectsData?.filter(project => {
-        const isValid = validateProjectId(project.id) !== null;
-        if (!isValid) {
-          console.warn('Filtering out project with invalid UUID:', project.id);
-        }
-        return isValid;
-      }) || [];
-      
-      setProjects(validProjects);
-      
-      // If no projects found, show a helpful message
-      if (!validProjects || validProjects.length === 0) {
-        toast({
-          title: "No projects available",
-          description: "Contact your administrator to create projects for time tracking.",
-          variant: "default",
-        });
-      }
-      
-    } catch (error: any) {
-      console.error('Error loading projects:', error);
-      toast({
-        title: "Error loading data",
-        description: error.message || "Failed to load projects",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const loadActiveSession = async () => {
-    const validUserId = validateUserId(userDetails?.id || null);
-    if (!validUserId) {
-      console.warn('Invalid user ID, cannot load active session');
-      return;
-    }
-    
-    try {
-      // Use simpler approach to avoid 406 errors
-      const { data, error } = await supabase
-        .from('time_logs')
-        .select('*')
-        .eq('user_id', validUserId)
-        .order('start_time', { ascending: false });
-      
       if (error) {
-        console.error('Error loading active session:', error);
+        console.error('Error fetching projects:', error);
+        toast({
+          title: 'Error fetching projects',
+          description: error.message,
+          variant: 'destructive',
+        });
         return;
       }
-      
-      // Find active session in memory
-      const activeSession = data?.find(log => !log.end_time);
-      
-      if (activeSession) {
-        const validProjectId = validateProjectId(activeSession.project_id);
-        if (validProjectId) {
-          setCurrentSession(activeSession);
-          setIsTracking(true);
-          setSelectedProject(validProjectId);
-          
-          // Calculate elapsed time
-          const startTime = new Date(activeSession.start_time).getTime();
-          const now = new Date().getTime();
-          setElapsedTime(now - startTime);
-        } else {
-          console.warn('Active session has invalid project ID:', activeSession.project_id);
-          // Clean up invalid session
-          try {
-            await supabase
-              .from('time_logs')
-              .update({ end_time: new Date().toISOString() })
-              .eq('id', activeSession.id);
-            console.log('Cleaned up session with invalid project ID');
-          } catch (cleanupError) {
-            console.error('Failed to cleanup invalid session:', cleanupError);
-          }
-        }
-      }
-    } catch (error: any) {
-      console.error('Error loading active session:', error);
+
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      toast({
+        title: 'Error fetching projects',
+        description: 'Failed to load projects.',
+        variant: 'destructive',
+      });
     }
   };
 
-  const calculateTodayTime = async () => {
-    const validUserId = validateUserId(userDetails?.id || null);
-    if (!validUserId) return;
-    
+  const fetchActiveLogs = async () => {
     try {
-      const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
-      
       const { data, error } = await supabase
         .from('time_logs')
-        .select('start_time, end_time')
-        .eq('user_id', validUserId)
-        .gte('start_time', startOfDay.toISOString())
-        .lt('start_time', endOfDay.toISOString());
-      
-      if (error) throw error;
-      
-      let totalMs = 0;
-      data?.forEach(log => {
-        const start = new Date(log.start_time).getTime();
-        const end = log.end_time ? new Date(log.end_time).getTime() : new Date().getTime();
-        totalMs += (end - start);
+        .select('id, start_time, end_time, project_id')
+        .eq('user_id', userDetails?.id)
+        .is('end_time', null);
+
+      if (error) {
+        console.error('Error fetching active time logs:', error);
+        toast({
+          title: 'Error fetching active time logs',
+          description: error.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setActiveLogs(data || []);
+      setIsTracking(data && data.length > 0);
+      if (data && data.length > 0) {
+        setSelectedProjectId(data[0].project_id);
+      }
+    } catch (error) {
+      console.error('Error fetching active time logs:', error);
+      toast({
+        title: 'Error fetching active time logs',
+        description: 'Failed to load active time logs.',
+        variant: 'destructive',
       });
-      
-      setTodayTime(totalMs);
-    } catch (error: any) {
-      console.error('Error calculating today time:', error);
+    }
+  };
+
+  const fetchRecentLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('time_logs')
+        .select('id, start_time, end_time, project_id')
+        .eq('user_id', userDetails?.id)
+        .not('end_time', 'is', null)
+        .order('start_time', { ascending: false })
+        .limit(5);
+
+      if (error) {
+        console.error('Error fetching recent time logs:', error);
+        toast({
+          title: 'Error fetching recent time logs',
+          description: error.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const recentLogs = data?.map((log: any) => ({
+        id: log.id,
+        start_time: log.start_time,
+        end_time: log.end_time,
+        project_id: log.project_id,
+        duration: log.end_time 
+          ? differenceInMinutes(new Date(log.end_time), new Date(log.start_time))
+          : differenceInMinutes(new Date(), new Date(log.start_time))
+      })) || [];
+
+      setRecentLogs(recentLogs);
+    } catch (error) {
+      console.error('Error fetching recent time logs:', error);
+      toast({
+        title: 'Error fetching recent time logs',
+        description: 'Failed to load recent time logs.',
+        variant: 'destructive',
+      });
     }
   };
 
   const startTracking = async () => {
-    const validProjectId = validateProjectId(selectedProject);
-    const validUserId = validateUserId(userDetails?.id || null);
-    
-    if (!validProjectId) {
+    if (!selectedProjectId) {
       toast({
-        title: "Please select a valid project",
-        description: "You need to select a valid project before starting time tracking.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!validUserId) {
-      toast({
-        title: "Invalid user session",
-        description: "Please log out and log back in.",
-        variant: "destructive",
+        title: 'Select a project',
+        description: 'Please select a project to start tracking.',
+        variant: 'destructive',
       });
       return;
     }
 
     try {
-      // Create new time log entry
       const { data, error } = await supabase
         .from('time_logs')
-        .insert({
-          user_id: validUserId,
-          project_id: validProjectId,
-          start_time: new Date().toISOString(),
-          is_idle: false
-        })
+        .insert([{ user_id: userDetails?.id, project_id: selectedProjectId }])
         .select()
         .single();
 
-      if (error) throw error;
-      
-      const session = data as TimeLog;
-      setCurrentSession(session);
-      setIsTracking(true);
-      setElapsedTime(0);
-
-      // Notify Electron process if available
-      if (window.electron) {
-        window.electron.setUserId(validUserId);
-        window.electron.setProjectId(validProjectId);
-        window.electron.startTracking();
+      if (error) {
+        console.error('Error starting time tracking:', error);
+        toast({
+          title: 'Error starting time tracking',
+          description: error.message,
+          variant: 'destructive',
+        });
+        return;
       }
 
+      fetchActiveLogs();
+      fetchRecentLogs();
+      setIsTracking(true);
       toast({
-        title: "Time tracking started",
-        description: "Successfully started tracking time for the selected project.",
+        title: 'Time tracking started',
+        description: `Tracking time for project ${selectedProjectId}.`,
       });
-    } catch (error: any) {
-      console.error('Error starting tracking:', error);
+    } catch (error) {
+      console.error('Error starting time tracking:', error);
       toast({
-        title: "Error starting tracking",
-        description: error.message || "Failed to start time tracking",
-        variant: "destructive",
+        title: 'Error starting time tracking',
+        description: 'Failed to start time tracking.',
+        variant: 'destructive',
       });
     }
   };
 
   const stopTracking = async () => {
-    if (!currentSession || !userDetails) return;
-
     try {
-      const endTime = new Date().toISOString();
-      
-      const { error } = await supabase
+      const { data: activeLog } = await supabase
         .from('time_logs')
-        .update({ end_time: endTime })
-        .eq('id', currentSession.id);
+        .select('id')
+        .eq('user_id', userDetails?.id)
+        .is('end_time', null)
+        .single();
 
-      if (error) throw error;
-
-      setCurrentSession(null);
-      setIsTracking(false);
-      setElapsedTime(0);
-
-      // Notify Electron process if available
-      if (window.electron) {
-        window.electron.stopTracking();
+      if (!activeLog) {
+        toast({
+          title: 'No active session',
+          description: 'No active tracking session found.',
+          variant: 'destructive',
+        });
+        return;
       }
 
-      // Recalculate today's time
-      await calculateTodayTime();
+      const { error } = await supabase
+        .from('time_logs')
+        .update({ end_time: new Date().toISOString() })
+        .eq('id', activeLog.id);
 
+      if (error) {
+        console.error('Error stopping time tracking:', error);
+        toast({
+          title: 'Error stopping time tracking',
+          description: error.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      fetchActiveLogs();
+      fetchRecentLogs();
+      setIsTracking(false);
       toast({
-        title: "Time tracking stopped",
-        description: "Successfully stopped time tracking and saved the session.",
+        title: 'Time tracking stopped',
+        description: 'Time tracking has been stopped.',
       });
-    } catch (error: any) {
-      console.error('Error stopping tracking:', error);
+    } catch (error) {
+      console.error('Error stopping time tracking:', error);
       toast({
-        title: "Error stopping tracking",
-        description: error.message || "Failed to stop time tracking",
-        variant: "destructive",
+        title: 'Error stopping time tracking',
+        description: 'Failed to stop time tracking.',
+        variant: 'destructive',
       });
     }
   };
 
-  const formatTime = (milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const getSelectedProjectName = () => {
-    const project = projects.find(p => p.id === selectedProject);
-    return project ? project.name : 'No project selected';
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-center">
-          <Clock className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>Loading time tracking...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Current Session Card */}
+    <div className="container mx-auto p-4">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Current Session
-          </CardTitle>
+          <CardTitle>Time Tracker</CardTitle>
+          <CardDescription>Track your work time efficiently.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Project Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Select Project</label>
-            <Select
-              value={selectedProject}
-              onValueChange={(value) => {
-                // Validate the selected project ID
-                const validId = validateProjectId(value);
-                if (validId) {
-                  setSelectedProject(validId);
-                } else {
-                  console.warn('Invalid project ID selected:', value);
-                  toast({
-                    title: "Invalid Project",
-                    description: "The selected project is invalid. Please choose another.",
-                    variant: "destructive",
-                  });
-                }
-              }}
-              disabled={isTracking}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose a project to track" />
+            <Select onValueChange={(value) => setSelectedProjectId(value)} value={selectedProjectId || ''}>
+              <SelectTrigger className="w-[100%]">
+                <SelectValue placeholder="Select a project" />
               </SelectTrigger>
               <SelectContent>
-                {projects.map(project => (
+                {projects.map((project: any) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}
                   </SelectItem>
@@ -364,81 +258,76 @@ export default function TimeTracker() {
               </SelectContent>
             </Select>
           </div>
-
-          {/* Timer Display */}
-          <div className="text-center py-8">
-            <div className="text-6xl font-mono font-bold text-primary mb-4">
-              {formatTime(elapsedTime)}
-            </div>
-            {isTracking && (
-              <div className="text-sm text-muted-foreground mb-4">
-                Tracking: {getSelectedProjectName()}
-              </div>
+          <div>
+            {isTracking ? (
+              <Button variant="destructive" className="w-full" onClick={stopTracking}>
+                <Square className="mr-2 h-4 w-4" /> Stop Tracking
+              </Button>
+            ) : (
+              <Button className="w-full" onClick={startTracking} disabled={!selectedProjectId}>
+                <Play className="mr-2 h-4 w-4" /> Start Tracking
+              </Button>
             )}
-            <div className="flex justify-center gap-3">
-              {!isTracking ? (
-                <Button
-                  onClick={startTracking}
-                  disabled={!selectedProject}
-                  size="lg"
-                  className="flex items-center gap-2"
-                >
-                  <Play className="h-5 w-5" />
-                  Start Tracking
-                </Button>
-              ) : (
-                <Button
-                  onClick={stopTracking}
-                  variant="destructive"
-                  size="lg"
-                  className="flex items-center gap-2"
-                >
-                  <Square className="h-5 w-5" />
-                  Stop Tracking
-                </Button>
-              )}
-            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Today's Summary */}
-      <Card>
+      <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Today's Summary
-          </CardTitle>
+          <CardTitle>Active Session</CardTitle>
+          <CardDescription>Current time tracking session.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">
-                {formatTime(todayTime)}
-              </div>
-              <div className="text-sm text-muted-foreground">Total Time</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">
-                {isTracking ? (
-                  <Badge variant="secondary" className="text-lg px-3 py-1">
-                    Tracking
+          {activeLogs.length > 0 ? (
+            activeLogs.map((log: any) => (
+              <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Project ID: {log.project_id}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Started at: {format(new Date(log.start_time), 'MMM dd, yyyy HH:mm')}
+                  </p>
+                </div>
+                <div>
+                  <Badge variant="secondary">
+                    <Clock className="mr-2 h-4 w-4" />
+                    {differenceInMinutes(new Date(), new Date(log.start_time))} minutes
                   </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-lg px-3 py-1">
-                    Idle
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">No active session.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Recent Sessions</CardTitle>
+          <CardDescription>Your recent time tracking sessions.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {recentLogs.length > 0 ? (
+            recentLogs.map((log: any) => (
+              <div key={log.id} className="flex items-center justify-between p-3 border rounded">
+                <div>
+                  <p className="text-sm font-medium">Project ID: {log.project_id}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {format(new Date(log.start_time), 'MMM dd, yyyy HH:mm')} -{' '}
+                    {log.end_time ? format(new Date(log.end_time), 'HH:mm') : 'Active'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <Badge variant="outline">
+                    <Clock className="mr-2 h-4 w-4" />
+                    {log.duration} minutes
                   </Badge>
-                )}
+                </div>
               </div>
-              <div className="text-sm text-muted-foreground">Status</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">
-                {format(new Date(), 'MMM d')}
-              </div>
-              <div className="text-sm text-muted-foreground">Date</div>
-            </div>
-          </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">No recent sessions.</p>
+          )}
         </CardContent>
       </Card>
     </div>

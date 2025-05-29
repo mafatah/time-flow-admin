@@ -1,22 +1,27 @@
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Calendar, Filter, Clock, Edit } from 'lucide-react';
-import { format, subDays } from 'date-fns';
-import { toast } from 'sonner';
-import { TimeLog } from '@/types/timeLog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useAuth } from '@/providers/auth-provider';
+import { format, differenceInMinutes } from 'date-fns';
+import { Clock, Calendar, Download, Filter, Search, Play, Square } from 'lucide-react';
+
+interface TimeLog {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  start_time: string;
+  end_time: string | null;
+}
 
 interface User {
   id: string;
-  full_name: string;
   email: string;
+  full_name?: string;
 }
 
 interface Project {
@@ -25,39 +30,51 @@ interface Project {
 }
 
 export default function TimeLogs() {
-  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
+  const { userDetails } = useAuth();
+  const [logs, setLogs] = useState<TimeLog[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    userId: '',
-    projectId: '',
-    startDate: format(subDays(new Date(), 7), 'yyyy-MM-dd'),
-    endDate: format(new Date(), 'yyyy-MM-dd'),
-    status: 'all' // all, active, completed
-  });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [userFilter, setUserFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
 
   useEffect(() => {
-    fetchUsers();
-    fetchProjects();
-  }, []);
+    if (userDetails?.role === 'admin') {
+      fetchTimeLogs();
+      fetchUsers();
+      fetchProjects();
+    }
+  }, [userDetails]);
 
-  useEffect(() => {
-    fetchTimeLogs();
-  }, [filters]);
+  const fetchTimeLogs = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('time_logs')
+        .select('*')
+        .order('start_time', { ascending: false });
+
+      if (error) throw error;
+      setLogs(data || []);
+    } catch (error) {
+      console.error('Error fetching time logs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, full_name, email')
-        .order('full_name');
+        .select('id, email, full_name');
 
       if (error) throw error;
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error('Failed to fetch users');
     }
   };
 
@@ -65,206 +82,153 @@ export default function TimeLogs() {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, name')
-        .order('name');
+        .select('id, name');
 
       if (error) throw error;
       setProjects(data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
-      toast.error('Failed to fetch projects');
     }
   };
 
-  const fetchTimeLogs = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('time_logs')
-        .select('*');
-
-      // Apply filters
-      if (filters.userId) {
-        query = query.eq('user_id', filters.userId);
-      }
-
-      if (filters.projectId) {
-        query = query.eq('project_id', filters.projectId);
-      }
-
-      if (filters.startDate) {
-        query = query.gte('start_time', new Date(filters.startDate).toISOString());
-      }
-
-      if (filters.endDate) {
-        const endDate = new Date(filters.endDate);
-        endDate.setHours(23, 59, 59, 999);
-        query = query.lte('start_time', endDate.toISOString());
-      }
-
-      const { data: timeLogData, error } = await query
-        .order('start_time', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-
-      if (!timeLogData || timeLogData.length === 0) {
-        setTimeLogs([]);
-        return;
-      }
-
-      // Filter by status in memory to avoid 406 errors
-      let filteredLogs = timeLogData;
-      if (filters.status === 'active') {
-        filteredLogs = timeLogData.filter(log => !log.end_time);
-      } else if (filters.status === 'completed') {
-        filteredLogs = timeLogData.filter(log => !!log.end_time);
-      }
-
-      // Enrich with user and project names
-      const enrichedLogs: TimeLog[] = filteredLogs.map(log => {
-        const user = users.find(u => u.id === log.user_id);
-        const project = projects.find(p => p.id === log.project_id);
-        
-        return {
-          ...log,
-          user_name: user?.full_name || 'Unknown User',
-          project_name: project?.name || 'Unknown Project'
-        };
-      });
-
-      setTimeLogs(enrichedLogs);
-    } catch (error) {
-      console.error('Error fetching time logs:', error);
-      toast.error('Failed to fetch time logs');
-    } finally {
-      setLoading(false);
+  const getDateFilterRange = () => {
+    const now = new Date();
+    switch (dateFilter) {
+      case 'today':
+        return { start: new Date(now.setHours(0, 0, 0, 0)), end: new Date() };
+      case 'yesterday':
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return { start: new Date(yesterday.setHours(0, 0, 0, 0)), end: new Date(yesterday.setHours(23, 59, 59, 999)) };
+      case 'week':
+        const weekStart = new Date(now);
+        weekStart.setDate(weekStart.getDate() - 7);
+        return { start: weekStart, end: now };
+      default:
+        return null;
     }
   };
 
-  const calculateDuration = (start: string, end: string | null): string => {
-    if (!end) return 'Ongoing';
+  const filteredLogs = logs.filter((log: any) => {
+    const user = users.find((u: any) => u.id === log.user_id);
+    const project = projects.find((p: any) => p.id === log.project_id);
     
-    const startTime = new Date(start);
-    const endTime = new Date(end);
-    const diffMs = endTime.getTime() - startTime.getTime();
+    // Apply user filter
+    if (userFilter !== 'all' && log.user_id !== userFilter) return false;
     
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    // Apply project filter
+    if (projectFilter !== 'all' && log.project_id !== projectFilter) return false;
     
-    return `${hours}h ${minutes}m`;
-  };
-
-  const stopTimeLog = async (logId: string) => {
-    try {
-      const { error } = await supabase
-        .from('time_logs')
-        .update({ end_time: new Date().toISOString() })
-        .eq('id', logId);
-
-      if (error) throw error;
-
-      toast.success('Time log stopped');
-      fetchTimeLogs();
-    } catch (error) {
-      console.error('Error stopping time log:', error);
-      toast.error('Failed to stop time log');
+    // Apply date filter
+    if (dateFilter !== 'all') {
+      const range = getDateFilterRange();
+      if (range) {
+        const logDate = new Date(log.start_time);
+        if (logDate < range.start || logDate > range.end) return false;
+      }
     }
+    
+    // Apply search term
+    if (searchTerm) {
+      const userMatch = user && (
+        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+      const projectMatch = project && project.name.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      return userMatch || projectMatch;
+    }
+    
+    return true;
+  });
+
+  const calculateDuration = (startTime: string, endTime: string | null) => {
+    if (!endTime) return 'In progress';
+    const minutes = differenceInMinutes(new Date(endTime), new Date(startTime));
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
+
+  if (userDetails?.role !== 'admin') {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Access denied. Admin privileges required.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Time Logs</h1>
-        <Button onClick={fetchTimeLogs} variant="outline">
-          Refresh
+        <div>
+          <h1 className="text-3xl font-bold">Time Logs</h1>
+          <p className="text-muted-foreground">View and manage employee time tracking data</p>
+        </div>
+        <Button onClick={fetchTimeLogs} disabled={loading}>
+          {loading ? 'Loading...' : 'Refresh'}
         </Button>
       </div>
 
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
+          <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            <span>Filters</span>
+            Filters
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">User</label>
-              <Select 
-                value={filters.userId} 
-                onValueChange={(value) => setFilters(prev => ({ ...prev, userId: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All users" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Users</SelectItem>
-                  {users.map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Project</label>
-              <Select 
-                value={filters.projectId} 
-                onValueChange={(value) => setFilters(prev => ({ ...prev, projectId: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All projects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Projects</SelectItem>
-                  {projects.map(project => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Start Date</label>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
               <Input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                placeholder="Search users or projects..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64"
               />
             </div>
+            
+            <Select value={userFilter} onValueChange={setUserFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by user" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Users</SelectItem>
+                {users.map((user: any) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.full_name || user.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">End Date</label>
-              <Input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
-              />
-            </div>
+            <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                {projects.map((project: any) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
-              <Select 
-                value={filters.status} 
-                onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
+                <SelectItem value="week">Last 7 Days</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -272,73 +236,85 @@ export default function TimeLogs() {
       {/* Time Logs Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
+          <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            <span>Time Logs ({timeLogs.length})</span>
+            Time Logs ({filteredLogs.length})
           </CardTitle>
+          <CardDescription>
+            Detailed view of employee time tracking entries
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8">Loading time logs...</div>
-          ) : timeLogs.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No time logs found for the selected criteria.
+          ) : filteredLogs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No time logs found matching your filters.
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Start Time</TableHead>
-                  <TableHead>End Time</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {timeLogs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="font-medium">{log.user_name}</TableCell>
-                    <TableCell>{log.project_name}</TableCell>
-                    <TableCell>
-                      {format(new Date(log.start_time), 'MMM d, yyyy HH:mm')}
-                    </TableCell>
-                    <TableCell>
-                      {log.end_time 
-                        ? format(new Date(log.end_time), 'MMM d, yyyy HH:mm')
-                        : 'Ongoing'
-                      }
-                    </TableCell>
-                    <TableCell>
-                      {calculateDuration(log.start_time, log.end_time)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-1">
-                        <Badge variant={log.end_time ? 'default' : 'secondary'}>
-                          {log.end_time ? 'Completed' : 'Active'}
-                        </Badge>
-                        {log.is_idle && (
-                          <Badge variant="outline">Idle</Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {!log.end_time && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => stopTimeLog(log.id)}
-                        >
-                          Stop
-                        </Button>
-                      )}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Start Time</TableHead>
+                    <TableHead>End Time</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredLogs.map((log: any) => (
+                    <TableRow key={log.id}>
+                      <TableCell>
+                        {users.find(u => u.id === log.user_id)?.full_name || 
+                         users.find(u => u.id === log.user_id)?.email || 
+                         'Unknown User'}
+                      </TableCell>
+                      <TableCell>
+                        {projects.find(p => p.id === log.project_id)?.name || 'No Project'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          {format(new Date(log.start_time), 'MMM dd, yyyy HH:mm')}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {log.end_time ? (
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            {format(new Date(log.end_time), 'MMM dd, yyyy HH:mm')}
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="flex items-center gap-1">
+                            <Play className="h-3 w-3" />
+                            In Progress
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {calculateDuration(log.start_time, log.end_time)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {log.end_time ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            Completed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            Active
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

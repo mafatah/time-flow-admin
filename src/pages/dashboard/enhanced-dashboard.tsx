@@ -1,316 +1,520 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Users, 
-  Clock, 
-  Activity, 
-  AlertTriangle, 
-  TrendingUp, 
-  Calendar,
-  BarChart3,
-  Eye
-} from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar, Clock, Users, Activity, TrendingUp, AlertTriangle, Globe, Camera, MousePointer, Keyboard } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format, subDays, startOfDay, endOfDay, isToday, isYesterday, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { useAuth } from '@/providers/auth-provider';
+import { supabase } from '@/integrations/supabase/client';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+
+interface TimeLog {
+  id: string;
+  start_time: string;
+  end_time: string | null;
+  user_id: string;
+  project_id: string | null;
+  idle_time_seconds: number | null;
+  keyboard_usage: number | null;
+  mouse_usage: number | null;
+  application_usage: any[] | null;
+  url_visited: any[] | null;
+  users: {
+    full_name: string;
+  };
+  projects: {
+    name: string;
+  } | null;
+}
+
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+}
 
 interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
-  totalTimeToday: number;
-  averageActivity: number;
-  unusualActivities: number;
+  totalHours: number;
+  projectsCount: number;
 }
 
-interface RecentActivity {
-  id: string;
-  user_name: string;
-  activity_type: string;
-  timestamp: string;
-  duration: number;
-}
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-interface UnusualActivity {
-  id: string;
-  user_id: string;
-  rule_triggered: string;
-  confidence: number | null;
-  detected_at: string;
-  duration_hm: string | null;
-  notes: string | null;
-}
-
-export default function EnhancedDashboard() {
+export function EnhancedDashboard() {
+  const { userDetails } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     activeUsers: 0,
-    totalTimeToday: 0,
-    averageActivity: 0,
-    unusualActivities: 0
+    totalHours: 0,
+    projectsCount: 0
   });
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
-  const [unusualActivities, setUnusualActivities] = useState<UnusualActivity[]>([]);
+  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
+  const [dateRange, setDateRange] = useState('today');
   const [loading, setLoading] = useState(true);
-  const { userDetails } = useAuth();
+  const [selectedUser, setSelectedUser] = useState<string>('all');
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    if (userDetails) {
-      loadDashboardData();
+    if (userDetails?.role === 'admin') {
+      fetchDashboardData();
+      fetchUsers();
+      fetchProjects();
     }
-  }, [userDetails]);
+  }, [userDetails, dateRange, selectedUser]);
 
-  const loadDashboardData = async () => {
+  const getDateRange = () => {
+    const now = new Date();
+    switch (dateRange) {
+      case 'today':
+        return { start: startOfDay(now), end: endOfDay(now) };
+      case 'yesterday':
+        const yesterday = subDays(now, 1);
+        return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
+      case 'week':
+        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+      case 'month':
+        return { start: startOfDay(subDays(now, 30)), end: endOfDay(now) };
+      default:
+        return { start: startOfDay(now), end: endOfDay(now) };
+    }
+  };
+
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
-      // Load basic stats
-      const { data: users } = await supabase
-        .from('users')
-        .select('id, full_name');
-
-      const { data: timeLogs } = await supabase
-        .from('time_logs')
-        .select('*')
-        .gte('start_time', new Date().toISOString().split('T')[0]);
-
-      // Load unusual activities with proper error handling
-      const { data: unusual } = await supabase
-        .from('unusual_activity')
-        .select('*')
-        .order('detected_at', { ascending: false })
-        .limit(10);
-
-      setStats({
-        totalUsers: users?.length || 0,
-        activeUsers: timeLogs?.length || 0,
-        totalTimeToday: 0,
-        averageActivity: 85,
-        unusualActivities: unusual?.length || 0
-      });
-
-      setUnusualActivities(unusual || []);
-
-      // Simulate recent activities if none exist
-      if (timeLogs && timeLogs.length > 0) {
-        const activities: RecentActivity[] = timeLogs.slice(0, 5).map((log, index) => ({
-          id: log.id,
-          user_name: `User ${index + 1}`,
-          activity_type: 'Time Tracking',
-          timestamp: log.start_time,
-          duration: 30
-        }));
-        setRecentActivities(activities);
+      const { start, end } = getDateRange();
+  
+      let userFilter = '';
+      if (selectedUser !== 'all') {
+        userFilter = `user_id.eq.${selectedUser}`;
       }
-
+  
+      // Fetch basic stats
+      const [usersRes, projectsRes, timeLogsRes] = await Promise.all([
+        supabase.from('users').select('id, full_name, email'),
+        supabase.from('projects').select('id, name'),
+        supabase
+          .from('time_logs')
+          .select('*')
+          .gte('start_time', start.toISOString())
+          .lte('start_time', end.toISOString())
+          .or(userFilter)
+      ]);
+  
+      if (usersRes.error) throw usersRes.error;
+      if (projectsRes.error) throw projectsRes.error;
+      if (timeLogsRes.error) throw timeLogsRes.error;
+  
+      // Calculate stats
+      const users = usersRes.data || [];
+      const projects = projectsRes.data || [];
+      const logs = timeLogsRes.data || [];
+  
+      const activeUserIds = new Set(logs.map((log: any) => log.user_id));
+      const totalHours = logs.reduce((sum: number, log: any) => {
+        if (log.end_time) {
+          const duration = new Date(log.end_time).getTime() - new Date(log.start_time).getTime();
+          return sum + duration / (1000 * 60 * 60);
+        }
+        return sum;
+      }, 0);
+  
+      setStats({
+        totalUsers: users.length,
+        activeUsers: activeUserIds.size,
+        totalHours: Math.round(totalHours * 100) / 100,
+        projectsCount: projects.length
+      });
+  
+      // Fetch detailed time logs with user and project info
+      const detailedLogsRes = await supabase
+        .from('time_logs')
+        .select(`
+          id,
+          start_time,
+          end_time,
+          user_id,
+          project_id,
+          idle_time_seconds,
+          keyboard_usage,
+          mouse_usage,
+          application_usage,
+          url_visited,
+          users (full_name),
+          projects (name)
+        `)
+        .gte('start_time', start.toISOString())
+        .lte('start_time', end.toISOString())
+        .order('start_time', { ascending: false })
+        .limit(10);
+  
+      if (detailedLogsRes.error) throw detailedLogsRes.error;
+  
+      // Manually join user and project data
+      const enrichedLogs: TimeLog[] = (detailedLogsRes.data || []).map((log: any) => {
+        const user = users.find((u: User) => u.id === log.user_id);
+        const project = log.project_id ? projects.find((p: Project) => p.id === log.project_id) : null;
+        
+        return {
+          ...log,
+          users: { full_name: user?.full_name || 'Unknown User' },
+          projects: project ? { name: project.name } : null
+        } as TimeLog;
+      });
+  
+      setTimeLogs(enrichedLogs);
+  
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const analyzeActivityPatterns = async () => {
+  const fetchUsers = async () => {
     try {
-      // Simulate activity analysis instead of inserting into unusual_activity
-      console.log('Analyzing activity patterns...');
-      
-      // Just refresh the data instead of creating new unusual activities
-      await loadDashboardData();
-      
-    } catch (error) {
-      console.error('Error analyzing patterns:', error);
-    }
-  };
-
-  const createUnusualActivityRecord = async (rule: string, confidence: number, duration: string) => {
-    try {
-      // Ensure we have a valid user ID
-      if (!userDetails?.id) {
-        console.error('No user ID available for creating unusual activity record');
-        return;
-      }
-
-      // Ensure confidence is within the valid range (0.00 to 99.99) for the new schema
-      const validConfidence = Math.min(Math.max(confidence, 0), 99.99);
-      
       const { data, error } = await supabase
-        .from('unusual_activity')
-        .insert({
-          user_id: userDetails.id,
-          rule_triggered: rule,
-          confidence: validConfidence,
-          duration_hm: duration,
-          notes: `Detected unusual ${rule} pattern`
-        })
-        .select();
+        .from('users')
+        .select('id, full_name, email')
+        .eq('role', 'employee');
 
-      if (error) {
-        console.error('Error creating unusual activity record:', error);
-        return;
-      }
-
-      console.log('Created unusual activity record:', data);
+      if (error) throw error;
+      setUsers(data || []);
     } catch (error) {
-      console.error('Error creating unusual activity record:', error);
+      console.error('Error fetching users:', error);
     }
   };
 
-  const formatTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name');
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    }
   };
 
-  if (loading) {
+  if (userDetails?.role !== 'admin') {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Access denied. Admin privileges required.</p>
       </div>
     );
   }
 
+  // Enhanced analytics calculations
+  const enhancedLogs = timeLogs.map((log: any, index: number) => {
+    const isLast = index === timeLogs.length - 1;
+    const nextLog = isLast ? null : timeLogs[index + 1];
+
+    const idlePercentage = log.idle_time_seconds
+      ? Math.min(100, Math.round((log.idle_time_seconds / ((new Date(log.end_time || log.start_time).getTime() - new Date(log.start_time).getTime()) / 1000)) * 100))
+      : 0;
+
+    const keyboardUsage = log.keyboard_usage !== null ? Math.min(100, log.keyboard_usage) : 0;
+    const mouseUsage = log.mouse_usage !== null ? Math.min(100, log.mouse_usage) : 0;
+
+    const applicationUsage = log.application_usage || [];
+    const topApplication = applicationUsage.length > 0
+      ? applicationUsage.reduce((prev: any, current: any) => (prev.percent > current.percent) ? prev : current)
+      : null;
+
+    const timeDifference = nextLog ? new Date(log.start_time).getTime() - new Date(nextLog.end_time || nextLog.start_time).getTime() : 0;
+    const timeSinceLastActivity = nextLog ? format(timeDifference, 'HH:mm') : 'N/A';
+
+    return {
+      ...log,
+      idlePercentage,
+      keyboardUsage,
+      mouseUsage,
+      topApplication,
+      timeSinceLastActivity
+    };
+  });
+
+  // Application Usage Stats
+  const applicationUsageData = enhancedLogs.reduce((acc: any, log: any) => {
+    if (log.application_usage) {
+      log.application_usage.forEach((app: any) => {
+        const existingApp = acc.find((a: any) => a.name === app.name);
+        if (existingApp) {
+          existingApp.percent += app.percent;
+        } else {
+          acc.push({ name: app.name, percent: app.percent });
+        }
+      });
+    }
+    return acc;
+  }, []).sort((a: any, b: any) => b.percent - a.percent).slice(0, 5);
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Enhanced Dashboard</h1>
-        <div className="flex gap-2">
-          <Button onClick={analyzeActivityPatterns} variant="outline">
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Analyze Patterns
-          </Button>
-          <Button onClick={loadDashboardData} variant="outline">
-            <Activity className="h-4 w-4 mr-2" />
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Enhanced Dashboard</h2>
+          <p className="text-muted-foreground">
+            Detailed insights into your team's productivity and activity
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Select range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="yesterday">Yesterday</SelectItem>
+              <SelectItem value="week">Last 7 days</SelectItem>
+              <SelectItem value="month">Last 30 days</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={selectedUser} onValueChange={setSelectedUser}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Select User" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Users</SelectItem>
+              {users.map((user: User) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={fetchDashboardData} disabled={loading}>
             Refresh
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">
-              Registered users in system
-            </p>
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="applications">Applications</TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview" className="space-y-4">
+          {/* Stats Cards */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalUsers}</div>
+                <p className="text-xs text-muted-foreground">
+                  Registered team members
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Today</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.activeUsers}</div>
-            <p className="text-xs text-muted-foreground">
-              Users active today
-            </p>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.activeUsers}</div>
+                <p className="text-xs text-muted-foreground">
+                  Users with activity in selected period
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Activity</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.averageActivity}%</div>
-            <Progress value={stats.averageActivity} className="mt-2" />
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalHours}h</div>
+                <p className="text-xs text-muted-foreground">
+                  Total tracked time in selected period
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unusual Activities</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.unusualActivities}</div>
-            <p className="text-xs text-muted-foreground">
-              Detected anomalies
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activities */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activities</CardTitle>
-            <CardDescription>Latest user activities and time tracking</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentActivities.length === 0 ? (
-                <p className="text-muted-foreground">No recent activities found</p>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Projects</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.projectsCount}</div>
+                <p className="text-xs text-muted-foreground">
+                  Total active projects
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        <TabsContent value="activity" className="space-y-4">
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>
+                Latest time tracking entries from your team with detailed insights
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-4">Loading recent activity...</div>
+              ) : enhancedLogs.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  No activity found for the selected period
+                </div>
               ) : (
-                recentActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                      <div>
-                        <p className="font-medium">{activity.user_name}</p>
-                        <p className="text-sm text-muted-foreground">{activity.activity_type}</p>
+                <div className="space-y-4">
+                  {enhancedLogs.map((log: any) => (
+                    <div key={log.id} className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                              {format(new Date(log.start_time), 'MMM dd, HH:mm')}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium">{log.users.full_name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {log.projects?.name || 'No project assigned'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {log.end_time ? (
+                            <Badge variant="secondary">
+                              {Math.round(
+                                (new Date(log.end_time).getTime() - new Date(log.start_time).getTime()) /
+                                (1000 * 60)
+                              )} min
+                            </Badge>
+                          ) : (
+                            <Badge variant="default">Active</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card className="shadow-none border-0">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Idle Time</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <Progress value={log.idlePercentage} className="mb-2" />
+                            <p className="text-xs text-muted-foreground">
+                              {log.idlePercentage}% of time
+                            </p>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="shadow-none border-0">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Keyboard Usage</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <Progress value={log.keyboardUsage} className="mb-2" />
+                            <p className="text-xs text-muted-foreground">
+                              {log.keyboardUsage}% of time
+                            </p>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="shadow-none border-0">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Mouse Usage</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <Progress value={log.mouseUsage} className="mb-2" />
+                            <p className="text-xs text-muted-foreground">
+                              {log.mouseUsage}% of time
+                            </p>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="shadow-none border-0">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Top Application</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {log.topApplication ? (
+                              <>
+                                <p className="text-sm font-medium">{log.topApplication.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {log.topApplication.percent}% of time
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No data</p>
+                            )}
+                          </CardContent>
+                        </Card>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">{formatTime(activity.duration)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(activity.timestamp).toLocaleTimeString()}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Unusual Activities</CardTitle>
-            <CardDescription>Detected anomalies and unusual patterns</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {unusualActivities.length === 0 ? (
-                <p className="text-muted-foreground">No unusual activities detected</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="applications" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Application Usage</CardTitle>
+              <CardDescription>
+                Insights into application usage during tracked time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {applicationUsageData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      dataKey="percent"
+                      isAnimationActive={false}
+                      data={applicationUsageData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      fill="#8884d8"
+                      label
+                    >
+                      {
+                        applicationUsageData.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))
+                      }
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
               ) : (
-                unusualActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <AlertTriangle className="h-4 w-4 text-orange-500" />
-                      <div>
-                        <p className="font-medium">{activity.rule_triggered}</p>
-                        <p className="text-sm text-muted-foreground">{activity.notes || 'No notes available'}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="outline">
-                        {activity.confidence ? Math.round(activity.confidence) : 0}% confidence
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(activity.detected_at).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                <div className="text-center py-4 text-muted-foreground">
+                  No application usage data available for the selected period.
+                </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

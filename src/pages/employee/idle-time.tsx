@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -606,27 +605,24 @@ const EmployeeIdleTime = () => {
             </div>
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {idlePeriods.slice(0, 20).map((period, index) => {
-                const severity = getIdleSeverity(period.duration_minutes || 0);
-                return (
-                  <div key={period.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Coffee className="h-4 w-4 text-yellow-500" />
-                      <div>
-                        <p className="font-medium">
-                          {format(new Date(period.idle_start), 'MMM dd, HH:mm')} - {period.idle_end ? format(new Date(period.idle_end), 'HH:mm') : 'Ongoing'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Duration: {period.duration_minutes || 0} minutes
-                        </p>
-                      </div>
+              {idlePeriods.map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Coffee className="h-4 w-4 text-yellow-500" />
+                    <div>
+                      <p className="font-medium">
+                        {format(new Date(item.idle_start), 'MMM dd, HH:mm')} - {item.idle_end ? format(new Date(item.idle_end), 'HH:mm') : 'Ongoing'}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Duration: {item.duration_minutes || 0} minutes
+                      </p>
                     </div>
-                    <Badge className={severity.color}>
-                      {severity.label}
-                    </Badge>
                   </div>
-                );
-              })}
+                  <Badge className={getIdleSeverity(item.duration_minutes || 0).color}>
+                    {getIdleSeverity(item.duration_minutes || 0).label}
+                  </Badge>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
