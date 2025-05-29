@@ -20,7 +20,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
     }
   });
   
-  export { dummyClient as supabase };
+  export const supabase = dummyClient;
 } else {
   // Validate URL format
   try {
@@ -51,5 +51,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
       console.error('Supabase connection error:', error);
     });
 
-  export { supabaseClient as supabase };
+  export const supabase = supabaseClient;
 }

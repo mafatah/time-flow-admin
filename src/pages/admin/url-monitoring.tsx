@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,13 +24,19 @@ interface URLLog {
   };
 }
 
+interface UserData {
+  id: string;
+  email: string;
+  full_name?: string;
+}
+
 export default function URLMonitoring() {
   const [urlLogs, setUrlLogs] = useState<URLLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [userFilter, setUserFilter] = useState('all');
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserData[]>([]);
 
   useEffect(() => {
     fetchURLLogs();
@@ -50,16 +55,16 @@ export default function URLMonitoring() {
       if (error) throw error;
       
       // Fetch user data separately
-      const userIds = [...new Set(data?.map(log => log.user_id) || [])];
+      const userIds = [...new Set(data?.map((log: any) => log.user_id) || [])];
       const { data: userData } = await supabase
         .from('users')
         .select('id, email, full_name')
         .in('id', userIds);
 
       // Enrich logs with user data
-      const enrichedLogs = data?.map(log => ({
+      const enrichedLogs = data?.map((log: any) => ({
         ...log,
-        user: userData?.find(user => user.id === log.user_id)
+        user: userData?.find((user: UserData) => user.id === log.user_id)
       })) || [];
 
       setUrlLogs(enrichedLogs);
@@ -84,7 +89,7 @@ export default function URLMonitoring() {
     }
   };
 
-  const filteredLogs = urlLogs.filter(log => {
+  const filteredLogs = urlLogs.filter((log: URLLog) => {
     const matchesSearch = log.site_url.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          log.user?.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || log.category === categoryFilter;
@@ -125,7 +130,7 @@ export default function URLMonitoring() {
 
   const getTotalTimeByCategory = () => {
     const categoryTotals: { [key: string]: number } = {};
-    filteredLogs.forEach(log => {
+    filteredLogs.forEach((log: URLLog) => {
       const category = log.category || 'other';
       categoryTotals[category] = (categoryTotals[category] || 0) + (log.duration_seconds || 0);
     });
@@ -156,7 +161,7 @@ export default function URLMonitoring() {
             <CardContent>
               <div className="text-2xl font-bold">{formatDuration(totalSeconds)}</div>
               <p className="text-xs text-muted-foreground">
-                {filteredLogs.filter(log => (log.category || 'other') === category).length} visits
+                {filteredLogs.filter((log: URLLog) => (log.category || 'other') === category).length} visits
               </p>
             </CardContent>
           </Card>
@@ -203,7 +208,7 @@ export default function URLMonitoring() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Users</SelectItem>
-                {users.map(user => (
+                {users.map((user: UserData) => (
                   <SelectItem key={user.id} value={user.id}>
                     {user.full_name || user.email}
                   </SelectItem>
@@ -239,7 +244,7 @@ export default function URLMonitoring() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLogs.map((log) => (
+                {filteredLogs.map((log: URLLog) => (
                   <TableRow key={log.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
