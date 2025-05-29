@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { ErrorBoundary } from "@/components/error-boundary";
-import MainLayout from "@/components/layout/main-layout";
+import { MainLayout } from "@/components/layout/main-layout";
 import LoginPage from "@/pages/auth/login";
 import Index from "@/pages/Index";
 import TimeTracker from "@/pages/time-tracking/time-tracker";

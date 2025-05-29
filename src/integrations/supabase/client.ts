@@ -28,15 +28,15 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Add connection test
-supabase.from('users').select('count', { count: 'exact', head: true }).then(
-  ({ error }) => {
+// Add connection test with proper error handling
+supabase.from('users').select('count', { count: 'exact', head: true })
+  .then(({ error }) => {
     if (error) {
       console.error('Supabase connection test failed:', error.message);
     } else {
       console.log('Supabase connection successful');
     }
-  }
-).catch((error) => {
-  console.error('Supabase connection error:', error);
-});
+  })
+  .catch((error: any) => {
+    console.error('Supabase connection error:', error);
+  });
