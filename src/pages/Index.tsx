@@ -1,75 +1,119 @@
-
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/providers/auth-provider';
+import { Loader2 } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { user, userDetails, loading, error } = useAuth();
+  const [isRedirecting, setIsRedirecting] = useState(false);
   
   useEffect(() => {
-    // Check for an existing session
-    const checkSession = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          throw error;
+    // Don't redirect while authentication is still loading
+    if (loading) {
+      return;
+    }
+
+    // If there's an auth error or no user, go to login
+    if (error || !user) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    // If user is authenticated but no user details yet, wait a bit more
+    if (user && !userDetails) {
+      // Give it a moment for userDetails to load
+      setTimeout(() => {
+        if (!userDetails) {
+          console.log("User details not loaded, redirecting to login");
+          navigate("/login", { replace: true });
         }
-        
-        if (data.session) {
-          // Get user details to determine role
-          const { data: userDetails, error: userError } = await supabase
-            .from("users")
-            .select("role")
-            .eq("id", data.session.user.id)
-            .single();
-          
-          if (userError) {
-            console.error("Error fetching user role:", userError);
-            navigate("/login");
-            return;
-          }
-          
-          // Redirect based on role
-          if (userDetails?.role === 'admin' || userDetails?.role === 'manager') {
-            navigate("/admin");
-          } else {
-            navigate("/employee/dashboard");
-          }
-        } else {
-          navigate("/login");
-        }
-      } catch (error: any) {
-        console.error("Error checking session:", error);
-        toast({
-          title: "Error",
-          description: "Failed to check authentication status",
-          variant: "destructive",
-        });
-        navigate("/login");
+      }, 2000);
+      return;
+    }
+
+    // If we have both user and userDetails, redirect based on role
+    if (user && userDetails) {
+      setIsRedirecting(true);
+      
+      console.log("Redirecting user with role:", userDetails.role);
+      
+      if (userDetails.role === 'admin' || userDetails.role === 'manager') {
+        navigate("/admin", { replace: true });
+      } else {
+        navigate("/employee/dashboard", { replace: true });
       }
-    };
-    
-    checkSession();
-  }, [navigate, toast]);
+    }
+  }, [user, userDetails, loading, error, navigate]);
   
+  // Show loading state
+  if (loading || isRedirecting) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-muted/40 p-6">
+        <div className="max-w-md text-center">
+          <h1 className="text-3xl font-bold text-primary mb-6">TimeFlow</h1>
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <div className="flex items-center justify-center mb-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+            <h2 className="text-2xl font-semibold mb-4">Loading...</h2>
+            <p className="mb-6 text-muted-foreground">
+              {loading ? "Checking authentication..." : "Redirecting based on your role..."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state with manual navigation option
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-muted/40 p-6">
+        <div className="max-w-md text-center">
+          <h1 className="text-3xl font-bold text-primary mb-6">TimeFlow</h1>
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <h2 className="text-2xl font-semibold mb-4 text-red-600">Authentication Error</h2>
+            <p className="mb-6 text-muted-foreground">{error}</p>
+            <div className="flex justify-center gap-4">
+              <Button variant="default" onClick={() => navigate("/login")}>
+                Go to Login
+              </Button>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Reload Page
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Fallback UI (should rarely be shown)
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-muted/40 p-6">
       <div className="max-w-md text-center">
-        <h1 className="text-3xl font-bold text-primary mb-6">TrackHub</h1>
+        <h1 className="text-3xl font-bold text-primary mb-6">TimeFlow</h1>
         <div className="bg-white p-6 rounded-lg shadow-lg">
-          <h2 className="text-2xl font-semibold mb-4">Welcome to TrackHub</h2>
+          <h2 className="text-2xl font-semibold mb-4">Welcome to TimeFlow</h2>
           <p className="mb-6">
             Employee time tracking and productivity monitoring platform.
-            Redirecting based on your role...
           </p>
-          <div className="flex justify-center">
+          <div className="flex justify-center gap-4">
             <Button variant="default" onClick={() => navigate("/login")}>
               Go to Login
             </Button>
+            {userDetails?.role === 'admin' && (
+              <Button variant="outline" onClick={() => navigate("/admin")}>
+                Admin Dashboard
+              </Button>
+            )}
+            {userDetails?.role === 'employee' && (
+              <Button variant="outline" onClick={() => navigate("/employee/dashboard")}>
+                Employee Dashboard
+              </Button>
+            )}
           </div>
         </div>
       </div>

@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTracker } from '@/providers/tracker-provider';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

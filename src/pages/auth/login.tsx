@@ -76,7 +76,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">TrackHub</CardTitle>
+          <CardTitle className="text-2xl font-bold">TimeFlow</CardTitle>
           <CardDescription>
             {isSignUp
               ? "Create a new account to get started"
