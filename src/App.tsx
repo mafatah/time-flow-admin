@@ -102,6 +102,14 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <Index />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
       <Route path="/time-tracker" element={
         <ProtectedRoute>
           <MainLayout>

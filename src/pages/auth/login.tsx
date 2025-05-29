@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/providers/auth-provider";
@@ -60,7 +59,7 @@ export default function LoginPage() {
       } else {
         // Handle login
         await signIn(values.email, values.password);
-        navigate("/dashboard");
+        navigate("/");
       }
     } catch (error: any) {
       toast({
