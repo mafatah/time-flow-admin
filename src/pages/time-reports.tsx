@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/providers/auth-provider';
-import { format, subDays, parseISO } from 'date-fns';
+import { useToast } from '@/components/ui/use-toast';
+import { format, subDays, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { Calendar, Clock, Download, Filter, Search } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -48,6 +49,7 @@ export default function TimeReports() {
   });
 
   const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchUsers();
@@ -69,7 +71,11 @@ export default function TimeReports() {
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error('Failed to fetch users');
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch users',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -84,7 +90,11 @@ export default function TimeReports() {
       setProjects(data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
-      toast.error('Failed to fetch projects');
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch projects',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -138,7 +148,11 @@ export default function TimeReports() {
       setReports(enrichedReports);
     } catch (error) {
       console.error('Error fetching reports:', error);
-      toast.error('Failed to fetch time reports');
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch time reports',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -158,7 +172,7 @@ export default function TimeReports() {
   };
 
   const exportToCSV = () => {
-    const csvData = reports.map(report => ({
+    const csvData = reports.map((report: TimeReport) => ({
       'User': report.user_name,
       'Email': report.user_email,
       'Project': report.project_name,
@@ -188,7 +202,10 @@ export default function TimeReports() {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
     
-    toast.success('Report exported successfully');
+    toast({
+      title: 'Success',
+      description: 'Report exported successfully',
+    });
   };
 
   const getTotalHours = (): string => {

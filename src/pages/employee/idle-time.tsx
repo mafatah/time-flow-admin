@@ -64,6 +64,7 @@ const EmployeeIdleTime = () => {
   const [dailyData, setDailyData] = useState<DailyIdleData[]>([]);
   const [testingIdle, setTestingIdle] = useState(false);
   const [testIdleStart, setTestIdleStart] = useState<Date | null>(null);
+  const [idleLogs, setIdleLogs] = useState([]);
 
   useEffect(() => {
     if (userDetails?.id) {
@@ -144,6 +145,27 @@ const EmployeeIdleTime = () => {
         description: `Found ${formattedData.length} idle periods for the selected time range.`,
         variant: 'default'
       });
+
+      // Fetch idle logs for top reasons
+      const { data: logs, error: logsError } = await supabase
+        .from('idle_logs')
+        .select('*')
+        .eq('user_id', userDetails.id)
+        .gte('idle_start', start.toISOString())
+        .lte('idle_start', end.toISOString())
+        .order('idle_start', { ascending: false });
+
+      if (logsError) {
+        console.error('Error fetching idle logs:', logsError);
+        toast({
+          title: 'Error loading idle logs',
+          description: logsError.message || 'Failed to load idle logs.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setIdleLogs(logs);
 
     } catch (error: any) {
       console.error('Error fetching idle data:', error);
@@ -381,6 +403,24 @@ const EmployeeIdleTime = () => {
     if (impact < 25) return 'text-yellow-600';
     return 'text-red-600';
   };
+
+  const topIdleReasons = idleLogs
+    .reduce((acc: any[], item: any) => {
+      const reasonIndex = acc.findIndex(r => r.reason === (item.reason || 'Unknown'));
+      if (reasonIndex >= 0) {
+        acc[reasonIndex].total += item.duration_minutes || 0;
+        acc[reasonIndex].count += 1;
+      } else {
+        acc.push({
+          reason: item.reason || 'Unknown',
+          total: item.duration_minutes || 0,
+          count: 1
+        });
+      }
+      return acc;
+    }, [])
+    .sort((a: any, b: any) => b.total - a.total)
+    .slice(0, 5);
 
   if (loading) {
     return (
