@@ -82,6 +82,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "@eslint/js": "^9.9.0",
     "@supabase/supabase-js": "^2.49.8",
     "@tailwindcss/typography": "^0.5.15",
@@ -116,7 +117,7 @@
     "vite": "^5.4.1"
   },
   "build": {
-    "appId": "com.timeflow.admin",
+    "appId": "com.ebdaadt.timetracker",
     "productName": "TimeFlow",
     "directories": {
       "output": "dist"
@@ -129,13 +130,18 @@
       {
         "from": "build/dist",
         "to": "resources/app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "mac": {
       "target": {
         "target": "dmg",
-        "arch": ["arm64", "x64"]
+        "arch": [
+          "arm64",
+          "x64"
+        ]
       },
       "category": "public.app-category.productivity",
       "identity": "Ebdaa Digital Technology (6GW49LK9V9)",
@@ -147,13 +153,17 @@
     "win": {
       "target": {
         "target": "nsis",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       }
     },
     "linux": {
       "target": {
         "target": "AppImage",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       },
       "category": "Office"
     },
