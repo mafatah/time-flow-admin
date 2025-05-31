@@ -35,6 +35,9 @@ import AdminScreenshots from "@/pages/admin/screenshots";
 // Reports pages
 import AppsUrlsIdle from "@/pages/reports/apps-urls-idle";
 
+// Other pages
+import DownloadPage from "@/pages/download";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -261,6 +264,14 @@ function AppRoutes() {
         <ProtectedRoute>
           <MainLayout>
             <AppsUrlsIdle />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/download" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <DownloadPage />
           </MainLayout>
         </ProtectedRoute>
       } />
