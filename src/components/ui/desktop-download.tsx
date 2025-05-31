@@ -85,8 +85,8 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     if (platform === 'mac') {
       return {
-        title: `${platformName} Desktop Installer - Interactive Demo`,
-        message: `✅ Download started! The TimeFlow installer will show you what the installation process looks like and install a demo app to your Applications folder.`,
+        title: `${platformName} Desktop Installer - Professionally Signed`,
+        message: `✅ Download started! This is a professionally signed TimeFlow installer with Apple Developer certificate. No Gatekeeper warnings!`,
         features: [
           '🔄 Automatic time tracking',
           '📸 Smart screenshot capture (2 random per 10 minutes)',
@@ -95,10 +95,11 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
           '📊 Detailed productivity insights'
         ],
         instructions: [
+          '✅ Signed with Apple Developer certificate (Ebdaa Digital Technology)',
           'Double-click the downloaded .dmg file to open the installer',
-          'Run "TimeFlow Installer.app" to see the installation process',
+          'Run "TimeFlow Installer.app" - no security warnings!',
           'The installer will create a demo app in your Applications folder',
-          'The demo shows all features the real TimeFlow Desktop would have',
+          'Professional installation experience with full macOS trust',
           'Contact your administrator to get the actual desktop application'
         ]
       };
@@ -248,7 +249,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
           TimeFlow Desktop App
         </CardTitle>
         <CardDescription>
-          Download the desktop application for enhanced time tracking with screenshot capture and automatic activity monitoring.
+          Download the professionally signed desktop application for enhanced time tracking with screenshot capture and automatic activity monitoring. No security warnings on macOS!
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -293,7 +294,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
               )}
               <div className="text-center">
                 <div className="font-medium">macOS</div>
-                <div className="text-xs opacity-70">Intel & Apple Silicon</div>
+                <div className="text-xs opacity-70">Signed • Intel & Apple Silicon</div>
               </div>
             </Button>
 
