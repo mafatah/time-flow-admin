@@ -155,7 +155,10 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "icon": "build/icon.icns"
+      "icon": "build/icon.icns",
+      "notarize": {
+        "teamId": "6GW49LK9V9"
+      }
     },
     "win": {
       "target": {
