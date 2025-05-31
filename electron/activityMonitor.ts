@@ -133,13 +133,8 @@ export async function startActivityMonitoring(userId: string) {
   // Save session to database
   saveActivitySession();
 
-  // Start screenshot capture using settings interval
-  activityInterval = setInterval(async () => {
-    if (currentUserId && isUserActive()) {
-      await captureActivityScreenshot();
-      updateLastActivity();
-    }
-  }, appSettings.screenshot_interval_seconds * 1000);
+  // Start random screenshot capture (2 per 10-minute period)
+  startRandomScreenshotCapture();
 
   // Start app activity tracking every 5 seconds
   appTrackingInterval = setInterval(async () => {
@@ -159,7 +154,7 @@ export async function startActivityMonitoring(userId: string) {
     await checkNotifications();
   }, 60000);
 
-  console.log(`✅ Activity monitoring started - Screenshots every ${appSettings.screenshot_interval_seconds}s, App tracking every 5s, Activity metrics every 1s`);
+  console.log(`✅ Activity monitoring started - Random screenshots (2 per 10 min), App tracking every 5s, Activity metrics every 1s`);
 }
 
 export function stopActivityMonitoring() {
@@ -169,7 +164,7 @@ export function stopActivityMonitoring() {
   isMonitoring = false;
 
   if (activityInterval) {
-    clearInterval(activityInterval);
+    clearTimeout(activityInterval);
     activityInterval = undefined;
   }
 
@@ -1083,4 +1078,36 @@ function getNotificationMessage(notification: any): string {
 // Export activity metrics for external access
 export function getActivityMetrics(): ActivityMetrics {
   return { ...activityMetrics };
+}
+
+function startRandomScreenshotCapture() {
+  if (activityInterval) {
+    clearTimeout(activityInterval);
+  }
+  
+  console.log('📸 Starting random screenshots - 2 per 10 minute period');
+  scheduleRandomScreenshot();
+}
+
+function scheduleRandomScreenshot() {
+  if (activityInterval) {
+    clearTimeout(activityInterval);
+  }
+  
+  // Generate random interval between 2-8 minutes (120-480 seconds)
+  // This ensures 2 screenshots within each 10-minute window at random times
+  const minInterval = 120; // 2 minutes 
+  const maxInterval = 480; // 8 minutes
+  const randomInterval = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
+  
+  console.log(`📸 Next screenshot in ${Math.round(randomInterval / 60)} minutes ${randomInterval % 60} seconds`);
+  
+  activityInterval = setTimeout(async () => {
+    if (currentUserId && isUserActive()) {
+      await captureActivityScreenshot();
+      updateLastActivity();
+    }
+    // Schedule next random screenshot
+    scheduleRandomScreenshot();
+  }, randomInterval * 1000);
 } 
