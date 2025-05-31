@@ -1,11 +1,10 @@
-
 {
   "user_id": "189a8371-8aaf-4551-9b33-8fed7f4cee5d",
   "project_id": "189a8371-8aaf-4551-9b33-8fed7f4cee5d",
   "supabase_url": "https://fkpiqcxkmrtaetvfgcli.supabase.co",
   "supabase_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4",
   "auto_start_tracking": true,
-  "screenshot_interval_seconds": 30,
+  "screenshot_interval_seconds": 300,
   "idle_threshold_seconds": 60,
   "enable_screenshots": true,
   "enable_idle_detection": true,
