@@ -64,9 +64,9 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         console.log(`Downloaded TimeFlow Desktop for ${platform}`);
         
         // Show warning dialog after download starts
-        setTimeout(() => {
-          showDownloadDialog(platform);
-        }, 1000);
+        // setTimeout(() => {
+        //   showDownloadDialog(platform);
+        // }, 1000);
         
       } else {
         // File doesn't exist, show instructions
