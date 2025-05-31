@@ -37,7 +37,6 @@ exports.appEvents = void 0;
 require("dotenv/config");
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
-const http = __importStar(require("http"));
 const fs = __importStar(require("fs"));
 const tracker_1 = require("./tracker.cjs");
 const autoLaunch_1 = require("./autoLaunch.cjs");
@@ -92,95 +91,35 @@ exports.appEvents.on('auto-stop-tracking', (data) => {
     updateTrayMenu();
 });
 async function createWindow() {
+    // Create a hidden window for the desktop tracking app
     mainWindow = new electron_1.BrowserWindow({
-        width: 1000,
-        height: 800,
+        width: 400,
+        height: 300,
+        show: false, // Keep hidden - this is a background tracker
         webPreferences: {
-            preload: path.join(__dirname, 'preload.cjs'),
-        },
+            nodeIntegration: true,
+            contextIsolation: false
+        }
     });
-    // In development, load from Vite dev server, in production load from file
-    const isDev = true; // Force dev mode to use Vite server
-    if (isDev) {
-        // Try multiple ports to find where Vite is running
-        const tryPorts = [8080, 8081, 8082, 8083];
-        let devUrl = 'http://localhost:8080';
-        let foundPort = false;
-        for (const port of tryPorts) {
-            try {
-                const testUrl = `http://localhost:${port}`;
-                // Test if port is responding and serving Vite content
-                await new Promise((resolve, reject) => {
-                    const req = http.get(testUrl, (res) => {
-                        if (res.statusCode === 200) {
-                            let data = '';
-                            res.on('data', (chunk) => {
-                                data += chunk;
-                            });
-                            res.on('end', () => {
-                                // Check if response contains Vite characteristics
-                                if (data.includes('vite') || data.includes('__vite_dev__') || data.includes('react')) {
-                                    devUrl = testUrl;
-                                    foundPort = true;
-                                    resolve();
-                                }
-                                else {
-                                    reject(new Error(`Port ${port} not serving Vite content`));
-                                }
-                            });
-                        }
-                        else {
-                            reject(new Error(`Port ${port} returned status ${res.statusCode}`));
-                        }
-                    });
-                    req.on('error', reject);
-                    req.setTimeout(2000, () => reject(new Error(`Timeout for port ${port}`)));
-                });
-                console.log(`Found Vite dev server on port ${port}`);
-                break;
-            }
-            catch (e) {
-                console.log(`Port ${port} not available:`, e instanceof Error ? e.message : 'Unknown error');
-                continue;
-            }
-        }
-        if (!foundPort) {
-            console.warn('No Vite dev server found on any port, using default port 8080');
-        }
-        console.log('Loading UI from dev server:', devUrl);
-        mainWindow.loadURL(devUrl)
-            .then(() => {
-            // Set initial hash route for HashRouter compatibility
-            mainWindow?.webContents.executeJavaScript(`
-          // Wait for React to load, then set initial route
-          setTimeout(() => {
-            if (window.location.hash === '' || window.location.hash === '#/') {
-              window.location.hash = '#/';
-            }
-          }, 1000);
-        `);
-        })
-            .catch(err => console.error('Failed to load UI from dev server:', err));
-    }
-    else {
-        const indexPath = path.join(__dirname, '../../../dist/index.html');
-        console.log('Loading UI from:', indexPath);
-        mainWindow.loadFile(indexPath)
-            .then(() => {
-            // Set initial hash route for HashRouter compatibility
-            mainWindow?.webContents.executeJavaScript(`
-          // Wait for React to load, then set initial route
-          setTimeout(() => {
-            if (window.location.hash === '' || window.location.hash === '#/') {
-              window.location.hash = '#/';
-            }
-          }, 1000);
-        `);
-        })
-            .catch(err => console.error('Failed to load UI:', err));
-    }
-    // Open DevTools for debugging
-    mainWindow.webContents.openDevTools();
+    // Load a minimal HTML page instead of the full React app
+    const minimalHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>TimeFlow Desktop Tracker</title>
+    </head>
+    <body>
+      <h3>TimeFlow Desktop Tracker</h3>
+      <p id="status">Starting...</p>
+      <script>
+        document.getElementById('status').textContent = 'Running in background';
+      </script>
+    </body>
+    </html>
+  `;
+    mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(minimalHtml)}`);
+    // Don't show the window - keep it hidden
+    // Remove DevTools opening
 }
 electron_1.app.whenReady().then(async () => {
     await createWindow();
@@ -217,7 +156,7 @@ electron_1.app.whenReady().then(async () => {
                 break;
             }
         }
-        if (config && config.user_id && config.auto_start_tracking) {
+        if (config && config.user_id) {
             console.log('🚀 Auto-starting activity monitoring for user:', config.user_id);
             (0, tracker_1.setUserId)(config.user_id);
             (0, activityMonitor_1.startActivityMonitoring)(config.user_id);
@@ -226,6 +165,11 @@ electron_1.app.whenReady().then(async () => {
         }
         else if (!config) {
             console.log('⚠️  No desktop-agent config found in any expected location');
+            console.log('🚀 Starting with default monitoring');
+            // Start with a default user ID for demo purposes
+            (0, tracker_1.setUserId)('189a8371-8aaf-4551-9b33-8fed7f4cee5d');
+            (0, activityMonitor_1.startActivityMonitoring)('189a8371-8aaf-4551-9b33-8fed7f4cee5d');
+            startTrackingTimer();
         }
     }
     catch (error) {
@@ -341,7 +285,7 @@ function createTray() {
 // Create a simple icon as base64 (16x16 green circle)
 function createSimpleIcon() {
     // This is a simple 16x16 PNG icon encoded as base64
-    return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
+    return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
 }
 // Update tray menu
 function updateTrayMenu() {
@@ -359,12 +303,10 @@ function updateTrayMenu() {
         },
         { type: 'separator' },
         {
-            label: '📊 Show Dashboard',
+            label: '📊 Open Dashboard',
             click: () => {
-                if (mainWindow) {
-                    mainWindow.show();
-                    mainWindow.focus();
-                }
+                // Open web dashboard in default browser instead of showing window
+                electron_1.shell.openExternal('https://time-flow-admin.vercel.app');
             }
         },
         {
@@ -382,12 +324,6 @@ function updateTrayMenu() {
                 (0, tracker_1.clearSavedSession)();
                 stopTrackingTimer();
                 (0, activityMonitor_1.stopActivityMonitoring)();
-                // Refresh the window to show login screen
-                if (mainWindow) {
-                    mainWindow.reload();
-                    mainWindow.show();
-                    mainWindow.focus();
-                }
                 console.log('🚪 User logged out - session cleared');
             }
         },
