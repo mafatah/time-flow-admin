@@ -52,19 +52,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initializeApp() {
-    // Check if user is already logged in
-    const savedUser = localStorage.getItem('timeflow_user');
-    if (savedUser) {
-        try {
-            currentUser = JSON.parse(savedUser);
-            showMainApp();
-        } catch (e) {
-            console.error('Error parsing saved user:', e);
-            showLogin();
-        }
-    } else {
-        showLogin();
-    }
+    // Always show login screen - don't auto-login saved users
+    // This ensures employees must log in each time and manually start tracking
+    localStorage.removeItem('timeflow_user'); // Clear any saved user
+    showLogin();
 }
 
 function setupEventListeners() {
@@ -261,8 +252,8 @@ function showMainApp() {
     // Load saved task
     loadCurrentTask();
     
-    // Start activity monitoring
-    ipcRenderer.send('start-activity-monitoring', currentUser.id);
+    // Don't auto-start activity monitoring - let employee start manually
+    // Employee must click "Start Tracking" to begin
     
     // Initialize dashboard
     navigateToPage('dashboard');
