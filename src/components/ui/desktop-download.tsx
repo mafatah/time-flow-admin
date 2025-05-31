@@ -35,7 +35,17 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Define download URLs - update these with actual file URLs
+    // For now, always show the information dialog since files are placeholders
+    // TODO: Remove this when actual desktop apps are ready
+    setTimeout(() => {
+      showDownloadDialog(platform);
+      setDownloading(null);
+    }, 500); // Small delay to show loading state
+    
+    return;
+    
+    // This code will be used when actual desktop apps are ready:
+    /*
     const downloadUrls = {
       windows: '/downloads/TimeFlow-Setup.exe',
       mac: '/downloads/TimeFlow.dmg', 
@@ -64,34 +74,34 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         console.log(`Downloaded TimeFlow Desktop for ${platform}`);
       } else {
         // File doesn't exist, show instructions
-        const instructions = getDownloadInstructions(platform);
         showDownloadDialog(platform);
       }
     } catch (error) {
       console.error('Download failed:', error);
-      const instructions = getDownloadInstructions(platform);
       showDownloadDialog(platform);
     } finally {
       setDownloading(null);
     }
+    */
   };
   
   const getDownloadInstructions = (platform: string) => {
     const platformName = getOSName(platform);
     return {
-      title: `${platformName} Desktop App`,
-      message: `The TimeFlow desktop app for ${platformName} is being prepared and will be available soon.`,
+      title: `${platformName} Desktop App - Development Version`,
+      message: `⚠️ The TimeFlow desktop app files are currently placeholder files for development purposes. They are not functional installers.`,
       features: [
         '🔄 Automatic time tracking',
-        '📸 Smart screenshot capture',
+        '📸 Smart screenshot capture (2 random per 10 minutes)',
         '⚡ Activity monitoring',
         '🔒 Secure data sync',
         '📊 Detailed productivity insights'
       ],
       instructions: [
-        'Contact your administrator for early access',
-        'Check back in a few days for the official release',
-        'Use the web version for basic time tracking in the meantime'
+        'Contact your administrator to get the actual desktop application',
+        'The development team is preparing the final release',
+        'Use the web version for time tracking functionality',
+        'Placeholder files are not functional - please wait for official release'
       ]
     };
   };

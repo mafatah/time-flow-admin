@@ -1,42 +1,49 @@
-# TimeFlow Desktop App Downloads
+# TimeFlow Desktop Applications - Development Placeholders
 
-This directory contains the downloadable desktop application files.
+⚠️ **IMPORTANT: These are placeholder files for development purposes only**
 
-## How to Add Actual Desktop Apps:
+## Current Status
 
-### 1. Build the Desktop Applications
-```bash
-# First, ensure all dependencies are installed
-npm install
+The files in this directory (`TimeFlow.dmg`, `TimeFlow-Setup.exe`, `TimeFlow.AppImage`) are **not functional installers**. They are 1MB placeholder files created to prevent download errors during development.
 
-# Build the web app and electron components
-npm run build:all
+## What's Coming
 
-# Build desktop applications (when Electron config is fixed)
-npm run electron:build
-```
+The TimeFlow Desktop Application is currently under development and will include:
 
-### 2. Add Built Files to This Directory
-Place the built application files here:
-- `TimeFlow-Setup.exe` (Windows installer)
-- `TimeFlow.dmg` (macOS disk image)
-- `TimeFlow.AppImage` (Linux AppImage)
+### 🚀 Core Features
+- **Random Screenshot Capture**: 2 screenshots per 10-minute period at random intervals
+- **Activity Monitoring**: Real-time tracking of mouse, keyboard, and application usage
+- **Idle Detection**: Automatic pause during inactive periods
+- **App Tracking**: Monitor which applications are being used
+- **URL Tracking**: Track website usage in browsers
+- **Secure Sync**: Real-time synchronization with the web dashboard
 
-### 3. Current Status
-The download component will automatically serve files from this directory.
-Currently using placeholder URLs - replace with actual download URLs when files are ready.
+### 📱 Platform Support
+- **Windows**: Native installer (.exe) for Windows 10/11
+- **macOS**: Universal binary (.dmg) for Intel and Apple Silicon Macs
+- **Linux**: Portable AppImage for all Linux distributions
 
-### 4. File Naming Convention
-- **Windows**: `TimeFlow-win-x64.exe` or `TimeFlow-Setup.exe`
-- **macOS**: `TimeFlow-mac.dmg` or `TimeFlow-universal.dmg`
-- **Linux**: `TimeFlow-linux-x64.AppImage` or `TimeFlow.AppImage`
+## How to Get the Actual Desktop App
 
-### 5. Upload to CDN (Production)
-For production, upload these files to:
-- AWS S3 / CloudFront
-- GitHub Releases
-- Your own file server
-- Or keep them in the public directory
+1. **Contact Your Administrator**: Reach out to your TimeFlow administrator for the latest release
+2. **Check for Updates**: The development team will announce when the official release is ready
+3. **Use Web Version**: In the meantime, use the full-featured web application at your TimeFlow dashboard
 
-### 6. Update Download URLs
-Edit `src/components/ui/desktop-download.tsx` to point to the actual file URLs. 
+## For Developers
+
+To replace these placeholder files with actual desktop applications:
+
+1. Build the desktop applications using the build scripts in `/scripts/`
+2. Replace the placeholder files with the actual compiled applications
+3. Update the `handleDownload` function in `src/components/ui/desktop-download.tsx` to enable downloads
+4. Test the download functionality across all platforms
+
+## File Sizes
+
+Current placeholder files are 1MB each to avoid "file too small" errors when users attempt downloads. The actual desktop applications will be appropriately sized for their respective platforms.
+
+---
+
+**Last Updated**: May 31, 2024  
+**Status**: Development Phase  
+**Contact**: Your TimeFlow Administrator 
