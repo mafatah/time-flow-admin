@@ -91,35 +91,57 @@ exports.appEvents.on('auto-stop-tracking', (data) => {
     updateTrayMenu();
 });
 async function createWindow() {
-    // Create a hidden window for the desktop tracking app
+    // Create the employee desktop app window
     mainWindow = new electron_1.BrowserWindow({
-        width: 400,
-        height: 300,
-        show: false, // Keep hidden - this is a background tracker
+        width: 1200,
+        height: 800,
+        show: true, // Show the window for employee interaction
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
-        }
+        },
+        titleBarStyle: 'hiddenInset', // Modern macOS look
+        vibrancy: 'under-window' // macOS transparency effect
     });
-    // Load a minimal HTML page instead of the full React app
-    const minimalHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>TimeFlow Desktop Tracker</title>
-    </head>
-    <body>
-      <h3>TimeFlow Desktop Tracker</h3>
-      <p id="status">Starting...</p>
-      <script>
-        document.getElementById('status').textContent = 'Running in background';
-      </script>
-    </body>
-    </html>
-  `;
-    mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(minimalHtml)}`);
-    // Don't show the window - keep it hidden
-    // Remove DevTools opening
+    // Load the employee desktop app interface
+    const desktopAgentPath = path.join(__dirname, '../desktop-agent/renderer/index.html');
+    if (fs.existsSync(desktopAgentPath)) {
+        console.log('📱 Loading employee desktop app from:', desktopAgentPath);
+        mainWindow.loadFile(desktopAgentPath);
+    }
+    else {
+        // Fallback: try different possible paths
+        const possiblePaths = [
+            path.join(__dirname, '../../desktop-agent/renderer/index.html'),
+            path.join(process.cwd(), 'desktop-agent/renderer/index.html'),
+            path.join(electron_1.app.getAppPath(), 'desktop-agent/renderer/index.html')
+        ];
+        let foundPath = '';
+        for (const testPath of possiblePaths) {
+            if (fs.existsSync(testPath)) {
+                foundPath = testPath;
+                break;
+            }
+        }
+        if (foundPath) {
+            console.log('📱 Loading employee desktop app from fallback path:', foundPath);
+            mainWindow.loadFile(foundPath);
+        }
+        else {
+            console.log('⚠️ Desktop agent UI not found, loading web interface instead');
+            // Load the web interface as fallback
+            if (process.env.NODE_ENV === 'development') {
+                mainWindow.loadURL('http://localhost:5173');
+            }
+            else {
+                mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+            }
+        }
+    }
+    // Show DevTools in development
+    if (process.env.NODE_ENV === 'development') {
+        mainWindow.webContents.openDevTools();
+    }
 }
 electron_1.app.whenReady().then(async () => {
     await createWindow();
@@ -136,7 +158,7 @@ electron_1.app.whenReady().then(async () => {
     else {
         console.log('⚠️  App ready but screen recording permission missing');
     }
-    // Auto-load desktop-agent config if it exists
+    // Auto-load desktop-agent config if it exists (but don't auto-start tracking)
     try {
         // Try multiple possible paths for the config file
         const possiblePaths = [
@@ -156,20 +178,14 @@ electron_1.app.whenReady().then(async () => {
                 break;
             }
         }
+        // Load config but don't auto-start tracking - let employee login and start manually
         if (config && config.user_id) {
-            console.log('🚀 Auto-starting activity monitoring for user:', config.user_id);
-            (0, tracker_1.setUserId)(config.user_id);
-            (0, activityMonitor_1.startActivityMonitoring)(config.user_id);
-            // Start the tracking timer as well
-            startTrackingTimer();
+            console.log('📋 Config found for user:', config.user_id);
+            console.log('⏳ Waiting for employee to login and start tracking manually...');
+            // Don't auto-start - employee should login first
         }
-        else if (!config) {
-            console.log('⚠️  No desktop-agent config found in any expected location');
-            console.log('🚀 Starting with default monitoring');
-            // Start with a default user ID for demo purposes
-            (0, tracker_1.setUserId)('189a8371-8aaf-4551-9b33-8fed7f4cee5d');
-            (0, activityMonitor_1.startActivityMonitoring)('189a8371-8aaf-4551-9b33-8fed7f4cee5d');
-            startTrackingTimer();
+        else {
+            console.log('⚠️  No desktop-agent config found - employee will need to login');
         }
     }
     catch (error) {
@@ -233,6 +249,19 @@ electron_1.ipcMain.handle('trigger-direct-screenshot', async () => {
     const result = await (0, activityMonitor_1.triggerDirectScreenshot)();
     showScreenshotNotification();
     return result;
+});
+// Handle user login from desktop-agent UI
+electron_1.ipcMain.on('user-logged-in', (event, user) => {
+    console.log('👤 User logged in from UI:', user.email);
+    (0, tracker_1.setUserId)(user.id);
+    console.log('✅ User ID set, ready for manual tracking start');
+});
+// Handle activity monitoring start from desktop-agent UI
+electron_1.ipcMain.on('start-activity-monitoring', (event, userId) => {
+    console.log('🚀 Starting activity monitoring for user:', userId);
+    (0, tracker_1.setUserId)(userId);
+    (0, activityMonitor_1.startActivityMonitoring)(userId);
+    console.log('✅ Activity monitoring started from UI');
 });
 // Add test mode for development
 electron_1.ipcMain.on('start-test-mode', () => {

@@ -21,7 +21,7 @@
     "preview": "vite preview",
     "electron:build": "electron-builder",
     "build:web": "tsc -p tsconfig.app.json",
-    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\; && node fix-imports.cjs",
+    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\; && node fix-imports.cjs && mkdir -p build/desktop-agent && cp -r desktop-agent/renderer desktop-agent/config.json desktop-agent/assets build/desktop-agent/",
     "build:all": "npm run build:dev && npm run build:electron && mkdir -p build/dist && cp -r dist/* build/dist/"
   },
   "dependencies": {
