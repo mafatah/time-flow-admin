@@ -35,16 +35,127 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Simulate download process
-    setTimeout(() => {
-      // In a real implementation, you would trigger the actual download here
-      console.log(`Downloading TimeFlow Desktop for ${platform}`);
+    // Define download URLs - update these with actual file URLs
+    const downloadUrls = {
+      windows: '/downloads/TimeFlow-Setup.exe',
+      mac: '/downloads/TimeFlow.dmg', 
+      linux: '/downloads/TimeFlow.AppImage'
+    };
+    
+    try {
+      const url = downloadUrls[platform as keyof typeof downloadUrls];
       
-      // For now, we'll just show an alert
-      alert(`Download started for ${platform}. The actual download links will be configured by your administrator.`);
+      if (!url) {
+        throw new Error('Download not available for this platform');
+      }
       
+      // Check if file exists
+      const response = await fetch(url, { method: 'HEAD' });
+      
+      if (response.ok) {
+        // File exists, start download
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = url.split('/').pop() || `TimeFlow-${platform}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log(`Downloaded TimeFlow Desktop for ${platform}`);
+      } else {
+        // File doesn't exist, show instructions
+        const instructions = getDownloadInstructions(platform);
+        showDownloadDialog(platform);
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+      const instructions = getDownloadInstructions(platform);
+      showDownloadDialog(platform);
+    } finally {
       setDownloading(null);
-    }, 1500);
+    }
+  };
+  
+  const getDownloadInstructions = (platform: string) => {
+    const platformName = getOSName(platform);
+    return {
+      title: `${platformName} Desktop App`,
+      message: `The TimeFlow desktop app for ${platformName} is being prepared and will be available soon.`,
+      features: [
+        '🔄 Automatic time tracking',
+        '📸 Smart screenshot capture',
+        '⚡ Activity monitoring',
+        '🔒 Secure data sync',
+        '📊 Detailed productivity insights'
+      ],
+      instructions: [
+        'Contact your administrator for early access',
+        'Check back in a few days for the official release',
+        'Use the web version for basic time tracking in the meantime'
+      ]
+    };
+  };
+
+  const showDownloadDialog = (platform: string) => {
+    const info = getDownloadInstructions(platform);
+    
+    // Create a more user-friendly dialog
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      font-family: system-ui, -apple-system, sans-serif;
+    `;
+    
+    modal.innerHTML = `
+      <div style="
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 500px;
+        margin: 1rem;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      ">
+        <h2 style="margin: 0 0 1rem 0; color: #2563eb; font-size: 1.5rem;">${info.title}</h2>
+        <p style="margin: 0 0 1rem 0; color: #666; line-height: 1.5;">${info.message}</p>
+        
+        <h3 style="margin: 1.5rem 0 0.5rem 0; color: #333; font-size: 1.1rem;">🚀 Coming Features:</h3>
+        <ul style="margin: 0 0 1.5rem 0; padding-left: 1.5rem; color: #666;">
+          ${info.features.map(feature => `<li style="margin: 0.25rem 0;">${feature}</li>`).join('')}
+        </ul>
+        
+        <h3 style="margin: 1.5rem 0 0.5rem 0; color: #333; font-size: 1.1rem;">📋 What to do now:</h3>
+        <ol style="margin: 0 0 1.5rem 0; padding-left: 1.5rem; color: #666;">
+          ${info.instructions.map(instruction => `<li style="margin: 0.25rem 0;">${instruction}</li>`).join('')}
+        </ol>
+        
+        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+          <button onclick="this.closest('div').remove()" style="
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+          ">Got it!</button>
+        </div>
+      </div>
+    `;
+    
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.remove();
+    };
+    
+    document.body.appendChild(modal);
   };
 
   const getOSIcon = (platform: string) => {

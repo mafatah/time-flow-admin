@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "author": "TimeFlow Team",
+  "description": "Time tracking and productivity monitoring application",
   "overrides": {
     "nan": "2.16.0"
   },
@@ -115,14 +117,45 @@
   },
   "build": {
     "appId": "com.timeflow.admin",
+    "productName": "TimeFlow",
+    "description": "Time tracking and productivity monitoring application",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "build/**/*",
+      "dist/**/*"
+    ],
+    "extraFiles": [
+      {
+        "from": "build/dist",
+        "to": "resources/app",
+        "filter": ["**/*"]
+      }
+    ],
     "mac": {
-      "target": "dmg"
+      "target": {
+        "target": "dmg",
+        "arch": ["arm64", "x64"]
+      },
+      "category": "public.app-category.productivity"
     },
     "win": {
-      "target": "nsis"
+      "target": {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
     },
     "linux": {
-      "target": "AppImage"
+      "target": {
+        "target": "AppImage",
+        "arch": ["x64"]
+      },
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }
