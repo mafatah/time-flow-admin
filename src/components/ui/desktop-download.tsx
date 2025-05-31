@@ -46,20 +46,20 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     // Define download URLs with architecture detection for macOS
     const getDownloadUrl = (platform: string) => {
+      // Use GitHub releases for all platforms to avoid file size limits
+      const baseUrl = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.0';
+      
       if (platform === 'mac' || platform === 'mac-intel' || platform === 'mac-arm') {
-        // Use the specific GitHub release v1.0.0 that contains the DMG files
-        const baseUrl = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.0';
-        
         // For mac-arm, use the ARM DMG; for mac-intel or generic mac, use Intel DMG
         return platform === 'mac-arm' 
           ? `${baseUrl}/TimeFlow-0.0.0-arm64.dmg`
           : `${baseUrl}/TimeFlow-0.0.0.dmg`;
       }
       
-      // Other platforms remain the same
+      // Windows and Linux also use GitHub releases
       const downloadUrls = {
-        windows: '/downloads/TimeFlow-Setup.exe',
-        linux: '/downloads/TimeFlow.AppImage'
+        windows: `${baseUrl}/TimeFlow-Setup-0.0.0.exe`,
+        linux: `${baseUrl}/TimeFlow-0.0.0.AppImage`
       };
       
       return downloadUrls[platform as keyof typeof downloadUrls];
@@ -121,6 +121,22 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         return 'Linux';
       default:
         return 'Unknown';
+    }
+  };
+
+  const getFileSize = (platform: string) => {
+    switch (platform) {
+      case 'mac-arm':
+        return '198MB';
+      case 'mac-intel':
+      case 'mac':
+        return '406MB';
+      case 'windows':
+        return '166MB';
+      case 'linux':
+        return '621MB';
+      default:
+        return '';
     }
   };
 
@@ -190,7 +206,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
               )}
               <div className="text-center">
                 <div className="font-medium">Windows</div>
-                <div className="text-xs opacity-70">Windows 10/11</div>
+                <div className="text-xs opacity-70">Windows 10/11 • {getFileSize('windows')}</div>
               </div>
             </Button>
 
@@ -209,9 +225,9 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
               <div className="text-center">
                 <div className="font-medium">macOS</div>
                 <div className="text-xs opacity-70">
-                  {os === 'mac-arm' ? 'Apple Silicon • Auto-detected' : 
-                   os === 'mac-intel' ? 'Intel • Auto-detected' : 
-                   'Auto-detected Architecture'}
+                  {os === 'mac-arm' ? `Apple Silicon • ${getFileSize('mac-arm')}` : 
+                   os === 'mac-intel' ? `Intel • ${getFileSize('mac-intel')}` : 
+                   `Auto-detected • ${getFileSize('mac')}`}
                 </div>
               </div>
             </Button>
@@ -230,7 +246,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
               )}
               <div className="text-center">
                 <div className="font-medium">Linux</div>
-                <div className="text-xs opacity-70">AppImage</div>
+                <div className="text-xs opacity-70">AppImage • {getFileSize('linux')}</div>
               </div>
             </Button>
           </div>
