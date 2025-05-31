@@ -35,17 +35,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // For now, always show the information dialog since files are placeholders
-    // TODO: Remove this when actual desktop apps are ready
-    setTimeout(() => {
-      showDownloadDialog(platform);
-      setDownloading(null);
-    }, 500); // Small delay to show loading state
-    
-    return;
-    
-    // This code will be used when actual desktop apps are ready:
-    /*
+    // Define download URLs
     const downloadUrls = {
       windows: '/downloads/TimeFlow-Setup.exe',
       mac: '/downloads/TimeFlow.dmg', 
@@ -72,6 +62,12 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         document.body.removeChild(link);
         
         console.log(`Downloaded TimeFlow Desktop for ${platform}`);
+        
+        // Show warning dialog after download starts
+        setTimeout(() => {
+          showDownloadDialog(platform);
+        }, 1000);
+        
       } else {
         // File doesn't exist, show instructions
         showDownloadDialog(platform);
@@ -82,14 +78,13 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     } finally {
       setDownloading(null);
     }
-    */
   };
   
   const getDownloadInstructions = (platform: string) => {
     const platformName = getOSName(platform);
     return {
       title: `${platformName} Desktop App - Development Version`,
-      message: `⚠️ The TimeFlow desktop app files are currently placeholder files for development purposes. They are not functional installers.`,
+      message: `✅ Download started! However, the TimeFlow desktop app file you downloaded is a placeholder file for development purposes. It is not a functional installer.`,
       features: [
         '🔄 Automatic time tracking',
         '📸 Smart screenshot capture (2 random per 10 minutes)',
@@ -98,10 +93,10 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         '📊 Detailed productivity insights'
       ],
       instructions: [
+        'The downloaded file is a 1MB placeholder - do not attempt to install it',
         'Contact your administrator to get the actual desktop application',
         'The development team is preparing the final release',
-        'Use the web version for time tracking functionality',
-        'Placeholder files are not functional - please wait for official release'
+        'Use the web version for time tracking functionality'
       ]
     };
   };
