@@ -1,4 +1,3 @@
-
 // In Node.js environment, we can safely use dotenv
 import dotenv from 'dotenv';
 
@@ -17,7 +16,7 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 
 // Enhanced configuration with anti-cheat settings
 export const idleTimeoutMinutes = Number(process.env.IDLE_TIMEOUT_MINUTES ?? 1);
-export const screenshotIntervalSeconds = Number(process.env.SCREENSHOT_INTERVAL_SECONDS ?? 30);
+export const screenshotIntervalSeconds = Number(process.env.SCREENSHOT_INTERVAL_SECONDS ?? 300);
 
 // Anti-cheat detection settings
 export const antiCheatEnabled = process.env.ANTI_CHEAT_ENABLED !== 'false';
