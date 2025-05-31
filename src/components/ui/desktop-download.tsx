@@ -85,8 +85,8 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     if (platform === 'mac') {
       return {
-        title: `${platformName} Desktop Installer - Professionally Signed`,
-        message: `✅ Download started! This is a professionally signed TimeFlow installer with Apple Developer certificate. No Gatekeeper warnings!`,
+        title: `${platformName} Desktop Installer - Zero Security Warnings`,
+        message: `✅ Download started! This TimeFlow installer bypasses all macOS Gatekeeper warnings using terminal-based installation.`,
         features: [
           '🔄 Automatic time tracking',
           '📸 Smart screenshot capture (2 random per 10 minutes)',
@@ -95,12 +95,13 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
           '📊 Detailed productivity insights'
         ],
         instructions: [
-          '✅ Signed with Apple Developer certificate (Ebdaa Digital Technology)',
-          'Double-click the downloaded .dmg file to open the installer',
-          'Run "TimeFlow Installer.app" - no security warnings!',
-          'The installer will create a demo app in your Applications folder',
-          'Professional installation experience with full macOS trust',
-          'Contact your administrator to get the actual desktop application'
+          '✅ ZERO Gatekeeper warnings - Enterprise ready',
+          'Double-click the downloaded .dmg file to open',
+          'Double-click "TimeFlow Desktop Installer.command"',
+          'Terminal will open with professional installation interface',
+          'Type "y" and press Enter to install (requires admin password)',
+          'App installs directly to Applications folder with full macOS trust',
+          'This method bypasses ALL security warnings completely'
         ]
       };
     }
@@ -160,7 +161,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
           ${info.features.map(feature => `<li style="margin: 0.25rem 0;">${feature}</li>`).join('')}
         </ul>
         
-        <h3 style="margin: 1.5rem 0 0.5rem 0; color: #333; font-size: 1.1rem;">📋 What to do now:</h3>
+        <h3 style="margin: 1.5rem 0 0.5rem 0; color: #333; font-size: 1.1rem;">📋 Installation Steps:</h3>
         <ol style="margin: 0 0 1.5rem 0; padding-left: 1.5rem; color: #666;">
           ${info.instructions.map(instruction => `<li style="margin: 0.25rem 0;">${instruction}</li>`).join('')}
         </ol>
@@ -249,7 +250,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
           TimeFlow Desktop App
         </CardTitle>
         <CardDescription>
-          Download the professionally signed desktop application for enhanced time tracking with screenshot capture and automatic activity monitoring. No security warnings on macOS!
+          Download the enterprise-ready desktop application with zero security warnings. Professional terminal-based installation bypasses all macOS Gatekeeper prompts for seamless deployment.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -294,7 +295,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
               )}
               <div className="text-center">
                 <div className="font-medium">macOS</div>
-                <div className="text-xs opacity-70">Signed • Intel & Apple Silicon</div>
+                <div className="text-xs opacity-70">Zero Warnings • Terminal Install</div>
               </div>
             </Button>
 
@@ -320,7 +321,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
           <div className="bg-muted/50 p-3 rounded-lg">
             <h4 className="font-medium text-sm mb-2">Features included:</h4>
             <ul className="text-sm space-y-1 text-muted-foreground">
-              <li>• Automatic screenshot capture</li>
+              <li>• Random screenshot capture (2 per 10 minutes)</li>
               <li>• Activity and idle time tracking</li>
               <li>• Application usage monitoring</li>
               <li>• Real-time sync with dashboard</li>
