@@ -18,7 +18,7 @@ if (!exports.SUPABASE_URL || !exports.SUPABASE_PUBLISHABLE_KEY) {
 }
 // Enhanced configuration with anti-cheat settings
 exports.idleTimeoutMinutes = Number(process.env.IDLE_TIMEOUT_MINUTES ?? 1);
-exports.screenshotIntervalSeconds = Number(process.env.SCREENSHOT_INTERVAL_SECONDS ?? 30);
+exports.screenshotIntervalSeconds = Number(process.env.SCREENSHOT_INTERVAL_SECONDS ?? 300);
 // Anti-cheat detection settings
 exports.antiCheatEnabled = process.env.ANTI_CHEAT_ENABLED !== 'false';
 exports.suspiciousActivityThreshold = Number(process.env.SUSPICIOUS_ACTIVITY_THRESHOLD ?? 10);

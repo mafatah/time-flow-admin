@@ -118,7 +118,6 @@
   "build": {
     "appId": "com.timeflow.admin",
     "productName": "TimeFlow",
-    "description": "Time tracking and productivity monitoring application",
     "directories": {
       "output": "dist"
     },
@@ -138,7 +137,12 @@
         "target": "dmg",
         "arch": ["arm64", "x64"]
       },
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "identity": "Ebdaa Digital Technology (6GW49LK9V9)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "win": {
       "target": {
