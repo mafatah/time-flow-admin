@@ -47,8 +47,8 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     // Define download URLs with architecture detection for macOS
     const getDownloadUrl = (platform: string) => {
       if (platform === 'mac' || platform === 'mac-intel' || platform === 'mac-arm') {
-        // Use environment variable for base URL or fallback to GitHub releases
-        const baseUrl = import.meta.env.VITE_DOWNLOAD_BASE_URL || 'https://github.com/mafatah/time-flow-admin/releases/latest/download';
+        // Use the specific GitHub release v1.0.0 that contains the DMG files
+        const baseUrl = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.0';
         
         // For mac-arm, use the ARM DMG; for mac-intel or generic mac, use Intel DMG
         return platform === 'mac-arm' 
