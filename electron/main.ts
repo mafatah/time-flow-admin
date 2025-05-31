@@ -139,40 +139,9 @@ app.whenReady().then(async () => {
     console.log('⚠️  App ready but screen recording permission missing');
   }
   
-  // Auto-load desktop-agent config if it exists (but don't auto-start tracking)
-  try {
-    // Try multiple possible paths for the config file
-    const possiblePaths = [
-      path.join(__dirname, '../desktop-agent/config.json'),
-      path.join(__dirname, '../../desktop-agent/config.json'),
-      path.join(process.cwd(), 'desktop-agent/config.json'),
-      path.join(app.getAppPath(), 'desktop-agent/config.json')
-    ];
-    
-    let configPath = '';
-    let config: any = null;
-    
-    for (const testPath of possiblePaths) {
-      console.log('🔍 Checking config path:', testPath);
-      if (fs.existsSync(testPath)) {
-        configPath = testPath;
-        config = JSON.parse(fs.readFileSync(testPath, 'utf8'));
-        console.log('📋 Found desktop-agent config at:', configPath);
-        break;
-      }
-    }
-    
-    // Load config but don't auto-start tracking - let employee login and start manually
-    if (config && config.user_id) {
-      console.log('📋 Config found for user:', config.user_id);
-      console.log('⏳ Waiting for employee to login and start tracking manually...');
-      // Don't auto-start - employee should login first
-    } else {
-      console.log('⚠️  No desktop-agent config found - employee will need to login');
-    }
-  } catch (error) {
-    console.log('⚠️  Could not load desktop-agent config:', error);
-  }
+  // Don't auto-load any config or start any tracking
+  // Let employees start fresh each time and manually control everything
+  console.log('📋 App ready - waiting for employee to login and start tracking manually');
   
   setupAutoLaunch().catch(err => console.error(err));
   initSystemMonitor();
@@ -199,18 +168,18 @@ app.on('before-quit', () => {
 
 ipcMain.on('set-user-id', (_e, id) => {
   setUserId(id);
-  // Start always-on activity monitoring when user ID is set
-  startActivityMonitoring(id);
-  // Start tracking timer
-  startTrackingTimer();
+  // Don't auto-start activity monitoring - wait for explicit start command
+  console.log('✅ User ID set:', id, '- Waiting for manual tracking start');
 });
 
 ipcMain.on('start-tracking', () => {
+  console.log('▶️ Manual tracking start requested');
   startTracking();
   startTrackingTimer();
 });
 
 ipcMain.on('stop-tracking', () => {
+  console.log('⏸️ Manual tracking stop requested');
   stopTracking();
   stopTrackingTimer();
 });
@@ -255,17 +224,8 @@ ipcMain.on('start-activity-monitoring', (event, userId) => {
   console.log('🚀 Starting activity monitoring for user:', userId);
   setUserId(userId);
   startActivityMonitoring(userId);
-  console.log('✅ Activity monitoring started from UI');
-});
-
-// Add test mode for development
-ipcMain.on('start-test-mode', () => {
-  console.log('🧪 Starting test mode - simulating user login...');
-  const testUserId = 'test-user-12345';
-  setUserId(testUserId);
-  startActivityMonitoring(testUserId);
   startTrackingTimer();
-  console.log('✅ Test mode started - activity monitoring should begin');
+  console.log('✅ Activity monitoring started from UI');
 });
 
 // Create tray icon
@@ -317,7 +277,7 @@ function createTray() {
 // Create a simple icon as base64 (16x16 green circle)
 function createSimpleIcon(): string {
   // This is a simple 16x16 PNG icon encoded as base64
-  return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
+  return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
 }
 
 // Update tray menu

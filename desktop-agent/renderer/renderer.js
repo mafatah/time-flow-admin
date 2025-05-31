@@ -286,14 +286,27 @@ function navigateToPage(pageId) {
         activeNavItem.classList.add('active');
     }
 
-    // Update page content
+    // Update page content - convert hyphenated names to camelCase
     document.querySelectorAll('.page-content').forEach(page => {
         page.classList.remove('active');
     });
     
-    const activePage = document.getElementById(`${pageId}Page`);
+    // Convert hyphenated page names to camelCase for page IDs
+    const pageIdMap = {
+        'dashboard': 'dashboardPage',
+        'time-tracker': 'timeTrackerPage', 
+        'reports': 'reportsPage',
+        'screenshots': 'screenshotsPage',
+        'idle-time': 'idleTimePage'
+    };
+    
+    const actualPageId = pageIdMap[pageId] || pageId + 'Page';
+    const activePage = document.getElementById(actualPageId);
     if (activePage) {
         activePage.classList.add('active');
+        console.log('✅ Switched to page:', pageId, '- Element ID:', actualPageId);
+    } else {
+        console.log('⚠️ Page not found:', pageId, '- Looking for element ID:', actualPageId);
     }
 
     // Update page title
