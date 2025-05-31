@@ -82,6 +82,28 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   
   const getDownloadInstructions = (platform: string) => {
     const platformName = getOSName(platform);
+    
+    if (platform === 'mac') {
+      return {
+        title: `${platformName} Desktop Installer - Interactive Demo`,
+        message: `✅ Download started! The TimeFlow installer will show you what the installation process looks like and install a demo app to your Applications folder.`,
+        features: [
+          '🔄 Automatic time tracking',
+          '📸 Smart screenshot capture (2 random per 10 minutes)',
+          '⚡ Activity monitoring',
+          '🔒 Secure data sync',
+          '📊 Detailed productivity insights'
+        ],
+        instructions: [
+          'Double-click the downloaded .dmg file to open the installer',
+          'Run "TimeFlow Installer.app" to see the installation process',
+          'The installer will create a demo app in your Applications folder',
+          'The demo shows all features the real TimeFlow Desktop would have',
+          'Contact your administrator to get the actual desktop application'
+        ]
+      };
+    }
+    
     return {
       title: `${platformName} Desktop App - Development Version`,
       message: `✅ Download started! However, the TimeFlow desktop app file you downloaded is a placeholder file for development purposes. It is not a functional installer.`,
@@ -93,7 +115,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         '📊 Detailed productivity insights'
       ],
       instructions: [
-        'The downloaded file is a 1MB placeholder - do not attempt to install it',
+        'The downloaded file is a placeholder - do not attempt to install it',
         'Contact your administrator to get the actual desktop application',
         'The development team is preparing the final release',
         'Use the web version for time tracking functionality'
