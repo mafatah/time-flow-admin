@@ -5,7 +5,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Download } from 'lucide-react';
+import DesktopDownload from '@/components/ui/desktop-download';
 import { useQuery } from '@tanstack/react-query';
 
 interface Project {
@@ -71,12 +71,10 @@ export function ProjectSelector() {
       
       <div className="space-y-4">
         {!canTrack && (
-          <div className="bg-amber-50 border border-amber-200 p-3 rounded-md text-amber-800 mb-4">
-            <p className="font-medium">Desktop Application Required</p>
-            <p className="text-sm mt-1">Time tracking is only available in the desktop application.</p>
-            <Button variant="outline" className="mt-2" size="sm">
-              <Download className="mr-1 h-4 w-4" /> Download Desktop App
-            </Button>
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-md text-amber-800 mb-4">
+            <p className="font-medium mb-2">Desktop Application Required</p>
+            <p className="text-sm mb-3">Time tracking requires the desktop application for screenshot capture and activity monitoring.</p>
+            <DesktopDownload variant="compact" />
           </div>
         )}
         

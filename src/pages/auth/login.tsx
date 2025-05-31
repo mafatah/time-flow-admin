@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
+import TimeFlowLogo from "@/components/ui/timeflow-logo";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -22,7 +22,6 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -35,35 +34,11 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      if (isSignUp) {
-        // Handle signup with secure default role
-        const { error } = await supabase.auth.signUp({
-          email: values.email,
-          password: values.password,
-          options: {
-            data: {
-              full_name: values.email.split('@')[0],
-              role: 'employee', // Secure default role - no privilege escalation
-            }
-          }
-        });
-        
-        if (error) throw error;
-        
-        toast({
-          title: "Account created successfully",
-          description: "Please check your email for verification instructions.",
-        });
-        
-        setIsSignUp(false);
-      } else {
-        // Handle login
-        await signIn(values.email, values.password);
-        navigate("/");
-      }
+      await signIn(values.email, values.password);
+      navigate("/");
     } catch (error: any) {
       toast({
-        title: isSignUp ? "Failed to create account" : "Login failed",
+        title: "Login failed",
         description: error.message,
         variant: "destructive",
       });
@@ -76,11 +51,11 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">TimeFlow</CardTitle>
+          <div className="flex justify-center mb-4">
+            <TimeFlowLogo size={60} showText={true} />
+          </div>
           <CardDescription>
-            {isSignUp
-              ? "Create a new account to get started"
-              : "Enter your credentials to access your account"}
+            Enter your credentials to access your account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -117,25 +92,19 @@ export default function LoginPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isSignUp ? "Creating Account..." : "Signing In..."}
+                    Signing In...
                   </>
                 ) : (
-                  <>{isSignUp ? "Create Account" : "Sign In"}</>
+                  "Sign In"
                 )}
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
-          <Button
-            variant="link"
-            className="w-full"
-            onClick={() => setIsSignUp(!isSignUp)}
-          >
-            {isSignUp
-              ? "Already have an account? Sign In"
-              : "Don't have an account? Sign Up"}
-          </Button>
+          <p className="text-sm text-muted-foreground text-center">
+            Don't have an account? Contact your administrator.
+          </p>
         </CardFooter>
       </Card>
     </div>

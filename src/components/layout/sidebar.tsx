@@ -1,7 +1,7 @@
-
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
+import TimeFlowLogo from "@/components/ui/timeflow-logo";
 import { 
   LayoutDashboard, 
   Users, 
@@ -158,7 +158,12 @@ const Sidebar = () => {
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-screen overflow-y-auto fixed left-0 top-0 z-50">
       <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-900">TimeFlow</h1>
+        <div className="flex items-center mb-2">
+          <TimeFlowLogo size={32} />
+          <div className="ml-2">
+            <h1 className="text-xl font-bold text-gray-900">TimeFlow</h1>
+          </div>
+        </div>
         <p className="text-sm text-gray-600 mt-1">
           {isAdmin ? 'Admin Panel' : 'Employee Tracking'}
         </p>

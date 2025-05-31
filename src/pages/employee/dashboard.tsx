@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, differenceInMinutes } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import DesktopDownload from '@/components/ui/desktop-download';
 
 interface EmployeeStats {
   todayHours: number;
@@ -384,7 +385,7 @@ const EmployeeDashboard = () => {
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 mb-6">
             <Button 
               onClick={() => window.location.href = '/employee/time-tracker'}
               className="flex items-center space-x-2"
@@ -408,6 +409,12 @@ const EmployeeDashboard = () => {
               <Coffee className="h-4 w-4" />
               <span>Idle Time Analysis</span>
             </Button>
+          </div>
+          
+          {/* Desktop App Download Section */}
+          <div className="border-t pt-4">
+            <h4 className="font-medium mb-3 text-sm text-muted-foreground">Need the desktop app?</h4>
+            <DesktopDownload variant="compact" />
           </div>
         </CardContent>
       </Card>
