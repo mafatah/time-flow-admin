@@ -10,7 +10,7 @@ interface DesktopDownloadProps {
 }
 
 const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', className = '' }) => {
-  const [os, setOs] = useState<'windows' | 'mac' | 'linux' | 'unknown'>('unknown');
+  const [os, setOs] = useState<'windows' | 'mac' | 'mac-intel' | 'mac-arm' | 'linux' | 'unknown'>('unknown');
   const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,7 +19,16 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       const platform = window.navigator.platform;
       
       if (platform.includes('Mac') || userAgent.includes('Mac')) {
-        setOs('mac');
+        // Try to detect Apple Silicon vs Intel
+        // This is a heuristic approach as direct detection isn't always reliable in browser
+        const isLikelyAppleSilicon = !userAgent.includes('Intel') && 
+          (userAgent.includes('Safari') || userAgent.includes('Chrome'));
+        
+        if (isLikelyAppleSilicon) {
+          setOs('mac-arm');
+        } else {
+          setOs('mac-intel');
+        }
       } else if (platform.includes('Win') || userAgent.includes('Windows')) {
         setOs('windows');
       } else if (platform.includes('Linux') || userAgent.includes('Linux')) {
@@ -35,15 +44,29 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Define download URLs
-    const downloadUrls = {
-      windows: '/downloads/TimeFlow-Setup.exe',
-      mac: '/downloads/TimeFlow.dmg', 
-      linux: '/downloads/TimeFlow.AppImage'
+    // Define download URLs with architecture detection for macOS
+    const getDownloadUrl = (platform: string) => {
+      if (platform === 'mac' || platform === 'mac-intel' || platform === 'mac-arm') {
+        // Use environment variable for base URL or fallback to GitHub releases
+        const baseUrl = import.meta.env.VITE_DOWNLOAD_BASE_URL || 'https://github.com/mafatah/time-flow-admin/releases/latest/download';
+        
+        // For mac-arm, use the ARM DMG; for mac-intel or generic mac, use Intel DMG
+        return platform === 'mac-arm' 
+          ? `${baseUrl}/TimeFlow-0.0.0-arm64.dmg`
+          : `${baseUrl}/TimeFlow-0.0.0.dmg`;
+      }
+      
+      // Other platforms remain the same
+      const downloadUrls = {
+        windows: '/downloads/TimeFlow-Setup.exe',
+        linux: '/downloads/TimeFlow.AppImage'
+      };
+      
+      return downloadUrls[platform as keyof typeof downloadUrls];
     };
     
     try {
-      const url = downloadUrls[platform as keyof typeof downloadUrls];
+      const url = getDownloadUrl(platform);
       
       if (!url) {
         throw new Error('Download not available for this platform');
@@ -61,7 +84,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         link.click();
         document.body.removeChild(link);
         
-        console.log(`Downloaded TimeFlow Desktop for ${platform}`);
+        console.log(`Downloaded TimeFlow Desktop for ${platform}:`, url);
         
         // Show warning dialog after download starts
         // setTimeout(() => {
@@ -190,6 +213,8 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getOSIcon = (platform: string) => {
     switch (platform) {
       case 'mac':
+      case 'mac-intel':
+      case 'mac-arm':
         return <Apple className="h-4 w-4" />;
       case 'windows':
         return <Monitor className="h-4 w-4" />;
@@ -204,6 +229,10 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     switch (platform) {
       case 'mac':
         return 'macOS';
+      case 'mac-intel':
+        return 'macOS (Intel)';
+      case 'mac-arm':
+        return 'macOS (Apple Silicon)';
       case 'windows':
         return 'Windows';
       case 'linux':
@@ -214,6 +243,8 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   };
 
   if (variant === 'compact') {
+    const normalizedOS = os.startsWith('mac') ? os : os; // Keep the specific mac variant for proper DMG selection
+    
     return (
       <div className={`flex flex-col sm:flex-row gap-2 ${className}`}>
         <Badge variant="outline" className="w-fit">
@@ -222,11 +253,11 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         </Badge>
         <Button
           size="sm"
-          onClick={() => handleDownload(os)}
-          disabled={downloading === os}
+          onClick={() => handleDownload(normalizedOS)}
+          disabled={downloading === normalizedOS}
           className="flex items-center gap-2"
         >
-          {downloading === os ? (
+          {downloading === normalizedOS ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-background border-t-transparent" />
               <span>Downloading...</span>
@@ -283,19 +314,23 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
 
             {/* macOS Download */}
             <Button
-              variant={os === 'mac' ? 'default' : 'outline'}
-              onClick={() => handleDownload('mac')}
-              disabled={downloading === 'mac'}
+              variant={os.startsWith('mac') ? 'default' : 'outline'}
+              onClick={() => handleDownload(os.startsWith('mac') ? os : 'mac')}
+              disabled={downloading === (os.startsWith('mac') ? os : 'mac')}
               className="flex flex-col items-center gap-2 h-auto p-4"
             >
-              {downloading === 'mac' ? (
+              {downloading === (os.startsWith('mac') ? os : 'mac') ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-background border-t-transparent" />
               ) : (
                 <Apple className="h-5 w-5" />
               )}
               <div className="text-center">
                 <div className="font-medium">macOS</div>
-                <div className="text-xs opacity-70">Zero Warnings • Terminal Install</div>
+                <div className="text-xs opacity-70">
+                  {os === 'mac-arm' ? 'Apple Silicon • Auto-detected' : 
+                   os === 'mac-intel' ? 'Intel • Auto-detected' : 
+                   'Auto-detected Architecture'}
+                </div>
               </div>
             </Button>
 
