@@ -788,17 +788,33 @@ function resetActivityStats() {
 function startScreenshotCapture() {
   if (screenshotInterval) clearInterval(screenshotInterval);
 
-  console.log(`📸 Starting screenshots every ${appSettings.screenshot_interval_seconds}s`);
+  console.log(`📸 Starting random screenshots - 2 per 10 minute period`);
   
-  // First screenshot after 10 seconds
-  setTimeout(captureScreenshot, 10000);
+  // Schedule first screenshot with initial random delay
+  scheduleRandomScreenshot();
+}
+
+function scheduleRandomScreenshot() {
+  if (screenshotInterval) clearTimeout(screenshotInterval);
   
-  screenshotInterval = setInterval(captureScreenshot, appSettings.screenshot_interval_seconds * 1000);
+  // Generate random interval between 2-8 minutes (120-480 seconds)
+  // This ensures 2 screenshots within each 10-minute window at random times
+  const minInterval = 120; // 2 minutes 
+  const maxInterval = 480; // 8 minutes
+  const randomInterval = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
+  
+  console.log(`📸 Next screenshot in ${Math.round(randomInterval / 60)} minutes ${randomInterval % 60} seconds`);
+  
+  screenshotInterval = setTimeout(async () => {
+    await captureScreenshot();
+    // Schedule next random screenshot
+    scheduleRandomScreenshot();
+  }, randomInterval * 1000);
 }
 
 function stopScreenshotCapture() {
   if (screenshotInterval) {
-    clearInterval(screenshotInterval);
+    clearTimeout(screenshotInterval);
     screenshotInterval = null;
   }
 }
