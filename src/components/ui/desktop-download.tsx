@@ -46,7 +46,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     // Define download URLs with architecture detection for macOS
     const getDownloadUrl = (platform: string) => {
-      // Use GitHub releases for large files
+      // Use GitHub releases for large files with simple file names
       const baseUrl = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.3';
       
       if (platform === 'mac' || platform === 'mac-intel' || platform === 'mac-arm') {
@@ -56,7 +56,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
           : `${baseUrl}/TimeFlow-Intel.dmg`;
       }
       
-      // Windows and Linux use GitHub releases
+      // Windows and Linux use simple file names
       const downloadUrls = {
         windows: `${baseUrl}/TimeFlow-Setup.exe`,
         linux: `${baseUrl}/TimeFlow.AppImage`
