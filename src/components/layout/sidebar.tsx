@@ -17,7 +17,9 @@ import {
   Timer,
   Coffee,
   TrendingUp,
-  LogOut
+  LogOut,
+  Monitor,
+  Globe
 } from "lucide-react";
 
 const Sidebar = () => {
@@ -100,6 +102,16 @@ const Sidebar = () => {
           title: "Screenshots",
           href: "/screenshots",
           icon: Camera
+        },
+        {
+          title: "Desktop Apps",
+          href: "/apps",
+          icon: Monitor
+        },
+        {
+          title: "Web & URLs", 
+          href: "/urls",
+          icon: Globe
         },
         {
           title: "Calendar",

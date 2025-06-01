@@ -21,6 +21,8 @@ import AppsUrlsIdle from '@/pages/reports/apps-urls-idle';
 import UsersPage from '@/pages/users/users-management';
 import ProjectsPage from '@/pages/projects';
 import ScreenshotsPage from '@/pages/screenshots';
+import AppsViewer from '@/pages/screenshots/apps-viewer';
+import UrlsViewer from '@/pages/screenshots/urls-viewer';
 import SettingsPage from '@/pages/settings';
 import CalendarPage from '@/pages/calendar';
 import TimeTrackingPage from '@/pages/time-tracking';
@@ -246,6 +248,26 @@ function AppRoutes() {
           <AdminRoute>
             <AppLayout>
               <ScreenshotsPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/apps" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <AppsViewer />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/urls" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <UrlsViewer />
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>
