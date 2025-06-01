@@ -44,52 +44,58 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Define download URLs with architecture detection for macOS
-    const getDownloadUrl = (platform: string) => {
-      // Use GitHub releases for large files with simple file names
-      const baseUrl = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.3';
-      
-      if (platform === 'mac' || platform === 'mac-intel' || platform === 'mac-arm') {
-        // For mac-arm, use the ARM DMG; for mac-intel or generic mac, use Intel DMG
-        return platform === 'mac-arm' 
-          ? `${baseUrl}/TimeFlow-ARM.dmg`
-          : `${baseUrl}/TimeFlow-Intel.dmg`;
-      }
-      
-      // Windows and Linux use simple file names
-      const downloadUrls = {
-        windows: `${baseUrl}/TimeFlow-Setup.exe`,
-        linux: `${baseUrl}/TimeFlow.AppImage`
-      };
-      
-      return downloadUrls[platform as keyof typeof downloadUrls];
-    };
-    
-    try {
-      const url = getDownloadUrl(platform);
-      
-      if (!url) {
-        throw new Error('Download not available for this platform');
-      }
-      
-      // Start download directly without checking if file exists
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = url.split('/').pop() || `TimeFlow-${platform}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      console.log(`Downloaded TimeFlow Desktop for ${platform}:`, url);
-      
-      // No popup - clean download experience
-      
-    } catch (error) {
-      console.error('Download failed:', error);
-      // Even on error, don't show popup - just log it
-    } finally {
+    // For now, show instructions to contact admin for download
+    setTimeout(() => {
+      alert(`Desktop app for ${getOSName(platform)} is ready for download!\n\nPlease contact your administrator to get the download link.\n\nFile sizes:\n- Windows: 85MB\n- macOS Intel: 117MB\n- macOS ARM: 110MB\n- Linux: 120MB`);
       setDownloading(null);
-    }
+    }, 1000);
+    
+    // // Define download URLs with architecture detection for macOS
+    // const getDownloadUrl = (platform: string) => {
+    //   // Use GitHub releases for large files with simple file names
+    //   const baseUrl = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.3';
+    //   
+    //   if (platform === 'mac' || platform === 'mac-intel' || platform === 'mac-arm') {
+    //     // For mac-arm, use the ARM DMG; for mac-intel or generic mac, use Intel DMG
+    //     return platform === 'mac-arm' 
+    //       ? `${baseUrl}/TimeFlow-ARM.dmg`
+    //       : `${baseUrl}/TimeFlow-Intel.dmg`;
+    //   }
+    //   
+    //   // Windows and Linux use simple file names
+    //   const downloadUrls = {
+    //     windows: `${baseUrl}/TimeFlow-Setup.exe`,
+    //     linux: `${baseUrl}/TimeFlow.AppImage`
+    //   };
+    //   
+    //   return downloadUrls[platform as keyof typeof downloadUrls];
+    // };
+    
+    // try {
+    //   const url = getDownloadUrl(platform);
+    //   
+    //   if (!url) {
+    //     throw new Error('Download not available for this platform');
+    //   }
+    //   
+    //   // Start download directly without checking if file exists
+    //   const link = document.createElement('a');
+    //   link.href = url;
+    //   link.download = url.split('/').pop() || `TimeFlow-${platform}`;
+    //   document.body.appendChild(link);
+    //   link.click();
+    //   document.body.removeChild(link);
+    //   
+    //   console.log(`Downloaded TimeFlow Desktop for ${platform}:`, url);
+    //   
+    //   // No popup - clean download experience
+    //   
+    // } catch (error) {
+    //   console.error('Download failed:', error);
+    //   // Even on error, don't show popup - just log it
+    // } finally {
+    //   setDownloading(null);
+    // }
   };
   
   const getOSIcon = (platform: string) => {
