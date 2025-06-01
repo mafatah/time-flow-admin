@@ -1,5 +1,5 @@
 
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
@@ -95,7 +95,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Main routes component
+// Main routes component that will be wrapped by AuthProvider
 function AppRoutes() {
   const { user, userDetails } = useAuth();
   
@@ -221,7 +221,7 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <Router>
+        <BrowserRouter>
           <AuthProvider>
             <TooltipProvider>
               <div className="min-h-screen bg-background w-full">
@@ -230,7 +230,7 @@ function App() {
               </div>
             </TooltipProvider>
           </AuthProvider>
-        </Router>
+        </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>
   );
