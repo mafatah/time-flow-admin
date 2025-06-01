@@ -127,25 +127,27 @@ export default function AppsUrlsIdle() {
 
       const { start, end } = getDateRange();
 
-      // Build user filter
-      let userFilter = '';
-      if (selectedUser !== 'all') {
-        userFilter = `user_id.eq.${selectedUser}`;
+      // Fetch users data first to create a lookup map
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, full_name, email');
+
+      if (usersError) {
+        console.error('Error fetching users for lookup:', usersError);
+        setError('Failed to fetch user data');
+        return;
       }
 
-      // Build project filter for time logs
-      let projectFilter = '';
-      if (selectedProject !== 'all') {
-        projectFilter = `project_id.eq.${selectedProject}`;
-      }
+      // Create user lookup map
+      const userLookup = (usersData || []).reduce((acc, user) => {
+        acc[user.id] = user.full_name || user.email || 'Unknown User';
+        return acc;
+      }, {} as Record<string, string>);
 
-      // Fetch app logs with filters
+      // Fetch app logs without join
       let appQuery = supabase
         .from('app_logs')
-        .select(`
-          *,
-          users!inner(id, full_name, email)
-        `)
+        .select('*')
         .gte('started_at', start.toISOString())
         .lte('started_at', end.toISOString());
 
@@ -159,16 +161,13 @@ export default function AppsUrlsIdle() {
         console.error('Error fetching app logs:', appError);
         setError('Failed to fetch app usage data');
       } else {
-        processAppUsage(appLogs || []);
+        processAppUsage(appLogs || [], userLookup);
       }
 
-      // Fetch URL logs with filters
+      // Fetch URL logs without join
       let urlQuery = supabase
         .from('url_logs')
-        .select(`
-          *,
-          users!inner(id, full_name, email)
-        `)
+        .select('*')
         .gte('started_at', start.toISOString())
         .lte('started_at', end.toISOString());
 
@@ -182,17 +181,14 @@ export default function AppsUrlsIdle() {
         console.error('Error fetching URL logs:', urlError);
         setError('Failed to fetch URL usage data');
       } else {
-        processUrlUsage(urlLogs || []);
+        processUrlUsage(urlLogs || [], userLookup);
       }
 
-      // Fetch idle logs with error handling - make this optional
+      // Fetch idle logs without join - make this optional
       try {
         let idleQuery = supabase
           .from('idle_logs')
-          .select(`
-            *,
-            users!inner(id, full_name, email)
-          `)
+          .select('*')
           .gte('idle_start', start.toISOString())
           .lte('idle_start', end.toISOString());
 
@@ -204,14 +200,12 @@ export default function AppsUrlsIdle() {
 
         if (idleError) {
           console.error('Error fetching idle logs:', idleError);
-          // Don't set error state, just log it and continue
           setIdleTime([]);
         } else {
-          processIdleTime(idleLogs || []);
+          processIdleTime(idleLogs || [], userLookup);
         }
       } catch (err) {
-        console.error('Idle logs table not accessible or relationship missing:', err);
-        // Create empty idle time data when table doesn't exist or has relationship issues
+        console.error('Idle logs table not accessible:', err);
         setIdleTime([]);
       }
 
@@ -223,7 +217,7 @@ export default function AppsUrlsIdle() {
     }
   };
 
-  const processAppUsage = (logs: any[]) => {
+  const processAppUsage = (logs: any[], userLookup: Record<string, string>) => {
     const appData: { [key: string]: { duration: number; count: number; category: string; user_id: string; user_name: string } } = {};
     
     logs.forEach(log => {
@@ -235,7 +229,7 @@ export default function AppsUrlsIdle() {
           count: 0, 
           category: log.category || 'other',
           user_id: log.user_id,
-          user_name: log.users?.full_name || log.users?.email || 'Unknown User'
+          user_name: userLookup[log.user_id] || 'Unknown User'
         };
       }
       appData[key].duration += duration;
@@ -260,7 +254,7 @@ export default function AppsUrlsIdle() {
     setAppUsage(processed);
   };
 
-  const processUrlUsage = (logs: any[]) => {
+  const processUrlUsage = (logs: any[], userLookup: Record<string, string>) => {
     const urlData: { [key: string]: { duration: number; count: number; category: string; user_id: string; user_name: string } } = {};
     
     logs.forEach(log => {
@@ -288,7 +282,7 @@ export default function AppsUrlsIdle() {
             count: 0, 
             category: log.category || 'other',
             user_id: log.user_id,
-            user_name: log.users?.full_name || log.users?.email || 'Unknown User'
+            user_name: userLookup[log.user_id] || 'Unknown User'
           };
         }
         urlData[key].duration += duration;
@@ -317,7 +311,7 @@ export default function AppsUrlsIdle() {
     setUrlUsage(processed);
   };
 
-  const processIdleTime = (logs: any[]) => {
+  const processIdleTime = (logs: any[], userLookup: Record<string, string>) => {
     const idleData: { [key: string]: { minutes: number; sessions: number; user_id: string; user_name: string } } = {};
     
     logs.forEach(log => {
@@ -330,7 +324,7 @@ export default function AppsUrlsIdle() {
           minutes: 0, 
           sessions: 0,
           user_id: log.user_id,
-          user_name: log.users?.full_name || log.users?.email || 'Unknown User'
+          user_name: userLookup[log.user_id] || 'Unknown User'
         };
       }
       idleData[key].minutes += duration;
