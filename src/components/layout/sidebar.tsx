@@ -24,6 +24,13 @@ const Sidebar = () => {
   const location = useLocation();
   const { userDetails, signOut } = useAuth();
   
+  // Debug logging
+  console.log('🔍 Sidebar Debug:', {
+    currentPath: location.pathname,
+    userDetails: userDetails,
+    userRole: userDetails?.role
+  });
+  
   // Determine user role
   const userRole = userDetails?.role || 'employee';
   const isAdmin = userRole === 'admin' || userRole === 'manager';
@@ -36,7 +43,7 @@ const Sidebar = () => {
       items: [
         {
           title: "Dashboard",
-          href: "/employee/dashboard",
+          href: "/employee",
           icon: LayoutDashboard
         },
         {
@@ -48,12 +55,13 @@ const Sidebar = () => {
           title: "Reports",
           href: "/employee/reports",
           icon: BarChart3
-        },
-        {
-          title: "Idle Time",
-          href: "/employee/idle-time",
-          icon: Coffee
         }
+        // TODO: Add idle time page when implemented
+        // {
+        //   title: "Idle Time",
+        //   href: "/employee/idle-time",
+        //   icon: Coffee
+        // }
       ]
     }
   ] : [];
@@ -65,7 +73,7 @@ const Sidebar = () => {
       items: [
         {
           title: "Dashboard",
-          href: "/admin",
+          href: "/dashboard",
           icon: Shield
         },
         {
@@ -77,17 +85,17 @@ const Sidebar = () => {
           title: "Projects",
           href: "/projects",
           icon: FolderOpen
-        }
-      ]
-    },
-    {
-      title: "Management",
-      items: [
+        },
         {
           title: "Time Tracking",
           href: "/time-tracking",
           icon: Clock
-        },
+        }
+      ]
+    },
+    {
+      title: "Monitoring",
+      items: [
         {
           title: "Screenshots",
           href: "/screenshots",
@@ -97,6 +105,11 @@ const Sidebar = () => {
           title: "Calendar",
           href: "/calendar",
           icon: Calendar
+        },
+        {
+          title: "Settings",
+          href: "/settings",
+          icon: Settings
         }
       ]
     },
@@ -104,49 +117,24 @@ const Sidebar = () => {
       title: "Reports",
       items: [
         {
+          title: "Insights", 
+          href: "/insights",
+          icon: TrendingUp
+        },
+        {
           title: "Analytics",
           href: "/reports",
           icon: BarChart3
         },
         {
           title: "Time Reports",
-          href: "/time-reports",
+          href: "/reports/time-reports",
           icon: Activity
         },
         {
           title: "Apps & URLs",
           href: "/reports/apps-urls-idle",
           icon: TrendingUp
-        },
-        {
-          title: "Insights",
-          href: "/insights",
-          icon: UserCheck
-        }
-      ]
-    },
-    {
-      title: "Monitoring",
-      items: [
-        {
-          title: "Idle Logs",
-          href: "/admin/idle-logs",
-          icon: Coffee
-        },
-        {
-          title: "Screenshots",
-          href: "/admin/screenshots",
-          icon: Camera
-        }
-      ]
-    },
-    {
-      title: "System",
-      items: [
-        {
-          title: "Settings",
-          href: "/settings",
-          icon: Settings
         }
       ]
     }

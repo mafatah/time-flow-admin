@@ -102,7 +102,15 @@ export default function CalendarPage() {
       
       let query = supabase
         .from('time_logs')
-        .select('*')
+        .select(`
+          id,
+          start_time,
+          end_time,
+          user_id,
+          project_id,
+          users!inner(id, full_name, email),
+          projects!inner(id, name)
+        `)
         .not('end_time', 'is', null)
         .order('start_time', { ascending: false });
 
@@ -119,9 +127,9 @@ export default function CalendarPage() {
       if (error) throw error;
 
       // Transform time logs into calendar events
-      const calendarEvents: CalendarEvent[] = (timeLogs || []).map((log: TimeLog) => {
-        const user = users.find((u: User) => u.id === log.user_id);
-        const project = projects.find((p: Project) => p.id === log.project_id);
+      const calendarEvents: CalendarEvent[] = (timeLogs || []).map((log: any) => {
+        const userName = log.users?.full_name || log.users?.email || 'Unknown User';
+        const projectName = log.projects?.name || 'No Project';
         
         const startTime = new Date(log.start_time);
         const endTime = log.end_time ? new Date(log.end_time) : new Date();
@@ -129,12 +137,12 @@ export default function CalendarPage() {
 
         return {
           id: log.id,
-          title: `${user?.full_name || 'Unknown'} - ${project?.name || 'No Project'}`,
+          title: `${userName} - ${projectName}`,
           start: startTime,
           end: endTime,
           resource: {
-            user: user?.full_name || 'Unknown',
-            project: project?.name || 'No Project',
+            user: userName,
+            project: projectName,
             duration: `${Math.floor(duration / 60)}h ${duration % 60}m`
           }
         };

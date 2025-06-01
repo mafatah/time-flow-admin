@@ -46,20 +46,20 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     // Define download URLs with architecture detection for macOS
     const getDownloadUrl = (platform: string) => {
-      // Use GitHub releases for all platforms to avoid file size limits
-      const baseUrl = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.2';
+      // Use GitHub releases for large files
+      const baseUrl = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.3';
       
       if (platform === 'mac' || platform === 'mac-intel' || platform === 'mac-arm') {
         // For mac-arm, use the ARM DMG; for mac-intel or generic mac, use Intel DMG
         return platform === 'mac-arm' 
-          ? `${baseUrl}/TimeFlow-0.0.0-arm64.dmg`
-          : `${baseUrl}/TimeFlow-0.0.0.dmg`;
+          ? `${baseUrl}/TimeFlow-ARM.dmg`
+          : `${baseUrl}/TimeFlow-Intel.dmg`;
       }
       
-      // Windows and Linux also use GitHub releases
+      // Windows and Linux use GitHub releases
       const downloadUrls = {
-        windows: `${baseUrl}/TimeFlow-Setup-0.0.0.exe`,
-        linux: `${baseUrl}/TimeFlow-0.0.0.AppImage`
+        windows: `${baseUrl}/TimeFlow-Setup.exe`,
+        linux: `${baseUrl}/TimeFlow.AppImage`
       };
       
       return downloadUrls[platform as keyof typeof downloadUrls];
@@ -127,14 +127,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '114MB';
+        return '110MB';
       case 'mac-intel':
       case 'mac':
-        return '121MB';
+        return '117MB';
       case 'windows':
-        return '166MB';
+        return '85MB';
       case 'linux':
-        return '621MB';
+        return '120MB';
       default:
         return '';
     }
