@@ -18,6 +18,8 @@ import EmployeeDashboard from '@/pages/employee/dashboard';
 import EmployeeTimeTracker from '@/pages/employee/time-tracker';
 import EmployeeReports from '@/pages/employee/reports';
 
+console.log('🚀 App.tsx loading...');
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -30,6 +32,8 @@ const queryClient = new QueryClient({
 // Protected route wrapper that requires authentication
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  
+  console.log('🔒 ProtectedRoute - user:', !!user, 'loading:', loading);
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
@@ -46,6 +50,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { userDetails, loading } = useAuth();
   
+  console.log('👑 AdminRoute - userDetails:', userDetails, 'loading:', loading);
+  
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
@@ -60,6 +66,8 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 // Employee route wrapper
 function EmployeeRoute({ children }: { children: React.ReactNode }) {
   const { userDetails, loading } = useAuth();
+  
+  console.log('👤 EmployeeRoute - userDetails:', userDetails, 'loading:', loading);
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
@@ -79,6 +87,7 @@ function EmployeeRoute({ children }: { children: React.ReactNode }) {
 
 // Layout wrapper for authenticated pages
 function AppLayout({ children }: { children: React.ReactNode }) {
+  console.log('🏗️ AppLayout rendering');
   return (
     <MainLayout>
       {children}
@@ -89,6 +98,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 // Main routes component
 function AppRoutes() {
   const { user, userDetails } = useAuth();
+  
+  console.log('🛣️ AppRoutes - user:', !!user, 'userDetails:', userDetails);
   
   return (
     <Routes>
@@ -205,6 +216,8 @@ function AppRoutes() {
 }
 
 function App() {
+  console.log('🎯 App component rendering');
+  
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
