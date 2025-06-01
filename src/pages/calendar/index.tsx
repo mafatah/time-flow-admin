@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, momentLocalizer, View } from 'react-big-calendar';
 import moment from 'moment';
+import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/providers/auth-provider';
 import { toast } from 'sonner';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import './calendar-styles.css'; // We'll create custom styles
 
 const localizer = momentLocalizer(moment);
 
@@ -42,6 +44,8 @@ interface CalendarEvent {
     duration: string;
     rawDuration: number; // in minutes
     status: string;
+    userId: string;
+    projectId: string;
   };
 }
 
@@ -153,7 +157,7 @@ export default function CalendarPage() {
 
       if (error) throw error;
 
-      // Transform time logs into calendar events with proper duration calculation
+      // Transform time logs into calendar events with proper duration calculation and improved display
       const calendarEvents: CalendarEvent[] = (timeLogs || [])
         .filter(log => log.start_time) // Ensure we have valid start time
         .map((log: any) => {
@@ -169,7 +173,7 @@ export default function CalendarPage() {
           } else {
             // For active sessions, use current time but cap display duration
             const now = new Date();
-            const maxDuration = 24 * 60 * 60 * 1000; // 24 hours max
+            const maxDuration = 12 * 60 * 60 * 1000; // 12 hours max for active sessions
             const sessionDuration = now.getTime() - startTime.getTime();
             
             if (sessionDuration > maxDuration) {
@@ -181,10 +185,10 @@ export default function CalendarPage() {
           
           // Calculate duration in minutes and validate
           const durationMs = endTime.getTime() - startTime.getTime();
-          const durationMinutes = Math.max(0, Math.round(durationMs / (1000 * 60)));
+          const durationMinutes = Math.max(10, Math.round(durationMs / (1000 * 60))); // Minimum 10 minutes
           
-          // Cap unreasonable durations (longer than 16 hours)
-          const cappedDuration = Math.min(durationMinutes, 16 * 60);
+          // Cap unreasonable durations (longer than 12 hours)
+          const cappedDuration = Math.min(durationMinutes, 12 * 60);
           
           // Adjust end time if duration was capped
           const finalEndTime = new Date(startTime.getTime() + cappedDuration * 60 * 1000);
@@ -194,9 +198,17 @@ export default function CalendarPage() {
           const minutes = cappedDuration % 60;
           const durationDisplay = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
           
+          // Color-code based on duration and status
+          const getStatusColor = () => {
+            if (!log.end_time) return 'active'; // Still running
+            if (cappedDuration >= 480) return 'long'; // 8+ hours
+            if (cappedDuration >= 240) return 'medium'; // 4+ hours
+            return 'short'; // Less than 4 hours
+          };
+          
           return {
             id: log.id,
-            title: `${userName}`,
+            title: `${userName.split(' ')[0]} - ${projectName}`, // Shortened for better display
             start: startTime,
             end: finalEndTime,
             resource: {
@@ -204,13 +216,13 @@ export default function CalendarPage() {
               project: projectName,
               duration: durationDisplay,
               rawDuration: cappedDuration,
-              status: log.status || 'completed'
+              status: getStatusColor(),
+              userId: log.user_id,
+              projectId: log.project_id || ''
             }
           };
-        })
-        .filter(event => event.resource.rawDuration > 0); // Filter out zero-duration events
+        });
 
-      console.log(`📅 Loaded ${calendarEvents.length} calendar events for ${currentView} view`);
       setEvents(calendarEvents);
     } catch (error) {
       console.error('Error fetching time logs:', error);
@@ -220,60 +232,102 @@ export default function CalendarPage() {
     }
   };
 
-  // Handle event selection
   const handleSelectEvent = (event: CalendarEvent) => {
     setSelectedEvent(event);
-    toast.info(`Selected: ${event.resource.user} - ${event.resource.project} (${event.resource.duration})`);
   };
 
-  // Handle slot selection (for creating new events - admin feature)
   const handleSelectSlot = ({ start, end }: { start: Date; end: Date }) => {
-    if (userDetails?.role === 'admin') {
-      const duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
-      toast.info(`Selected time slot: ${moment(start).format('HH:mm')} - ${moment(end).format('HH:mm')} (${duration}min)`);
-    }
+    // You can implement manual time entry here if needed
+    console.log('Selected slot:', start, end);
   };
 
   // Custom event component with better styling
   const EventComponent = ({ event }: { event: CalendarEvent }) => {
-    const isActive = event.resource.status === 'active';
-    const isLongSession = event.resource.rawDuration > 480; // 8+ hours
+    const { resource } = event;
     
     const getEventColors = () => {
-      if (isActive) return 'bg-green-500 text-white';
-      if (isLongSession) return 'bg-orange-500 text-white';
-      return 'bg-blue-500 text-white';
+      switch (resource.status) {
+        case 'active':
+          return 'bg-green-500 text-white border-green-600';
+        case 'long':
+          return 'bg-orange-500 text-white border-orange-600';
+        case 'medium':
+          return 'bg-blue-500 text-white border-blue-600';
+        case 'short':
+          return 'bg-gray-500 text-white border-gray-600';
+        default:
+          return 'bg-gray-400 text-white border-gray-500';
+      }
     };
-    
+
     return (
-      <div 
-        className={`
-          ${getEventColors()}
-          text-xs rounded-md cursor-pointer transition-all hover:opacity-90 
-          flex flex-col justify-start p-1 h-full w-full
-          overflow-hidden relative
-        `}
-        onClick={() => handleSelectEvent(event)}
-        style={{ 
-          fontSize: '11px',
-          lineHeight: '1.2',
-          minHeight: '20px'
-        }}
-      >
-        <div className="truncate font-medium mb-0.5">
-          {event.resource.user}
-        </div>
-        <div className="truncate text-xs opacity-90 mb-1">
-          {event.resource.project}
-        </div>
-        <div className="text-xs opacity-80 mt-auto">
-          <span className="bg-black bg-opacity-20 px-1 py-0.5 rounded text-xs">
-            {event.resource.duration}
-            {isActive && ' (Active)'}
-          </span>
-        </div>
+      <div className={`px-1 py-0.5 rounded text-xs font-medium border ${getEventColors()} overflow-hidden`}>
+        <div className="truncate">{event.title}</div>
+        <div className="text-xs opacity-90">{resource.duration}</div>
       </div>
     );
+  };
+
+  // Custom week header component  
+  const WeekHeader = ({ date, localizer }: any) => {
+    return (
+      <div className="text-center py-2">
+        <div className="font-semibold">{localizer?.format(date, 'dddd') || ''}</div>
+        <div className="text-sm text-gray-600">{localizer?.format(date, 'MMM DD') || ''}</div>
+      </div>
+    );
+  };
+
+  // Custom day cell wrapper to prevent overlapping
+  const DayCellWrapper = ({ children, value }: any) => {
+    return (
+      <div className="calendar-day-cell min-h-[120px] p-1 border-gray-200">
+        {children}
+      </div>
+    );
+  };
+
+  const eventStyleGetter = (event: CalendarEvent) => {
+    const { resource } = event;
+    
+    let backgroundColor = '#3174ad';
+    let borderColor = '#2c5282';
+    
+    switch (resource.status) {
+      case 'active':
+        backgroundColor = '#48bb78';
+        borderColor = '#38a169';
+        break;
+      case 'long':
+        backgroundColor = '#ed8936';
+        borderColor = '#dd6b20';
+        break;
+      case 'medium':
+        backgroundColor = '#4299e1';
+        borderColor = '#3182ce';
+        break;
+      case 'short':
+        backgroundColor = '#a0aec0';
+        borderColor = '#718096';
+        break;
+    }
+
+    return {
+      style: {
+        backgroundColor,
+        borderColor,
+        border: `1px solid ${borderColor}`,
+        borderRadius: '4px',
+        opacity: 0.9,
+        color: 'white',
+        fontSize: '12px',
+        padding: '2px 4px',
+        margin: '1px 0',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    };
   };
 
   if (userDetails?.role !== 'admin') {
@@ -286,331 +340,209 @@ export default function CalendarPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Calendar View</h1>
-        <div className="flex items-center space-x-4">
-          <Select value={selectedUser} onValueChange={setSelectedUser}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select User" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Users</SelectItem>
-              {users.map((user: User) => (
-                <SelectItem key={user.id} value={user.id}>
-                  {user.full_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select Project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map((project: Project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Button 
-            variant="outline" 
-            onClick={() => setCurrentDate(new Date())}
+        <div>
+          <h1 className="text-3xl font-bold">Time Tracking Calendar</h1>
+          <p className="text-muted-foreground">Click on any time block to see details. Green = Active sessions, Orange = Long sessions (8+ hours)</p>
+        </div>
+        
+        {/* View Controls */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={currentView === 'month' ? 'default' : 'outline'}
+            onClick={() => setCurrentView('month')}
+            size="sm"
           >
-            Today
+            Month
+          </Button>
+          <Button
+            variant={currentView === 'week' ? 'default' : 'outline'}
+            onClick={() => setCurrentView('week')}
+            size="sm"
+          >
+            Week
+          </Button>
+          <Button
+            variant={currentView === 'day' ? 'default' : 'outline'}
+            onClick={() => setCurrentView('day')}
+            size="sm"
+          >
+            Day
+          </Button>
+          <Button
+            variant={currentView === 'agenda' ? 'default' : 'outline'}
+            onClick={() => setCurrentView('agenda')}
+            size="sm"
+          >
+            Agenda
           </Button>
         </div>
       </div>
 
-      {/* Statistics Card */}
+      {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{events.length}</div>
-              <div className="text-sm text-muted-foreground">Total Sessions</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Employee</label>
+              <Select value={selectedUser} onValueChange={setSelectedUser}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Users" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.full_name || user.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {events.filter(e => e.resource.status === 'active').length}
-              </div>
-              <div className="text-sm text-muted-foreground">Active Sessions</div>
+            
+            <div>
+              <label className="text-sm font-medium mb-2 block">Project</label>
+              <Select value={selectedProject} onValueChange={setSelectedProject}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">
-                {Math.round(events.reduce((total, e) => total + e.resource.rawDuration, 0) / 60)}h
-              </div>
-              <div className="text-sm text-muted-foreground">Total Hours</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {new Set(events.map(e => e.resource.user)).size}
-              </div>
-              <div className="text-sm text-muted-foreground">Active Users</div>
+
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setCurrentDate(new Date())} variant="outline" size="sm">
+                Today
+              </Button>
+              <Button onClick={() => fetchTimeLogs()} variant="outline" size="sm">
+                Refresh
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Legend */}
       <Card>
-        <CardHeader>
-          <CardTitle>Time Tracking Calendar</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Click on any time block to see details. Green = Active sessions, Orange = Long sessions (8+ hours)
-          </p>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">Loading calendar data...</div>
-          ) : (
-            <div style={{ height: '600px' }} className="calendar-container">
-              <style>{`
-                .rbc-calendar {
-                  font-family: inherit;
-                }
-                
-                /* General event styling */
-                .rbc-event {
-                  border: none !important;
-                  border-radius: 8px !important;
-                  padding: 6px 8px !important;
-                  margin: 2px !important;
-                  overflow: hidden !important;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-                  font-size: 12px !important;
-                  line-height: 1.3 !important;
-                  position: relative !important;
-                  z-index: 1 !important;
-                }
-                
-                /* Month view specific styling */
-                .rbc-month-view .rbc-event {
-                  min-height: 22px !important;
-                  margin: 1px 2px !important;
-                  padding: 2px 6px !important;
-                  font-size: 11px !important;
-                  line-height: 1.2 !important;
-                  border-radius: 4px !important;
-                }
-                
-                .rbc-month-view .rbc-date-cell {
-                  padding: 4px !important;
-                  min-height: 100px !important;
-                  position: relative !important;
-                }
-                
-                .rbc-month-view .rbc-events-container {
-                  margin-top: 2px !important;
-                }
-                
-                .rbc-month-view .rbc-event-label {
-                  display: block !important;
-                  overflow: hidden !important;
-                  text-overflow: ellipsis !important;
-                  white-space: nowrap !important;
-                }
-                
-                /* Week and Day view specific styling */
-                .rbc-week-view .rbc-event, 
-                .rbc-day-view .rbc-event {
-                  min-height: 60px !important;
-                  margin: 2px 4px !important;
-                  padding: 8px !important;
-                  font-size: 13px !important;
-                  line-height: 1.4 !important;
-                }
-                
-                .rbc-week-view .rbc-time-content, 
-                .rbc-day-view .rbc-time-content {
-                  min-height: 600px !important;
-                }
-                
-                /* Prevent overlapping by ensuring proper positioning */
-                .rbc-week-view .rbc-event-container,
-                .rbc-day-view .rbc-event-container {
-                  margin-right: 2px !important;
-                }
-                
-                .rbc-time-slot {
-                  border-bottom: 1px solid #f1f5f9 !important;
-                  min-height: 40px !important;
-                }
-                
-                .rbc-timeslot-group {
-                  border-bottom: 1px solid #e2e8f0 !important;
-                  min-height: 80px !important;
-                }
-                
-                .rbc-time-view .rbc-time-gutter .rbc-time-slot {
-                  font-size: 12px !important;
-                  padding: 4px 8px !important;
-                }
-                
-                /* Agenda view styling */
-                .rbc-agenda-view .rbc-event {
-                  min-height: auto !important;
-                  margin: 4px 0 !important;
-                  padding: 8px 12px !important;
-                }
-                
-                /* Event content styling */
-                .rbc-event-content {
-                  font-weight: 500 !important;
-                  color: white !important;
-                  text-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
-                }
-                
-                /* Time gutter styling */
-                .rbc-time-view .rbc-time-gutter {
-                  background-color: #fafafa !important;
-                  border-right: 1px solid #e2e8f0 !important;
-                }
-                
-                /* Header styling */
-                .rbc-header {
-                  padding: 12px 8px !important;
-                  font-weight: 600 !important;
-                  background-color: #f8fafc !important;
-                  border-bottom: 2px solid #e2e8f0 !important;
-                }
-                
-                /* Toolbar styling */
-                .rbc-toolbar {
-                  margin-bottom: 20px !important;
-                  padding: 0 !important;
-                }
-                
-                .rbc-toolbar button {
-                  padding: 8px 16px !important;
-                  margin: 0 4px !important;
-                  border-radius: 6px !important;
-                  border: 1px solid #e2e8f0 !important;
-                  background: white !important;
-                  font-weight: 500 !important;
-                }
-                
-                .rbc-toolbar button:hover {
-                  background-color: #f1f5f9 !important;
-                }
-                
-                .rbc-toolbar button.rbc-active {
-                  background-color: #3b82f6 !important;
-                  color: white !important;
-                  border-color: #3b82f6 !important;
-                }
-                
-                /* Today button styling */
-                .rbc-btn-group button {
-                  border-radius: 6px !important;
-                  font-size: 14px !important;
-                }
-                
-                /* Ensure events don't overlap in month view */
-                .rbc-month-view .rbc-row-content {
-                  z-index: 1 !important;
-                }
-                
-                .rbc-month-view .rbc-row {
-                  min-height: 100px !important;
-                }
-                
-                /* Fix for overlapping events in week view */
-                .rbc-week-view .rbc-event,
-                .rbc-day-view .rbc-event {
-                  position: relative !important;
-                  width: calc(100% - 8px) !important;
-                  left: 2px !important;
-                }
-                
-                /* Responsive adjustments */
-                @media (max-width: 768px) {
-                  .rbc-month-view .rbc-event {
-                    font-size: 10px !important;
-                    padding: 1px 4px !important;
-                    min-height: 18px !important;
-                  }
-                  
-                  .rbc-week-view .rbc-event,
-                  .rbc-day-view .rbc-event {
-                    font-size: 11px !important;
-                    padding: 4px 6px !important;
-                    min-height: 40px !important;
-                  }
-                }
-              `}</style>
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-green-500 rounded"></div>
+              <span>Active Sessions</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-orange-500 rounded"></div>
+              <span>Long Sessions (8+ hours)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-blue-500 rounded"></div>
+              <span>Medium Sessions (4-8 hours)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-gray-500 rounded"></div>
+              <span>Short Sessions (&lt;4 hours)</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Calendar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div style={{ height: 600 }}>
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <p>Loading calendar...</p>
+              </div>
+            ) : (
               <Calendar
                 localizer={localizer}
                 events={events}
                 startAccessor="start"
                 endAccessor="end"
+                style={{ height: '100%' }}
                 view={currentView}
                 onView={setCurrentView}
                 date={currentDate}
                 onNavigate={setCurrentDate}
                 onSelectEvent={handleSelectEvent}
                 onSelectSlot={handleSelectSlot}
-                selectable={userDetails?.role === 'admin'}
-                style={{ height: '100%' }}
-                eventPropGetter={(event: CalendarEvent) => {
-                  const isActive = event.resource.status === 'active';
-                  const isLongSession = event.resource.rawDuration > 480;
-                  
-                  return {
-                    style: {
-                      backgroundColor: isActive ? '#22c55e' : isLongSession ? '#f97316' : '#3b82f6',
-                      borderRadius: '4px',
-                      opacity: 0.9,
-                      color: 'white',
-                      border: '0px',
-                      display: 'block',
-                      cursor: 'pointer'
-                    }
-                  };
-                }}
+                selectable
+                eventPropGetter={eventStyleGetter}
                 components={{
-                  event: EventComponent
+                  event: EventComponent,
+                  week: {
+                    header: WeekHeader
+                  },
+                  dateCellWrapper: DayCellWrapper
                 }}
-                min={moment().hour(6).minute(0).toDate()} // Start calendar at 6 AM
-                max={moment().hour(22).minute(0).toDate()} // End calendar at 10 PM
+                formats={{
+                  timeGutterFormat: 'HH:mm',
+                  dayHeaderFormat: 'ddd MMM DD',
+                  dayRangeHeaderFormat: ({ start, end }, culture, localizer) =>
+                    `${localizer?.format(start, 'MMM DD', culture) || ''} - ${localizer?.format(end, 'MMM DD', culture) || ''}`,
+                  agendaTimeFormat: 'HH:mm',
+                  agendaTimeRangeFormat: ({ start, end }, culture, localizer) =>
+                    `${localizer?.format(start, 'HH:mm', culture) || ''} - ${localizer?.format(end, 'HH:mm', culture) || ''}`
+                }}
+                min={new Date(2023, 0, 1, 6, 0)} // Start at 6 AM
+                max={new Date(2023, 0, 1, 22, 0)} // End at 10 PM
+                step={30}
+                timeslots={2}
+                scrollToTime={new Date(2023, 0, 1, 8, 0)} // Scroll to 8 AM
               />
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Selected Event Details */}
+      {/* Event Details Modal */}
       {selectedEvent && (
-        <Card>
+        <Card className="mt-4">
           <CardHeader>
             <CardTitle>Session Details</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <strong>User:</strong> {selectedEvent.resource.user}
+                <label className="font-medium">Employee:</label>
+                <p>{selectedEvent.resource.user}</p>
               </div>
               <div>
-                <strong>Project:</strong> {selectedEvent.resource.project}
+                <label className="font-medium">Project:</label>
+                <p>{selectedEvent.resource.project}</p>
               </div>
               <div>
-                <strong>Start Time:</strong> {moment(selectedEvent.start).format('MMMM D, YYYY h:mm A')}
+                <label className="font-medium">Start Time:</label>
+                <p>{moment(selectedEvent.start).format('YYYY-MM-DD HH:mm')}</p>
               </div>
               <div>
-                <strong>End Time:</strong> {moment(selectedEvent.end).format('MMMM D, YYYY h:mm A')}
+                <label className="font-medium">End Time:</label>
+                <p>{moment(selectedEvent.end).format('YYYY-MM-DD HH:mm')}</p>
               </div>
               <div>
-                <strong>Duration:</strong> {selectedEvent.resource.duration}
+                <label className="font-medium">Duration:</label>
+                <p>{selectedEvent.resource.duration}</p>
               </div>
               <div>
-                <strong>Status:</strong> 
-                <Badge variant={selectedEvent.resource.status === 'active' ? 'default' : 'secondary'} className="ml-2">
+                <label className="font-medium">Status:</label>
+                <Badge variant={selectedEvent.resource.status === 'active' ? 'default' : 'secondary'}>
                   {selectedEvent.resource.status}
                 </Badge>
               </div>
+            </div>
+            <div className="mt-4">
+              <Button variant="outline" onClick={() => setSelectedEvent(null)}>
+                Close
+              </Button>
             </div>
           </CardContent>
         </Card>

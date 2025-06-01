@@ -26,6 +26,9 @@ import UrlsViewer from '@/pages/screenshots/urls-viewer';
 import SettingsPage from '@/pages/settings';
 import CalendarPage from '@/pages/calendar';
 import TimeTrackingPage from '@/pages/time-tracking';
+import EmployeeSettingsPage from '@/pages/employee-settings';
+import FinancePage from '@/pages/finance';
+import SuspiciousActivityPage from '@/pages/suspicious-activity';
 
 console.log('🚀 App.tsx loading...');
 
@@ -298,6 +301,36 @@ function AppRoutes() {
           <AdminRoute>
             <AppLayout>
               <TimeTrackingPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/employee-settings" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <EmployeeSettingsPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/finance" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <FinancePage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/suspicious-activity" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <SuspiciousActivityPage />
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>

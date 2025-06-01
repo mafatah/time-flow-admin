@@ -19,7 +19,13 @@ import {
   TrendingUp,
   LogOut,
   Monitor,
-  Globe
+  Globe,
+  DollarSign,
+  AlertTriangle,
+  User,
+  ChevronRight,
+  Home,
+  ClipboardList
 } from "lucide-react";
 
 const Sidebar = () => {
@@ -76,7 +82,7 @@ const Sidebar = () => {
         {
           title: "Dashboard",
           href: "/dashboard",
-          icon: Shield
+          icon: LayoutDashboard
         },
         {
           title: "Users",
@@ -104,12 +110,12 @@ const Sidebar = () => {
           icon: Camera
         },
         {
-          title: "Desktop Apps",
+          title: "Apps Monitoring",
           href: "/apps",
           icon: Monitor
         },
         {
-          title: "Web & URLs", 
+          title: "URLs Monitoring", 
           href: "/urls",
           icon: Globe
         },
@@ -147,6 +153,26 @@ const Sidebar = () => {
           title: "Apps & URLs",
           href: "/reports/apps-urls-idle",
           icon: TrendingUp
+        }
+      ]
+    },
+    {
+      title: "Management",
+      items: [
+        {
+          title: "Employee Settings",
+          href: "/employee-settings",
+          icon: User
+        },
+        {
+          title: "Finance & Payroll",
+          href: "/finance",
+          icon: DollarSign
+        },
+        {
+          title: "Suspicious Activity",
+          href: "/suspicious-activity",
+          icon: Shield
         }
       ]
     }

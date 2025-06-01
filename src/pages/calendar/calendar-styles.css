@@ -1,0 +1,344 @@
+/* Custom Calendar Styles to prevent overlapping and improve display */
+
+.rbc-calendar {
+  font-family: inherit !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+/* General event styling */
+.rbc-event {
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 4px 8px !important;
+  margin: 1px 2px !important;
+  overflow: hidden !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+  font-size: 12px !important;
+  line-height: 1.3 !important;
+  position: relative !important;
+  z-index: 1 !important;
+  cursor: pointer !important;
+}
+
+.rbc-event:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+  transform: translateY(-1px) !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Month view specific styling */
+.rbc-month-view .rbc-event {
+  min-height: 20px !important;
+  margin: 1px !important;
+  padding: 2px 6px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  border-radius: 4px !important;
+}
+
+.rbc-month-view .rbc-date-cell {
+  padding: 2px !important;
+  min-height: 120px !important;
+  position: relative !important;
+  border: 1px solid #f1f5f9 !important;
+}
+
+.rbc-month-view .rbc-events-container {
+  margin-top: 2px !important;
+  max-height: 90px !important;
+  overflow: hidden !important;
+}
+
+.rbc-month-view .rbc-event-label {
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.rbc-month-view .rbc-row {
+  min-height: 120px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+/* Week and Day view specific styling */
+.rbc-week-view .rbc-event, 
+.rbc-day-view .rbc-event {
+  min-height: 40px !important;
+  margin: 2px 1px !important;
+  padding: 6px 8px !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  border-radius: 6px !important;
+}
+
+.rbc-week-view .rbc-time-content, 
+.rbc-day-view .rbc-time-content {
+  min-height: 600px !important;
+}
+
+/* Prevent overlapping by ensuring proper positioning */
+.rbc-week-view .rbc-event-container,
+.rbc-day-view .rbc-event-container {
+  margin-right: 1px !important;
+  z-index: auto !important;
+}
+
+/* Time slot styling */
+.rbc-time-slot {
+  border-bottom: 1px solid #f8fafc !important;
+  min-height: 30px !important;
+}
+
+.rbc-timeslot-group {
+  border-bottom: 1px solid #e2e8f0 !important;
+  min-height: 60px !important;
+}
+
+.rbc-time-view .rbc-time-gutter .rbc-time-slot {
+  font-size: 11px !important;
+  padding: 2px 8px !important;
+  color: #64748b !important;
+}
+
+/* Agenda view styling */
+.rbc-agenda-view .rbc-event {
+  min-height: auto !important;
+  margin: 2px 0 !important;
+  padding: 8px 12px !important;
+}
+
+.rbc-agenda-view table {
+  width: 100% !important;
+}
+
+.rbc-agenda-view .rbc-agenda-table {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+}
+
+.rbc-agenda-view .rbc-agenda-table tbody > tr > td {
+  padding: 8px 12px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+/* Event content styling */
+.rbc-event-content {
+  font-weight: 500 !important;
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Time gutter styling */
+.rbc-time-view .rbc-time-gutter {
+  background-color: #fafafa !important;
+  border-right: 1px solid #e2e8f0 !important;
+  width: 60px !important;
+}
+
+/* Header styling */
+.rbc-header {
+  padding: 8px 4px !important;
+  font-weight: 600 !important;
+  background-color: #f8fafc !important;
+  border-bottom: 2px solid #e2e8f0 !important;
+  font-size: 14px !important;
+  text-align: center !important;
+}
+
+.rbc-header + .rbc-header {
+  border-left: 1px solid #e2e8f0 !important;
+}
+
+/* Toolbar styling */
+.rbc-toolbar {
+  margin-bottom: 16px !important;
+  padding: 0 !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+.rbc-toolbar button {
+  padding: 6px 12px !important;
+  margin: 0 2px !important;
+  border-radius: 6px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: white !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.rbc-toolbar button:hover {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.rbc-toolbar button.rbc-active,
+.rbc-toolbar button:focus {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  border-color: #3b82f6 !important;
+  outline: none !important;
+}
+
+.rbc-toolbar .rbc-toolbar-label {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  margin: 0 16px !important;
+}
+
+/* Today button styling */
+.rbc-btn-group {
+  display: flex !important;
+  gap: 4px !important;
+}
+
+.rbc-btn-group button {
+  border-radius: 6px !important;
+  font-size: 13px !important;
+}
+
+/* Current day highlighting */
+.rbc-today {
+  background-color: #fef3c7 !important;
+}
+
+.rbc-month-view .rbc-today {
+  background-color: #fef3c7 !important;
+}
+
+/* Selected date styling */
+.rbc-selected {
+  background-color: #dbeafe !important;
+}
+
+/* Off-range (other month) dates */
+.rbc-off-range {
+  color: #9ca3af !important;
+}
+
+.rbc-off-range-bg {
+  background-color: #f9fafb !important;
+}
+
+/* Now indicator */
+.rbc-current-time-indicator {
+  background-color: #ef4444 !important;
+  height: 2px !important;
+  z-index: 10 !important;
+}
+
+/* Ensure events don't overlap in month view */
+.rbc-month-view .rbc-row-content {
+  z-index: 1 !important;
+  position: relative !important;
+}
+
+/* Fix for overlapping events in week/day view */
+.rbc-week-view .rbc-event,
+.rbc-day-view .rbc-event {
+  position: relative !important;
+  width: calc(100% - 4px) !important;
+  left: 2px !important;
+}
+
+/* Multiple events in same time slot */
+.rbc-week-view .rbc-event + .rbc-event,
+.rbc-day-view .rbc-event + .rbc-event {
+  margin-top: 2px !important;
+}
+
+/* Scrolling in time views */
+.rbc-time-view {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+}
+
+.rbc-time-content {
+  border-top: 1px solid #e2e8f0 !important;
+}
+
+/* Custom day cell styling */
+.calendar-day-cell {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .rbc-month-view .rbc-event {
+    font-size: 10px !important;
+    padding: 1px 4px !important;
+    min-height: 16px !important;
+    margin: 0.5px !important;
+  }
+  
+  .rbc-week-view .rbc-event,
+  .rbc-day-view .rbc-event {
+    font-size: 11px !important;
+    padding: 4px 6px !important;
+    min-height: 32px !important;
+  }
+  
+  .rbc-toolbar {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  
+  .rbc-toolbar .rbc-toolbar-label {
+    order: -1 !important;
+    margin: 0 !important;
+  }
+  
+  .rbc-time-view .rbc-time-gutter {
+    width: 50px !important;
+  }
+  
+  .rbc-time-view .rbc-time-gutter .rbc-time-slot {
+    font-size: 10px !important;
+    padding: 1px 4px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .rbc-month-view .rbc-date-cell {
+    min-height: 80px !important;
+  }
+  
+  .rbc-month-view .rbc-event {
+    font-size: 9px !important;
+    min-height: 14px !important;
+  }
+  
+  .rbc-header {
+    padding: 4px 2px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .rbc-calendar {
+    border: none !important;
+  }
+  
+  .rbc-event {
+    box-shadow: none !important;
+    border: 1px solid #000 !important;
+  }
+  
+  .rbc-toolbar {
+    display: none !important;
+  }
+} 
