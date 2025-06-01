@@ -55,13 +55,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // === APP INITIALIZATION ===
-function initializeApp() {
-    // Always show login screen first - no auto-login
-    localStorage.removeItem('timeflow_user');
-    showLogin();
-    
-    // Update current date display
-    updateCurrentDate();
+async function initializeApp() {
+    try {
+        console.log('🚀 TimeFlow Desktop Agent initializing...');
+        
+        // Get config from main process
+        const config = await ipcRenderer.invoke('get-config');
+        console.log('✅ Config loaded:', config);
+        
+        // Initialize Supabase client
+        supabaseClient = supabase.createClient(config.supabase_url, config.supabase_key);
+        console.log('✅ Supabase client initialized');
+        
+        // Try to load saved session
+        const savedSession = await ipcRenderer.invoke('load-session');
+        if (savedSession && savedSession.user) {
+            console.log('📂 Found saved session, auto-logging in...');
+            await handleUserLogin(savedSession.user);
+        }
+        
+        // Add test buttons after dashboard is loaded
+        addTestButtons();
+        
+        console.log('✅ App initialization complete');
+    } catch (error) {
+        console.error('❌ App initialization failed:', error);
+        showNotification('Failed to initialize app: ' + error.message, 'error');
+    }
 }
 
 // === EVENT LISTENERS ===
@@ -917,3 +937,77 @@ window.addEventListener('beforeunload', () => {
 });
 
 console.log('📱 TimeFlow Desktop Agent Renderer loaded successfully');
+
+// === MANUAL TESTING FUNCTIONS ===
+async function testScreenshotCapture() {
+    console.log('🧪 Testing screenshot capture manually...');
+    showNotification('Testing screenshot capture...', 'info');
+    
+    try {
+        const result = await ipcRenderer.invoke('test-screenshot');
+        if (result && result.success) {
+            showNotification('✅ Screenshot test successful!', 'success');
+            console.log('✅ Screenshot test result:', result);
+        } else {
+            showNotification('❌ Screenshot test failed', 'error');
+            console.error('❌ Screenshot test failed:', result);
+        }
+    } catch (error) {
+        showNotification('❌ Screenshot test error: ' + error.message, 'error');
+        console.error('❌ Screenshot test error:', error);
+    }
+}
+
+async function triggerManualScreenshot() {
+    console.log('📸 Triggering manual screenshot...');
+    showNotification('Capturing screenshot...', 'info');
+    
+    try {
+        const result = await ipcRenderer.invoke('manual-screenshot');
+        if (result && result.success) {
+            showNotification('✅ Manual screenshot captured!', 'success');
+            console.log('✅ Manual screenshot result:', result);
+            updateScreenshotGallery(); // Refresh gallery
+        } else {
+            showNotification('❌ Manual screenshot failed', 'error');
+            console.error('❌ Manual screenshot failed:', result);
+        }
+    } catch (error) {
+        showNotification('❌ Manual screenshot error: ' + error.message, 'error');
+        console.error('❌ Manual screenshot error:', error);
+    }
+}
+
+function addTestButtons() {
+    // Add test buttons to the dashboard for debugging
+    const dashboard = document.getElementById('dashboard');
+    if (dashboard && currentUser) {
+        const testButtonsHTML = `
+            <div class="test-buttons" style="margin-top: 20px; padding: 15px; border: 2px dashed #4f46e5; border-radius: 8px; background: rgba(79, 70, 229, 0.05);">
+                <h4 style="margin: 0 0 10px 0; color: #4f46e5; font-size: 14px;">🧪 Debug Tools</h4>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button id="testScreenshotBtn" class="btn-secondary" style="font-size: 12px; padding: 6px 12px;">
+                        🖼️ Test Screenshot
+                    </button>
+                    <button id="manualScreenshotBtn" class="btn-secondary" style="font-size: 12px; padding: 6px 12px;">
+                        📸 Manual Screenshot
+                    </button>
+                    <button id="refreshGalleryBtn" class="btn-secondary" style="font-size: 12px; padding: 6px 12px;">
+                        🔄 Refresh Gallery
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Insert test buttons before screenshot gallery
+        const screenshotSection = dashboard.querySelector('.screenshot-section');
+        if (screenshotSection) {
+            screenshotSection.insertAdjacentHTML('beforebegin', testButtonsHTML);
+            
+            // Add event listeners
+            document.getElementById('testScreenshotBtn')?.addEventListener('click', testScreenshotCapture);
+            document.getElementById('manualScreenshotBtn')?.addEventListener('click', triggerManualScreenshot);
+            document.getElementById('refreshGalleryBtn')?.addEventListener('click', updateScreenshotGallery);
+        }
+    }
+}
