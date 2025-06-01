@@ -181,37 +181,127 @@ electron_1.app.on('before-quit', () => {
         clearInterval(timerInterval);
     }
 });
-electron_1.ipcMain.on('set-user-id', (_e, id) => {
-    (0, tracker_1.setUserId)(id);
-    // Don't auto-start activity monitoring - wait for explicit start command
-    console.log('✅ User ID set:', id, '- Waiting for manual tracking start');
+// Handle user login from desktop-agent UI - FIX: Use handle instead of on for invoke calls
+electron_1.ipcMain.handle('user-logged-in', (event, user) => {
+    console.log('👤 User logged in from UI:', user.email);
+    (0, tracker_1.setUserId)(user.id);
+    console.log('Set user ID:', user.id);
+    console.log('✅ User ID set, ready for manual tracking start');
+    return { success: true, message: 'User logged in successfully' };
 });
-electron_1.ipcMain.on('start-tracking', () => {
-    console.log('▶️ Manual tracking start requested');
-    (0, tracker_1.startTracking)();
-    startTrackingTimer();
-});
-electron_1.ipcMain.on('stop-tracking', () => {
-    console.log('⏸️ Manual tracking stop requested');
-    (0, tracker_1.stopTracking)();
-    stopTrackingTimer();
-});
-electron_1.ipcMain.on('sync-offline-data', () => void (0, tracker_1.syncOfflineData)());
-electron_1.ipcMain.handle('load-session', () => (0, tracker_1.loadSession)());
-electron_1.ipcMain.on('clear-session', () => (0, tracker_1.clearSavedSession)());
-electron_1.ipcMain.on('logout', () => {
-    console.log('🚪 Logout requested from UI');
+// Handle user logout from desktop-agent UI
+electron_1.ipcMain.handle('user-logged-out', () => {
+    console.log('🚪 User logout requested from UI');
     // Clear session and stop tracking
     (0, tracker_1.clearSavedSession)();
     stopTrackingTimer();
     (0, activityMonitor_1.stopActivityMonitoring)();
-    // Reload the window to show login screen
+    console.log('✅ User logged out - session cleared and tracking stopped');
+    return { success: true, message: 'User logged out successfully' };
+});
+// Handle tracking start with better response
+electron_1.ipcMain.handle('start-tracking', (event, userId) => {
+    try {
+        console.log('▶️ Manual tracking start requested for user:', userId);
+        if (userId) {
+            (0, tracker_1.setUserId)(userId);
+        }
+        (0, tracker_1.startTracking)();
+        startTrackingTimer();
+        (0, activityMonitor_1.startActivityMonitoring)(userId);
+        isTracking = true;
+        updateTrayMenu();
+        console.log('✅ Tracking started successfully');
+        return { success: true, message: 'Time tracking started!' };
+    }
+    catch (error) {
+        console.error('❌ Error starting tracking:', error);
+        return { success: false, message: 'Failed to start tracking' };
+    }
+});
+// Handle tracking pause
+electron_1.ipcMain.handle('pause-tracking', () => {
+    try {
+        console.log('⏸️ Manual tracking pause requested');
+        (0, activityMonitor_1.stopActivityMonitoring)();
+        isTracking = false;
+        updateTrayMenu();
+        console.log('✅ Tracking paused successfully');
+        return { success: true, message: 'Time tracking paused' };
+    }
+    catch (error) {
+        console.error('❌ Error pausing tracking:', error);
+        return { success: false, message: 'Failed to pause tracking' };
+    }
+});
+// Handle tracking stop with better response
+electron_1.ipcMain.handle('stop-tracking', () => {
+    try {
+        console.log('⏹️ Manual tracking stop requested');
+        (0, tracker_1.stopTracking)();
+        stopTrackingTimer();
+        (0, activityMonitor_1.stopActivityMonitoring)();
+        isTracking = false;
+        updateTrayMenu();
+        console.log('✅ Tracking stopped successfully');
+        return { success: true, message: 'Time tracking stopped' };
+    }
+    catch (error) {
+        console.error('❌ Error stopping tracking:', error);
+        return { success: false, message: 'Failed to stop tracking' };
+    }
+});
+// Handle screenshot force capture with response
+electron_1.ipcMain.handle('force-screenshot', async () => {
+    try {
+        console.log('📸 Manual screenshot requested');
+        const result = await (0, activityMonitor_1.triggerDirectScreenshot)();
+        showScreenshotNotification();
+        return { success: true, message: 'Screenshot captured successfully' };
+    }
+    catch (error) {
+        console.error('❌ Error capturing screenshot:', error);
+        return { success: false, message: 'Failed to capture screenshot' };
+    }
+});
+// Handle activity monitoring start from desktop-agent UI
+electron_1.ipcMain.on('start-activity-monitoring', (event, userId) => {
+    console.log('🚀 Starting activity monitoring for user:', userId);
+    (0, tracker_1.setUserId)(userId);
+    (0, activityMonitor_1.startActivityMonitoring)(userId);
+    startTrackingTimer();
+    console.log('✅ Activity monitoring started from UI');
+});
+// Keep existing deprecated handlers for backward compatibility
+electron_1.ipcMain.on('set-user-id', (_e, id) => {
+    (0, tracker_1.setUserId)(id);
+    console.log('✅ User ID set:', id, '- Waiting for manual tracking start');
+});
+electron_1.ipcMain.on('start-tracking', () => {
+    console.log('▶️ Manual tracking start requested (legacy)');
+    (0, tracker_1.startTracking)();
+    startTrackingTimer();
+});
+electron_1.ipcMain.on('stop-tracking', () => {
+    console.log('⏸️ Manual tracking stop requested (legacy)');
+    (0, tracker_1.stopTracking)();
+    stopTrackingTimer();
+});
+electron_1.ipcMain.on('logout', () => {
+    console.log('🚪 Logout requested from UI (legacy)');
+    (0, tracker_1.clearSavedSession)();
+    stopTrackingTimer();
+    (0, activityMonitor_1.stopActivityMonitoring)();
     if (mainWindow) {
         mainWindow.reload();
     }
     console.log('🚪 User logged out - session cleared and tracking stopped');
 });
-// Add missing get-config handler
+// Add back the missing sync handlers
+electron_1.ipcMain.on('sync-offline-data', () => void (0, tracker_1.syncOfflineData)());
+electron_1.ipcMain.handle('load-session', () => (0, tracker_1.loadSession)());
+electron_1.ipcMain.on('clear-session', () => (0, tracker_1.clearSavedSession)());
+// Add missing get-config handler if not already present
 electron_1.ipcMain.handle('get-config', () => {
     return {
         supabase_url: process.env.VITE_SUPABASE_URL || 'https://fkpiqcxkmrtaetvfgcli.supabase.co',
@@ -226,7 +316,7 @@ electron_1.ipcMain.handle('get-config', () => {
         enable_anti_cheat: process.env.ANTI_CHEAT_ENABLED !== 'false'
     };
 });
-// Add missing fetch-screenshots handler
+// Add missing fetch-screenshots handler if not already present
 electron_1.ipcMain.handle('fetch-screenshots', async (event, params) => {
     try {
         const { createClient } = await Promise.resolve().then(() => __importStar(require('@supabase/supabase-js')));
@@ -267,20 +357,6 @@ electron_1.ipcMain.handle('trigger-direct-screenshot', async () => {
     const result = await (0, activityMonitor_1.triggerDirectScreenshot)();
     showScreenshotNotification();
     return result;
-});
-// Handle user login from desktop-agent UI
-electron_1.ipcMain.on('user-logged-in', (event, user) => {
-    console.log('👤 User logged in from UI:', user.email);
-    (0, tracker_1.setUserId)(user.id);
-    console.log('✅ User ID set, ready for manual tracking start');
-});
-// Handle activity monitoring start from desktop-agent UI
-electron_1.ipcMain.on('start-activity-monitoring', (event, userId) => {
-    console.log('🚀 Starting activity monitoring for user:', userId);
-    (0, tracker_1.setUserId)(userId);
-    (0, activityMonitor_1.startActivityMonitoring)(userId);
-    startTrackingTimer();
-    console.log('✅ Activity monitoring started from UI');
 });
 // Create tray icon
 function createTray() {
