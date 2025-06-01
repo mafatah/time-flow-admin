@@ -190,15 +190,33 @@ export default function TimeTrackerPage() {
   };
 
   const stopTracking = async () => {
-    if (!userDetails?.id) return;
+    if (!userDetails?.id) {
+      toast({
+        title: 'User not found',
+        description: 'Please ensure you are logged in properly.',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     try {
-      const { data: activeLog } = await supabase
+      // Try to find active session - use both conditions to be more explicit
+      const { data: activeLog, error: fetchError } = await supabase
         .from('time_logs')
-        .select('id')
+        .select('id, start_time, project_id')
         .eq('user_id', userDetails.id)
         .is('end_time', null)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to handle no results
+
+      if (fetchError) {
+        console.error('Error fetching active session:', fetchError);
+        toast({
+          title: 'Error fetching active session',
+          description: fetchError.message,
+          variant: 'destructive',
+        });
+        return;
+      }
 
       if (!activeLog) {
         toast({
@@ -209,32 +227,38 @@ export default function TimeTrackerPage() {
         return;
       }
 
-      const { error } = await supabase
+      // Update the session with end time
+      const { error: updateError } = await supabase
         .from('time_logs')
-        .update({ end_time: new Date().toISOString() })
-        .eq('id', activeLog.id);
+        .update({ 
+          end_time: new Date().toISOString(),
+          status: 'completed' // Add status if column exists
+        })
+        .eq('id', activeLog.id)
+        .eq('user_id', userDetails.id); // Double check user ownership
 
-      if (error) {
-        console.error('Error stopping time tracking:', error);
+      if (updateError) {
+        console.error('Error stopping time tracking:', updateError);
         toast({
           title: 'Error stopping time tracking',
-          description: error.message,
+          description: updateError.message,
           variant: 'destructive',
         });
         return;
       }
 
-      fetchActiveLogs();
-      fetchRecentLogs();
+      // Refresh the data
+      await Promise.all([fetchActiveLogs(), fetchRecentLogs()]);
+      
       toast({
         title: 'Time tracking stopped',
-        description: 'Time tracking has been stopped.',
+        description: 'Time tracking has been stopped successfully.',
       });
     } catch (error) {
       console.error('Error stopping time tracking:', error);
       toast({
         title: 'Error stopping time tracking',
-        description: 'Failed to stop time tracking.',
+        description: 'An unexpected error occurred. Please try again.',
         variant: 'destructive',
       });
     }

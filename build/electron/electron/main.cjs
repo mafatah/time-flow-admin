@@ -304,7 +304,7 @@ function createTray() {
         tray = new electron_1.Tray(resizedIcon);
     }
     // Set initial tooltip
-    tray.setToolTip('TimeFlow - Not tracking');
+    tray.setToolTip('Ebdaa Time - Not tracking');
     // Create context menu
     updateTrayMenu();
     // Handle click events
@@ -395,7 +395,7 @@ function stopTrackingTimer() {
     }
     // Update tray
     if (tray) {
-        tray.setToolTip('TimeFlow - Not tracking');
+        tray.setToolTip('Ebdaa Time - Not tracking');
     }
     // Update menu
     updateTrayMenu();
@@ -413,7 +413,7 @@ function updateTrayTimer() {
     const timeString = hours > 0
         ? `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
         : `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    tray.setToolTip(`TimeFlow - Tracking: ${timeString}`);
+    tray.setToolTip(`Ebdaa Time - Tracking: ${timeString}`);
 }
 // Show screenshot notification
 function showScreenshotNotification() {

@@ -262,21 +262,38 @@ export default function AppsUrlsIdle() {
     const urlData: { [key: string]: { duration: number; count: number; category: string; user_id: string; user_name: string } } = {};
     
     logs.forEach(log => {
-      const duration = log.duration_seconds || 0;
-      const domain = new URL(log.site_url).hostname;
-      const key = `${domain}_${log.user_id}`;
-      
-      if (!urlData[key]) {
-        urlData[key] = { 
-          duration: 0, 
-          count: 0, 
-          category: log.category || 'other',
-          user_id: log.user_id,
-          user_name: log.users?.full_name || log.users?.email || 'Unknown User'
-        };
+      try {
+        const duration = log.duration_seconds || 0;
+        let domain = 'unknown-domain';
+        
+        // Safely extract domain from URL
+        try {
+          if (log.site_url && typeof log.site_url === 'string') {
+            // Check if URL has protocol
+            const urlWithProtocol = log.site_url.startsWith('http') ? log.site_url : `https://${log.site_url}`;
+            domain = new URL(urlWithProtocol).hostname;
+          }
+        } catch (urlError) {
+          console.warn('Invalid URL encountered:', log.site_url);
+          domain = log.site_url || 'unknown-domain';
+        }
+        
+        const key = `${domain}_${log.user_id}`;
+        
+        if (!urlData[key]) {
+          urlData[key] = { 
+            duration: 0, 
+            count: 0, 
+            category: log.category || 'other',
+            user_id: log.user_id,
+            user_name: log.users?.full_name || log.users?.email || 'Unknown User'
+          };
+        }
+        urlData[key].duration += duration;
+        urlData[key].count += 1;
+      } catch (error) {
+        console.warn('Error processing URL log:', error, log);
       }
-      urlData[key].duration += duration;
-      urlData[key].count += 1;
     });
 
     const processed = Object.entries(urlData)
@@ -291,6 +308,7 @@ export default function AppsUrlsIdle() {
           user_name: data.user_name
         };
       })
+      .filter(item => item.total_duration > 0) // Filter out zero duration items
       .sort((a, b) => b.total_duration - a.total_duration)
       .slice(0, 10);
 
