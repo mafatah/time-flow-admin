@@ -210,14 +210,12 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <Router>
           <AuthProvider>
-            <TrackerProvider>
-              <TooltipProvider>
-                <div className="min-h-screen bg-background w-full">
-                  <AppRoutes />
-                  <Toaster />
-                </div>
-              </TooltipProvider>
-            </TrackerProvider>
+            <TooltipProvider>
+              <div className="min-h-screen bg-background w-full">
+                <AppRoutes />
+                <Toaster />
+              </div>
+            </TooltipProvider>
           </AuthProvider>
         </Router>
       </QueryClientProvider>
