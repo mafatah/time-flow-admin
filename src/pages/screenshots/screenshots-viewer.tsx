@@ -54,7 +54,7 @@ export default function ScreenshotsViewer() {
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [userFilter, setUserFilter] = useState<string>('all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
+  const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('grid');
   const { userDetails } = useAuth();
 
   useEffect(() => {
