@@ -50,7 +50,7 @@ export default function TimeTrackerPage() {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, name, color')
+        .select('id, name')
         .order('name');
 
       if (error) {
@@ -63,12 +63,14 @@ export default function TimeTrackerPage() {
         return;
       }
 
-      setProjects(data || []);
-      
-      // Auto-select default project if none selected
-      if (!selectedProjectId && data && data.length > 0) {
-        const defaultProject = data.find(p => p.name === 'Default Project') || data[0];
-        setSelectedProjectId(defaultProject.id);
+      if (data && Array.isArray(data)) {
+        setProjects(data);
+        
+        // Auto-select default project if none selected
+        if (!selectedProjectId && data.length > 0) {
+          const defaultProject = data.find(p => p.name === 'Default Project') || data[0];
+          setSelectedProjectId(defaultProject.id);
+        }
       }
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -88,7 +90,7 @@ export default function TimeTrackerPage() {
         .from('time_logs')
         .select(`
           *,
-          projects!inner(name, color)
+          projects(name)
         `)
         .eq('user_id', userDetails.id)
         .is('end_time', null)
@@ -99,7 +101,9 @@ export default function TimeTrackerPage() {
         return;
       }
 
-      setActiveLogs(data || []);
+      if (data && Array.isArray(data)) {
+        setActiveLogs(data);
+      }
     } catch (error) {
       console.error('Error fetching active logs:', error);
     } finally {
@@ -115,7 +119,7 @@ export default function TimeTrackerPage() {
         .from('time_logs')
         .select(`
           *,
-          projects(name, color)
+          projects(name)
         `)
         .eq('user_id', userDetails.id)
         .not('end_time', 'is', null)
@@ -127,15 +131,17 @@ export default function TimeTrackerPage() {
         return;
       }
 
-      // Calculate duration for recent logs
-      const logsWithDuration = (data || []).map((log) => ({
-        ...log,
-        duration: log.end_time
-          ? differenceInMinutes(new Date(log.end_time), new Date(log.start_time))
-          : 0,
-      }));
+      if (data && Array.isArray(data)) {
+        // Calculate duration for recent logs
+        const logsWithDuration = data.map((log) => ({
+          ...log,
+          duration: log.end_time
+            ? differenceInMinutes(new Date(log.end_time), new Date(log.start_time))
+            : 0,
+        }));
 
-      setRecentLogs(logsWithDuration);
+        setRecentLogs(logsWithDuration);
+      }
     } catch (error) {
       console.error('Error fetching recent logs:', error);
     }
