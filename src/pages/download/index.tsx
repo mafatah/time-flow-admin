@@ -22,7 +22,7 @@ const DownloadPage = () => {
             <EbdaaTimeLogo size={40} />
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Download Ebdaa Time Desktop</h1>
-              <p className="text-gray-600">Enhanced time tracking for your desktop</p>
+              <p className="text-gray-600">Contact your administrator for desktop app installation files</p>
             </div>
           </div>
         </div>
@@ -39,7 +39,7 @@ const DownloadPage = () => {
               <CardHeader>
                 <CardTitle className="text-lg">Why Desktop App?</CardTitle>
                 <CardDescription>
-                  Enhanced features for accurate time tracking
+                  Download the enterprise-ready desktop application. Contact your administrator to get access to the desktop apps with zero security warnings. Professional deployment ensures seamless installation across all platforms.
                 </CardDescription>
               </CardHeader>
               <CardContent>

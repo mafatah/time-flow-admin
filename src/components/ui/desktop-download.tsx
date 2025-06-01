@@ -44,58 +44,41 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // For now, show instructions to contact admin for download
+    // Create a comprehensive download information modal
+    const platformInfo = {
+      windows: { name: 'Windows', size: '85MB', file: 'TimeFlow-Setup.exe' },
+      'mac-intel': { name: 'macOS (Intel)', size: '117MB', file: 'TimeFlow-Intel.dmg' },
+      'mac-arm': { name: 'macOS (Apple Silicon)', size: '110MB', file: 'TimeFlow-ARM.dmg' },
+      linux: { name: 'Linux', size: '120MB', file: 'TimeFlow.AppImage' }
+    };
+    
+    const info = platformInfo[platform as keyof typeof platformInfo];
+    
     setTimeout(() => {
-      alert(`Desktop app for ${getOSName(platform)} is ready for download!\n\nPlease contact your administrator to get the download link.\n\nFile sizes:\n- Windows: 85MB\n- macOS Intel: 117MB\n- macOS ARM: 110MB\n- Linux: 120MB`);
+      const message = `TimeFlow Desktop App - ${info?.name || 'Unknown Platform'}
+
+📱 Ready for Download:
+• File: ${info?.file || 'N/A'}
+• Size: ${info?.size || 'N/A'}
+• Status: ✅ Available
+
+📧 To Download:
+Contact your system administrator at:
+• Email: admin@timeflow.com
+• Or request through your IT department
+
+💡 Features Included:
+• Automatic screenshot capture (every 2-8 minutes)
+• Real-time activity tracking
+• Application usage monitoring  
+• Idle time detection
+• Secure data encryption
+
+The desktop app provides enhanced monitoring capabilities that complement the web dashboard.`;
+      
+      alert(message);
       setDownloading(null);
-    }, 1000);
-    
-    // // Define download URLs with architecture detection for macOS
-    // const getDownloadUrl = (platform: string) => {
-    //   // Use GitHub releases for large files with simple file names
-    //   const baseUrl = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.3';
-    //   
-    //   if (platform === 'mac' || platform === 'mac-intel' || platform === 'mac-arm') {
-    //     // For mac-arm, use the ARM DMG; for mac-intel or generic mac, use Intel DMG
-    //     return platform === 'mac-arm' 
-    //       ? `${baseUrl}/TimeFlow-ARM.dmg`
-    //       : `${baseUrl}/TimeFlow-Intel.dmg`;
-    //   }
-    //   
-    //   // Windows and Linux use simple file names
-    //   const downloadUrls = {
-    //     windows: `${baseUrl}/TimeFlow-Setup.exe`,
-    //     linux: `${baseUrl}/TimeFlow.AppImage`
-    //   };
-    //   
-    //   return downloadUrls[platform as keyof typeof downloadUrls];
-    // };
-    
-    // try {
-    //   const url = getDownloadUrl(platform);
-    //   
-    //   if (!url) {
-    //     throw new Error('Download not available for this platform');
-    //   }
-    //   
-    //   // Start download directly without checking if file exists
-    //   const link = document.createElement('a');
-    //   link.href = url;
-    //   link.download = url.split('/').pop() || `TimeFlow-${platform}`;
-    //   document.body.appendChild(link);
-    //   link.click();
-    //   document.body.removeChild(link);
-    //   
-    //   console.log(`Downloaded TimeFlow Desktop for ${platform}:`, url);
-    //   
-    //   // No popup - clean download experience
-    //   
-    // } catch (error) {
-    //   console.error('Download failed:', error);
-    //   // Even on error, don't show popup - just log it
-    // } finally {
-    //   setDownloading(null);
-    // }
+    }, 800);
   };
   
   const getOSIcon = (platform: string) => {
