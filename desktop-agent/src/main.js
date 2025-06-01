@@ -150,7 +150,7 @@ function createWindow() {
       contextIsolation: false
     },
     icon: path.join(__dirname, '../assets/icon.png'),
-    title: 'TimeFlow - Employee Portal',
+    title: 'Ebdaa Time - Employee Portal',
     resizable: true,
     show: false,
     minWidth: 800,
@@ -162,20 +162,20 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    console.log('✅ TimeFlow Agent ready');
+    console.log('✅ Ebdaa Time Agent ready');
   });
 
   // Handle window events
   mainWindow.on('minimize', () => {
     mainWindow.hide();
-    showTrayNotification('TimeFlow continues tracking in background');
+    showTrayNotification('Ebdaa Time continues tracking in background');
   });
 
   mainWindow.on('close', (event) => {
     if (isTracking) {
       event.preventDefault();
       mainWindow.hide();
-      showTrayNotification('TimeFlow continues tracking in background');
+      showTrayNotification('Ebdaa Time continues tracking in background');
     }
   });
 
@@ -188,7 +188,7 @@ function createTray() {
   
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show TimeFlow',
+      label: 'Show Ebdaa Time',
       click: () => {
         mainWindow.show();
         mainWindow.focus();
@@ -215,7 +215,7 @@ function createTray() {
   ]);
   
   tray.setContextMenu(contextMenu);
-  tray.setToolTip('TimeFlow Agent');
+  tray.setToolTip('Ebdaa Time Agent');
   
   tray.on('click', () => {
     mainWindow.show();
@@ -871,7 +871,7 @@ async function checkNotifications() {
 function showTrayNotification(message, type = 'info') {
   if (Notification.isSupported()) {
     const notification = new Notification({
-      title: 'TimeFlow',
+      title: 'Ebdaa Time',
       body: message,
       icon: path.join(__dirname, '../assets/icon.png')
     });
@@ -1019,7 +1019,7 @@ async function resumeTracking() {
 function updateTrayMenu() {
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show TimeFlow',
+      label: 'Show Ebdaa Time',
       click: () => {
         mainWindow.show();
         mainWindow.focus();
@@ -1432,7 +1432,7 @@ powerMonitor.on('unlock-screen', () => {
   }
 });
 
-console.log('📱 TimeFlow Desktop Agent initialized');
+console.log('📱 Ebdaa Time Desktop Agent initialized');
 
 // Initialize components
 function initializeComponents() {

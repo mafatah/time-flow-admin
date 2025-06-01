@@ -217,31 +217,57 @@ async function handleLogin(e) {
     loginBtn.textContent = 'Signing in...';
 
     try {
-        // Get the real user config from main process
+        // Get the config from main process
         const config = await ipcRenderer.invoke('get-config');
         
-        if (email && password && config.user_id) {
-            // Use the real employee user from config
-            currentUser = {
-                id: config.user_id,
-                email: email,
-                name: email.split('@')[0],
-                role: 'employee'
-            };
-
-            // Save user to localStorage
-            localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
-
-            // Notify main process about user login
-            ipcRenderer.send('user-logged-in', currentUser);
-
-            showMainApp();
-        } else {
-            throw new Error('Authentication failed. Please check your credentials.');
+        // Create Supabase client if not already created
+        if (!window.supabase) {
+            const { createClient } = require('@supabase/supabase-js');
+            window.supabase = createClient(config.supabase_url, config.supabase_key);
         }
+
+        // Authenticate with Supabase
+        const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+
+        if (authError) {
+            throw new Error(authError.message);
+        }
+
+        // Get user details from users table
+        const { data: userDetails, error: userError } = await window.supabase
+            .from('users')
+            .select('id, email, full_name, role')
+            .eq('id', authData.user.id)
+            .single();
+
+        if (userError) {
+            console.error('User details error:', userError);
+            // Still proceed with auth data if user table lookup fails
+        }
+
+        // Set current user
+        currentUser = {
+            id: authData.user.id,
+            email: authData.user.email,
+            name: userDetails ? userDetails.full_name : email.split('@')[0],
+            role: userDetails ? userDetails.role : 'employee'
+        };
+
+        // Save user to localStorage
+        localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
+
+        // Notify main process about user login
+        ipcRenderer.send('user-logged-in', currentUser);
+
+        showMainApp();
+        showNotification('Login successful!', 'success');
+        
     } catch (error) {
         console.error('Login error:', error);
-        errorDiv.textContent = error.message || 'Login failed. Please try again.';
+        errorDiv.textContent = error.message || 'Authentication failed. Please check your credentials.';
         errorDiv.style.display = 'block';
     } finally {
         loginBtn.disabled = false;
@@ -261,40 +287,64 @@ async function handleQuickLogin() {
 
     // Set predefined credentials
     emailInput.value = 'employee@timeflow.com';
-    passwordInput.value = 'password123';
+    passwordInput.value = 'employee123456';
 
     // Disable button
     quickLoginBtn.disabled = true;
     quickLoginBtn.textContent = 'Logging in...';
 
     try {
-        // Get the real user config from main process
+        // Get the config from main process
         const config = await ipcRenderer.invoke('get-config');
         
-        if (config.user_id) {
-            // Use the real employee user from config
-            currentUser = {
-                id: config.user_id,
-                email: 'employee@timeflow.com',
-                name: 'John Employee',
-                role: 'employee'
-            };
-
-            // Save user to localStorage
-            localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
-
-            // Notify main process about user login
-            ipcRenderer.send('user-logged-in', currentUser);
-
-            showMainApp();
-            showNotification('Welcome back, John!', 'success');
-        } else {
-            throw new Error('Configuration error. Please contact administrator.');
+        // Create Supabase client if not already created
+        if (!window.supabase) {
+            const { createClient } = require('@supabase/supabase-js');
+            window.supabase = createClient(config.supabase_url, config.supabase_key);
         }
 
+        // Authenticate with Supabase
+        const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+            email: 'employee@timeflow.com',
+            password: 'employee123456'
+        });
+
+        if (authError) {
+            throw new Error(authError.message);
+        }
+
+        // Get user details from users table
+        const { data: userDetails, error: userError } = await window.supabase
+            .from('users')
+            .select('id, email, full_name, role')
+            .eq('id', authData.user.id)
+            .single();
+
+        if (userError) {
+            console.error('User details error:', userError);
+            // Still proceed with auth data if user table lookup fails
+        }
+
+        // Set current user
+        currentUser = {
+            id: authData.user.id,
+            email: authData.user.email,
+            name: userDetails ? userDetails.full_name : 'John Employee',
+            role: userDetails ? userDetails.role : 'employee'
+        };
+
+        // Save user to localStorage
+        localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
+
+        // Notify main process about user login
+        ipcRenderer.send('user-logged-in', currentUser);
+
+        showMainApp();
+        showNotification('Welcome back!', 'success');
+        
     } catch (error) {
         console.error('Quick login error:', error);
-        errorDiv.textContent = 'Quick login failed. Please try again.';
+        errorDiv.textContent = error.message || 'Quick login failed. Please try again.';
         errorDiv.style.display = 'block';
     } finally {
         quickLoginBtn.disabled = false;

@@ -310,7 +310,7 @@ function createTray() {
   }
 
   // Set initial tooltip
-  tray.setToolTip('TimeFlow - Not tracking');
+  tray.setToolTip('Ebdaa Time - Not tracking');
   
   // Create context menu
   updateTrayMenu();
@@ -413,7 +413,7 @@ function stopTrackingTimer() {
   
   // Update tray
   if (tray) {
-    tray.setToolTip('TimeFlow - Not tracking');
+    tray.setToolTip('Ebdaa Time - Not tracking');
   }
   
   // Update menu
@@ -437,7 +437,7 @@ function updateTrayTimer() {
     ? `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
     : `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   
-  tray.setToolTip(`TimeFlow - Tracking: ${timeString}`);
+  tray.setToolTip(`Ebdaa Time - Tracking: ${timeString}`);
 }
 
 // Show screenshot notification
