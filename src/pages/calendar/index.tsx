@@ -241,21 +241,23 @@ export default function CalendarPage() {
     
     return (
       <div 
-        className={`text-xs p-1 rounded cursor-pointer transition-all hover:opacity-90 ${
+        className={`text-xs p-2 rounded cursor-pointer transition-all hover:opacity-90 min-h-[60px] flex flex-col justify-between ${
           isActive ? 'bg-green-500 text-white' : 
           isLongSession ? 'bg-orange-500 text-white' : 
           'bg-blue-500 text-white'
         }`}
         onClick={() => handleSelectEvent(event)}
+        style={{ margin: '1px', minHeight: '50px' }}
       >
-        <div className="font-medium truncate">{event.resource.user}</div>
-        <div className="truncate opacity-90">{event.resource.project}</div>
-        <Badge 
-          variant={isActive ? "default" : "secondary"} 
-          className="text-xs mt-1"
-        >
-          {event.resource.duration} {isActive && '(Active)'}
-        </Badge>
+        <div className="flex-1">
+          <div className="font-medium text-sm leading-tight mb-1">{event.resource.user}</div>
+          <div className="text-xs opacity-90 leading-tight">{event.resource.project}</div>
+        </div>
+        <div className="mt-1">
+          <span className="text-xs bg-black bg-opacity-20 px-1 py-0.5 rounded">
+            {event.resource.duration} {isActive && '(Active)'}
+          </span>
+        </div>
       </div>
     );
   };
@@ -351,7 +353,51 @@ export default function CalendarPage() {
           {loading ? (
             <div className="text-center py-8">Loading calendar data...</div>
           ) : (
-            <div style={{ height: '600px' }}>
+            <div style={{ height: '600px' }} className="calendar-container">
+              <style>{`
+                .rbc-calendar {
+                  font-family: inherit;
+                }
+                .rbc-event {
+                  border: none !important;
+                  border-radius: 6px !important;
+                  padding: 4px 6px !important;
+                  margin: 2px 1px !important;
+                  min-height: 45px !important;
+                  overflow: visible !important;
+                }
+                .rbc-month-view .rbc-event {
+                  min-height: 20px !important;
+                  margin: 1px !important;
+                }
+                .rbc-week-view .rbc-event, .rbc-day-view .rbc-event {
+                  min-height: 50px !important;
+                  margin: 2px 1px !important;
+                }
+                .rbc-agenda-view .rbc-event {
+                  min-height: auto !important;
+                }
+                .rbc-event-content {
+                  font-size: 12px !important;
+                  line-height: 1.2 !important;
+                }
+                .rbc-time-slot {
+                  border-bottom: 1px solid #e5e7eb !important;
+                }
+                .rbc-timeslot-group {
+                  border-bottom: 1px solid #d1d5db !important;
+                }
+                .rbc-time-view .rbc-time-gutter .rbc-time-slot {
+                  font-size: 12px !important;
+                }
+                .rbc-month-view .rbc-date-cell {
+                  padding: 8px 4px !important;
+                  min-height: 80px !important;
+                }
+                .rbc-week-view .rbc-time-content, .rbc-day-view .rbc-time-content {
+                  min-height: 500px !important;
+                }
+              `}</style>
               <Calendar
                 localizer={localizer}
                 events={events}

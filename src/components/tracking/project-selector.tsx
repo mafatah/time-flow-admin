@@ -78,15 +78,25 @@ export function ProjectSelector() {
           </div>
         )}
         
+        {canTrack && !selectedProjectId && (
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-md text-blue-800 mb-4">
+            <p className="font-medium mb-2">Project Selection Required</p>
+            <p className="text-sm">Please select a project before starting time tracking. This helps organize your work sessions and generate accurate reports.</p>
+          </div>
+        )}
+        
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="w-full sm:w-2/3">
+            <label className="text-sm font-medium mb-2 block">
+              Select Project <span className="text-red-500">*</span>
+            </label>
             <Select
               value={selectedProjectId || ""}
               onValueChange={(value) => setSelectedProjectId(value)}
               disabled={isTracking || !canTrack}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a project" />
+              <SelectTrigger className={`${!selectedProjectId && canTrack ? 'border-red-300 focus:border-red-500' : ''}`}>
+                <SelectValue placeholder="Choose a project to track time..." />
               </SelectTrigger>
               <SelectContent>
                 {projectsLoading ? (
@@ -94,7 +104,12 @@ export function ProjectSelector() {
                 ) : projects && projects.length > 0 ? (
                   projects.map((project: Project) => (
                     <SelectItem key={project.id} value={project.id}>
-                      {project.name}
+                      <div className="flex flex-col">
+                        <span className="font-medium">{project.name}</span>
+                        {project.description && (
+                          <span className="text-xs text-muted-foreground">{project.description}</span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))
                 ) : (
@@ -102,6 +117,9 @@ export function ProjectSelector() {
                 )}
               </SelectContent>
             </Select>
+            {!selectedProjectId && canTrack && (
+              <p className="text-xs text-red-500 mt-1">Please select a project to continue</p>
+            )}
           </div>
           
           <div className="w-full sm:w-1/3">
@@ -120,11 +138,19 @@ export function ProjectSelector() {
                 className="w-full"
                 disabled={!selectedProjectId || !canTrack}
               >
-                Start Tracking
+                {selectedProjectId ? 'Start Tracking' : 'Select Project First'}
               </Button>
             )}
           </div>
         </div>
+        
+        {selectedProjectId && !isTracking && canTrack && (
+          <div className="bg-green-50 border border-green-200 p-3 rounded-md text-green-800">
+            <p className="text-sm">
+              ✓ Ready to track time for <strong>{projects?.find(p => p.id === selectedProjectId)?.name}</strong>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
