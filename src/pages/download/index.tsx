@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DesktopDownload from '@/components/ui/desktop-download';
-import TimeFlowLogo from '@/components/ui/timeflow-logo';
+import EbdaaTimeLogo from '@/components/ui/timeflow-logo';
 import { ArrowLeft, Shield, Clock, Camera, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -19,9 +19,9 @@ const DownloadPage = () => {
             </Button>
           </Link>
           <div className="flex items-center gap-3">
-            <TimeFlowLogo size={40} />
+            <EbdaaTimeLogo size={40} />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Download TimeFlow Desktop</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Download Ebdaa Time Desktop</h1>
               <p className="text-gray-600">Enhanced time tracking for your desktop</p>
             </div>
           </div>

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
-import TimeFlowLogo from "@/components/ui/timeflow-logo";
+import EbdaaTimeLogo from "@/components/ui/timeflow-logo";
 import DesktopDownload from "@/components/ui/desktop-download";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -57,7 +57,7 @@ export default function LoginPage() {
             <Card className="w-full max-w-md">
               <CardHeader className="space-y-1 text-center">
                 <div className="flex justify-center mb-4">
-                  <TimeFlowLogo size={60} showText={true} />
+                  <EbdaaTimeLogo size={60} showText={true} />
                 </div>
                 <CardDescription>
                   Enter your credentials to access your account

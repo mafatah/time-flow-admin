@@ -1,12 +1,12 @@
 import React from 'react';
 
-interface TimeFlowLogoProps {
+interface EbdaaTimeLogoProps {
   size?: number;
   className?: string;
   showText?: boolean;
 }
 
-const TimeFlowLogo: React.FC<TimeFlowLogoProps> = ({ 
+const EbdaaTimeLogo: React.FC<EbdaaTimeLogoProps> = ({ 
   size = 40, 
   className = '', 
   showText = false 
@@ -21,7 +21,7 @@ const TimeFlowLogo: React.FC<TimeFlowLogoProps> = ({
         xmlns="http://www.w3.org/2000/svg"
         className="drop-shadow-sm"
       >
-        {/* Outer Circle - Primary Color */}
+        {/* Outer Circle - Premium Gradient */}
         <circle
           cx="24"
           cy="24"
@@ -31,7 +31,7 @@ const TimeFlowLogo: React.FC<TimeFlowLogoProps> = ({
           strokeWidth="2"
         />
         
-        {/* Inner Circle - Background */}
+        {/* Inner Creative Burst Pattern */}
         <circle
           cx="24"
           cy="24"
@@ -39,99 +39,104 @@ const TimeFlowLogo: React.FC<TimeFlowLogoProps> = ({
           fill="white"
           stroke="currentColor"
           strokeWidth="1"
-          opacity="0.9"
+          opacity="0.95"
         />
         
-        {/* Clock Face Marks */}
-        <g stroke="currentColor" strokeWidth="1.5" opacity="0.6">
-          {/* 12, 3, 6, 9 o'clock marks */}
-          <line x1="24" y1="8" x2="24" y2="12" strokeWidth="2" />
-          <line x1="40" y1="24" x2="36" y2="24" strokeWidth="2" />
-          <line x1="24" y1="40" x2="24" y2="36" strokeWidth="2" />
-          <line x1="8" y1="24" x2="12" y2="24" strokeWidth="2" />
+        {/* Creative Spark Pattern */}
+        <g stroke="currentColor" strokeWidth="1.5" opacity="0.7">
+          {/* Central Star Pattern */}
+          <path d="M24 8 L26 16 L24 24 L22 16 Z" fill="url(#gradient2)" />
+          <path d="M40 24 L32 26 L24 24 L32 22 Z" fill="url(#gradient2)" />
+          <path d="M24 40 L22 32 L24 24 L26 32 Z" fill="url(#gradient2)" />
+          <path d="M8 24 L16 22 L24 24 L16 26 Z" fill="url(#gradient2)" />
           
-          {/* Other hour marks */}
-          <line x1="32.5" y1="10.5" x2="31" y2="12" />
-          <line x1="37.5" y1="15.5" x2="36" y2="17" />
-          <line x1="37.5" y1="32.5" x2="36" y2="31" />
-          <line x1="32.5" y1="37.5" x2="31" y2="36" />
-          <line x1="15.5" y1="37.5" x2="17" y2="36" />
-          <line x1="10.5" y1="32.5" x2="12" y2="31" />
-          <line x1="10.5" y1="15.5" x2="12" y2="17" />
-          <line x1="15.5" y1="10.5" x2="17" y2="12" />
+          {/* Diagonal Rays */}
+          <path d="M33.5 14.5 L29 19 L24 24 L29 19 Z" fill="url(#gradient3)" opacity="0.6" />
+          <path d="M33.5 33.5 L29 29 L24 24 L29 29 Z" fill="url(#gradient3)" opacity="0.6" />
+          <path d="M14.5 33.5 L19 29 L24 24 L19 29 Z" fill="url(#gradient3)" opacity="0.6" />
+          <path d="M14.5 14.5 L19 19 L24 24 L19 19 Z" fill="url(#gradient3)" opacity="0.6" />
         </g>
         
-        {/* Clock Hands */}
-        <g stroke="currentColor" strokeLinecap="round">
-          {/* Hour Hand - pointing to 10 */}
-          <line
-            x1="24"
-            y1="24"
-            x2="18"
-            y2="16"
-            strokeWidth="3"
-            opacity="0.8"
-          />
-          
-          {/* Minute Hand - pointing to 2 */}
+        {/* Time Elements */}
+        <g stroke="currentColor" strokeLinecap="round" opacity="0.8">
+          {/* Hour Hand - pointing to 3 (E for Ebdaa) */}
           <line
             x1="24"
             y1="24"
             x2="32"
-            y2="14"
-            strokeWidth="2"
-            opacity="0.8"
+            y2="24"
+            strokeWidth="3"
+            opacity="0.9"
           />
           
-          {/* Second Hand - pointing to 6 */}
+          {/* Minute Hand - pointing to 12 */}
           <line
             x1="24"
             y1="24"
             x2="24"
-            y2="35"
+            y2="14"
+            strokeWidth="2"
+            opacity="0.9"
+          />
+          
+          {/* Second Hand - Dynamic sweep */}
+          <line
+            x1="24"
+            y1="24"
+            x2="30"
+            y2="18"
             strokeWidth="1"
             stroke="#ef4444"
             opacity="0.9"
           />
         </g>
         
-        {/* Center Dot */}
+        {/* Center Creative Hub */}
         <circle
           cx="24"
           cy="24"
-          r="2"
-          fill="currentColor"
-          opacity="0.8"
+          r="3"
+          fill="url(#gradient2)"
+          opacity="0.9"
         />
         
-        {/* Flow Arrow */}
+        {/* Innovation Arrow */}
         <path
-          d="M30 24 L36 20 L36 22 L42 22 L42 26 L36 26 L36 28 Z"
-          fill="url(#gradient2)"
-          opacity="0.7"
+          d="M30 20 L38 16 L38 18 L44 18 L44 22 L38 22 L38 24 Z"
+          fill="url(#gradient4)"
+          opacity="0.8"
         />
         
         {/* Gradient Definitions */}
         <defs>
           <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="hsl(var(--primary))" />
-            <stop offset="100%" stopColor="hsl(var(--primary) / 0.8)" />
+            <stop offset="0%" stopColor="#3b82f6" />
+            <stop offset="50%" stopColor="#6366f1" />
+            <stop offset="100%" stopColor="#8b5cf6" />
           </linearGradient>
           <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="hsl(var(--primary))" />
-            <stop offset="100%" stopColor="hsl(var(--primary) / 0.6)" />
+            <stop offset="0%" stopColor="#f59e0b" />
+            <stop offset="100%" stopColor="#ef4444" />
+          </linearGradient>
+          <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#1d4ed8" />
+          </linearGradient>
+          <linearGradient id="gradient4" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#059669" />
           </linearGradient>
         </defs>
       </svg>
       
       {showText && (
         <div className="flex flex-col">
-          <span className="font-bold text-lg text-primary">TimeFlow</span>
-          <span className="text-xs text-muted-foreground">Time Tracking</span>
+          <span className="font-bold text-lg text-primary">Ebdaa Time</span>
+          <span className="text-xs text-muted-foreground">Employee Tracking</span>
         </div>
       )}
     </div>
   );
 };
 
-export default TimeFlowLogo; 
+export default EbdaaTimeLogo; 

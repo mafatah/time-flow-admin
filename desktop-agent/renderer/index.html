@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TimeFlow - Employee Portal</title>
+    <title>Ebdaa Time - Employee Portal</title>
     <style>
         * {
             margin: 0;
@@ -535,7 +535,7 @@
     <!-- LOGIN SCREEN -->
     <div id="loginContainer" class="login-container">
         <div class="login-card">
-            <div class="login-logo">TimeFlow</div>
+            <div class="login-logo">Ebdaa Time</div>
             <div class="login-subtitle">Employee Time Tracking</div>
             
             <form id="loginForm">
@@ -546,7 +546,7 @@
                 
                 <div class="form-group">
                     <label class="form-label">Password</label>
-                    <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" value="password123" required>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" value="employee123456" required>
                 </div>
                 
                 <button type="submit" id="loginBtn" class="login-btn">Sign In</button>
@@ -554,7 +554,7 @@
                 <button type="button" id="quickLoginBtn" class="quick-login-btn">Quick Login as Employee</button>
                 
                 <div class="login-help">
-                    <small>Demo credentials: employee@timeflow.com / password123</small>
+                    <small>Demo credentials: employee@timeflow.com / employee123456</small>
                 </div>
                 
                 <div id="loginError" class="error-message"></div>
@@ -567,7 +567,7 @@
         <!-- SIDEBAR -->
         <div class="sidebar">
             <div class="sidebar-header">
-                <div class="sidebar-logo">TimeFlow</div>
+                <div class="sidebar-logo">Ebdaa Time</div>
                 <div class="sidebar-subtitle">Employee Portal</div>
             </div>
             
@@ -1110,6 +1110,8 @@
         </div>
     </div>
 
+    <!-- Include Supabase client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="renderer.js"></script>
 </body>
 </html>
