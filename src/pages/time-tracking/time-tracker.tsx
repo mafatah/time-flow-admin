@@ -200,32 +200,45 @@ export default function TimeTrackerPage() {
     }
     
     try {
-      // Try to find active session - use both conditions to be more explicit
-      const { data: activeLog, error: fetchError } = await supabase
+      // For admin users, we need to be more specific about which session to stop
+      // If admin, show all active sessions and let them choose, or stop the most recent one
+      let activeLogQuery = supabase
         .from('time_logs')
-        .select('id, start_time, project_id')
-        .eq('user_id', userDetails.id)
-        .is('end_time', null)
-        .maybeSingle(); // Use maybeSingle instead of single to handle no results
+        .select('id, start_time, project_id, user_id')
+        .is('end_time', null);
+      
+      // If user is admin, they might want to stop any session, but for now let's just stop their own
+      if (userDetails.role === 'admin') {
+        // Admin can see all active sessions but we'll still only stop their own for safety
+        activeLogQuery = activeLogQuery.eq('user_id', userDetails.id);
+      } else {
+        // Regular users can only stop their own sessions
+        activeLogQuery = activeLogQuery.eq('user_id', userDetails.id);
+      }
+      
+      const { data: activeLogs, error: fetchError } = await activeLogQuery.order('start_time', { ascending: false });
 
       if (fetchError) {
-        console.error('Error fetching active session:', fetchError);
+        console.error('Error fetching active sessions:', fetchError);
         toast({
-          title: 'Error fetching active session',
+          title: 'Error fetching active sessions',
           description: fetchError.message,
           variant: 'destructive',
         });
         return;
       }
 
-      if (!activeLog) {
+      if (!activeLogs || activeLogs.length === 0) {
         toast({
           title: 'No active session',
-          description: 'No active tracking session found.',
+          description: 'No active tracking session found for your account.',
           variant: 'destructive',
         });
         return;
       }
+
+      // Use the most recent active session
+      const activeLog = activeLogs[0];
 
       // Update the session with end time
       const { error: updateError } = await supabase
@@ -235,7 +248,7 @@ export default function TimeTrackerPage() {
           status: 'completed' // Add status if column exists
         })
         .eq('id', activeLog.id)
-        .eq('user_id', userDetails.id); // Double check user ownership
+        .eq('user_id', activeLog.user_id); // Double check user ownership
 
       if (updateError) {
         console.error('Error stopping time tracking:', updateError);
@@ -252,7 +265,7 @@ export default function TimeTrackerPage() {
       
       toast({
         title: 'Time tracking stopped',
-        description: 'Time tracking has been stopped successfully.',
+        description: `Successfully stopped tracking session for project ${activeLog.project_id}.`,
       });
     } catch (error) {
       console.error('Error stopping time tracking:', error);

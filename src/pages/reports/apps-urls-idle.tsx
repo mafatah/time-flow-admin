@@ -185,7 +185,7 @@ export default function AppsUrlsIdle() {
         processUrlUsage(urlLogs || []);
       }
 
-      // Fetch idle logs with error handling
+      // Fetch idle logs with error handling - make this optional
       try {
         let idleQuery = supabase
           .from('idle_logs')
@@ -204,12 +204,14 @@ export default function AppsUrlsIdle() {
 
         if (idleError) {
           console.error('Error fetching idle logs:', idleError);
+          // Don't set error state, just log it and continue
           setIdleTime([]);
         } else {
           processIdleTime(idleLogs || []);
         }
       } catch (err) {
-        console.error('Idle logs table not accessible:', err);
+        console.error('Idle logs table not accessible or relationship missing:', err);
+        // Create empty idle time data when table doesn't exist or has relationship issues
         setIdleTime([]);
       }
 
