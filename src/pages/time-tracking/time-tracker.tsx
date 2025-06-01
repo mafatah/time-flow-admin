@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { Play, Square, Clock } from 'lucide-react';
 interface Project {
   id: string;
   name: string;
+  color?: string;
 }
 
 interface TimeLog {
@@ -19,6 +21,10 @@ interface TimeLog {
   start_time: string;
   end_time: string | null;
   project_id: string | null;
+  projects?: {
+    name: string;
+    color?: string;
+  };
 }
 
 export default function TimeTrackerPage() {
@@ -29,7 +35,7 @@ export default function TimeTrackerPage() {
   const [recentLogs, setRecentLogs] = useState<TimeLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Calculate if tracking is active based on active logs (no separate state)
+  // Calculate if tracking is active based on active logs
   const hasActiveSession = activeLogs.length > 0;
 
   useEffect(() => {
@@ -44,7 +50,7 @@ export default function TimeTrackerPage() {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, name')
+        .select('id, name, color')
         .order('name');
 
       if (error) {
@@ -58,6 +64,12 @@ export default function TimeTrackerPage() {
       }
 
       setProjects(data || []);
+      
+      // Auto-select default project if none selected
+      if (!selectedProjectId && data && data.length > 0) {
+        const defaultProject = data.find(p => p.name === 'Default Project') || data[0];
+        setSelectedProjectId(defaultProject.id);
+      }
     } catch (error) {
       console.error('Error fetching projects:', error);
       toast({
@@ -74,7 +86,10 @@ export default function TimeTrackerPage() {
     try {
       const { data, error } = await supabase
         .from('time_logs')
-        .select('*')
+        .select(`
+          *,
+          projects!inner(name, color)
+        `)
         .eq('user_id', userDetails.id)
         .is('end_time', null)
         .order('start_time', { ascending: false });
@@ -98,7 +113,10 @@ export default function TimeTrackerPage() {
     try {
       const { data, error } = await supabase
         .from('time_logs')
-        .select('*')
+        .select(`
+          *,
+          projects(name, color)
+        `)
         .eq('user_id', userDetails.id)
         .not('end_time', 'is', null)
         .order('start_time', { ascending: false })
@@ -158,7 +176,9 @@ export default function TimeTrackerPage() {
         .insert({ 
           user_id: userDetails.id, 
           project_id: selectedProjectId,
-          start_time: new Date().toISOString()
+          start_time: new Date().toISOString(),
+          status: 'active',
+          is_idle: false
         })
         .select()
         .single();
@@ -173,11 +193,12 @@ export default function TimeTrackerPage() {
         return;
       }
 
-      fetchActiveLogs();
-      fetchRecentLogs();
+      await Promise.all([fetchActiveLogs(), fetchRecentLogs()]);
+      
+      const projectName = projects.find(p => p.id === selectedProjectId)?.name || 'selected project';
       toast({
         title: 'Time tracking started',
-        description: `Tracking time for project ${selectedProjectId}.`,
+        description: `Started tracking time for ${projectName}.`,
       });
     } catch (error) {
       console.error('Error starting time tracking:', error);
@@ -200,23 +221,14 @@ export default function TimeTrackerPage() {
     }
     
     try {
-      // For admin users, we need to be more specific about which session to stop
-      // If admin, show all active sessions and let them choose, or stop the most recent one
-      let activeLogQuery = supabase
+      // Get the most recent active session for this user
+      const { data: activeLogs, error: fetchError } = await supabase
         .from('time_logs')
-        .select('id, start_time, project_id, user_id')
-        .is('end_time', null);
-      
-      // If user is admin, they might want to stop any session, but for now let's just stop their own
-      if (userDetails.role === 'admin') {
-        // Admin can see all active sessions but we'll still only stop their own for safety
-        activeLogQuery = activeLogQuery.eq('user_id', userDetails.id);
-      } else {
-        // Regular users can only stop their own sessions
-        activeLogQuery = activeLogQuery.eq('user_id', userDetails.id);
-      }
-      
-      const { data: activeLogs, error: fetchError } = await activeLogQuery.order('start_time', { ascending: false });
+        .select('id, start_time, project_id, projects(name)')
+        .eq('user_id', userDetails.id)
+        .is('end_time', null)
+        .order('start_time', { ascending: false })
+        .limit(1);
 
       if (fetchError) {
         console.error('Error fetching active sessions:', fetchError);
@@ -237,7 +249,6 @@ export default function TimeTrackerPage() {
         return;
       }
 
-      // Use the most recent active session
       const activeLog = activeLogs[0];
 
       // Update the session with end time
@@ -245,10 +256,10 @@ export default function TimeTrackerPage() {
         .from('time_logs')
         .update({ 
           end_time: new Date().toISOString(),
-          status: 'completed' // Add status if column exists
+          status: 'completed'
         })
         .eq('id', activeLog.id)
-        .eq('user_id', activeLog.user_id); // Double check user ownership
+        .eq('user_id', userDetails.id);
 
       if (updateError) {
         console.error('Error stopping time tracking:', updateError);
@@ -263,9 +274,10 @@ export default function TimeTrackerPage() {
       // Refresh the data
       await Promise.all([fetchActiveLogs(), fetchRecentLogs()]);
       
+      const projectName = activeLog.projects?.name || 'project';
       toast({
         title: 'Time tracking stopped',
-        description: `Successfully stopped tracking session for project ${activeLog.project_id}.`,
+        description: `Successfully stopped tracking session for ${projectName}.`,
       });
     } catch (error) {
       console.error('Error stopping time tracking:', error);
@@ -275,6 +287,14 @@ export default function TimeTrackerPage() {
         variant: 'destructive',
       });
     }
+  };
+
+  const getProjectDisplay = (log: TimeLog) => {
+    if (log.projects) {
+      return log.projects.name;
+    }
+    const project = projects.find(p => p.id === log.project_id);
+    return project?.name || 'Unknown Project';
   };
 
   return (
@@ -287,13 +307,21 @@ export default function TimeTrackerPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Select onValueChange={(value) => setSelectedProjectId(value)} value={selectedProjectId || ''}>
-              <SelectTrigger className="w-[100%]">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a project" />
               </SelectTrigger>
               <SelectContent>
-                {projects.map((project: any) => (
+                {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
-                    {project.name}
+                    <div className="flex items-center gap-2">
+                      {project.color && (
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: project.color }}
+                        />
+                      )}
+                      {project.name}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -322,10 +350,10 @@ export default function TimeTrackerPage() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading active sessions...</p>
           ) : activeLogs.length > 0 ? (
-            activeLogs.map((log: any) => (
+            activeLogs.map((log) => (
               <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
-                  <p className="text-sm font-medium">Project ID: {log.project_id}</p>
+                  <p className="text-sm font-medium">{getProjectDisplay(log)}</p>
                   <p className="text-xs text-muted-foreground">
                     Started at: {format(new Date(log.start_time), 'MMM dd, yyyy HH:mm')}
                   </p>
@@ -355,9 +383,9 @@ export default function TimeTrackerPage() {
         <CardContent>
           {recentLogs.length > 0 ? (
             recentLogs.map((log: any) => (
-              <div key={log.id} className="flex items-center justify-between p-3 border rounded">
+              <div key={log.id} className="flex items-center justify-between p-3 border rounded mb-2 last:mb-0">
                 <div>
-                  <p className="text-sm font-medium">Project ID: {log.project_id}</p>
+                  <p className="text-sm font-medium">{getProjectDisplay(log)}</p>
                   <p className="text-xs text-muted-foreground">
                     {format(new Date(log.start_time), 'MMM dd, yyyy HH:mm')} -{' '}
                     {log.end_time ? format(new Date(log.end_time), 'HH:mm') : 'Active'}

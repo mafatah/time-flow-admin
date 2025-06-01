@@ -160,31 +160,66 @@ export type Database = {
         Row: {
           created_at: string | null
           duration_minutes: number | null
+          duration_seconds: number | null
           id: string
           idle_end: string | null
           idle_start: string
           project_id: string | null
+          time_log_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
           duration_minutes?: number | null
+          duration_seconds?: number | null
           id?: string
           idle_end?: string | null
           idle_start?: string
           project_id?: string | null
+          time_log_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string | null
           duration_minutes?: number | null
+          duration_seconds?: number | null
           id?: string
           idle_end?: string | null
           idle_start?: string
           project_id?: string | null
+          time_log_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_idle_logs_project_id"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_idle_logs_time_log_id"
+            columns: ["time_log_id"]
+            isOneToOne: false
+            referencedRelation: "time_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_idle_logs_user_id"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_idle_logs_user_id"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -437,30 +472,45 @@ export type Database = {
       }
       time_logs: {
         Row: {
+          created_at: string | null
+          description: string | null
           end_time: string | null
           id: string
           is_idle: boolean
+          is_manual: boolean | null
           project_id: string | null
           start_time: string
+          status: string | null
           task_id: string | null
+          updated_at: string | null
           user_id: string
         }
         Insert: {
+          created_at?: string | null
+          description?: string | null
           end_time?: string | null
           id?: string
           is_idle?: boolean
+          is_manual?: boolean | null
           project_id?: string | null
           start_time?: string
+          status?: string | null
           task_id?: string | null
+          updated_at?: string | null
           user_id: string
         }
         Update: {
+          created_at?: string | null
+          description?: string | null
           end_time?: string | null
           id?: string
           is_idle?: boolean
+          is_manual?: boolean | null
           project_id?: string | null
           start_time?: string
+          status?: string | null
           task_id?: string | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
