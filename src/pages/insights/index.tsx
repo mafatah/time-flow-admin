@@ -4,32 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/providers/auth-provider';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { Calendar, Camera, Activity, TrendingUp, Users, Clock, X, ZoomIn } from 'lucide-react';
-
-interface Screenshot {
-  id: string;
-  user_id: string;
-  project_id: string;
-  captured_at: string;
-  file_url: string;
-  activity_percent: number;
-  focus_percent: number;
-}
-
-interface User {
-  id: string;
-  full_name: string;
-}
-
-interface Project {
-  id: string;
-  name: string;
-}
+import { Calendar, Activity, TrendingUp, Users, Clock } from 'lucide-react';
 
 interface TimeLogData {
   date: string;
@@ -38,17 +17,25 @@ interface TimeLogData {
   user_name: string;
 }
 
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+}
+
 export default function InsightsPage() {
   const { userDetails } = useAuth();
-  const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogData, setTimeLogData] = useState<TimeLogData[]>([]);
   const [dateRange, setDateRange] = useState('today');
   const [selectedUser, setSelectedUser] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     if (userDetails?.role === 'admin') {
@@ -81,18 +68,6 @@ export default function InsightsPage() {
       setLoading(true);
       const { start, end } = getDateRange();
 
-      // Build screenshot query with user filter
-      let screenshotQuery = supabase
-        .from('screenshots')
-        .select('*')
-        .gte('captured_at', start.toISOString())
-        .lte('captured_at', end.toISOString())
-        .order('captured_at', { ascending: false });
-
-      if (selectedUser !== 'all') {
-        screenshotQuery = screenshotQuery.eq('user_id', selectedUser);
-      }
-
       // Build time logs query with user filter
       let timeLogsQuery = supabase
         .from('time_logs')
@@ -109,26 +84,11 @@ export default function InsightsPage() {
         timeLogsQuery = timeLogsQuery.eq('user_id', selectedUser);
       }
 
-      const [screenshotsRes, projectsRes, timeLogsRes] = await Promise.all([
-        screenshotQuery,
-        supabase.from('projects').select('id, name'),
+      const [timeLogsRes] = await Promise.all([
         timeLogsQuery
       ]);
 
-      if (screenshotsRes.error) throw screenshotsRes.error;
-      if (projectsRes.error) throw projectsRes.error;
       if (timeLogsRes.error) throw timeLogsRes.error;
-
-      // Map screenshots to match our interface
-      const mappedScreenshots: Screenshot[] = (screenshotsRes.data || []).map((screenshot: any) => ({
-        id: screenshot.id,
-        user_id: screenshot.user_id || '', // Handle null user_id
-        project_id: screenshot.project_id || '',
-        captured_at: screenshot.captured_at,
-        file_url: screenshot.image_url, // Map image_url to file_url
-        activity_percent: screenshot.activity_percent || 0,
-        focus_percent: screenshot.focus_percent || 0
-      }));
 
       // Process time logs for breakdown chart
       const processedTimeLogs: TimeLogData[] = (timeLogsRes.data || []).map((log: any) => {
@@ -144,8 +104,10 @@ export default function InsightsPage() {
         };
       });
 
-      setScreenshots(mappedScreenshots);
-      setProjects(projectsRes.data || []);
+      setProjects(timeLogsRes.data?.map((log: any) => ({
+        id: log.projects?.id || '',
+        name: log.projects?.name || 'Unknown Project'
+      })) || []);
       setTimeLogData(processedTimeLogs);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -168,16 +130,6 @@ export default function InsightsPage() {
     }
   };
 
-  const openScreenshotModal = (screenshot: Screenshot) => {
-    setSelectedScreenshot(screenshot);
-    setIsModalOpen(true);
-  };
-
-  const closeScreenshotModal = () => {
-    setSelectedScreenshot(null);
-    setIsModalOpen(false);
-  };
-
   if (userDetails?.role !== 'admin') {
     return (
       <div className="flex items-center justify-center h-64">
@@ -186,18 +138,18 @@ export default function InsightsPage() {
     );
   }
 
-  const productivityData = screenshots.map((screenshot: any) => ({
-    time: format(new Date(screenshot.captured_at), 'HH:mm'),
-    activity: screenshot.activity_percent || 0,
-    focus: screenshot.focus_percent || 0
+  const productivityData = timeLogData.map((log: any) => ({
+    time: format(new Date(log.date), 'HH:mm'),
+    activity: log.hours,
+    focus: log.hours
   }));
 
-  const hourlyActivity = screenshots.reduce((acc: any, screenshot: any) => {
-    const hour = format(new Date(screenshot.captured_at), 'HH:00');
+  const hourlyActivity = timeLogData.reduce((acc: any, log: any) => {
+    const hour = format(new Date(log.date), 'HH:00');
     if (!acc[hour]) {
       acc[hour] = { hour, total: 0, count: 0 };
     }
-    acc[hour].total += screenshot.activity_percent || 0;
+    acc[hour].total += log.hours;
     acc[hour].count += 1;
     return acc;
   }, {});
@@ -389,100 +341,6 @@ export default function InsightsPage() {
           </div>
         </div>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5" />
-            Recent Screenshots
-          </CardTitle>
-          <CardDescription>
-            Latest screenshots captured from employee screens. Click to view in detail.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {loading ? (
-            <div className="text-center py-4">Loading screenshots...</div>
-          ) : screenshots.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground">
-              No screenshots found for the selected period.
-            </div>
-          ) : (
-            screenshots.map((screenshot) => (
-              <div 
-                key={screenshot.id} 
-                className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => openScreenshotModal(screenshot)}
-              >
-                <div className="relative group">
-                  <img
-                    src={screenshot.file_url}
-                    alt={`Screenshot at ${format(new Date(screenshot.captured_at), 'MMM dd, yyyy HH:mm')}`}
-                    className="w-full h-32 object-cover rounded-md"
-                  />
-                  <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-30 transition-opacity duration-200 rounded-md flex items-center justify-center">
-                    <ZoomIn className="h-8 w-8 text-white" />
-                  </div>
-                </div>
-                <div className="mt-2 space-y-1">
-                  <p className="text-sm font-medium">
-                    {format(new Date(screenshot.captured_at), 'MMM dd, yyyy HH:mm')}
-                  </p>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="secondary">Activity: {screenshot.activity_percent}%</Badge>
-                    <Badge variant="secondary">Focus: {screenshot.focus_percent}%</Badge>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Screenshot Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Screenshot Details</span>
-              <Button variant="ghost" size="sm" onClick={closeScreenshotModal}>
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogTitle>
-          </DialogHeader>
-          {selectedScreenshot && (
-            <div className="space-y-4">
-              <img
-                src={selectedScreenshot.file_url}
-                alt={`Screenshot at ${format(new Date(selectedScreenshot.captured_at), 'MMM dd, yyyy HH:mm:ss')}`}
-                className="w-full h-auto rounded-lg"
-              />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Captured:</span>
-                  <p className="text-muted-foreground">
-                    {format(new Date(selectedScreenshot.captured_at), 'MMM dd, yyyy HH:mm:ss')}
-                  </p>
-                </div>
-                <div>
-                  <span className="font-medium">Activity:</span>
-                  <p className="text-muted-foreground">{selectedScreenshot.activity_percent}%</p>
-                </div>
-                <div>
-                  <span className="font-medium">Focus:</span>
-                  <p className="text-muted-foreground">{selectedScreenshot.focus_percent}%</p>
-                </div>
-                <div>
-                  <span className="font-medium">User:</span>
-                  <p className="text-muted-foreground">
-                    {users.find(u => u.id === selectedScreenshot.user_id)?.full_name || 'Unknown User'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

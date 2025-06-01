@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Calendar, Download, Eye } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Calendar, Download, Eye, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -40,6 +40,8 @@ export default function AdminScreenshots() {
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+  const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchScreenshots();
@@ -100,8 +102,14 @@ export default function AdminScreenshots() {
     }
   };
 
-  const handleViewScreenshot = (imageUrl: string) => {
-    window.open(imageUrl, '_blank');
+  const handleViewScreenshot = (screenshot: Screenshot) => {
+    setSelectedScreenshot(screenshot);
+    setIsModalOpen(true);
+  };
+
+  const closeScreenshotModal = () => {
+    setSelectedScreenshot(null);
+    setIsModalOpen(false);
   };
 
   const handleDownloadScreenshot = async (imageUrl: string, fileName: string) => {
@@ -188,7 +196,7 @@ export default function AdminScreenshots() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleViewScreenshot(screenshot.image_url)}
+                          onClick={() => handleViewScreenshot(screenshot)}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -211,6 +219,64 @@ export default function AdminScreenshots() {
           )}
         </CardContent>
       </Card>
+
+      {selectedScreenshot && (
+        <Dialog open={isModalOpen} onOpenChange={closeScreenshotModal}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Screenshot Details</span>
+                <Button variant="ghost" size="sm" onClick={closeScreenshotModal}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <img
+                src={selectedScreenshot.image_url}
+                alt={`Screenshot ${selectedScreenshot.id}`}
+                className="w-full h-auto rounded-lg max-h-[60vh] object-contain"
+              />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Captured:</span>
+                  <p className="text-muted-foreground">
+                    {format(new Date(selectedScreenshot.captured_at), 'MMM dd, yyyy HH:mm:ss')}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-medium">User:</span>
+                  <p className="text-muted-foreground">{selectedScreenshot.user_name}</p>
+                </div>
+                <div>
+                  <span className="font-medium">Activity:</span>
+                  <p className="text-muted-foreground">
+                    {selectedScreenshot.activity_percent ? `${selectedScreenshot.activity_percent}%` : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-medium">Focus:</span>
+                  <p className="text-muted-foreground">
+                    {selectedScreenshot.focus_percent ? `${selectedScreenshot.focus_percent}%` : 'N/A'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleDownloadScreenshot(
+                    selectedScreenshot.image_url,
+                    `screenshot-${selectedScreenshot.id}.png`
+                  )}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
