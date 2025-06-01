@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ebdaa Time - Employee Portal</title>
+    <title>TimeFlow - Employee Desktop</title>
+    <link href="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -12,89 +14,108 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: #f8fafc;
             color: #1e293b;
             overflow: hidden;
+            height: 100vh;
         }
 
-        /* LOGIN SCREEN */
+        /* === LOGIN SCREEN === */
         .login-container {
-            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 1000;
         }
 
         .login-card {
             background: white;
-            padding: 40px;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-            width: 360px;
+            padding: 48px 40px;
+            border-radius: 20px;
+            box-shadow: 0 25px 75px rgba(0, 0, 0, 0.2);
+            width: 400px;
             text-align: center;
         }
 
+        .login-header {
+            margin-bottom: 32px;
+        }
+
         .login-logo {
-            font-size: 28px;
-            font-weight: 700;
-            color: #667eea;
+            font-size: 32px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             margin-bottom: 8px;
         }
 
         .login-subtitle {
             color: #64748b;
-            margin-bottom: 32px;
+            font-size: 16px;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
             text-align: left;
         }
 
         .form-label {
             display: block;
-            margin-bottom: 6px;
-            font-weight: 500;
+            margin-bottom: 8px;
+            font-weight: 600;
             color: #374151;
+            font-size: 14px;
         }
 
         .form-input {
             width: 100%;
-            padding: 12px 16px;
+            padding: 16px;
             border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.2s;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.2s;
+            background: #f8fafc;
         }
 
         .form-input:focus {
             outline: none;
             border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .login-btn {
             width: 100%;
-            padding: 14px;
-            background: #667eea;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 16px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.3s;
             margin-bottom: 16px;
         }
 
         .login-btn:hover {
-            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
         }
 
         .login-btn:disabled {
             background: #94a3b8;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         .quick-login-btn {
@@ -103,49 +124,120 @@
             background: #10b981;
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.3s;
             margin-bottom: 16px;
         }
 
         .quick-login-btn:hover {
             background: #059669;
+            transform: translateY(-1px);
         }
 
-        .login-help {
-            text-align: center;
-            margin-bottom: 16px;
+        .demo-info {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
         }
 
-        .login-help small {
-            color: #64748b;
-            font-size: 12px;
-            background: #f8fafc;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid #e2e8f0;
+        .demo-info h4 {
+            color: #0369a1;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .demo-info p {
+            color: #0284c7;
+            font-size: 13px;
+            line-height: 1.4;
         }
 
         .error-message {
-            color: #ef4444;
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            border-radius: 8px;
+            padding: 12px;
+            color: #dc2626;
             font-size: 14px;
-            margin-top: 8px;
+            margin-top: 16px;
             display: none;
         }
 
-        /* MAIN APP LAYOUT */
+        /* === MAIN APPLICATION === */
         .app-container {
+            display: none;
             height: 100vh;
-            display: flex;
-            display: none; /* Hidden initially until login */
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: 60px 1fr;
+            grid-template-areas: 
+                "sidebar header"
+                "sidebar main";
         }
 
-        /* SIDEBAR */
+        /* === HEADER === */
+        .app-header {
+            grid-area: header;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .tracking-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .tracking-status.active {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .tracking-status.paused {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .tracking-status.stopped {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* === SIDEBAR === */
         .sidebar {
-            width: 280px;
+            grid-area: sidebar;
             background: #1e293b;
             color: white;
             display: flex;
@@ -153,18 +245,18 @@
         }
 
         .sidebar-header {
-            padding: 24px 20px;
+            padding: 20px;
             border-bottom: 1px solid #334155;
         }
 
-        .sidebar-logo {
-            font-size: 20px;
-            font-weight: 700;
+        .app-logo {
+            font-size: 18px;
+            font-weight: 800;
             color: #60a5fa;
             margin-bottom: 4px;
         }
 
-        .sidebar-subtitle {
+        .app-subtitle {
             font-size: 12px;
             color: #94a3b8;
             text-transform: uppercase;
@@ -177,7 +269,7 @@
         }
 
         .nav-section {
-            margin-bottom: 32px;
+            margin-bottom: 24px;
         }
 
         .nav-section-title {
@@ -190,18 +282,14 @@
         }
 
         .nav-item {
-            display: block;
+            display: flex;
+            align-items: center;
             padding: 12px 20px;
             color: #cbd5e1;
-            text-decoration: none;
+            cursor: pointer;
             font-size: 14px;
             font-weight: 500;
             transition: all 0.2s;
-            cursor: pointer;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
         }
 
         .nav-item:hover,
@@ -210,9 +298,10 @@
             color: #60a5fa;
         }
 
-        .nav-item .nav-icon {
+        .nav-icon {
             margin-right: 12px;
-            font-size: 16px;
+            width: 18px;
+            height: 18px;
         }
 
         .sidebar-footer {
@@ -223,19 +312,19 @@
         .user-info {
             display: flex;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
 
         .user-avatar {
-            width: 32px;
-            height: 32px;
-            background: #60a5fa;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             margin-right: 12px;
-            font-weight: 600;
+            font-weight: 700;
             font-size: 14px;
         }
 
@@ -247,6 +336,7 @@
             font-weight: 600;
             color: white;
             font-size: 14px;
+            margin-bottom: 2px;
         }
 
         .user-role {
@@ -256,51 +346,40 @@
 
         .logout-btn {
             width: 100%;
-            padding: 8px 12px;
+            padding: 10px 16px;
             background: #374151;
             color: #cbd5e1;
             border: none;
-            border-radius: 6px;
-            font-size: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.2s;
         }
 
         .logout-btn:hover {
             background: #4b5563;
+            color: white;
         }
 
-        /* MAIN CONTENT */
+        /* === MAIN CONTENT === */
         .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .main-header {
-            background: white;
-            padding: 20px 32px;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .page-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: #1e293b;
-        }
-
-        .main-body {
-            flex: 1;
-            padding: 32px;
+            grid-area: main;
             overflow-y: auto;
+            padding: 32px;
             background: #f8fafc;
         }
 
-        /* DASHBOARD CARDS */
+        /* === PAGE SECTIONS === */
+        .page-section {
+            display: none;
+        }
+
+        .page-section.active {
+            display: block;
+        }
+
+        /* === DASHBOARD === */
         .dashboard-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -310,253 +389,275 @@
 
         .dashboard-card {
             background: white;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #f1f5f9;
         }
 
         .card-header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 16px;
+            justify-content: between;
+            margin-bottom: 24px;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 16px;
         }
 
         .card-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #1e293b;
-        }
-
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .status-badge.active {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .status-badge.paused {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-badge.stopped {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .time-display {
-            font-size: 32px;
+            font-size: 18px;
             font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .card-subtitle {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .metric-display {
+            margin-bottom: 20px;
+        }
+
+        .metric-value {
+            font-size: 36px;
+            font-weight: 800;
             color: #667eea;
             margin-bottom: 8px;
         }
 
-        .time-label {
+        .metric-label {
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .metric-change {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+
+        .metric-change.positive {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .metric-change.negative {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* === CONTROL BUTTONS === */
+        .control-section {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #f1f5f9;
+            margin-bottom: 32px;
+        }
+
+        .control-header {
+            margin-bottom: 24px;
+        }
+
+        .control-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .control-subtitle {
             color: #64748b;
             font-size: 14px;
         }
 
-        .control-buttons {
+        .button-group {
             display: flex;
-            gap: 12px;
-            margin-top: 20px;
+            gap: 16px;
         }
 
         .btn {
-            padding: 10px 20px;
+            flex: 1;
+            padding: 16px 24px;
             border: none;
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: 12px;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         .btn-primary {
-            background: #667eea;
+            background: linear-gradient(135deg, #10b981, #059669);
             color: white;
         }
 
         .btn-primary:hover {
-            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
         }
 
         .btn-secondary {
-            background: #e2e8f0;
-            color: #475569;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
         }
 
         .btn-secondary:hover {
-            background: #cbd5e1;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(245, 158, 11, 0.3);
         }
 
         .btn-danger {
-            background: #ef4444;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
             color: white;
         }
 
         .btn-danger:hover {
-            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
         }
 
         .btn:disabled {
-            opacity: 0.5;
+            background: #e2e8f0;
+            color: #94a3b8;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-top: 20px;
-        }
-
-        .stat-item {
-            text-align: center;
-            padding: 16px;
-            background: #f8fafc;
-            border-radius: 8px;
-        }
-
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: #667eea;
-            margin-bottom: 4px;
-        }
-
-        .stat-label {
-            font-size: 12px;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* ACTIVITY FEED */
-        .activity-card {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        .activity-item {
-            display: flex;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 12px;
-            font-size: 14px;
-        }
-
-        .activity-icon.screenshot {
-            background: #dbeafe;
-            color: #1d4ed8;
-        }
-
-        .activity-icon.idle {
-            background: #fee2e2;
-            color: #dc2626;
-        }
-
-        .activity-details {
-            flex: 1;
-        }
-
-        .activity-title {
-            font-weight: 500;
-            color: #1e293b;
-            margin-bottom: 2px;
-        }
-
-        .activity-time {
-            font-size: 12px;
-            color: #64748b;
-        }
-
-        /* RESPONSIVE */
-        .page-content {
-            display: none;
-        }
-
-        .page-content.active {
-            display: block;
-        }
-
-        /* NOTIFICATIONS */
+        /* === NOTIFICATIONS === */
         .notification {
             position: fixed;
             top: 20px;
             right: 20px;
-            background: #10b981;
-            color: white;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 14px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            padding: 16px 20px;
+            max-width: 400px;
             transform: translateX(100%);
-            transition: transform 0.3s ease;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: transform 0.3s;
+            z-index: 2000;
         }
 
         .notification.show {
             transform: translateX(0);
         }
 
-        .notification.error {
-            background: #ef4444;
+        .notification.success {
+            border-left: 4px solid #10b981;
         }
 
-        .notification.warning {
-            background: #f59e0b;
+        .notification.error {
+            border-left: 4px solid #ef4444;
+        }
+
+        .notification.info {
+            border-left: 4px solid #3b82f6;
+        }
+
+        /* === LOADING STATES === */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .app-container {
+                grid-template-columns: 60px 1fr;
+            }
+            
+            .sidebar-nav .nav-item span {
+                display: none;
+            }
+        }
+
+        /* === HIDDEN UTILITY === */
+        .hidden {
+            display: none !important;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body>
     <!-- LOGIN SCREEN -->
     <div id="loginContainer" class="login-container">
-        <div class="login-card">
-            <div class="login-logo">Ebdaa Time</div>
-            <div class="login-subtitle">Employee Time Tracking</div>
-            
+        <div class="login-card fade-in">
+            <div class="login-header">
+                <h1 class="login-logo">TimeFlow</h1>
+                <p class="login-subtitle">Employee Desktop Portal</p>
+            </div>
+
+            <div class="demo-info">
+                <h4>Demo Account Ready</h4>
+                <p>Click "Quick Login" to sign in with demo credentials, or enter your own credentials below.</p>
+            </div>
+
             <form id="loginForm">
                 <div class="form-group">
-                    <label class="form-label">Email</label>
+                    <label class="form-label" for="loginEmail">Email Address</label>
                     <input type="email" id="loginEmail" class="form-input" placeholder="Enter your email" value="employee@timeflow.com" required>
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">Password</label>
+                    <label class="form-label" for="loginPassword">Password</label>
                     <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" value="employee123456" required>
                 </div>
+
+                <button type="button" id="quickLoginBtn" class="quick-login-btn">
+                    🚀 Quick Login (Demo Account)
+                </button>
                 
-                <button type="submit" id="loginBtn" class="login-btn">Sign In</button>
-                
-                <button type="button" id="quickLoginBtn" class="quick-login-btn">Quick Login as Employee</button>
-                
-                <div class="login-help">
-                    <small>Demo credentials: employee@timeflow.com / employee123456</small>
-                </div>
-                
+                <button type="submit" id="loginBtn" class="login-btn">
+                    <span id="loginBtnText">Sign In</span>
+                    <span id="loginLoader" class="loading hidden"></span>
+                </button>
+
                 <div id="loginError" class="error-message"></div>
             </form>
         </div>
@@ -564,554 +665,209 @@
 
     <!-- MAIN APPLICATION -->
     <div id="appContainer" class="app-container">
+        <!-- HEADER -->
+        <div class="app-header">
+            <h1 id="pageTitle" class="page-title">Dashboard</h1>
+            <div class="header-actions">
+                <div id="trackingStatus" class="tracking-status stopped">
+                    <div class="status-dot"></div>
+                    <span>Not Tracking</span>
+                </div>
+            </div>
+        </div>
+
         <!-- SIDEBAR -->
         <div class="sidebar">
             <div class="sidebar-header">
-                <div class="sidebar-logo">Ebdaa Time</div>
-                <div class="sidebar-subtitle">Employee Portal</div>
+                <div class="app-logo">TimeFlow</div>
+                <div class="app-subtitle">Employee Portal</div>
             </div>
-            
+
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <div class="nav-section-title">Main</div>
-                    <button class="nav-item active" data-page="dashboard">
-                        <span class="nav-icon">📊</span>
-                        Dashboard
-                    </button>
-                    <button class="nav-item" data-page="time-tracker">
-                        <span class="nav-icon">⏰</span>
-                        Time Tracker
-                    </button>
-                    <button class="nav-item" data-page="reports">
-                        <span class="nav-icon">📈</span>
-                        Reports
-                    </button>
-                </div>
-                
-                <div class="nav-section">
-                    <div class="nav-section-title">Activity</div>
-                    <button class="nav-item" data-page="screenshots">
-                        <span class="nav-icon">📸</span>
-                        Screenshots
-                    </button>
-                    <button class="nav-item" data-page="idle-time">
-                        <span class="nav-icon">😴</span>
-                        Idle Time
-                    </button>
-                </div>
-            </nav>
-            
-            <div class="sidebar-footer">
-                <div class="user-info">
-                    <div class="user-avatar" id="userAvatar">U</div>
-                    <div class="user-details">
-                        <div class="user-name" id="userName">Employee</div>
-                        <div class="user-role">Team Member</div>
+                    
+                    <div class="nav-item active" data-page="dashboard">
+                        <i data-lucide="home" class="nav-icon"></i>
+                        <span>Dashboard</span>
+                    </div>
+                    
+                    <div class="nav-item" data-page="timetracker">
+                        <i data-lucide="clock" class="nav-icon"></i>
+                        <span>Time Tracker</span>
                     </div>
                 </div>
-                <button class="logout-btn" id="logoutBtn">Logout</button>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Activity</div>
+                    
+                    <div class="nav-item" data-page="screenshots">
+                        <i data-lucide="camera" class="nav-icon"></i>
+                        <span>Screenshots</span>
+                    </div>
+                    
+                    <div class="nav-item" data-page="reports">
+                        <i data-lucide="bar-chart-3" class="nav-icon"></i>
+                        <span>My Reports</span>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="userAvatar">E</div>
+                    <div class="user-details">
+                        <div class="user-name" id="userName">Employee User</div>
+                        <div class="user-role" id="userRole">Team Member</div>
+                    </div>
+                </div>
+                <button id="logoutBtn" class="logout-btn">Sign Out</button>
             </div>
         </div>
 
         <!-- MAIN CONTENT -->
         <div class="main-content">
-            <div class="main-header">
-                <h1 class="page-title" id="pageTitle">Dashboard</h1>
+            <!-- DASHBOARD PAGE -->
+            <div id="dashboardPage" class="page-section active">
+                <div class="dashboard-grid">
+                    <!-- TODAY'S TIME CARD -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i data-lucide="clock" style="color: white; width: 24px; height: 24px;"></i>
+                            </div>
+                            <div>
+                                <div class="card-title">Today's Time</div>
+                                <div class="card-subtitle">Total work hours</div>
+                            </div>
+                        </div>
+                        <div class="metric-display">
+                            <div class="metric-value" id="todayTime">0h 0m</div>
+                            <div class="metric-label">Active tracking time</div>
+                        </div>
+                    </div>
+
+                    <!-- CURRENT SESSION CARD -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i data-lucide="play-circle" style="color: white; width: 24px; height: 24px;"></i>
+                            </div>
+                            <div>
+                                <div class="card-title">Current Session</div>
+                                <div class="card-subtitle">Active session time</div>
+                            </div>
+                        </div>
+                        <div class="metric-display">
+                            <div class="metric-value" id="sessionTime">--:--:--</div>
+                            <div class="metric-label" id="sessionStatus">Ready to start</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TRACKING CONTROLS -->
+                <div class="control-section">
+                    <div class="control-header">
+                        <div class="control-title">Time Tracking Controls</div>
+                        <div class="control-subtitle">Start, pause, or stop your work session</div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button id="startBtn" class="btn btn-primary">
+                            <i data-lucide="play" style="width: 20px; height: 20px;"></i>
+                            <span>Start Tracking</span>
+                        </button>
+                        
+                        <button id="pauseBtn" class="btn btn-secondary" disabled>
+                            <i data-lucide="pause" style="width: 20px; height: 20px;"></i>
+                            <span>Pause</span>
+                        </button>
+                        
+                        <button id="stopBtn" class="btn btn-danger" disabled>
+                            <i data-lucide="stop-circle" style="width: 20px; height: 20px;"></i>
+                            <span>Stop</span>
+                        </button>
+                    </div>
+                </div>
             </div>
-            
-            <div class="main-body">
-                <!-- DASHBOARD PAGE -->
-                <div id="dashboardPage" class="page-content active">
-                    <div class="dashboard-grid">
-                        <!-- Current Session -->
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <h3 class="card-title">Current Session</h3>
-                                <span id="sessionStatus" class="status-badge stopped">Stopped</span>
-                            </div>
-                            
-                            <div class="time-display" id="sessionTime">00:00:00</div>
-                            <div class="time-label">Time tracked today</div>
-                            
-                            <div class="control-buttons">
-                                <button id="startBtn" class="btn btn-primary">Start Tracking</button>
-                                <button id="pauseBtn" class="btn btn-secondary" disabled>Pause</button>
-                                <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
-                            </div>
-                        </div>
 
-                        <!-- Activity Stats -->
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <h3 class="card-title">Activity Statistics</h3>
-                            </div>
-                            
-                            <div class="stats-grid">
-                                <div class="stat-item">
-                                    <div class="stat-value" id="activityPercent">0%</div>
-                                    <div class="stat-label">Activity</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value" id="focusPercent">100%</div>
-                                    <div class="stat-label">Focus</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value" id="mouseClicks">0</div>
-                                    <div class="stat-label">Mouse Clicks</div>
-                                </div>
-                            </div>
-                        </div>
+            <!-- TIME TRACKER PAGE -->
+            <div id="timetrackerPage" class="page-section">
+                <div class="control-section">
+                    <div class="control-header">
+                        <div class="control-title">Time Tracker</div>
+                        <div class="control-subtitle">Manage your work sessions</div>
                     </div>
-
-                    <!-- Recent Activity -->
-                    <div class="activity-card">
-                        <h3 class="card-title" style="margin-bottom: 20px;">Recent Activity</h3>
-                        <div id="activityFeed">
-                            <div class="activity-item">
-                                <div class="activity-icon screenshot">📸</div>
-                                <div class="activity-details">
-                                    <div class="activity-title">Screenshot captured</div>
-                                    <div class="activity-time">Just now</div>
-                                </div>
-                            </div>
-                        </div>
+                    
+                    <div style="text-align: center; margin-bottom: 32px;">
+                        <div class="metric-value" id="trackerTime">00:00:00</div>
+                        <div class="metric-label" id="trackerStatus">Ready to start tracking</div>
                     </div>
-                </div>
-
-                <!-- TIME TRACKER PAGE -->
-                <div id="timeTrackerPage" class="page-content">
-                    <div class="dashboard-grid">
-                        <!-- Current Session Details -->
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <h3 class="card-title">Current Session</h3>
-                                <span id="trackerSessionStatus" class="status-badge stopped">Stopped</span>
-                            </div>
-                            
-                            <div class="time-display" id="trackerSessionTime">00:00:00</div>
-                            <div class="time-label">Current session duration</div>
-                            
-                            <div class="control-buttons">
-                                <button id="trackerStartBtn" class="btn btn-primary">Start Session</button>
-                                <button id="trackerPauseBtn" class="btn btn-secondary" disabled>Pause</button>
-                                <button id="trackerStopBtn" class="btn btn-danger" disabled>End Session</button>
-                            </div>
-                            
-                            <div style="margin-top: 20px;">
-                                <div class="form-group">
-                                    <label class="form-label">Current Task</label>
-                                    <input type="text" class="form-input" placeholder="What are you working on?" id="currentTaskInput">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Today's Summary -->
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <h3 class="card-title">Today's Summary</h3>
-                                <span class="time-label" id="todayDate">December 10, 2024</span>
-                            </div>
-                            
-                            <div class="stats-grid">
-                                <div class="stat-item">
-                                    <div class="stat-value" id="todayTotalTime">0h 0m</div>
-                                    <div class="stat-label">Total Time</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value" id="todayActiveTime">0h 0m</div>
-                                    <div class="stat-label">Active Time</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value" id="todayIdleTime">0m</div>
-                                    <div class="stat-label">Idle Time</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Time Entries -->
-                    <div class="activity-card">
-                        <div class="card-header" style="margin-bottom: 20px;">
-                            <h3 class="card-title">Time Entries</h3>
-                            <button class="btn btn-primary" style="padding: 8px 16px; font-size: 14px;">Add Manual Entry</button>
-                        </div>
-                        <div id="timeEntriesList">
-                            <div class="time-entry">
-                                <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px;">
-                                    <div>
-                                        <div style="font-weight: 600; color: #1e293b;">Development Work</div>
-                                        <div style="font-size: 14px; color: #64748b;">09:00 AM - 12:30 PM</div>
-                                    </div>
-                                    <div style="text-align: right;">
-                                        <div style="font-weight: 600; color: #667eea;">3h 30m</div>
-                                        <div style="font-size: 12px; color: #10b981;">✓ Completed</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="time-entry">
-                                <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px;">
-                                    <div>
-                                        <div style="font-weight: 600; color: #1e293b;">Client Meeting</div>
-                                        <div style="font-size: 14px; color: #64748b;">02:00 PM - 03:00 PM</div>
-                                    </div>
-                                    <div style="text-align: right;">
-                                        <div style="font-weight: 600; color: #667eea;">1h 00m</div>
-                                        <div style="font-size: 12px; color: #10b981;">✓ Completed</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- REPORTS PAGE -->
-                <div id="reportsPage" class="page-content">
-                    <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 24px;">
-                        <!-- Weekly Stats -->
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <h3 class="card-title">This Week</h3>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value" style="font-size: 28px;">32h 15m</div>
-                                <div class="stat-label">Total Hours</div>
-                            </div>
-                            <div style="margin-top: 12px; font-size: 14px; color: #10b981;">
-                                ↗ +2h from last week
-                            </div>
-                        </div>
-
-                        <!-- Monthly Stats -->
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <h3 class="card-title">This Month</h3>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value" style="font-size: 28px;">142h 30m</div>
-                                <div class="stat-label">Total Hours</div>
-                            </div>
-                            <div style="margin-top: 12px; font-size: 14px; color: #10b981;">
-                                ↗ +12h from last month
-                            </div>
-                        </div>
-
-                        <!-- Productivity Score -->
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <h3 class="card-title">Productivity</h3>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value" style="font-size: 28px; color: #10b981;">87%</div>
-                                <div class="stat-label">This Week</div>
-                            </div>
-                            <div style="margin-top: 12px; font-size: 14px; color: #10b981;">
-                                ↗ +5% improvement
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Detailed Reports -->
-                    <div class="activity-card">
-                        <div class="card-header" style="margin-bottom: 20px;">
-                            <h3 class="card-title">Time Breakdown</h3>
-                            <div style="display: flex; gap: 12px;">
-                                <select class="form-input" style="width: auto;">
-                                    <option>Last 7 days</option>
-                                    <option>Last 30 days</option>
-                                    <option>This month</option>
-                                </select>
-                                <button class="btn btn-primary" style="padding: 8px 16px; font-size: 14px;">Export</button>
-                            </div>
-                        </div>
+                    
+                    <div class="button-group">
+                        <button id="trackerStartBtn" class="btn btn-primary">
+                            <i data-lucide="play" style="width: 20px; height: 20px;"></i>
+                            <span>Start</span>
+                        </button>
                         
-                        <!-- Chart placeholder -->
-                        <div style="height: 200px; background: #f8fafc; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; border: 2px dashed #e2e8f0;">
-                            <div style="text-align: center; color: #64748b;">
-                                <div style="font-size: 18px; margin-bottom: 8px;">📊</div>
-                                <div>Time tracking chart would appear here</div>
-                            </div>
-                        </div>
-
-                        <!-- Activity breakdown -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-                            <div>
-                                <h4 style="margin-bottom: 16px; color: #1e293b;">Top Applications</h4>
-                                <div class="app-usage-item" style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                                    <span>Visual Studio Code</span>
-                                    <span style="font-weight: 600;">12h 30m</span>
-                                </div>
-                                <div class="app-usage-item" style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                                    <span>Chrome Browser</span>
-                                    <span style="font-weight: 600;">8h 45m</span>
-                                </div>
-                                <div class="app-usage-item" style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                                    <span>Slack</span>
-                                    <span style="font-weight: 600;">2h 15m</span>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 style="margin-bottom: 16px; color: #1e293b;">Daily Average</h4>
-                                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                                    <span>Active Time</span>
-                                    <span style="font-weight: 600; color: #10b981;">6h 24m</span>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                                    <span>Idle Time</span>
-                                    <span style="font-weight: 600; color: #f59e0b;">1h 12m</span>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                                    <span>Focus Score</span>
-                                    <span style="font-weight: 600; color: #667eea;">91%</span>
-                                </div>
-                            </div>
-                        </div>
+                        <button id="trackerPauseBtn" class="btn btn-secondary" disabled>
+                            <i data-lucide="pause" style="width: 20px; height: 20px;"></i>
+                            <span>Pause</span>
+                        </button>
+                        
+                        <button id="trackerStopBtn" class="btn btn-danger" disabled>
+                            <i data-lucide="stop-circle" style="width: 20px; height: 20px;"></i>
+                            <span>Stop</span>
+                        </button>
                     </div>
                 </div>
+            </div>
 
-                <!-- SCREENSHOTS PAGE -->
-                <div id="screenshotsPage" class="page-content">
-                    <div style="margin-bottom: 24px;">
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <h3 class="card-title">Screenshot Settings</h3>
-                            </div>
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-                                <div class="stat-item">
-                                    <div class="stat-value">20s</div>
-                                    <div class="stat-label">Capture Interval</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value">156</div>
-                                    <div class="stat-label">Today's Captures</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value">92%</div>
-                                    <div class="stat-label">Quality Score</div>
-                                </div>
-                            </div>
-                        </div>
+            <!-- SCREENSHOTS PAGE -->
+            <div id="screenshotsPage" class="page-section">
+                <div class="control-section">
+                    <div class="control-header">
+                        <div class="control-title">Screenshots</div>
+                        <div class="control-subtitle">View your recent activity screenshots</div>
                     </div>
-
-                    <div class="activity-card">
-                        <div class="card-header" style="margin-bottom: 20px;">
-                            <h3 class="card-title">Recent Screenshots</h3>
-                            <div style="display: flex; gap: 12px; align-items: center;">
-                                <input type="date" class="form-input" style="width: auto;" id="screenshotDate">
-                                <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">Filter</button>
-                            </div>
-                        </div>
-                        
-                        <!-- Screenshot grid -->
-                        <div id="screenshotGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
-                            <div class="screenshot-item" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;">
-                                <div style="width: 100%; height: 120px; background: #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
-                                    <span style="color: #64748b;">📸</span>
-                                </div>
-                                <div style="font-size: 12px; color: #64748b;">15:42:30</div>
-                                <div style="font-size: 11px; color: #94a3b8;">Activity: 95%</div>
-                            </div>
-                            <div class="screenshot-item" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;">
-                                <div style="width: 100%; height: 120px; background: #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
-                                    <span style="color: #64748b;">📸</span>
-                                </div>
-                                <div style="font-size: 12px; color: #64748b;">15:42:10</div>
-                                <div style="font-size: 11px; color: #94a3b8;">Activity: 87%</div>
-                            </div>
-                            <div class="screenshot-item" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;">
-                                <div style="width: 100%; height: 120px; background: #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
-                                    <span style="color: #64748b;">📸</span>
-                                </div>
-                                <div style="font-size: 12px; color: #64748b;">15:41:50</div>
-                                <div style="font-size: 11px; color: #94a3b8;">Activity: 92%</div>
-                            </div>
-                            <div class="screenshot-item" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;">
-                                <div style="width: 100%; height: 120px; background: #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
-                                    <span style="color: #64748b;">📸</span>
-                                </div>
-                                <div style="font-size: 12px; color: #64748b;">15:41:30</div>
-                                <div style="font-size: 11px; color: #94a3b8;">Activity: 78%</div>
-                            </div>
-                            <div class="screenshot-item" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;">
-                                <div style="width: 100%; height: 120px; background: #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
-                                    <span style="color: #64748b;">📸</span>
-                                </div>
-                                <div style="font-size: 12px; color: #64748b;">15:41:10</div>
-                                <div style="font-size: 11px; color: #94a3b8;">Activity: 89%</div>
-                            </div>
-                            <div class="screenshot-item" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;">
-                                <div style="width: 100%; height: 120px; background: #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
-                                    <span style="color: #64748b;">📸</span>
-                                </div>
-                                <div style="font-size: 12px; color: #64748b;">15:40:50</div>
-                                <div style="font-size: 11px; color: #94a3b8;">Activity: 96%</div>
-                            </div>
-                        </div>
-
-                        <div style="text-align: center; margin-top: 24px;">
-                            <button class="btn btn-secondary" id="loadMoreScreenshotsBtn">Load More Screenshots</button>
-                        </div>
+                    
+                    <div style="text-align: center; padding: 40px;">
+                        <i data-lucide="camera" style="width: 48px; height: 48px; color: #94a3b8; margin-bottom: 16px;"></i>
+                        <p style="color: #64748b;">Screenshots will appear here during active tracking sessions</p>
                     </div>
                 </div>
+            </div>
 
-                <!-- IDLE TIME PAGE -->
-                <div id="idleTimePage" class="page-content">
-                    <div class="dashboard-grid" style="margin-bottom: 24px;">
-                        <!-- Today's Idle Summary -->
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <h3 class="card-title">Today's Idle Time</h3>
-                            </div>
-                            <div class="time-display" style="color: #f59e0b;">23m</div>
-                            <div class="time-label">Total idle periods</div>
-                            
-                            <div class="stats-grid" style="margin-top: 16px;">
-                                <div class="stat-item">
-                                    <div class="stat-value">8</div>
-                                    <div class="stat-label">Periods</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value">2.9m</div>
-                                    <div class="stat-label">Avg Length</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-value">7m</div>
-                                    <div class="stat-label">Longest</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Idle Settings -->
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <h3 class="card-title">Idle Detection</h3>
-                            </div>
-                            
-                            <div style="margin-bottom: 16px;">
-                                <div class="form-group">
-                                    <label class="form-label">Idle Threshold</label>
-                                    <select class="form-input">
-                                        <option>2 minutes</option>
-                                        <option selected>5 minutes</option>
-                                        <option>10 minutes</option>
-                                        <option>15 minutes</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
-                                <span style="color: #15803d;">✓</span>
-                                <span style="color: #15803d; font-size: 14px;">Auto-pause enabled</span>
-                            </div>
-                        </div>
+            <!-- REPORTS PAGE -->
+            <div id="reportsPage" class="page-section">
+                <div class="control-section">
+                    <div class="control-header">
+                        <div class="control-title">My Reports</div>
+                        <div class="control-subtitle">View your time tracking reports and statistics</div>
                     </div>
-
-                    <!-- Idle History -->
-                    <div class="activity-card">
-                        <div class="card-header" style="margin-bottom: 20px;">
-                            <h3 class="card-title">Idle Periods Today</h3>
-                            <div style="font-size: 14px; color: #64748b;">All times automatically detected</div>
-                        </div>
-                        
-                        <div id="idlePeriodsList">
-                            <div class="idle-period" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px;">
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <div style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></div>
-                                    <div>
-                                        <div style="font-weight: 600;">15:30 - 15:37</div>
-                                        <div style="font-size: 14px; color: #64748b;">Break period</div>
-                                    </div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <div style="font-weight: 600; color: #f59e0b;">7m</div>
-                                    <div style="font-size: 12px; color: #64748b;">Auto-paused</div>
-                                </div>
-                            </div>
-                            
-                            <div class="idle-period" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px;">
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <div style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></div>
-                                    <div>
-                                        <div style="font-weight: 600;">12:15 - 12:18</div>
-                                        <div style="font-size: 14px; color: #64748b;">Short break</div>
-                                    </div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <div style="font-weight: 600; color: #f59e0b;">3m</div>
-                                    <div style="font-size: 12px; color: #64748b;">Auto-paused</div>
-                                </div>
-                            </div>
-                            
-                            <div class="idle-period" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px;">
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <div style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></div>
-                                    <div>
-                                        <div style="font-weight: 600;">10:45 - 10:47</div>
-                                        <div style="font-size: 14px; color: #64748b;">Brief pause</div>
-                                    </div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <div style="font-weight: 600; color: #f59e0b;">2m</div>
-                                    <div style="font-size: 12px; color: #64748b;">Auto-paused</div>
-                                </div>
-                            </div>
-                            
-                            <div class="idle-period" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px;">
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <div style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></div>
-                                    <div>
-                                        <div style="font-weight: 600;">09:30 - 09:34</div>
-                                        <div style="font-size: 14px; color: #64748b;">Coffee break</div>
-                                    </div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <div style="font-weight: 600; color: #f59e0b;">4m</div>
-                                    <div style="font-size: 12px; color: #64748b;">Auto-paused</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Weekly comparison -->
-                        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
-                            <h4 style="margin-bottom: 16px; color: #1e293b;">Weekly Comparison</h4>
-                            <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px;">
-                                <div style="text-align: center; padding: 12px; background: #f8fafc; border-radius: 6px;">
-                                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Mon</div>
-                                    <div style="font-weight: 600; color: #f59e0b;">18m</div>
-                                </div>
-                                <div style="text-align: center; padding: 12px; background: #f8fafc; border-radius: 6px;">
-                                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Tue</div>
-                                    <div style="font-weight: 600; color: #f59e0b;">25m</div>
-                                </div>
-                                <div style="text-align: center; padding: 12px; background: #f8fafc; border-radius: 6px;">
-                                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Wed</div>
-                                    <div style="font-weight: 600; color: #f59e0b;">31m</div>
-                                </div>
-                                <div style="text-align: center; padding: 12px; background: #f8fafc; border-radius: 6px;">
-                                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Thu</div>
-                                    <div style="font-weight: 600; color: #f59e0b;">22m</div>
-                                </div>
-                                <div style="text-align: center; padding: 12px; background: #eef2ff; border-radius: 6px; border: 2px solid #667eea;">
-                                    <div style="font-size: 12px; color: #667eea; margin-bottom: 4px;">Today</div>
-                                    <div style="font-weight: 600; color: #f59e0b;">23m</div>
-                                </div>
-                                <div style="text-align: center; padding: 12px; background: #f8fafc; border-radius: 6px; opacity: 0.5;">
-                                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Sat</div>
-                                    <div style="font-weight: 600; color: #94a3b8;">-</div>
-                                </div>
-                                <div style="text-align: center; padding: 12px; background: #f8fafc; border-radius: 6px; opacity: 0.5;">
-                                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Sun</div>
-                                    <div style="font-weight: 600; color: #94a3b8;">-</div>
-                                </div>
-                            </div>
-                        </div>
+                    
+                    <div style="text-align: center; padding: 40px;">
+                        <i data-lucide="bar-chart-3" style="width: 48px; height: 48px; color: #94a3b8; margin-bottom: 16px;"></i>
+                        <p style="color: #64748b;">Your detailed reports and analytics will be displayed here</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Include Supabase client -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2.45.1/dist/umd/supabase.js"></script>
+    <!-- NOTIFICATION -->
+    <div id="notification" class="notification">
+        <div id="notificationMessage">Notification message</div>
+    </div>
+
     <script src="renderer.js"></script>
+    <script>
+        // Initialize Lucide icons
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        });
+    </script>
 </body>
 </html>
