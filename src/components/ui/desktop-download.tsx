@@ -44,41 +44,35 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Create a comprehensive download information modal
-    const platformInfo = {
-      windows: { name: 'Windows', size: '85MB', file: 'TimeFlow-Setup.exe' },
-      'mac-intel': { name: 'macOS (Intel)', size: '117MB', file: 'TimeFlow-Intel.dmg' },
-      'mac-arm': { name: 'macOS (Apple Silicon)', size: '110MB', file: 'TimeFlow-ARM.dmg' },
-      linux: { name: 'Linux', size: '120MB', file: 'TimeFlow.AppImage' }
+    // Define the download files available in public/downloads/
+    const downloadFiles = {
+      windows: '/downloads/TimeFlow-Setup.exe',
+      'mac-intel': '/downloads/TimeFlow-Intel.dmg',
+      'mac-arm': '/downloads/TimeFlow-ARM.dmg',
+      'mac': '/downloads/TimeFlow-Intel.dmg', // Default to Intel for generic mac
+      linux: '/downloads/TimeFlow.AppImage'
     };
     
-    const info = platformInfo[platform as keyof typeof platformInfo];
+    const filePath = downloadFiles[platform as keyof typeof downloadFiles];
     
-    setTimeout(() => {
-      const message = `TimeFlow Desktop App - ${info?.name || 'Unknown Platform'}
-
-📱 Ready for Download:
-• File: ${info?.file || 'N/A'}
-• Size: ${info?.size || 'N/A'}
-• Status: ✅ Available
-
-📧 To Download:
-Contact your system administrator at:
-• Email: admin@timeflow.com
-• Or request through your IT department
-
-💡 Features Included:
-• Automatic screenshot capture (every 2-8 minutes)
-• Real-time activity tracking
-• Application usage monitoring  
-• Idle time detection
-• Secure data encryption
-
-The desktop app provides enhanced monitoring capabilities that complement the web dashboard.`;
+    if (filePath) {
+      // Create a temporary link to trigger download
+      const link = document.createElement('a');
+      link.href = filePath;
+      link.download = filePath.split('/').pop() || 'TimeFlow-Desktop';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       
-      alert(message);
+      // Show success message
+      setTimeout(() => {
+        alert(`✅ Download started for ${getOSName(platform)}!\n\nFile: ${filePath.split('/').pop()}\nSize: ${getFileSize(platform)}\n\n📋 Installation Notes:\n• Windows: Run the .exe file as administrator\n• macOS: Open the .dmg file and drag to Applications\n• Linux: Make the .AppImage executable and run\n\n🔐 The app includes automatic screenshot capture and activity tracking capabilities.`);
+        setDownloading(null);
+      }, 500);
+    } else {
+      alert('❌ Download file not found. Please contact your administrator.');
       setDownloading(null);
-    }, 800);
+    }
   };
   
   const getOSIcon = (platform: string) => {

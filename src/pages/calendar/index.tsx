@@ -40,6 +40,8 @@ interface CalendarEvent {
     user: string;
     project: string;
     duration: string;
+    rawDuration: number; // in minutes
+    status: string;
   };
 }
 
@@ -53,6 +55,7 @@ export default function CalendarPage() {
   const [currentView, setCurrentView] = useState<View>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
   useEffect(() => {
     if (userDetails?.role === 'admin') {
@@ -100,6 +103,28 @@ export default function CalendarPage() {
     try {
       setLoading(true);
       
+      // Get data for the visible date range based on current view
+      let startDate, endDate;
+      const currentMoment = moment(currentDate);
+      
+      switch (currentView) {
+        case 'month':
+          startDate = currentMoment.clone().startOf('month').startOf('week');
+          endDate = currentMoment.clone().endOf('month').endOf('week');
+          break;
+        case 'week':
+          startDate = currentMoment.clone().startOf('week');
+          endDate = currentMoment.clone().endOf('week');
+          break;
+        case 'day':
+          startDate = currentMoment.clone().startOf('day');
+          endDate = currentMoment.clone().endOf('day');
+          break;
+        default:
+          startDate = currentMoment.clone().subtract(7, 'days');
+          endDate = currentMoment.clone().add(7, 'days');
+      }
+      
       let query = supabase
         .from('time_logs')
         .select(`
@@ -108,10 +133,12 @@ export default function CalendarPage() {
           end_time,
           user_id,
           project_id,
+          status,
           users!inner(id, full_name, email),
-          projects!inner(id, name)
+          projects(id, name)
         `)
-        .not('end_time', 'is', null)
+        .gte('start_time', startDate.toISOString())
+        .lte('start_time', endDate.toISOString())
         .order('start_time', { ascending: false });
 
       if (selectedUser !== 'all') {
@@ -126,28 +153,64 @@ export default function CalendarPage() {
 
       if (error) throw error;
 
-      // Transform time logs into calendar events
-      const calendarEvents: CalendarEvent[] = (timeLogs || []).map((log: any) => {
-        const userName = log.users?.full_name || log.users?.email || 'Unknown User';
-        const projectName = log.projects?.name || 'No Project';
-        
-        const startTime = new Date(log.start_time);
-        const endTime = log.end_time ? new Date(log.end_time) : new Date();
-        const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
-
-        return {
-          id: log.id,
-          title: `${userName} - ${projectName}`,
-          start: startTime,
-          end: endTime,
-          resource: {
-            user: userName,
-            project: projectName,
-            duration: `${Math.floor(duration / 60)}h ${duration % 60}m`
+      // Transform time logs into calendar events with proper duration calculation
+      const calendarEvents: CalendarEvent[] = (timeLogs || [])
+        .filter(log => log.start_time) // Ensure we have valid start time
+        .map((log: any) => {
+          const userName = log.users?.full_name || log.users?.email || 'Unknown User';
+          const projectName = log.projects?.name || 'Default Project';
+          
+          const startTime = new Date(log.start_time);
+          
+          // Handle end time properly - if no end_time, use current time but cap at reasonable limit
+          let endTime: Date;
+          if (log.end_time) {
+            endTime = new Date(log.end_time);
+          } else {
+            // For active sessions, use current time but cap display duration
+            const now = new Date();
+            const maxDuration = 24 * 60 * 60 * 1000; // 24 hours max
+            const sessionDuration = now.getTime() - startTime.getTime();
+            
+            if (sessionDuration > maxDuration) {
+              endTime = new Date(startTime.getTime() + maxDuration);
+            } else {
+              endTime = now;
+            }
           }
-        };
-      });
+          
+          // Calculate duration in minutes and validate
+          const durationMs = endTime.getTime() - startTime.getTime();
+          const durationMinutes = Math.max(0, Math.round(durationMs / (1000 * 60)));
+          
+          // Cap unreasonable durations (longer than 16 hours)
+          const cappedDuration = Math.min(durationMinutes, 16 * 60);
+          
+          // Adjust end time if duration was capped
+          const finalEndTime = new Date(startTime.getTime() + cappedDuration * 60 * 1000);
+          
+          // Format duration display
+          const hours = Math.floor(cappedDuration / 60);
+          const minutes = cappedDuration % 60;
+          const durationDisplay = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+          
+          return {
+            id: log.id,
+            title: `${userName}`,
+            start: startTime,
+            end: finalEndTime,
+            resource: {
+              user: userName,
+              project: projectName,
+              duration: durationDisplay,
+              rawDuration: cappedDuration,
+              status: log.status || 'completed'
+            }
+          };
+        })
+        .filter(event => event.resource.rawDuration > 0); // Filter out zero-duration events
 
+      console.log(`📅 Loaded ${calendarEvents.length} calendar events for ${currentView} view`);
       setEvents(calendarEvents);
     } catch (error) {
       console.error('Error fetching time logs:', error);
@@ -157,7 +220,45 @@ export default function CalendarPage() {
     }
   };
 
-  
+  // Handle event selection
+  const handleSelectEvent = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    toast.info(`Selected: ${event.resource.user} - ${event.resource.project} (${event.resource.duration})`);
+  };
+
+  // Handle slot selection (for creating new events - admin feature)
+  const handleSelectSlot = ({ start, end }: { start: Date; end: Date }) => {
+    if (userDetails?.role === 'admin') {
+      const duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+      toast.info(`Selected time slot: ${moment(start).format('HH:mm')} - ${moment(end).format('HH:mm')} (${duration}min)`);
+    }
+  };
+
+  // Custom event component with better styling
+  const EventComponent = ({ event }: { event: CalendarEvent }) => {
+    const isActive = event.resource.status === 'active';
+    const isLongSession = event.resource.rawDuration > 480; // 8+ hours
+    
+    return (
+      <div 
+        className={`text-xs p-1 rounded cursor-pointer transition-all hover:opacity-90 ${
+          isActive ? 'bg-green-500 text-white' : 
+          isLongSession ? 'bg-orange-500 text-white' : 
+          'bg-blue-500 text-white'
+        }`}
+        onClick={() => handleSelectEvent(event)}
+      >
+        <div className="font-medium truncate">{event.resource.user}</div>
+        <div className="truncate opacity-90">{event.resource.project}</div>
+        <Badge 
+          variant={isActive ? "default" : "secondary"} 
+          className="text-xs mt-1"
+        >
+          {event.resource.duration} {isActive && '(Active)'}
+        </Badge>
+      </div>
+    );
+  };
 
   if (userDetails?.role !== 'admin') {
     return (
@@ -199,12 +300,52 @@ export default function CalendarPage() {
               ))}
             </SelectContent>
           </Select>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentDate(new Date())}
+          >
+            Today
+          </Button>
         </div>
       </div>
+
+      {/* Statistics Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{events.length}</div>
+              <div className="text-sm text-muted-foreground">Total Sessions</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {events.filter(e => e.resource.status === 'active').length}
+              </div>
+              <div className="text-sm text-muted-foreground">Active Sessions</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600">
+                {Math.round(events.reduce((total, e) => total + e.resource.rawDuration, 0) / 60)}h
+              </div>
+              <div className="text-sm text-muted-foreground">Total Hours</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-600">
+                {new Set(events.map(e => e.resource.user)).size}
+              </div>
+              <div className="text-sm text-muted-foreground">Active Users</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>Time Tracking Calendar</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Click on any time block to see details. Green = Active sessions, Orange = Long sessions (8+ hours)
+          </p>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -220,33 +361,70 @@ export default function CalendarPage() {
                 onView={setCurrentView}
                 date={currentDate}
                 onNavigate={setCurrentDate}
+                onSelectEvent={handleSelectEvent}
+                onSelectSlot={handleSelectSlot}
+                selectable={userDetails?.role === 'admin'}
                 style={{ height: '100%' }}
-                eventPropGetter={() => ({
-                  style: {
-                    backgroundColor: '#3b82f6',
-                    borderRadius: '4px',
-                    opacity: 0.8,
-                    color: 'white',
-                    border: '0px',
-                    display: 'block'
-                  }
-                })}
-                components={{
-                  event: ({ event }) => (
-                    <div className="text-xs">
-                      <div className="font-medium">{event.resource.user}</div>
-                      <div>{event.resource.project}</div>
-                      <Badge variant="secondary" className="text-xs">
-                        {event.resource.duration}
-                      </Badge>
-                    </div>
-                  )
+                eventPropGetter={(event: CalendarEvent) => {
+                  const isActive = event.resource.status === 'active';
+                  const isLongSession = event.resource.rawDuration > 480;
+                  
+                  return {
+                    style: {
+                      backgroundColor: isActive ? '#22c55e' : isLongSession ? '#f97316' : '#3b82f6',
+                      borderRadius: '4px',
+                      opacity: 0.9,
+                      color: 'white',
+                      border: '0px',
+                      display: 'block',
+                      cursor: 'pointer'
+                    }
+                  };
                 }}
+                components={{
+                  event: EventComponent
+                }}
+                min={moment().hour(6).minute(0).toDate()} // Start calendar at 6 AM
+                max={moment().hour(22).minute(0).toDate()} // End calendar at 10 PM
               />
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Selected Event Details */}
+      {selectedEvent && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Session Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <strong>User:</strong> {selectedEvent.resource.user}
+              </div>
+              <div>
+                <strong>Project:</strong> {selectedEvent.resource.project}
+              </div>
+              <div>
+                <strong>Start Time:</strong> {moment(selectedEvent.start).format('MMMM D, YYYY h:mm A')}
+              </div>
+              <div>
+                <strong>End Time:</strong> {moment(selectedEvent.end).format('MMMM D, YYYY h:mm A')}
+              </div>
+              <div>
+                <strong>Duration:</strong> {selectedEvent.resource.duration}
+              </div>
+              <div>
+                <strong>Status:</strong> 
+                <Badge variant={selectedEvent.resource.status === 'active' ? 'default' : 'secondary'} className="ml-2">
+                  {selectedEvent.resource.status}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

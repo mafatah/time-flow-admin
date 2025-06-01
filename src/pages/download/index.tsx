@@ -21,8 +21,8 @@ const DownloadPage = () => {
           <div className="flex items-center gap-3">
             <EbdaaTimeLogo size={40} />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Download Ebdaa Time Desktop</h1>
-              <p className="text-gray-600">Contact your administrator for desktop app installation files</p>
+              <h1 className="text-3xl font-bold text-gray-900">Download TimeFlow Desktop</h1>
+              <p className="text-gray-600">Download the desktop app directly - no login required</p>
             </div>
           </div>
         </div>
@@ -39,7 +39,7 @@ const DownloadPage = () => {
               <CardHeader>
                 <CardTitle className="text-lg">Why Desktop App?</CardTitle>
                 <CardDescription>
-                  Download the enterprise-ready desktop application. Contact your administrator to get access to the desktop apps with zero security warnings. Professional deployment ensures seamless installation across all platforms.
+                  Get enhanced time tracking with automatic screenshots, activity monitoring, and real-time sync. Download available for Windows, macOS, and Linux.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -49,7 +49,7 @@ const DownloadPage = () => {
                     <div>
                       <h4 className="font-medium">Auto Screenshots</h4>
                       <p className="text-sm text-muted-foreground">
-                        Captures work evidence every 30 seconds
+                        Random screenshots every 2-8 minutes during activity
                       </p>
                     </div>
                   </div>
