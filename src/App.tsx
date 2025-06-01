@@ -16,7 +16,8 @@ import EmployeeTimeTracker from '@/pages/employee/time-tracker';
 import EmployeeReports from '@/pages/employee/reports';
 import ReportsPage from '@/pages/reports';
 import TimeReportsPage from '@/pages/time-reports';
-import AppsUrlsIdle from '@/pages/insights';
+import InsightsPage from '@/pages/insights';
+import AppsUrlsIdle from '@/pages/reports/apps-urls-idle';
 import UsersPage from '@/pages/users';
 import ProjectsPage from '@/pages/projects';
 import ScreenshotsPage from '@/pages/screenshots';
@@ -214,7 +215,7 @@ function AppRoutes() {
         <ProtectedRoute>
           <AdminRoute>
             <AppLayout>
-              <AppsUrlsIdle />
+              <InsightsPage />
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>
