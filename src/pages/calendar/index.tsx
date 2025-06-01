@@ -239,23 +239,37 @@ export default function CalendarPage() {
     const isActive = event.resource.status === 'active';
     const isLongSession = event.resource.rawDuration > 480; // 8+ hours
     
+    const getEventColors = () => {
+      if (isActive) return 'bg-green-500 text-white';
+      if (isLongSession) return 'bg-orange-500 text-white';
+      return 'bg-blue-500 text-white';
+    };
+    
     return (
       <div 
-        className={`text-xs p-2 rounded cursor-pointer transition-all hover:opacity-90 min-h-[60px] flex flex-col justify-between ${
-          isActive ? 'bg-green-500 text-white' : 
-          isLongSession ? 'bg-orange-500 text-white' : 
-          'bg-blue-500 text-white'
-        }`}
+        className={`
+          ${getEventColors()}
+          text-xs rounded-md cursor-pointer transition-all hover:opacity-90 
+          flex flex-col justify-start p-1 h-full w-full
+          overflow-hidden relative
+        `}
         onClick={() => handleSelectEvent(event)}
-        style={{ margin: '1px', minHeight: '50px' }}
+        style={{ 
+          fontSize: '11px',
+          lineHeight: '1.2',
+          minHeight: '20px'
+        }}
       >
-        <div className="flex-1">
-          <div className="font-medium text-sm leading-tight mb-1">{event.resource.user}</div>
-          <div className="text-xs opacity-90 leading-tight">{event.resource.project}</div>
+        <div className="truncate font-medium mb-0.5">
+          {event.resource.user}
         </div>
-        <div className="mt-1">
-          <span className="text-xs bg-black bg-opacity-20 px-1 py-0.5 rounded">
-            {event.resource.duration} {isActive && '(Active)'}
+        <div className="truncate text-xs opacity-90 mb-1">
+          {event.resource.project}
+        </div>
+        <div className="text-xs opacity-80 mt-auto">
+          <span className="bg-black bg-opacity-20 px-1 py-0.5 rounded text-xs">
+            {event.resource.duration}
+            {isActive && ' (Active)'}
           </span>
         </div>
       </div>
@@ -358,44 +372,174 @@ export default function CalendarPage() {
                 .rbc-calendar {
                   font-family: inherit;
                 }
+                
+                /* General event styling */
                 .rbc-event {
                   border: none !important;
-                  border-radius: 6px !important;
-                  padding: 4px 6px !important;
-                  margin: 2px 1px !important;
-                  min-height: 45px !important;
-                  overflow: visible !important;
+                  border-radius: 8px !important;
+                  padding: 6px 8px !important;
+                  margin: 2px !important;
+                  overflow: hidden !important;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+                  font-size: 12px !important;
+                  line-height: 1.3 !important;
+                  position: relative !important;
+                  z-index: 1 !important;
                 }
+                
+                /* Month view specific styling */
                 .rbc-month-view .rbc-event {
-                  min-height: 20px !important;
-                  margin: 1px !important;
-                }
-                .rbc-week-view .rbc-event, .rbc-day-view .rbc-event {
-                  min-height: 50px !important;
-                  margin: 2px 1px !important;
-                }
-                .rbc-agenda-view .rbc-event {
-                  min-height: auto !important;
-                }
-                .rbc-event-content {
-                  font-size: 12px !important;
+                  min-height: 22px !important;
+                  margin: 1px 2px !important;
+                  padding: 2px 6px !important;
+                  font-size: 11px !important;
                   line-height: 1.2 !important;
+                  border-radius: 4px !important;
                 }
-                .rbc-time-slot {
-                  border-bottom: 1px solid #e5e7eb !important;
-                }
-                .rbc-timeslot-group {
-                  border-bottom: 1px solid #d1d5db !important;
-                }
-                .rbc-time-view .rbc-time-gutter .rbc-time-slot {
-                  font-size: 12px !important;
-                }
+                
                 .rbc-month-view .rbc-date-cell {
-                  padding: 8px 4px !important;
+                  padding: 4px !important;
+                  min-height: 100px !important;
+                  position: relative !important;
+                }
+                
+                .rbc-month-view .rbc-events-container {
+                  margin-top: 2px !important;
+                }
+                
+                .rbc-month-view .rbc-event-label {
+                  display: block !important;
+                  overflow: hidden !important;
+                  text-overflow: ellipsis !important;
+                  white-space: nowrap !important;
+                }
+                
+                /* Week and Day view specific styling */
+                .rbc-week-view .rbc-event, 
+                .rbc-day-view .rbc-event {
+                  min-height: 60px !important;
+                  margin: 2px 4px !important;
+                  padding: 8px !important;
+                  font-size: 13px !important;
+                  line-height: 1.4 !important;
+                }
+                
+                .rbc-week-view .rbc-time-content, 
+                .rbc-day-view .rbc-time-content {
+                  min-height: 600px !important;
+                }
+                
+                /* Prevent overlapping by ensuring proper positioning */
+                .rbc-week-view .rbc-event-container,
+                .rbc-day-view .rbc-event-container {
+                  margin-right: 2px !important;
+                }
+                
+                .rbc-time-slot {
+                  border-bottom: 1px solid #f1f5f9 !important;
+                  min-height: 40px !important;
+                }
+                
+                .rbc-timeslot-group {
+                  border-bottom: 1px solid #e2e8f0 !important;
                   min-height: 80px !important;
                 }
-                .rbc-week-view .rbc-time-content, .rbc-day-view .rbc-time-content {
-                  min-height: 500px !important;
+                
+                .rbc-time-view .rbc-time-gutter .rbc-time-slot {
+                  font-size: 12px !important;
+                  padding: 4px 8px !important;
+                }
+                
+                /* Agenda view styling */
+                .rbc-agenda-view .rbc-event {
+                  min-height: auto !important;
+                  margin: 4px 0 !important;
+                  padding: 8px 12px !important;
+                }
+                
+                /* Event content styling */
+                .rbc-event-content {
+                  font-weight: 500 !important;
+                  color: white !important;
+                  text-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+                }
+                
+                /* Time gutter styling */
+                .rbc-time-view .rbc-time-gutter {
+                  background-color: #fafafa !important;
+                  border-right: 1px solid #e2e8f0 !important;
+                }
+                
+                /* Header styling */
+                .rbc-header {
+                  padding: 12px 8px !important;
+                  font-weight: 600 !important;
+                  background-color: #f8fafc !important;
+                  border-bottom: 2px solid #e2e8f0 !important;
+                }
+                
+                /* Toolbar styling */
+                .rbc-toolbar {
+                  margin-bottom: 20px !important;
+                  padding: 0 !important;
+                }
+                
+                .rbc-toolbar button {
+                  padding: 8px 16px !important;
+                  margin: 0 4px !important;
+                  border-radius: 6px !important;
+                  border: 1px solid #e2e8f0 !important;
+                  background: white !important;
+                  font-weight: 500 !important;
+                }
+                
+                .rbc-toolbar button:hover {
+                  background-color: #f1f5f9 !important;
+                }
+                
+                .rbc-toolbar button.rbc-active {
+                  background-color: #3b82f6 !important;
+                  color: white !important;
+                  border-color: #3b82f6 !important;
+                }
+                
+                /* Today button styling */
+                .rbc-btn-group button {
+                  border-radius: 6px !important;
+                  font-size: 14px !important;
+                }
+                
+                /* Ensure events don't overlap in month view */
+                .rbc-month-view .rbc-row-content {
+                  z-index: 1 !important;
+                }
+                
+                .rbc-month-view .rbc-row {
+                  min-height: 100px !important;
+                }
+                
+                /* Fix for overlapping events in week view */
+                .rbc-week-view .rbc-event,
+                .rbc-day-view .rbc-event {
+                  position: relative !important;
+                  width: calc(100% - 8px) !important;
+                  left: 2px !important;
+                }
+                
+                /* Responsive adjustments */
+                @media (max-width: 768px) {
+                  .rbc-month-view .rbc-event {
+                    font-size: 10px !important;
+                    padding: 1px 4px !important;
+                    min-height: 18px !important;
+                  }
+                  
+                  .rbc-week-view .rbc-event,
+                  .rbc-day-view .rbc-event {
+                    font-size: 11px !important;
+                    padding: 4px 6px !important;
+                    min-height: 40px !important;
+                  }
                 }
               `}</style>
               <Calendar
