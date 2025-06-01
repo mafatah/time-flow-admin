@@ -45,11 +45,50 @@ const elements = {
 };
 
 // === INITIALIZATION ===
-document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
-    setupEventListeners();
-    setupIpcListeners();
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // Get config first
+        const config = await ipcRenderer.invoke('get-config');
+        
+        // Initialize Supabase client
+        if (typeof window.supabase === 'undefined') {
+            console.error('❌ Supabase not loaded from CDN');
+            showError('Authentication system not available');
+            return;
+        }
+        
+        supabaseClient = window.supabase.createClient(config.supabase_url, config.supabase_key);
+        
+        console.log('✅ Supabase client initialized successfully');
+        
+        // Initialize the app properly
+        initializeApp();
+        setupEventListeners();
+        setupIpcListeners();
+        
+        // Show login form
+        showLoginForm();
+    } catch (error) {
+        console.error('❌ Failed to initialize Supabase client:', error);
+        showError('Failed to initialize authentication system');
+    }
 });
+
+function showError(message) {
+    const errorDiv = document.getElementById('loginError') || document.createElement('div');
+    errorDiv.id = 'loginError';
+    errorDiv.className = 'error-message';
+    errorDiv.style.display = 'block';
+    errorDiv.textContent = message;
+    
+    // Add to form if not already present
+    if (!document.getElementById('loginError')) {
+        const form = document.querySelector('form');
+        if (form) {
+            form.appendChild(errorDiv);
+        }
+    }
+}
 
 function initializeApp() {
     // Always show login screen - don't auto-login saved users
@@ -217,17 +256,8 @@ async function handleLogin(e) {
     loginBtn.textContent = 'Signing in...';
 
     try {
-        // Get the config from main process
-        const config = await ipcRenderer.invoke('get-config');
-        
-        // Create Supabase client if not already created
-        if (!window.supabase) {
-            const { createClient } = require('@supabase/supabase-js');
-            window.supabase = createClient(config.supabase_url, config.supabase_key);
-        }
-
         // Authenticate with Supabase
-        const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+        const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
             email: email,
             password: password
         });
@@ -237,7 +267,7 @@ async function handleLogin(e) {
         }
 
         // Get user details from users table
-        const { data: userDetails, error: userError } = await window.supabase
+        const { data: userDetails, error: userError } = await supabaseClient
             .from('users')
             .select('id, email, full_name, role')
             .eq('id', authData.user.id)
@@ -294,17 +324,8 @@ async function handleQuickLogin() {
     quickLoginBtn.textContent = 'Logging in...';
 
     try {
-        // Get the config from main process
-        const config = await ipcRenderer.invoke('get-config');
-        
-        // Create Supabase client if not already created
-        if (!window.supabase) {
-            const { createClient } = require('@supabase/supabase-js');
-            window.supabase = createClient(config.supabase_url, config.supabase_key);
-        }
-
         // Authenticate with Supabase
-        const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+        const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
             email: 'employee@timeflow.com',
             password: 'employee123456'
         });
@@ -314,7 +335,7 @@ async function handleQuickLogin() {
         }
 
         // Get user details from users table
-        const { data: userDetails, error: userError } = await window.supabase
+        const { data: userDetails, error: userError } = await supabaseClient
             .from('users')
             .select('id, email, full_name, role')
             .eq('id', authData.user.id)
