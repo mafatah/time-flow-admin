@@ -71,12 +71,19 @@ function setupEventListeners() {
         quickLoginBtn.addEventListener('click', handleQuickLogin);
     }
 
-    // Navigation items
+    // Navigation handlers
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            const page = e.target.closest('.nav-item').getAttribute('data-page');
-            navigateToPage(page);
+        item.addEventListener('click', () => {
+            const targetPage = item.getAttribute('data-page');
+            if (targetPage) {
+                showPage(targetPage);
+                
+                // Load screenshots when navigating to screenshots page
+                if (targetPage === 'screenshots') {
+                    setTimeout(loadRecentScreenshots, 100);
+                }
+            }
         });
     });
 
@@ -100,8 +107,55 @@ function setupEventListeners() {
     if (trackerPauseBtn) trackerPauseBtn.addEventListener('click', pauseTracking);
     if (trackerStopBtn) trackerStopBtn.addEventListener('click', stopTracking);
 
+    // Start/stop tracking buttons  
+    const startTrackingBtn = document.getElementById('startTracking');
+    const pauseTrackingBtn = document.getElementById('pauseTracking');
+    const stopTrackingBtn = document.getElementById('stopTracking');
+
+    if (startTrackingBtn) {
+        startTrackingBtn.addEventListener('click', async () => {
+            const result = await ipcRenderer.invoke('start-tracking');
+            showNotification(result.message, result.success ? 'success' : 'error');
+            updateTrackingControls();
+        });
+    }
+
+    if (pauseTrackingBtn) {
+        pauseTrackingBtn.addEventListener('click', async () => {
+            const result = await ipcRenderer.invoke('pause-tracking');
+            showNotification(result.message, result.success ? 'success' : 'error');
+            updateTrackingControls();
+        });
+    }
+
+    if (stopTrackingBtn) {
+        stopTrackingBtn.addEventListener('click', async () => {
+            const result = await ipcRenderer.invoke('stop-tracking');
+            showNotification(result.message, result.success ? 'success' : 'error');
+            updateTrackingControls();
+        });
+    }
+
+    // Manual screenshot button
+    const manualScreenshotBtn = document.getElementById('manualScreenshot');
+    if (manualScreenshotBtn) {
+        manualScreenshotBtn.addEventListener('click', async () => {
+            showNotification('Capturing screenshot...', 'info');
+            const result = await ipcRenderer.invoke('force-screenshot');
+            showNotification(result.message, result.success ? 'success' : 'error');
+            // Refresh screenshots after manual capture
+            setTimeout(loadRecentScreenshots, 2000);
+        });
+    }
+
+    // Settings form
+    const settingsForm = document.getElementById('settingsForm');
+    if (settingsForm) {
+        settingsForm.addEventListener('submit', saveSettings);
+    }
+
     // Current task input
-    const currentTaskInput = document.getElementById('currentTaskInput');
+    const currentTaskInput = document.getElementById('currentTask');
     if (currentTaskInput) {
         currentTaskInput.addEventListener('change', (e) => {
             // Save current task
@@ -114,7 +168,13 @@ function setupEventListeners() {
     const screenshotDate = document.getElementById('screenshotDate');
     if (screenshotDate) {
         screenshotDate.value = new Date().toISOString().split('T')[0];
-        screenshotDate.addEventListener('change', filterScreenshots);
+        screenshotDate.addEventListener('change', loadRecentScreenshots);
+    }
+
+    // Load More Screenshots button
+    const loadMoreBtn = document.getElementById('loadMoreScreenshotsBtn');
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', loadMoreScreenshots);
     }
 }
 
@@ -157,12 +217,13 @@ async function handleLogin(e) {
     loginBtn.textContent = 'Signing in...';
 
     try {
-        // For now, we'll use a simple demo login
-        // In production, this would authenticate with the backend
-        if (email && password) {
-            // Create demo user
+        // Get the real user config from main process
+        const config = await ipcRenderer.invoke('get-config');
+        
+        if (email && password && config.user_id) {
+            // Use the real employee user from config
             currentUser = {
-                id: 'demo-user-' + Date.now(),
+                id: config.user_id,
                 email: email,
                 name: email.split('@')[0],
                 role: 'employee'
@@ -176,7 +237,7 @@ async function handleLogin(e) {
 
             showMainApp();
         } else {
-            throw new Error('Please enter email and password');
+            throw new Error('Authentication failed. Please check your credentials.');
         }
     } catch (error) {
         console.error('Login error:', error);
@@ -207,22 +268,29 @@ async function handleQuickLogin() {
     quickLoginBtn.textContent = 'Logging in...';
 
     try {
-        // Create employee user
-        currentUser = {
-            id: 'employee-' + Date.now(),
-            email: 'employee@timeflow.com',
-            name: 'John Employee',
-            role: 'employee'
-        };
+        // Get the real user config from main process
+        const config = await ipcRenderer.invoke('get-config');
+        
+        if (config.user_id) {
+            // Use the real employee user from config
+            currentUser = {
+                id: config.user_id,
+                email: 'employee@timeflow.com',
+                name: 'John Employee',
+                role: 'employee'
+            };
 
-        // Save user to localStorage
-        localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
+            // Save user to localStorage
+            localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
 
-        // Notify main process about user login
-        ipcRenderer.send('user-logged-in', currentUser);
+            // Notify main process about user login
+            ipcRenderer.send('user-logged-in', currentUser);
 
-        showMainApp();
-        showNotification('Welcome back, John!', 'success');
+            showMainApp();
+            showNotification('Welcome back, John!', 'success');
+        } else {
+            throw new Error('Configuration error. Please contact administrator.');
+        }
 
     } catch (error) {
         console.error('Quick login error:', error);
@@ -713,3 +781,169 @@ window.addEventListener('beforeunload', () => {
 });
 
 console.log('📱 TimeFlow Agent Renderer loaded');
+
+// Add new functions for screenshot functionality
+async function loadRecentScreenshots() {
+    const screenshotDate = document.getElementById('screenshotDate');
+    const selectedDate = screenshotDate ? screenshotDate.value : new Date().toISOString().split('T')[0];
+    
+    try {
+        showNotification('Loading screenshots...', 'info');
+        
+        // Get current user from config
+        const config = await ipcRenderer.invoke('get-config');
+        if (!config || !config.user_id) {
+            showNotification('User not logged in', 'error');
+            return;
+        }
+
+        // Fetch screenshots from main process
+        const screenshots = await ipcRenderer.invoke('fetch-screenshots', {
+            user_id: config.user_id,
+            date: selectedDate,
+            limit: 20
+        });
+
+        displayScreenshots(screenshots);
+        
+        if (screenshots.length > 0) {
+            showNotification(`Loaded ${screenshots.length} screenshots`, 'success');
+        } else {
+            showNotification('No screenshots found for selected date', 'info');
+        }
+        
+    } catch (error) {
+        console.error('Error loading screenshots:', error);
+        showNotification('Failed to load screenshots', 'error');
+    }
+}
+
+function displayScreenshots(screenshots) {
+    const gridContainer = document.getElementById('screenshotGrid');
+    if (!gridContainer) return;
+
+    if (screenshots.length === 0) {
+        gridContainer.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #64748b;">
+                <span style="font-size: 48px;">📷</span>
+                <div style="margin-top: 16px; font-size: 16px;">No screenshots found</div>
+                <div style="font-size: 14px; margin-top: 8px;">Screenshots will appear here when captured</div>
+            </div>
+        `;
+        return;
+    }
+
+    // Build screenshot grid HTML
+    let screenshotHTML = '';
+    screenshots.forEach((screenshot, index) => {
+        const capturedAt = new Date(screenshot.captured_at);
+        const timeString = capturedAt.toLocaleTimeString('en-US', { 
+            hour12: false, 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        });
+        
+        const activityPercent = screenshot.activity_percent || 0;
+        
+        screenshotHTML += `
+            <div class="screenshot-item" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;">
+                <div style="width: 100%; height: 120px; background: #e2e8f0; border-radius: 6px; overflow: hidden; margin-bottom: 8px; cursor: pointer;" onclick="openScreenshot('${screenshot.image_url}')">
+                    <img src="${screenshot.image_url}" 
+                         alt="Screenshot ${index + 1}" 
+                         style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s;"
+                         onmouseover="this.style.transform='scale(1.05)'"
+                         onmouseout="this.style.transform='scale(1)'"
+                         onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<div style=\\'display: flex; align-items: center; justify-content: center; height: 100%; color: #64748b;\\'>📸<\\/div>';">
+                </div>
+                <div style="font-size: 12px; color: #64748b;">${timeString}</div>
+                <div style="font-size: 11px; color: #94a3b8;">Activity: ${activityPercent}%</div>
+            </div>
+        `;
+    });
+
+    gridContainer.innerHTML = screenshotHTML;
+    
+    // Store current screenshots for load more functionality
+    window.currentScreenshots = screenshots;
+    window.screenshotOffset = screenshots.length;
+}
+
+async function loadMoreScreenshots() {
+    const screenshotDate = document.getElementById('screenshotDate');
+    const selectedDate = screenshotDate ? screenshotDate.value : new Date().toISOString().split('T')[0];
+    
+    try {
+        showNotification('Loading more screenshots...', 'info');
+        
+        // Get current user from config
+        const config = await ipcRenderer.invoke('get-config');
+        if (!config || !config.user_id) {
+            showNotification('User not logged in', 'error');
+            return;
+        }
+
+        // Fetch more screenshots with offset
+        const offset = window.screenshotOffset || 0;
+        const newScreenshots = await ipcRenderer.invoke('fetch-screenshots', {
+            user_id: config.user_id,
+            date: selectedDate,
+            limit: 20,
+            offset: offset
+        });
+
+        if (newScreenshots.length === 0) {
+            showNotification('No more screenshots to load', 'info');
+            return;
+        }
+
+        // Append new screenshots to existing ones
+        const allScreenshots = [...(window.currentScreenshots || []), ...newScreenshots];
+        displayScreenshots(allScreenshots);
+        
+        showNotification(`Loaded ${newScreenshots.length} more screenshots`, 'success');
+        
+    } catch (error) {
+        console.error('Error loading more screenshots:', error);
+        showNotification('Failed to load more screenshots', 'error');
+    }
+}
+
+function openScreenshot(imageUrl) {
+    // Open screenshot in new window/tab
+    window.open(imageUrl, '_blank');
+}
+
+function filterScreenshots() {
+    // Reload screenshots for the selected date
+    loadRecentScreenshots();
+}
+
+function showPage(pageId) {
+    // Hide all pages
+    document.querySelectorAll('.page-content').forEach(page => {
+        page.style.display = 'none';
+    });
+    
+    // Remove active state from all nav items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Show target page
+    const targetPage = document.getElementById(pageId + 'Page');
+    if (targetPage) {
+        targetPage.style.display = 'block';
+    }
+    
+    // Add active state to clicked nav item
+    const activeNavItem = document.querySelector(`[data-page="${pageId}"]`);
+    if (activeNavItem) {
+        activeNavItem.classList.add('active');
+    }
+    
+    // Load screenshots when navigating to screenshots page
+    if (pageId === 'screenshots') {
+        setTimeout(loadRecentScreenshots, 100);
+    }
+}
