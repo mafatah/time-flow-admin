@@ -423,6 +423,20 @@ export default function ScreenshotsViewer() {
                               alt={`Screenshot ${index + 1}`}
                               className="w-full h-20 object-cover rounded border cursor-pointer hover:scale-105 transition-transform"
                               onClick={() => window.open(screenshot.image_url, '_blank')}
+                              onError={(e) => {
+                                console.error('Individual timeline image failed to load:', screenshot.image_url);
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  parent.innerHTML = `
+                                    <div class="w-full h-20 bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-500 text-xs">
+                                      <div class="text-lg">📷</div>
+                                      <div>Failed</div>
+                                    </div>
+                                  `;
+                                }
+                              }}
                             />
                             <div className="text-xs text-center text-muted-foreground">
                               {format(new Date(screenshot.captured_at), 'HH:mm')}
@@ -471,6 +485,19 @@ export default function ScreenshotsViewer() {
                               alt={`Screenshot ${idx + 1}`}
                               className="w-12 h-8 object-cover rounded border cursor-pointer hover:scale-110 transition-transform"
                               onClick={() => window.open(screenshot.image_url, '_blank')}
+                              onError={(e) => {
+                                console.error('Timeline image failed to load:', screenshot.image_url);
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  const errorDiv = document.createElement('div');
+                                  errorDiv.className = 'w-12 h-8 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs text-gray-500';
+                                  errorDiv.innerHTML = '❌';
+                                  errorDiv.title = `Failed to load: ${screenshot.image_url}`;
+                                  parent.insertBefore(errorDiv, target);
+                                }
+                              }}
                             />
                           ))}
                           {period.screenshots.length > 3 && (
@@ -614,6 +641,24 @@ export default function ScreenshotsViewer() {
                         alt={`Screenshot ${screenshot.id}`}
                         className="w-full h-32 object-cover cursor-pointer hover:scale-105 transition-transform"
                         onClick={() => window.open(screenshot.image_url, '_blank')}
+                        onError={(e) => {
+                          console.error('Image failed to load:', screenshot.image_url);
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="w-full h-32 bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-500 text-xs">
+                                <div class="text-2xl mb-1">📷</div>
+                                <div>Image failed to load</div>
+                                <div class="mt-1 text-xs text-center px-2 break-all">${screenshot.image_url}</div>
+                              </div>
+                            `;
+                          }
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully:', screenshot.image_url);
+                        }}
                       />
                       <div className="p-3">
                         <div className="flex items-center space-x-2 mb-2">
