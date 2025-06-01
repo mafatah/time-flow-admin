@@ -61,21 +61,53 @@ export default function ScreenshotsViewer() {
     fetchData();
   }, [selectedDate]);
 
+  useEffect(() => {
+    // Also fetch data when filters change
+    if (screenshots.length > 0) {
+      console.log('🔄 Filters changed, recalculating timeline...');
+    }
+  }, [userFilter, projectFilter]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
-      const startDate = startOfDay(new Date(selectedDate));
-      const endDate = endOfDay(new Date(selectedDate));
+      
+      // Use local date for the selected date, but convert to UTC for database query
+      const selectedDateTime = new Date(selectedDate + 'T00:00:00');
+      const startDate = startOfDay(selectedDateTime);
+      const endDate = endOfDay(selectedDateTime);
 
-      // Fetch screenshots
-      let { data: screenshotsData, error: screenshotsError } = await supabase
+      console.log('🔍 Fetching screenshots for date range:', {
+        selectedDate,
+        selectedDateTime: selectedDateTime.toISOString(),
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        currentUTC: new Date().toISOString()
+      });
+
+      // Fetch screenshots - query the last 24 hours if today is selected
+      const isToday = selectedDate === format(new Date(), 'yyyy-MM-dd');
+      let query = supabase
         .from('screenshots')
         .select('*')
-        .gte('captured_at', startDate.toISOString())
-        .lt('captured_at', endDate.toISOString())
         .order('captured_at', { ascending: true });
+      
+      if (isToday) {
+        // For today, get screenshots from the last 24 hours
+        const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        query = query.gte('captured_at', last24Hours.toISOString());
+      } else {
+        // For other dates, use the date range
+        query = query
+          .gte('captured_at', startDate.toISOString())
+          .lt('captured_at', endDate.toISOString());
+      }
+
+      let { data: screenshotsData, error: screenshotsError } = await query;
 
       if (screenshotsError) throw screenshotsError;
+      
+      console.log('📊 Raw screenshots data:', screenshotsData);
       
       // Map database fields to interface, filtering out null user_ids
       const mappedScreenshots: Screenshot[] = (screenshotsData || [])
@@ -90,6 +122,7 @@ export default function ScreenshotsViewer() {
           focus_percent: screenshot.focus_percent || 0
         }));
 
+      console.log('📸 Mapped screenshots:', mappedScreenshots);
       setScreenshots(mappedScreenshots);
 
       // Fetch users
@@ -158,28 +191,39 @@ export default function ScreenshotsViewer() {
     const periods: ActivityPeriod[] = [];
     let currentPeriod: ActivityPeriod | null = null;
 
+    console.log('🕐 Generated time slots:', timeSlots.filter(slot => slot.screenshots.length > 0));
+
     timeSlots.forEach((slot, index) => {
-      const isActive = slot.screenshots.length > 0 && slot.activityPercent > 20;
+      // If there are screenshots in this slot, it's always considered an active period
+      const hasScreenshots = slot.screenshots.length > 0;
+      const isActive = hasScreenshots && slot.activityPercent > 10; // Lower threshold
       const periodType = isActive ? 'active' : 'idle';
 
-      if (!currentPeriod || currentPeriod.type !== periodType) {
-        // Start new period
-        if (currentPeriod) {
-          periods.push(currentPeriod);
+      // Only process slots that have screenshots
+      if (hasScreenshots) {
+        if (!currentPeriod || currentPeriod.type !== periodType) {
+          // Start new period
+          if (currentPeriod) {
+            periods.push(currentPeriod);
+          }
+          
+          currentPeriod = {
+            start: slot.time,
+            end: slot.time,
+            type: periodType,
+            duration: 10,
+            screenshots: [...slot.screenshots]
+          };
+        } else {
+          // Extend current period
+          currentPeriod.end = slot.time;
+          currentPeriod.duration += 10;
+          currentPeriod.screenshots.push(...slot.screenshots);
         }
-        
-        currentPeriod = {
-          start: slot.time,
-          end: slot.time,
-          type: periodType,
-          duration: 10,
-          screenshots: [...slot.screenshots]
-        };
-      } else {
-        // Extend current period
-        currentPeriod.end = slot.time;
-        currentPeriod.duration += 10;
-        currentPeriod.screenshots.push(...slot.screenshots);
+      } else if (currentPeriod) {
+        // End the current period if we hit a slot with no screenshots
+        periods.push(currentPeriod);
+        currentPeriod = null;
       }
     });
 
@@ -187,7 +231,10 @@ export default function ScreenshotsViewer() {
       periods.push(currentPeriod);
     }
 
-    return periods.filter(p => p.duration > 0);
+    const filteredPeriods = periods.filter(p => p.duration > 0 && p.screenshots.length > 0);
+    console.log('📈 Generated activity periods:', filteredPeriods);
+    
+    return filteredPeriods;
   };
 
   const timeSlots = generateTimeSlots();
@@ -198,6 +245,18 @@ export default function ScreenshotsViewer() {
   const totalIdleTime = activityPeriods
     .filter(p => p.type === 'idle')
     .reduce((sum, p) => sum + p.duration, 0);
+
+  // Debug info
+  console.log('🐛 Debug Info:', {
+    selectedDate,
+    userFilter,
+    projectFilter,
+    totalScreenshots: screenshots.length,
+    filteredScreenshots: filteredScreenshots.length,
+    activityPeriods: activityPeriods.length,
+    totalActiveTime,
+    totalIdleTime
+  });
 
   return (
     <div className="space-y-6">
@@ -349,8 +408,37 @@ export default function ScreenshotsViewer() {
               {loading ? (
                 <div className="text-center py-8">Loading timeline...</div>
               ) : activityPeriods.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No activity data for selected date.
+                <div className="space-y-4">
+                  <div className="text-center py-4 text-muted-foreground">
+                    No activity periods detected.
+                  </div>
+                  {filteredScreenshots.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Individual Screenshots ({filteredScreenshots.length})</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                        {filteredScreenshots.slice(0, 12).map((screenshot, index) => (
+                          <div key={screenshot.id} className="space-y-1">
+                            <img
+                              src={screenshot.image_url}
+                              alt={`Screenshot ${index + 1}`}
+                              className="w-full h-20 object-cover rounded border cursor-pointer hover:scale-105 transition-transform"
+                              onClick={() => window.open(screenshot.image_url, '_blank')}
+                            />
+                            <div className="text-xs text-center text-muted-foreground">
+                              {format(new Date(screenshot.captured_at), 'HH:mm')}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {filteredScreenshots.length > 12 && (
+                        <div className="text-center">
+                          <Button variant="outline" size="sm" onClick={() => setViewMode('grid')}>
+                            View All {filteredScreenshots.length} Screenshots
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">

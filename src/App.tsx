@@ -1,5 +1,5 @@
-
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
@@ -8,23 +8,29 @@ import { TrackerProvider } from '@/providers/tracker-provider';
 import { ErrorBoundary } from '@/components/error-boundary';
 import MainLayout from '@/components/layout/main-layout';
 
-// Import pages
+// Lazy load pages for better performance
 import LoginPage from '@/pages/auth/login';
 import DashboardPage from '@/pages/dashboard';
-import ReportsPage from '@/pages/reports';
-import TimeReportsPage from '@/pages/time-reports';
-import AppsUrlsIdle from '@/pages/reports/apps-urls-idle';
 import EmployeeDashboard from '@/pages/employee/dashboard';
 import EmployeeTimeTracker from '@/pages/employee/time-tracker';
 import EmployeeReports from '@/pages/employee/reports';
+import ReportsPage from '@/pages/reports';
+import TimeReportsPage from '@/pages/time-reports';
+import AppsUrlsIdle from '@/pages/insights';
+import UsersPage from '@/pages/users';
+import ProjectsPage from '@/pages/projects';
+import ScreenshotsPage from '@/pages/screenshots';
+import SettingsPage from '@/pages/settings';
+import CalendarPage from '@/pages/calendar';
+import TimeTrackingPage from '@/pages/time-tracking';
 
 console.log('🚀 App.tsx loading...');
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
+      retry: 3,
+      staleTime: 5 * 60 * 1000, // 5 minutes
     },
   },
 });
@@ -56,7 +62,11 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
   
-  if (!userDetails || userDetails.role !== 'admin') {
+  if (!userDetails) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (userDetails.role !== 'admin') {
     return <Navigate to="/employee" replace />;
   }
   
@@ -95,11 +105,35 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Safe Navigate component to prevent SecurityError
+function SafeNavigate({ to, replace = false }: { to: string; replace?: boolean }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  React.useEffect(() => {
+    // Prevent navigation to the same route
+    if (location.pathname !== to) {
+      const timer = setTimeout(() => {
+        navigate(to, { replace });
+      }, 10); // Small delay to prevent rapid navigation
+      
+      return () => clearTimeout(timer);
+    }
+  }, [to, replace, navigate, location.pathname]);
+  
+  return <div className="flex items-center justify-center min-h-screen">Redirecting...</div>;
+}
+
 // Main routes component that will be wrapped by AuthProvider
 function AppRoutes() {
-  const { user, userDetails } = useAuth();
+  const { user, userDetails, loading } = useAuth();
   
-  console.log('🛣️ AppRoutes - user:', !!user, 'userDetails:', userDetails);
+  console.log('🛣️ AppRoutes - user:', !!user, 'userDetails:', userDetails, 'loading:', loading);
+  
+  // Show loading while auth is being determined
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
   
   return (
     <Routes>
@@ -107,11 +141,11 @@ function AppRoutes() {
       <Route 
         path="/login" 
         element={
-          user ? (
-            userDetails?.role === 'admin' ? (
-              <Navigate to="/dashboard" replace />
+          user && userDetails ? (
+            userDetails.role === 'admin' ? (
+              <SafeNavigate to="/dashboard" replace />
             ) : (
-              <Navigate to="/employee" replace />
+              <SafeNavigate to="/employee" replace />
             )
           ) : (
             <LoginPage />
@@ -123,14 +157,14 @@ function AppRoutes() {
       <Route 
         path="/" 
         element={
-          user ? (
-            userDetails?.role === 'admin' ? (
-              <Navigate to="/dashboard" replace />
+          user && userDetails ? (
+            userDetails.role === 'admin' ? (
+              <SafeNavigate to="/dashboard" replace />
             ) : (
-              <Navigate to="/employee" replace />
+              <SafeNavigate to="/employee" replace />
             )
           ) : (
-            <Navigate to="/login" replace />
+            <SafeNavigate to="/login" replace />
           )
         } 
       />
@@ -176,6 +210,76 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
+      <Route path="/insights" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <AppsUrlsIdle />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/users" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <UsersPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/projects" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <ProjectsPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/screenshots" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <ScreenshotsPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <SettingsPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/calendar" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <CalendarPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/time-tracking" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <TimeTrackingPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
       {/* Employee Routes */}
       <Route path="/employee" element={
         <ProtectedRoute>
@@ -210,7 +314,7 @@ function AppRoutes() {
       } />
       
       {/* Catch all route */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<SafeNavigate to="/login" replace />} />
     </Routes>
   );
 }
