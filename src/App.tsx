@@ -18,7 +18,7 @@ import ReportsPage from '@/pages/reports';
 import TimeReportsPage from '@/pages/time-reports';
 import InsightsPage from '@/pages/insights';
 import AppsUrlsIdle from '@/pages/reports/apps-urls-idle';
-import UsersPage from '@/pages/users';
+import UsersPage from '@/pages/users/users-management';
 import ProjectsPage from '@/pages/projects';
 import ScreenshotsPage from '@/pages/screenshots';
 import SettingsPage from '@/pages/settings';
