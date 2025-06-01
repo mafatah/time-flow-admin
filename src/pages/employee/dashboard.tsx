@@ -73,9 +73,13 @@ const EmployeeDashboard = () => {
         .select('*')
         .eq('user_id', userDetails.id)
         .gte('start_time', startOfToday.toISOString())
-        .lte('start_time', endOfToday.toISOString());
+        .lt('start_time', endOfToday.toISOString())
+        .order('start_time', { ascending: true });
 
       if (todayTimeLogsError) throw todayTimeLogsError;
+
+      console.log('Today time logs:', todayTimeLogs);
+      console.log('Today date range:', startOfToday.toISOString(), 'to', endOfToday.toISOString());
 
       // Get time logs for this week
       const { data: weekTimeLogs, error: weekTimeLogsError } = await supabase
@@ -128,22 +132,52 @@ const EmployeeDashboard = () => {
       todayTimeLogs?.forEach((log: any) => {
         const startTime = new Date(log.start_time);
         const endTime = log.end_time ? new Date(log.end_time) : new Date();
-        const durationMinutes = differenceInMinutes(endTime, startTime);
-        const hours = durationMinutes / 60;
+        
+        console.log('Processing log:', {
+          id: log.id,
+          start_time: log.start_time,
+          end_time: log.end_time,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString()
+        });
+        
+        // Ensure the session is within today's range
+        const sessionStart = startTime < startOfToday ? startOfToday : startTime;
+        const sessionEnd = endTime > endOfToday ? endOfToday : endTime;
+        
+        console.log('Session bounds:', {
+          sessionStart: sessionStart.toISOString(),
+          sessionEnd: sessionEnd.toISOString()
+        });
+        
+        // Only calculate if session is valid
+        if (sessionStart < sessionEnd) {
+          const durationMinutes = differenceInMinutes(sessionEnd, sessionStart);
+          const hours = durationMinutes / 60;
 
-        todayHours += hours;
-        if (log.is_idle) {
-          todayIdleTime += hours;
-        }
+          console.log('Calculated duration:', { durationMinutes, hours });
 
-        // Hourly activity
-        const hourKey = format(startTime, 'HH');
-        if (log.is_idle) {
-          hourlyActivity[hourKey].idle += hours;
-        } else {
-          hourlyActivity[hourKey].active += hours;
+          // Only add positive durations
+          if (hours > 0) {
+            todayHours += hours;
+            
+            // Handle idle time calculation
+            if (log.is_idle) {
+              todayIdleTime += hours;
+            }
+
+            // Hourly activity distribution
+            const hourKey = format(sessionStart, 'HH');
+            if (log.is_idle) {
+              hourlyActivity[hourKey].idle += hours;
+            } else {
+              hourlyActivity[hourKey].active += hours;
+            }
+          }
         }
       });
+
+      console.log('Final calculated hours:', { todayHours, todayIdleTime });
 
       // Process time logs for week
       weekTimeLogs?.forEach((log: any) => {
