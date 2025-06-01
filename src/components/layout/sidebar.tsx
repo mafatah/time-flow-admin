@@ -110,16 +110,6 @@ const Sidebar = () => {
           icon: Camera
         },
         {
-          title: "Apps Monitoring",
-          href: "/apps",
-          icon: Monitor
-        },
-        {
-          title: "URLs Monitoring", 
-          href: "/urls",
-          icon: Globe
-        },
-        {
           title: "Calendar",
           href: "/calendar",
           icon: Calendar
