@@ -27,8 +27,8 @@ export default function LoginPage() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      email: "employee@timeflow.com",
+      password: "employee123456",
     },
   });
 
@@ -107,6 +107,15 @@ export default function LoginPage() {
                 </Form>
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Demo credentials pre-filled above
+                  </p>
+                  <p className="text-xs text-muted-foreground border rounded-md p-2 bg-muted/50">
+                    <strong>Employee:</strong> employee@timeflow.com / employee123456<br />
+                    <strong>Admin:</strong> admin@timeflow.com / admin123456
+                  </p>
+                </div>
                 <p className="text-sm text-muted-foreground text-center">
                   Don't have an account? Contact your administrator.
                 </p>
