@@ -67,27 +67,39 @@ const EmployeeDashboard = () => {
       const startOfThisWeek = startOfWeek(today);
       const endOfThisWeek = endOfWeek(today);
 
-             // Get time logs for today and this week
-       const { data: timeLogs, error: timeLogsError } = await supabase
-         .from('time_logs')
-         .select('*')
-         .eq('user_id', userDetails.id)
-         .gte('start_time', startOfThisWeek.toISOString())
-         .lte('start_time', endOfThisWeek.toISOString());
+      // Get time logs for today specifically
+      const { data: todayTimeLogs, error: todayTimeLogsError } = await supabase
+        .from('time_logs')
+        .select('*')
+        .eq('user_id', userDetails.id)
+        .gte('start_time', startOfToday.toISOString())
+        .lte('start_time', endOfToday.toISOString());
 
-      if (timeLogsError) throw timeLogsError;
+      if (todayTimeLogsError) throw todayTimeLogsError;
 
-      // Get idle logs for today
-      // Temporarily disable idle_logs query due to schema mismatch
-      const idleLogs: any[] = [];
-      // const { data: idleLogs, error: idleLogsError } = await supabase
-      //   .from('idle_logs')
-      //   .select('*')
-      //   .eq('user_id', userDetails.id)
-      //   .gte('idle_start', startOfToday.toISOString())
-      //   .lte('idle_start', endOfToday.toISOString())
-      //   .order('idle_start', { ascending: false });
-      // if (idleLogsError) throw idleLogsError;
+      // Get time logs for this week
+      const { data: weekTimeLogs, error: weekTimeLogsError } = await supabase
+        .from('time_logs')
+        .select('*')
+        .eq('user_id', userDetails.id)
+        .gte('start_time', startOfThisWeek.toISOString())
+        .lte('start_time', endOfThisWeek.toISOString());
+
+      if (weekTimeLogsError) throw weekTimeLogsError;
+
+      // Get idle logs for today - Now enabled since database schema is fixed
+      const { data: idleLogs, error: idleLogsError } = await supabase
+        .from('idle_logs')
+        .select('*')
+        .eq('user_id', userDetails.id)
+        .gte('idle_start', startOfToday.toISOString())
+        .lte('idle_start', endOfToday.toISOString())
+        .order('idle_start', { ascending: false });
+      
+      if (idleLogsError) {
+        console.warn('Error fetching idle logs:', idleLogsError);
+        // Continue with empty array if idle logs fail
+      }
 
                     // Check if currently tracking
        const { data: activeLog, error: activeLogError } = await supabase
@@ -112,8 +124,29 @@ const EmployeeDashboard = () => {
         hourlyActivity[hour] = { active: 0, idle: 0 };
       }
 
-      // Process time logs
-      timeLogs?.forEach((log: any) => {
+      // Process time logs for today
+      todayTimeLogs?.forEach((log: any) => {
+        const startTime = new Date(log.start_time);
+        const endTime = log.end_time ? new Date(log.end_time) : new Date();
+        const durationMinutes = differenceInMinutes(endTime, startTime);
+        const hours = durationMinutes / 60;
+
+        todayHours += hours;
+        if (log.is_idle) {
+          todayIdleTime += hours;
+        }
+
+        // Hourly activity
+        const hourKey = format(startTime, 'HH');
+        if (log.is_idle) {
+          hourlyActivity[hourKey].idle += hours;
+        } else {
+          hourlyActivity[hourKey].active += hours;
+        }
+      });
+
+      // Process time logs for week
+      weekTimeLogs?.forEach((log: any) => {
         const startTime = new Date(log.start_time);
         const endTime = log.end_time ? new Date(log.end_time) : new Date();
         const durationMinutes = differenceInMinutes(endTime, startTime);
@@ -123,30 +156,14 @@ const EmployeeDashboard = () => {
         if (log.is_idle) {
           weekIdleTime += hours;
         }
-
-        // Today's data
-        if (startTime >= startOfToday && startTime <= endOfToday) {
-          todayHours += hours;
-          if (log.is_idle) {
-            todayIdleTime += hours;
-          }
-
-          // Hourly activity
-          const hourKey = format(startTime, 'HH');
-          if (log.is_idle) {
-            hourlyActivity[hourKey].idle += hours;
-          } else {
-            hourlyActivity[hourKey].active += hours;
-          }
-        }
       });
 
       // Process idle periods from idle_logs
-      const idlePeriods = idleLogs?.map((log: any) => ({
+      const idlePeriods = (idleLogs || []).map((log: any) => ({
         start: log.idle_start,
-        end: log.idle_end,
-        duration: log.duration_seconds
-      })) || [];
+        end: log.idle_end || new Date().toISOString(), // Use current time if still idle
+        duration: log.duration_seconds || (log.duration_minutes ? log.duration_minutes * 60 : 0)
+      }));
 
       // Calculate productivity score
       const totalActiveTime = todayHours - todayIdleTime;
