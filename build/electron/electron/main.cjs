@@ -358,6 +358,35 @@ electron_1.ipcMain.handle('trigger-direct-screenshot', async () => {
     showScreenshotNotification();
     return result;
 });
+// Add screenshot testing handlers
+electron_1.ipcMain.handle('test-screenshot', async () => {
+    console.log('🧪 Manual screenshot test requested');
+    try {
+        // Import the activity monitor function
+        const { triggerDirectScreenshot } = await Promise.resolve().then(() => __importStar(require('./activityMonitor')));
+        const result = await triggerDirectScreenshot();
+        console.log('✅ Screenshot test completed:', result);
+        return { success: result, message: 'Screenshot test completed' };
+    }
+    catch (error) {
+        console.error('❌ Screenshot test failed:', error);
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('manual-screenshot', async () => {
+    console.log('📸 Manual screenshot capture requested');
+    try {
+        // Import the activity monitor function
+        const { triggerActivityCapture } = await Promise.resolve().then(() => __importStar(require('./activityMonitor')));
+        triggerActivityCapture();
+        console.log('✅ Manual screenshot triggered');
+        return { success: true, message: 'Manual screenshot triggered' };
+    }
+    catch (error) {
+        console.error('❌ Manual screenshot failed:', error);
+        return { success: false, error: error.message };
+    }
+});
 // Create tray icon
 function createTray() {
     // Use the assets from the electron directory

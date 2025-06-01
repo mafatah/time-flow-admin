@@ -157,17 +157,12 @@ function stopActivityMonitoring() {
 function isUserActive() {
     const idleTimeMs = appSettings.idle_threshold_seconds * 1000;
     const timeSinceLastActivity = Date.now() - lastActivityTime;
-    const timeSinceLastScreenshot = Date.now() - lastSuccessfulScreenshot;
-    // Check if we've had too many screenshot failures or been too long without successful capture
+    // Only stop monitoring if we have consecutive technical failures, not just lack of screenshots
     if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
-        console.log(`❌ Too many consecutive screenshot failures (${consecutiveScreenshotFailures}), user considered inactive`);
+        console.log(`❌ Too many consecutive screenshot failures (${consecutiveScreenshotFailures}), stopping monitoring due to technical issues`);
         return false;
     }
-    // If we haven't had a successful screenshot in a while, consider user inactive
-    if (timeSinceLastScreenshot > MAX_SYSTEM_UNAVAILABLE_TIME) {
-        console.log(`❌ No successful screenshot in ${Math.round(timeSinceLastScreenshot / 1000)}s, user considered inactive`);
-        return false;
-    }
+    // Check actual user activity (mouse/keyboard), not screenshot success
     return timeSinceLastActivity < idleTimeMs;
 }
 function updateLastActivity() {
@@ -281,38 +276,54 @@ async function captureActivityScreenshot() {
         return;
     try {
         console.log('📸 Capturing activity screenshot...');
-        // Add timeout to screenshot capture
+        console.log('🔍 Screenshot attempt details:', {
+            userId: currentUserId,
+            sessionId: currentActivitySession.id,
+            timestamp: new Date().toISOString()
+        });
+        // Reduce timeout to 5 seconds and add more detailed error handling
         const screenshotPromise = new Promise(async (resolve, reject) => {
             try {
+                console.log('🖥️ Getting primary display...');
                 const primaryDisplay = electron_1.screen.getPrimaryDisplay();
                 const { width, height } = primaryDisplay.workAreaSize;
+                console.log(`📐 Display dimensions: ${width}x${height}`);
+                console.log('🔍 Getting desktop sources...');
                 const sources = await electron_1.desktopCapturer.getSources({
                     types: ['screen'],
                     thumbnailSize: { width: Math.min(width, 1920), height: Math.min(height, 1080) }
                 });
+                console.log(`📺 Found ${sources.length} screen sources`);
                 if (sources.length === 0) {
                     throw new Error('No screen sources available - check macOS Screen Recording permissions');
                 }
+                console.log('🖼️ Converting thumbnail to PNG buffer...');
                 let buffer = sources[0].thumbnail.toPNG();
+                console.log(`📊 Screenshot buffer size: ${buffer.length} bytes`);
                 // Apply blur if enabled in settings
                 if (appSettings.blur_screenshots) {
                     console.log('🔄 Applying blur to screenshot...');
                     buffer = await blurImage(buffer);
                 }
-                const filename = `activity_${(0, crypto_1.randomUUID)()}.png`;
+                const filename = `activity_${Date.now()}_${(0, crypto_1.randomUUID)().slice(0, 8)}.png`;
                 const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
+                console.log(`💾 Saving screenshot to: ${tempPath}`);
                 fs_1.default.writeFileSync(tempPath, buffer);
-                console.log('💾 Activity screenshot saved:', filename);
+                console.log('✅ Screenshot file saved successfully');
                 resolve({ tempPath, filename });
             }
             catch (error) {
+                console.error('❌ Screenshot capture error:', error);
                 reject(error);
             }
         });
+        // Reduce timeout to 5 seconds for faster feedback
         const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Screenshot capture timeout')), SCREENSHOT_TIMEOUT_MS);
+            setTimeout(() => reject(new Error('Screenshot capture timeout (5s)')), 5000);
         });
+        console.log('⏱️ Starting screenshot capture with 5s timeout...');
         const { tempPath, filename } = await Promise.race([screenshotPromise, timeoutPromise]);
+        console.log('☁️ Starting upload to Supabase...');
         // Upload to Supabase with activity metrics
         await uploadActivityScreenshot(tempPath, filename);
         // Update session stats
@@ -326,11 +337,17 @@ async function captureActivityScreenshot() {
             console.log('✅ System available again after being unavailable');
             systemUnavailableStart = null;
         }
-        console.log('✅ Activity screenshot uploaded successfully with metrics');
+        console.log('🎉 Screenshot capture and upload completed successfully!');
+        console.log(`📊 Total screenshots this session: ${currentActivitySession.total_screenshots}`);
     }
     catch (error) {
         consecutiveScreenshotFailures++;
-        console.error(`❌ Activity screenshot failed (${consecutiveScreenshotFailures}/${MAX_SCREENSHOT_FAILURES}):`, error);
+        console.error(`💥 Screenshot failed (attempt ${consecutiveScreenshotFailures}/${MAX_SCREENSHOT_FAILURES}):`);
+        console.error('📋 Error details:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack?.split('\n').slice(0, 3).join('\n')
+        });
         (0, errorHandler_1.logError)('captureActivityScreenshot', error);
         // Track when system became unavailable
         if (!systemUnavailableStart) {
@@ -342,6 +359,7 @@ async function captureActivityScreenshot() {
             (systemUnavailableStart && (Date.now() - systemUnavailableStart) > MAX_SYSTEM_UNAVAILABLE_TIME);
         if (shouldStopTracking) {
             console.log('🛑 Stopping tracking due to system unavailability or screenshot failures');
+            console.log(`📊 Failure stats: ${consecutiveScreenshotFailures} failures, ${systemUnavailableStart ? Date.now() - systemUnavailableStart : 0}ms unavailable`);
             // Stop all monitoring
             stopActivityMonitoring();
             // Notify main process to stop timer tracking
@@ -389,9 +407,18 @@ async function uploadActivityScreenshot(filePath, filename) {
     // Use a default task ID that should exist in the system
     // This will be replaced with real task ID when proper time tracking is active
     const taskId = ACTIVITY_MONITORING_TASK_ID;
-    console.log(`☁️ Uploading activity screenshot - user: ${currentUserId}, task: ${taskId}`);
+    console.log(`☁️ Starting upload process...`);
+    console.log(`📋 Upload details:`, {
+        userId: currentUserId,
+        taskId: taskId,
+        filename: filename,
+        filePath: filePath
+    });
     try {
+        console.log('📂 Reading file buffer...');
         const fileBuffer = fs_1.default.readFileSync(filePath);
+        console.log(`📊 File buffer size: ${fileBuffer.length} bytes`);
+        console.log('☁️ Uploading to Supabase Storage...');
         // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase_1.supabase.storage
             .from('screenshots')
@@ -400,23 +427,28 @@ async function uploadActivityScreenshot(filePath, filename) {
             upsert: true
         });
         if (uploadError) {
-            console.log('❌ Storage upload failed:', uploadError);
+            console.error('❌ Supabase Storage upload failed:', {
+                error: uploadError.message,
+                code: uploadError.name,
+                details: uploadError
+            });
             (0, unsyncedManager_1.queueScreenshot)({
                 user_id: currentUserId,
                 project_id: '00000000-0000-0000-0000-000000000001',
                 image_url: `local://${filePath}`,
                 captured_at: new Date().toISOString()
             });
-            return;
+            throw new Error(`Storage upload failed: ${uploadError.message}`);
         }
+        console.log('✅ Storage upload successful, getting public URL...');
         // Get public URL
         const { data: { publicUrl } } = supabase_1.supabase.storage
             .from('screenshots')
             .getPublicUrl(`${currentUserId}/${filename}`);
+        console.log(`🔗 Public URL generated: ${publicUrl}`);
+        console.log('💾 Saving to database...');
         // Save to database with activity metrics
-        const { error: dbError } = await supabase_1.supabase
-            .from('screenshots')
-            .insert({
+        const dbPayload = {
             user_id: currentUserId,
             project_id: '00000000-0000-0000-0000-000000000001',
             image_url: publicUrl,
@@ -426,18 +458,34 @@ async function uploadActivityScreenshot(filePath, filename) {
             mouse_clicks: activityMetrics.mouse_clicks,
             keystrokes: activityMetrics.keystrokes,
             mouse_movements: activityMetrics.mouse_movements
-        });
+        };
+        console.log('📊 Database payload:', dbPayload);
+        const { error: dbError } = await supabase_1.supabase
+            .from('screenshots')
+            .insert(dbPayload);
         if (dbError) {
-            console.log('❌ Database save failed:', dbError);
+            console.error('❌ Database save failed:', {
+                error: dbError.message,
+                code: dbError.code,
+                details: dbError
+            });
             (0, unsyncedManager_1.queueScreenshot)({
                 user_id: currentUserId,
                 project_id: '00000000-0000-0000-0000-000000000001',
                 image_url: publicUrl,
                 captured_at: new Date().toISOString()
             });
-            return;
+            throw new Error(`Database save failed: ${dbError.message}`);
         }
-        console.log('✅ Activity screenshot uploaded successfully with metrics');
+        console.log('🎉 Screenshot uploaded and saved to database successfully!');
+        // Clean up temp file
+        try {
+            fs_1.default.unlinkSync(filePath);
+            console.log('🗑️ Temporary file cleaned up');
+        }
+        catch (cleanupError) {
+            console.log('⚠️ Could not clean up temp file:', cleanupError.message);
+        }
         // Emit event to trigger notification in main process
         try {
             if (!appEvents) {
@@ -449,24 +497,12 @@ async function uploadActivityScreenshot(filePath, filename) {
             }
         }
         catch (e) {
-            // Silent fail if events not available
-        }
-        // Clean up local file
-        try {
-            fs_1.default.unlinkSync(filePath);
-        }
-        catch (err) {
-            console.log('⚠️ Could not delete local file:', err.message);
+            console.log('⚠️ Could not emit screenshot-captured event:', e.message);
         }
     }
     catch (error) {
-        console.log('❌ Activity screenshot upload error:', error);
-        (0, unsyncedManager_1.queueScreenshot)({
-            user_id: currentUserId,
-            project_id: '00000000-0000-0000-0000-000000000001',
-            image_url: `local://${filePath}`,
-            captured_at: new Date().toISOString()
-        });
+        console.error('💥 Upload process failed:', error);
+        throw error; // Re-throw to be handled by calling function
     }
 }
 async function getCurrentAppName() {
@@ -938,9 +974,14 @@ function scheduleRandomScreenshot() {
     const randomInterval = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
     console.log(`📸 Next screenshot in ${Math.round(randomInterval / 60)} minutes ${randomInterval % 60} seconds`);
     activityInterval = setTimeout(async () => {
-        if (currentUserId && isUserActive()) {
+        // Take screenshot regardless of user activity status - that's the whole point of monitoring!
+        if (currentUserId) {
+            console.log('📸 Attempting scheduled screenshot...');
             await captureActivityScreenshot();
             updateLastActivity();
+        }
+        else {
+            console.log('⚠️ No user ID available for scheduled screenshot');
         }
         // Schedule next random screenshot
         scheduleRandomScreenshot();
