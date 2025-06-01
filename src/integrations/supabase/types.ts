@@ -125,6 +125,13 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "app_logs_time_log_id_fkey"
+            columns: ["time_log_id"]
+            isOneToOne: false
+            referencedRelation: "time_logs"
+            referencedColumns: ["id"]
+          },
         ]
       }
       employee_project_assignments: {
@@ -712,6 +719,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "url_logs_time_log_id_fkey"
+            columns: ["time_log_id"]
+            isOneToOne: false
+            referencedRelation: "time_logs"
             referencedColumns: ["id"]
           },
         ]
