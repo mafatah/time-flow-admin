@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/providers/auth-provider';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, differenceInSeconds } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Globe, Monitor, Clock, TrendingUp, Activity, Filter, Calendar } from 'lucide-react';
 
@@ -36,12 +36,40 @@ interface User {
   email: string;
 }
 
+// Helper function to extract domain from URL
+const extractDomain = (url: string): string => {
+  try {
+    if (!url) return 'Unknown';
+    if (!url.startsWith('http')) {
+      url = 'https://' + url;
+    }
+    const domain = new URL(url).hostname;
+    return domain.replace('www.', '');
+  } catch {
+    return url || 'Unknown';
+  }
+};
+
+// Helper function to estimate duration
+const estimateDuration = (startedAt: string, endedAt: string | null): number => {
+  if (!startedAt) return 0;
+  
+  if (endedAt) {
+    return differenceInSeconds(new Date(endedAt), new Date(startedAt));
+  }
+  
+  // If no end time, estimate based on typical session length
+  // For apps: assume 5 minutes average
+  // For URLs: assume 2 minutes average
+  return 180; // 3 minutes default
+};
+
 export default function AppsUrlsPage() {
   const { userDetails } = useAuth();
   const [appData, setAppData] = useState<AppData[]>([]);
   const [urlData, setUrlData] = useState<UrlData[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [dateRange, setDateRange] = useState('today');
+  const [dateRange, setDateRange] = useState('week'); // Changed default to week since most data is from last week
   const [selectedUser, setSelectedUser] = useState('all');
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(true);
@@ -80,6 +108,12 @@ export default function AppsUrlsPage() {
       setLoading(true);
       const { start, end } = getDateRange();
 
+      console.log('🔍 Fetching app/URL data for range:', {
+        start: start.toISOString(),
+        end: end.toISOString(),
+        selectedUser
+      });
+
       await Promise.all([
         fetchAppData(start, end),
         fetchUrlData(start, end)
@@ -95,9 +129,9 @@ export default function AppsUrlsPage() {
     try {
       let query = supabase
         .from('app_logs')
-        .select('app_name, duration_seconds, category, timestamp')
-        .gte('timestamp', start.toISOString())
-        .lte('timestamp', end.toISOString())
+        .select('app_name, started_at, ended_at, duration_seconds, category, timestamp, window_title')
+        .gte('started_at', start.toISOString())
+        .lte('started_at', end.toISOString())
         .not('app_name', 'is', null);
 
       if (selectedUser !== 'all') {
@@ -107,7 +141,9 @@ export default function AppsUrlsPage() {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Process app data
+      console.log('📱 Raw app data:', data?.length, 'records');
+
+      // Process app data with better duration handling
       const appStats = (data || []).reduce((acc: any, log: any) => {
         const appName = log.app_name || 'Unknown App';
         if (!acc[appName]) {
@@ -118,7 +154,14 @@ export default function AppsUrlsPage() {
             category: log.category || 'Other'
           };
         }
-        acc[appName].total_duration += log.duration_seconds || 0;
+        
+        // Calculate duration from duration_seconds or estimate from timestamps
+        let duration = log.duration_seconds;
+        if (!duration || duration === 0) {
+          duration = estimateDuration(log.started_at, log.ended_at);
+        }
+        
+        acc[appName].total_duration += duration;
         acc[appName].total_sessions += 1;
         return acc;
       }, {});
@@ -134,9 +177,11 @@ export default function AppsUrlsPage() {
         .sort((a: any, b: any) => b.total_duration - a.total_duration)
         .slice(0, 20); // Top 20 apps
 
+      console.log('📊 Processed app data:', processedApps.slice(0, 3));
       setAppData(processedApps);
     } catch (error) {
       console.error('Error fetching app data:', error);
+      setAppData([]);
     }
   };
 
@@ -144,10 +189,10 @@ export default function AppsUrlsPage() {
     try {
       let query = supabase
         .from('url_logs')
-        .select('domain, site_url, duration_seconds, category, timestamp, url, title')
-        .gte('timestamp', start.toISOString())
-        .lte('timestamp', end.toISOString())
-        .not('domain', 'is', null);
+        .select('domain, site_url, started_at, ended_at, duration_seconds, category, timestamp, url, title, browser')
+        .gte('started_at', start.toISOString())
+        .lte('started_at', end.toISOString())
+        .not('site_url', 'is', null);
 
       if (selectedUser !== 'all') {
         query = query.eq('user_id', selectedUser);
@@ -156,9 +201,13 @@ export default function AppsUrlsPage() {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Process URL data
+      console.log('🌐 Raw URL data:', data?.length, 'records');
+
+      // Process URL data with better domain extraction and duration handling
       const urlStats = (data || []).reduce((acc: any, log: any) => {
-        const domain = log.domain || 'Unknown Site';
+        // Extract domain from site_url if domain is null
+        const domain = log.domain || extractDomain(log.site_url);
+        
         if (!acc[domain]) {
           acc[domain] = {
             domain: domain,
@@ -168,7 +217,14 @@ export default function AppsUrlsPage() {
             category: log.category || 'Other'
           };
         }
-        acc[domain].total_duration += log.duration_seconds || 0;
+        
+        // Calculate duration from duration_seconds or estimate from timestamps
+        let duration = log.duration_seconds;
+        if (!duration || duration === 0) {
+          duration = estimateDuration(log.started_at, log.ended_at);
+        }
+        
+        acc[domain].total_duration += duration;
         acc[domain].total_visits += 1;
         return acc;
       }, {});
@@ -184,9 +240,11 @@ export default function AppsUrlsPage() {
         .sort((a: any, b: any) => b.total_duration - a.total_duration)
         .slice(0, 20); // Top 20 domains
 
+      console.log('📊 Processed URL data:', processedUrls.slice(0, 3));
       setUrlData(processedUrls);
     } catch (error) {
       console.error('Error fetching URL data:', error);
+      setUrlData([]);
     }
   };
 
@@ -386,7 +444,7 @@ export default function AppsUrlsPage() {
               Top {activeTab === 'apps' ? 'Applications' : 'Websites'} Usage
             </CardTitle>
             <CardDescription>
-              Distribution of time spent
+              Distribution of time spent {currentData.length > 0 ? `(${currentData.length} total)` : ''}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -394,7 +452,8 @@ export default function AppsUrlsPage() {
               <div className="text-center py-8">Loading chart...</div>
             ) : chartData.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No data available for the selected period.
+                <p>No data available for the selected period.</p>
+                <p className="text-xs mt-2">Try selecting "Last 7 days" - most data is from last week.</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
@@ -433,7 +492,8 @@ export default function AppsUrlsPage() {
               <div className="text-center py-8">Loading chart...</div>
             ) : chartData.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No data available for the selected period.
+                <p>No data available for the selected period.</p>
+                <p className="text-xs mt-2">Try selecting "Last 7 days" - most data is from last week.</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
@@ -471,7 +531,8 @@ export default function AppsUrlsPage() {
             <div className="text-center py-8">Loading data...</div>
           ) : currentData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No {activeTab === 'apps' ? 'application' : 'website'} data found for the selected period.
+              <p>No {activeTab === 'apps' ? 'application' : 'website'} data found for the selected period.</p>
+              <p className="text-xs mt-2">Try selecting "Last 7 days" to see historical data.</p>
             </div>
           ) : (
             <div className="space-y-3">

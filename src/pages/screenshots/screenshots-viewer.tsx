@@ -492,67 +492,91 @@ export default function ScreenshotsViewer() {
             <CardHeader>
               <CardTitle>Activity Heatmap (10-minute intervals)</CardTitle>
               <CardDescription>
-                Visual representation of activity throughout the day
+                Visual representation of activity throughout the day - each block represents 10 minutes
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Time labels */}
-                <div className="grid grid-cols-24 gap-1 text-xs text-center text-muted-foreground">
-                  {Array.from({length: 24}, (_, i) => (
-                    <div key={i}>{i.toString().padStart(2, '0')}</div>
+                {/* Time labels - show every 2 hours for clarity */}
+                <div className="grid grid-cols-12 gap-1 text-xs text-center text-muted-foreground mb-2">
+                  {Array.from({length: 12}, (_, i) => (
+                    <div key={i} className="font-medium">
+                      {(i * 2).toString().padStart(2, '0')}:00
+                    </div>
                   ))}
                 </div>
                 
-                {/* Activity blocks */}
-                <div className="grid grid-cols-144 gap-1">
-                  {timeSlots.map((slot, index) => {
-                    const intensity = slot.screenshots.length > 0 ? 
-                      Math.min(slot.activityPercent / 100, 1) : 0;
+                {/* Activity blocks - group by 2-hour periods for better readability */}
+                <div className="space-y-2">
+                  {Array.from({length: 12}, (_, hourGroup) => {
+                    const startHour = hourGroup * 2;
+                    const endHour = startHour + 2;
+                    const slotsForPeriod = timeSlots.slice(startHour * 6, endHour * 6); // 6 slots per hour
                     
                     return (
-                      <div
-                        key={index}
-                        className={`h-4 rounded cursor-pointer transition-all hover:scale-110 ${
-                          slot.screenshots.length === 0 
-                            ? 'bg-gray-100' 
-                            : slot.isActive 
-                              ? 'bg-green-500' 
-                              : slot.isIdle 
-                                ? 'bg-orange-300' 
-                                : 'bg-blue-300'
-                        }`}
-                        style={{
-                          opacity: slot.screenshots.length > 0 ? Math.max(0.3, intensity) : 0.1
-                        }}
-                        title={`${slot.time}: ${slot.screenshots.length} screenshots, ${slot.activityPercent}% activity`}
-                        onClick={() => {
-                          if (slot.screenshots.length > 0) {
-                            window.open(slot.screenshots[0].image_url, '_blank');
-                          }
-                        }}
-                      />
+                      <div key={hourGroup} className="flex items-center gap-1">
+                        <div className="w-12 text-xs text-muted-foreground font-medium">
+                          {startHour.toString().padStart(2, '0')}:00
+                        </div>
+                        <div className="flex gap-1 flex-1">
+                          {slotsForPeriod.map((slot, index) => {
+                            const intensity = slot.screenshots.length > 0 ? 
+                              Math.min(slot.activityPercent / 100, 1) : 0;
+                            
+                            const getActivityColor = () => {
+                              if (slot.screenshots.length === 0) return 'bg-gray-100';
+                              if (slot.isActive) return 'bg-green-500';
+                              if (slot.isIdle) return 'bg-orange-400';
+                              return 'bg-blue-400';
+                            };
+                            
+                            return (
+                              <div
+                                key={index}
+                                className={`h-8 w-4 rounded cursor-pointer transition-all hover:scale-110 hover:shadow-lg border ${getActivityColor()}`}
+                                style={{
+                                  opacity: slot.screenshots.length > 0 ? Math.max(0.4, intensity) : 0.1
+                                }}
+                                title={`${slot.time}: ${slot.screenshots.length} screenshots, ${slot.activityPercent}% activity`}
+                                onClick={() => {
+                                  if (slot.screenshots.length > 0) {
+                                    window.open(slot.screenshots[0].image_url, '_blank');
+                                  }
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
                 
-                {/* Legend */}
-                <div className="flex items-center gap-6 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-green-500 rounded"></div>
-                    <span>Active (&gt;30% activity)</span>
+                {/* Enhanced Legend */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium mb-3">Activity Legend</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-green-500 rounded border"></div>
+                      <span>High Activity (&gt;30%)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-blue-400 rounded border"></div>
+                      <span>Low Activity (10-30%)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-orange-400 rounded border"></div>
+                      <span>Idle (&lt;10%)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-gray-100 rounded border"></div>
+                      <span>No Activity</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-300 rounded"></div>
-                    <span>Low Activity (10-30%)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-orange-300 rounded"></div>
-                    <span>Idle (&lt;10% activity)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gray-100 rounded"></div>
-                    <span>No Data</span>
+                  <div className="mt-3 text-xs text-muted-foreground">
+                    <p>• Each block represents 10 minutes</p>
+                    <p>• Click on active blocks to view screenshots</p>
+                    <p>• Opacity indicates activity intensity</p>
                   </div>
                 </div>
               </div>
