@@ -5,26 +5,18 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
 import { TrackerProvider } from '@/providers/tracker-provider';
-import ErrorBoundary from '@/components/error-boundary';
+import { ErrorBoundary } from '@/components/error-boundary';
 import MainLayout from '@/components/layout/main-layout';
 
 // Import pages
 import LoginPage from '@/pages/auth/login';
 import DashboardPage from '@/pages/dashboard';
 import ReportsPage from '@/pages/reports';
-import TimeReportsPage from '@/pages/reports/time-reports';
+import TimeReportsPage from '@/pages/time-reports';
 import AppsUrlsIdle from '@/pages/reports/apps-urls-idle';
-import AnalyticsPage from '@/pages/reports/analytics';
-import InsightsPage from '@/pages/reports/insights';
-import IdleLogsPage from '@/pages/monitoring/idle-logs';
-import ScreenshotsPage from '@/pages/monitoring/screenshots';
-import SettingsPage from '@/pages/system/settings';
-import UsersPage from '@/pages/admin/users';
-import ProjectsPage from '@/pages/admin/projects';
 import EmployeeDashboard from '@/pages/employee/dashboard';
 import EmployeeTimeTracker from '@/pages/employee/time-tracker';
 import EmployeeReports from '@/pages/employee/reports';
-import EmployeeScreenshots from '@/pages/employee/screenshots';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -173,76 +165,6 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
-      <Route path="/reports/analytics" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <AnalyticsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/reports/insights" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <InsightsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/monitoring/idle-logs" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <IdleLogsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/monitoring/screenshots" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <ScreenshotsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/system/settings" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <SettingsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/admin/users" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <UsersPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/admin/projects" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <ProjectsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
-      } />
-      
       {/* Employee Routes */}
       <Route path="/employee" element={
         <ProtectedRoute>
@@ -258,7 +180,9 @@ function AppRoutes() {
         <ProtectedRoute>
           <EmployeeRoute>
             <AppLayout>
-              <EmployeeTimeTracker />
+              <TrackerProvider>
+                <EmployeeTimeTracker />
+              </TrackerProvider>
             </AppLayout>
           </EmployeeRoute>
         </ProtectedRoute>
@@ -269,16 +193,6 @@ function AppRoutes() {
           <EmployeeRoute>
             <AppLayout>
               <EmployeeReports />
-            </AppLayout>
-          </EmployeeRoute>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/employee/screenshots" element={
-        <ProtectedRoute>
-          <EmployeeRoute>
-            <AppLayout>
-              <EmployeeScreenshots />
             </AppLayout>
           </EmployeeRoute>
         </ProtectedRoute>
