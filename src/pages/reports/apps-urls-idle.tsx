@@ -1,19 +1,23 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { format } from "date-fns";
-import { Monitor, Globe, Clock, Activity } from "lucide-react";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { Monitor, Globe, Clock, Activity, Filter } from "lucide-react";
+import { useAuth } from '@/providers/auth-provider';
 
 interface AppUsage {
   app_name: string;
   total_duration: number;
   session_count: number;
   category: string;
+  user_id: string;
+  user_name?: string;
 }
 
 interface UrlUsage {
@@ -21,37 +25,135 @@ interface UrlUsage {
   total_duration: number;
   visit_count: number;
   category: string;
+  user_id: string;
+  user_name?: string;
 }
 
 interface IdleTime {
   date: string;
   total_idle_minutes: number;
   idle_sessions: number;
+  user_id: string;
+  user_name?: string;
+}
+
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function AppsUrlsIdle() {
+  const { userDetails } = useAuth();
   const [appUsage, setAppUsage] = useState<AppUsage[]>([]);
   const [urlUsage, setUrlUsage] = useState<UrlUsage[]>([]);
   const [idleTime, setIdleTime] = useState<IdleTime[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filter states
+  const [dateRange, setDateRange] = useState('week');
+  const [selectedUser, setSelectedUser] = useState('all');
+  const [selectedProject, setSelectedProject] = useState('all');
 
   useEffect(() => {
-    fetchAnalyticsData();
-  }, []);
+    if (userDetails?.role === 'admin') {
+      fetchUsers();
+      fetchProjects();
+    }
+  }, [userDetails]);
+
+  useEffect(() => {
+    if (userDetails?.role === 'admin') {
+      fetchAnalyticsData();
+    }
+  }, [userDetails, dateRange, selectedUser, selectedProject]);
+
+  const getDateRange = () => {
+    const now = new Date();
+    switch (dateRange) {
+      case 'today':
+        return { start: startOfDay(now), end: endOfDay(now) };
+      case 'week':
+        return { start: startOfDay(subDays(now, 7)), end: endOfDay(now) };
+      case 'month':
+        return { start: startOfDay(subDays(now, 30)), end: endOfDay(now) };
+      default:
+        return { start: startOfDay(subDays(now, 7)), end: endOfDay(now) };
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .order('full_name');
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    }
+  };
 
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch app logs
-      const { data: appLogs, error: appError } = await supabase
+      const { start, end } = getDateRange();
+
+      // Build user filter
+      let userFilter = '';
+      if (selectedUser !== 'all') {
+        userFilter = `user_id.eq.${selectedUser}`;
+      }
+
+      // Build project filter for time logs
+      let projectFilter = '';
+      if (selectedProject !== 'all') {
+        projectFilter = `project_id.eq.${selectedProject}`;
+      }
+
+      // Fetch app logs with filters
+      let appQuery = supabase
         .from('app_logs')
-        .select('*')
-        .gte('started_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        .select(`
+          *,
+          users!inner(id, full_name, email)
+        `)
+        .gte('started_at', start.toISOString())
+        .lte('started_at', end.toISOString());
+
+      if (selectedUser !== 'all') {
+        appQuery = appQuery.eq('user_id', selectedUser);
+      }
+
+      const { data: appLogs, error: appError } = await appQuery;
 
       if (appError) {
         console.error('Error fetching app logs:', appError);
@@ -60,11 +162,21 @@ export default function AppsUrlsIdle() {
         processAppUsage(appLogs || []);
       }
 
-      // Fetch URL logs
-      const { data: urlLogs, error: urlError } = await supabase
+      // Fetch URL logs with filters
+      let urlQuery = supabase
         .from('url_logs')
-        .select('*')
-        .gte('started_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        .select(`
+          *,
+          users!inner(id, full_name, email)
+        `)
+        .gte('started_at', start.toISOString())
+        .lte('started_at', end.toISOString());
+
+      if (selectedUser !== 'all') {
+        urlQuery = urlQuery.eq('user_id', selectedUser);
+      }
+
+      const { data: urlLogs, error: urlError } = await urlQuery;
 
       if (urlError) {
         console.error('Error fetching URL logs:', urlError);
@@ -75,14 +187,23 @@ export default function AppsUrlsIdle() {
 
       // Fetch idle logs with error handling
       try {
-        const { data: idleLogs, error: idleError } = await supabase
+        let idleQuery = supabase
           .from('idle_logs')
-          .select('*')
-          .gte('idle_start', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+          .select(`
+            *,
+            users!inner(id, full_name, email)
+          `)
+          .gte('idle_start', start.toISOString())
+          .lte('idle_start', end.toISOString());
+
+        if (selectedUser !== 'all') {
+          idleQuery = idleQuery.eq('user_id', selectedUser);
+        }
+
+        const { data: idleLogs, error: idleError } = await idleQuery;
 
         if (idleError) {
           console.error('Error fetching idle logs:', idleError);
-          // Don't set error state for idle logs as it's not critical
           setIdleTime([]);
         } else {
           processIdleTime(idleLogs || []);
@@ -101,28 +222,36 @@ export default function AppsUrlsIdle() {
   };
 
   const processAppUsage = (logs: any[]) => {
-    const appData: { [key: string]: { duration: number; count: number; category: string } } = {};
+    const appData: { [key: string]: { duration: number; count: number; category: string; user_id: string; user_name: string } } = {};
     
     logs.forEach(log => {
       const duration = log.duration_seconds || 0;
-      if (!appData[log.app_name]) {
-        appData[log.app_name] = { 
+      const key = `${log.app_name}_${log.user_id}`;
+      if (!appData[key]) {
+        appData[key] = { 
           duration: 0, 
           count: 0, 
-          category: log.category || 'other' 
+          category: log.category || 'other',
+          user_id: log.user_id,
+          user_name: log.users?.full_name || log.users?.email || 'Unknown User'
         };
       }
-      appData[log.app_name].duration += duration;
-      appData[log.app_name].count += 1;
+      appData[key].duration += duration;
+      appData[key].count += 1;
     });
 
     const processed = Object.entries(appData)
-      .map(([app, data]) => ({
-        app_name: app,
-        total_duration: Math.round(data.duration / 60), // Convert to minutes
-        session_count: data.count,
-        category: data.category
-      }))
+      .map(([key, data]) => {
+        const appName = key.split('_')[0];
+        return {
+          app_name: appName,
+          total_duration: Math.round(data.duration / 60), // Convert to minutes
+          session_count: data.count,
+          category: data.category,
+          user_id: data.user_id,
+          user_name: data.user_name
+        };
+      })
       .sort((a, b) => b.total_duration - a.total_duration)
       .slice(0, 10);
 
@@ -130,30 +259,38 @@ export default function AppsUrlsIdle() {
   };
 
   const processUrlUsage = (logs: any[]) => {
-    const urlData: { [key: string]: { duration: number; count: number; category: string } } = {};
+    const urlData: { [key: string]: { duration: number; count: number; category: string; user_id: string; user_name: string } } = {};
     
     logs.forEach(log => {
       const duration = log.duration_seconds || 0;
       const domain = new URL(log.site_url).hostname;
+      const key = `${domain}_${log.user_id}`;
       
-      if (!urlData[domain]) {
-        urlData[domain] = { 
+      if (!urlData[key]) {
+        urlData[key] = { 
           duration: 0, 
           count: 0, 
-          category: log.category || 'other' 
+          category: log.category || 'other',
+          user_id: log.user_id,
+          user_name: log.users?.full_name || log.users?.email || 'Unknown User'
         };
       }
-      urlData[domain].duration += duration;
-      urlData[domain].count += 1;
+      urlData[key].duration += duration;
+      urlData[key].count += 1;
     });
 
     const processed = Object.entries(urlData)
-      .map(([url, data]) => ({
-        site_url: url,
-        total_duration: Math.round(data.duration / 60), // Convert to minutes
-        visit_count: data.count,
-        category: data.category
-      }))
+      .map(([key, data]) => {
+        const domain = key.split('_')[0];
+        return {
+          site_url: domain,
+          total_duration: Math.round(data.duration / 60), // Convert to minutes
+          visit_count: data.count,
+          category: data.category,
+          user_id: data.user_id,
+          user_name: data.user_name
+        };
+      })
       .sort((a, b) => b.total_duration - a.total_duration)
       .slice(0, 10);
 
@@ -161,25 +298,36 @@ export default function AppsUrlsIdle() {
   };
 
   const processIdleTime = (logs: any[]) => {
-    const idleData: { [key: string]: { minutes: number; sessions: number } } = {};
+    const idleData: { [key: string]: { minutes: number; sessions: number; user_id: string; user_name: string } } = {};
     
     logs.forEach(log => {
       const date = format(new Date(log.idle_start), 'yyyy-MM-dd');
       const duration = log.duration_minutes || 0;
+      const key = `${date}_${log.user_id}`;
       
-      if (!idleData[date]) {
-        idleData[date] = { minutes: 0, sessions: 0 };
+      if (!idleData[key]) {
+        idleData[key] = { 
+          minutes: 0, 
+          sessions: 0,
+          user_id: log.user_id,
+          user_name: log.users?.full_name || log.users?.email || 'Unknown User'
+        };
       }
-      idleData[date].minutes += duration;
-      idleData[date].sessions += 1;
+      idleData[key].minutes += duration;
+      idleData[key].sessions += 1;
     });
 
     const processed = Object.entries(idleData)
-      .map(([date, data]) => ({
-        date,
-        total_idle_minutes: data.minutes,
-        idle_sessions: data.sessions
-      }))
+      .map(([key, data]) => {
+        const date = key.split('_')[0];
+        return {
+          date,
+          total_idle_minutes: data.minutes,
+          idle_sessions: data.sessions,
+          user_id: data.user_id,
+          user_name: data.user_name
+        };
+      })
       .sort((a, b) => a.date.localeCompare(b.date));
 
     setIdleTime(processed);
@@ -197,6 +345,14 @@ export default function AppsUrlsIdle() {
     };
     return colors[category] || colors['other'];
   };
+
+  if (userDetails?.role !== 'admin') {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Access denied. Admin privileges required.</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -228,7 +384,68 @@ export default function AppsUrlsIdle() {
           <h1 className="text-3xl font-bold">Apps, URLs & Idle Time</h1>
           <p className="text-gray-600">Detailed analysis of application usage, website visits, and idle periods</p>
         </div>
+        <div className="flex items-center space-x-2">
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Select range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">Last 7 days</SelectItem>
+              <SelectItem value="month">Last 30 days</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={selectedUser} onValueChange={setSelectedUser}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Select User" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Users</SelectItem>
+              {users.map((user) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.full_name || user.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={fetchAnalyticsData} disabled={loading}>
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      {/* Filters Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Active Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4 text-sm text-gray-600">
+            <div>
+              <span className="font-medium">Date Range:</span> {
+                dateRange === 'today' ? 'Today' :
+                dateRange === 'week' ? 'Last 7 days' :
+                dateRange === 'month' ? 'Last 30 days' : 'Unknown'
+              }
+            </div>
+            <div>
+              <span className="font-medium">User:</span> {
+                selectedUser === 'all' ? 'All Users' : 
+                users.find(u => u.id === selectedUser)?.full_name || 
+                users.find(u => u.id === selectedUser)?.email || 'Unknown User'
+              }
+            </div>
+            {appUsage.length > 0 && (
+              <div>
+                <span className="font-medium">Results:</span> {appUsage.length} apps, {urlUsage.length} websites, {idleTime.length} idle periods
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="apps" className="space-y-6">
         <TabsList>
@@ -281,8 +498,14 @@ export default function AppsUrlsIdle() {
                             {app.category}
                           </Badge>
                         </div>
-                        <div className="text-sm text-gray-600">
-                          {app.session_count} sessions
+                        <div className="text-sm text-gray-600 flex items-center gap-2">
+                          <span>{app.session_count} sessions</span>
+                          {selectedUser === 'all' && (
+                            <>
+                              <span>•</span>
+                              <span>{app.user_name}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">
@@ -348,8 +571,14 @@ export default function AppsUrlsIdle() {
                             {url.category}
                           </Badge>
                         </div>
-                        <div className="text-sm text-gray-600">
-                          {url.visit_count} visits
+                        <div className="text-sm text-gray-600 flex items-center gap-2">
+                          <span>{url.visit_count} visits</span>
+                          {selectedUser === 'all' && (
+                            <>
+                              <span>•</span>
+                              <span>{url.user_name}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">
@@ -419,8 +648,14 @@ export default function AppsUrlsIdle() {
                           <div className="font-medium">
                             {format(new Date(day.date), 'MMM dd, yyyy')}
                           </div>
-                          <div className="text-sm text-gray-600">
-                            {day.idle_sessions} idle sessions
+                          <div className="text-sm text-gray-600 flex items-center gap-2">
+                            <span>{day.idle_sessions} idle sessions</span>
+                            {selectedUser === 'all' && (
+                              <>
+                                <span>•</span>
+                                <span>{day.user_name}</span>
+                              </>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">

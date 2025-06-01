@@ -201,6 +201,62 @@ ipcMain.on('logout', () => {
   console.log('🚪 User logged out - session cleared and tracking stopped');
 });
 
+// Add missing get-config handler
+ipcMain.handle('get-config', () => {
+  return {
+    supabase_url: process.env.VITE_SUPABASE_URL || 'https://fkpiqcxkmrtaetvfgcli.supabase.co',
+    supabase_key: process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4',
+    user_id: process.env.USER_ID || '',
+    project_id: process.env.PROJECT_ID || '00000000-0000-0000-0000-000000000001',
+    screenshot_interval_seconds: screenshotIntervalSeconds,
+    idle_threshold_seconds: Number(process.env.IDLE_TIMEOUT_MINUTES || 1) * 60,
+    enable_screenshots: true,
+    enable_idle_detection: true,
+    enable_activity_tracking: true,
+    enable_anti_cheat: process.env.ANTI_CHEAT_ENABLED !== 'false'
+  };
+});
+
+// Add missing fetch-screenshots handler
+ipcMain.handle('fetch-screenshots', async (event, params) => {
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    const { user_id, date, limit = 20, offset = 0 } = params;
+    
+    // Create date range for the selected date
+    const startDate = new Date(date);
+    const endDate = new Date(date);
+    endDate.setDate(endDate.getDate() + 1);
+    
+    console.log(`📸 Fetching screenshots for user ${user_id} on ${date}`);
+    
+    const { data: screenshots, error } = await supabase
+      .from('screenshots')
+      .select('*')
+      .eq('user_id', user_id)
+      .gte('captured_at', startDate.toISOString())
+      .lt('captured_at', endDate.toISOString())
+      .order('captured_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    
+    if (error) {
+      console.error('❌ Error fetching screenshots:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Fetched ${screenshots?.length || 0} screenshots`);
+    return screenshots || [];
+    
+  } catch (error) {
+    console.error('❌ Failed to fetch screenshots:', error);
+    return [];
+  }
+});
+
 ipcMain.on('trigger-activity-capture', () => {
   triggerActivityCapture();
   showScreenshotNotification();
@@ -277,7 +333,7 @@ function createTray() {
 // Create a simple icon as base64 (16x16 green circle)
 function createSimpleIcon(): string {
   // This is a simple 16x16 PNG icon encoded as base64
-  return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
+  return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
 }
 
 // Update tray menu

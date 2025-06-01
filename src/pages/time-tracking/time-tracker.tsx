@@ -1,14 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/auth-provider';
-import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInMinutes } from 'date-fns';
-import { Play, Square, Clock, Calendar } from 'lucide-react';
+import { Play, Square, Clock } from 'lucide-react';
 
 interface Project {
   id: string;
@@ -24,14 +23,14 @@ interface TimeLog {
 
 export default function TimeTrackerPage() {
   const { userDetails } = useAuth();
-  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [activeLogs, setActiveLogs] = useState<TimeLog[]>([]);
-  const [recentLogs, setRecentLogs] = useState<
-    { id: string; start_time: string; end_time: string | null; project_id: string | null; duration: number }[]
-  >([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [isTracking, setIsTracking] = useState(false);
+  const [activeLogs, setActiveLogs] = useState<TimeLog[]>([]);
+  const [recentLogs, setRecentLogs] = useState<TimeLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Calculate if tracking is active based on active logs (no separate state)
+  const hasActiveSession = activeLogs.length > 0;
 
   useEffect(() => {
     if (userDetails?.id) {
@@ -63,7 +62,7 @@ export default function TimeTrackerPage() {
       console.error('Error fetching projects:', error);
       toast({
         title: 'Error fetching projects',
-        description: 'Failed to load projects.',
+        description: 'Failed to fetch projects.',
         variant: 'destructive',
       });
     }
@@ -71,79 +70,56 @@ export default function TimeTrackerPage() {
 
   const fetchActiveLogs = async () => {
     if (!userDetails?.id) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('time_logs')
-        .select('id, start_time, end_time, project_id')
+        .select('*')
         .eq('user_id', userDetails.id)
-        .is('end_time', null);
+        .is('end_time', null)
+        .order('start_time', { ascending: false });
 
       if (error) {
-        console.error('Error fetching active time logs:', error);
-        toast({
-          title: 'Error fetching active time logs',
-          description: error.message,
-          variant: 'destructive',
-        });
+        console.error('Error fetching active logs:', error);
         return;
       }
 
       setActiveLogs(data || []);
-      setIsTracking(data && data.length > 0);
-      if (data && data.length > 0) {
-        setSelectedProjectId(data[0].project_id);
-      }
     } catch (error) {
-      console.error('Error fetching active time logs:', error);
-      toast({
-        title: 'Error fetching active time logs',
-        description: 'Failed to load active time logs.',
-        variant: 'destructive',
-      });
+      console.error('Error fetching active logs:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchRecentLogs = async () => {
     if (!userDetails?.id) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('time_logs')
-        .select('id, start_time, end_time, project_id')
+        .select('*')
         .eq('user_id', userDetails.id)
         .not('end_time', 'is', null)
         .order('start_time', { ascending: false })
-        .limit(5);
+        .limit(10);
 
       if (error) {
-        console.error('Error fetching recent time logs:', error);
-        toast({
-          title: 'Error fetching recent time logs',
-          description: error.message,
-          variant: 'destructive',
-        });
+        console.error('Error fetching recent logs:', error);
         return;
       }
 
-      const recentLogs = data?.map((log: any) => ({
-        id: log.id,
-        start_time: log.start_time,
-        end_time: log.end_time,
-        project_id: log.project_id,
-        duration: log.end_time 
+      // Calculate duration for recent logs
+      const logsWithDuration = (data || []).map((log) => ({
+        ...log,
+        duration: log.end_time
           ? differenceInMinutes(new Date(log.end_time), new Date(log.start_time))
-          : differenceInMinutes(new Date(), new Date(log.start_time))
-      })) || [];
+          : 0,
+      }));
 
-      setRecentLogs(recentLogs);
+      setRecentLogs(logsWithDuration);
     } catch (error) {
-      console.error('Error fetching recent time logs:', error);
-      toast({
-        title: 'Error fetching recent time logs',
-        description: 'Failed to load recent time logs.',
-        variant: 'destructive',
-      });
+      console.error('Error fetching recent logs:', error);
     }
   };
 
@@ -166,10 +142,24 @@ export default function TimeTrackerPage() {
       return;
     }
 
+    // Check if there's already an active session
+    if (hasActiveSession) {
+      toast({
+        title: 'Session already active',
+        description: 'Please stop the current session before starting a new one.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('time_logs')
-        .insert({ user_id: userDetails.id, project_id: selectedProjectId })
+        .insert({ 
+          user_id: userDetails.id, 
+          project_id: selectedProjectId,
+          start_time: new Date().toISOString()
+        })
         .select()
         .single();
 
@@ -185,7 +175,6 @@ export default function TimeTrackerPage() {
 
       fetchActiveLogs();
       fetchRecentLogs();
-      setIsTracking(true);
       toast({
         title: 'Time tracking started',
         description: `Tracking time for project ${selectedProjectId}.`,
@@ -237,7 +226,6 @@ export default function TimeTrackerPage() {
 
       fetchActiveLogs();
       fetchRecentLogs();
-      setIsTracking(false);
       toast({
         title: 'Time tracking stopped',
         description: 'Time tracking has been stopped.',
@@ -275,12 +263,12 @@ export default function TimeTrackerPage() {
             </Select>
           </div>
           <div>
-            {isTracking ? (
+            {hasActiveSession ? (
               <Button variant="destructive" className="w-full" onClick={stopTracking}>
                 <Square className="mr-2 h-4 w-4" /> Stop Tracking
               </Button>
             ) : (
-              <Button className="w-full" onClick={startTracking} disabled={!selectedProjectId}>
+              <Button className="w-full" onClick={startTracking} disabled={!selectedProjectId || loading}>
                 <Play className="mr-2 h-4 w-4" /> Start Tracking
               </Button>
             )}
@@ -294,7 +282,9 @@ export default function TimeTrackerPage() {
           <CardDescription>Current time tracking session.</CardDescription>
         </CardHeader>
         <CardContent>
-          {activeLogs.length > 0 ? (
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading active sessions...</p>
+          ) : activeLogs.length > 0 ? (
             activeLogs.map((log: any) => (
               <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
@@ -312,7 +302,10 @@ export default function TimeTrackerPage() {
               </div>
             ))
           ) : (
-            <p className="text-sm text-muted-foreground">No active session.</p>
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">No active tracking session found.</p>
+              <p className="text-xs text-muted-foreground mt-1">Start tracking to see your active session here.</p>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -342,7 +335,7 @@ export default function TimeTrackerPage() {
               </div>
             ))
           ) : (
-            <p className="text-sm text-muted-foreground">No recent sessions.</p>
+            <p className="text-sm text-muted-foreground">No recent sessions found.</p>
           )}
         </CardContent>
       </Card>

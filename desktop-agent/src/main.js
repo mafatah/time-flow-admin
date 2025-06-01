@@ -1185,6 +1185,44 @@ ipcMain.handle('force-screenshot', async () => {
   return { success: true, message: 'Screenshot captured manually' };
 });
 
+ipcMain.handle('get-config', () => {
+  return config;
+});
+
+ipcMain.handle('fetch-screenshots', async (event, params) => {
+  try {
+    const { user_id, date, limit = 20, offset = 0 } = params;
+    
+    // Create date range for the selected date
+    const startDate = new Date(date);
+    const endDate = new Date(date);
+    endDate.setDate(endDate.getDate() + 1);
+    
+    console.log(`📸 Fetching screenshots for user ${user_id} on ${date}`);
+    
+    const { data: screenshots, error } = await supabase
+      .from('screenshots')
+      .select('*')
+      .eq('user_id', user_id)
+      .gte('captured_at', startDate.toISOString())
+      .lt('captured_at', endDate.toISOString())
+      .order('captured_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    
+    if (error) {
+      console.error('❌ Error fetching screenshots:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Fetched ${screenshots?.length || 0} screenshots`);
+    return screenshots || [];
+    
+  } catch (error) {
+    console.error('❌ Failed to fetch screenshots:', error);
+    return [];
+  }
+});
+
 // === FRAUD DETECTION HANDLERS ===
 ipcMain.handle('report-suspicious-activity', (event, activityData) => {
   if (antiCheatDetector) {
