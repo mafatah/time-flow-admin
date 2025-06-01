@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,6 @@ import { Play, Square, Clock } from 'lucide-react';
 interface Project {
   id: string;
   name: string;
-  color?: string;
 }
 
 interface TimeLog {
@@ -23,8 +21,7 @@ interface TimeLog {
   project_id: string | null;
   projects?: {
     name: string;
-    color?: string;
-  };
+  } | null;
 }
 
 export default function TimeTrackerPage() {
@@ -320,12 +317,6 @@ export default function TimeTrackerPage() {
                 {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     <div className="flex items-center gap-2">
-                      {project.color && (
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: project.color }}
-                        />
-                      )}
                       {project.name}
                     </div>
                   </SelectItem>
