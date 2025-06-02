@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import DesktopDownload from "@/components/ui/desktop-download";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -110,6 +110,12 @@ export default function LoginPage() {
                 <p className="text-sm text-muted-foreground text-center">
                   Don't have an account? Contact your administrator.
                 </p>
+                <Link to="/download" className="w-full">
+                  <Button variant="outline" className="w-full">
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Desktop App (Public Access)
+                  </Button>
+                </Link>
               </CardFooter>
             </Card>
           </div>

@@ -117,10 +117,13 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Use GitHub Releases for reliable large file hosting
+    // Use GitHub Releases for reliable large file hosting - PUBLIC ACCESS
     const githubReleaseBase = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.0';
     
-    // Define the download files from GitHub Releases
+    // Alternative: Direct public file hosting (uncomment if GitHub fails)
+    // const publicHostBase = 'https://timeflow-downloads.netlify.app/releases';
+    
+    // Define the download files from GitHub Releases - ALL PUBLIC
     const downloadFiles = {
       windows: `${githubReleaseBase}/EbdaaWorkTime-Setup.exe`,
       'mac-intel': `${githubReleaseBase}/EbdaaWorkTime-Intel.dmg`,
@@ -137,22 +140,27 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       platform,
       detectedOS: os,
       filePath,
-      userAgent: navigator.userAgent
+      userAgent: navigator.userAgent,
+      isPublicDownload: true
     });
     
     if (filePath) {
       try {
-        // Create invisible link element for direct download
+        // Create invisible link element for direct download - NO AUTH REQUIRED
         const link = document.createElement('a');
         link.href = filePath;
         link.download = filename;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         
+        // Force download by setting CORS and referrer policy for public access
+        link.setAttribute('crossorigin', 'anonymous');
+        link.setAttribute('referrerpolicy', 'no-referrer');
+        
         // Add to DOM temporarily
         document.body.appendChild(link);
         
-        // Trigger download
+        // Trigger download immediately
         link.click();
         
         // Clean up
@@ -178,7 +186,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         // Show error notification instead of alert
         setNotification({
           platform: 'Error',
-          filename: 'Download failed',
+          filename: 'Download failed - this is a public download, no login required',
           size: '',
           show: true
         });
@@ -193,7 +201,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       // Show error notification instead of alert
       setNotification({
         platform: 'Error',
-        filename: 'Download file not found',
+        filename: 'Download file not found - this is a public download',
         size: '',
         show: true
       });

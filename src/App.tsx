@@ -10,6 +10,7 @@ import MainLayout from '@/components/layout/main-layout';
 
 // Lazy load pages for better performance
 import LoginPage from '@/pages/auth/login';
+import DownloadPage from '@/pages/download';
 import DashboardPage from '@/pages/dashboard';
 import EmployeeDashboard from '@/pages/employee/dashboard';
 import EmployeeTimeTracker from '@/pages/employee/time-tracker';
@@ -143,6 +144,9 @@ function AppRoutes() {
   
   return (
     <Routes>
+      {/* Public Download Route - No Authentication Required */}
+      <Route path="/download" element={<DownloadPage />} />
+      
       {/* Login route - redirect if already authenticated */}
       <Route 
         path="/login" 

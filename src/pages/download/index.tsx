@@ -22,7 +22,7 @@ const DownloadPage = () => {
             <EbdaaTimeLogo size={40} />
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Download Ebdaa Work Time Desktop</h1>
-              <p className="text-gray-600">Download the desktop app directly - no login required</p>
+              <p className="text-gray-600">Download the desktop app directly - no login required, completely public access</p>
             </div>
           </div>
         </div>
