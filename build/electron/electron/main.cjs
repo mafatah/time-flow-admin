@@ -79,7 +79,7 @@ exports.appEvents.on('auto-stop-tracking', (data) => {
             message = `Tracking stopped due to system inactivity (${minutes} minutes without successful monitoring).`;
         }
         new electron_1.Notification({
-            title: 'TimeFlow - Auto-Stop',
+            title: 'Ebdaa Work Time - Auto-Stop',
             body: message
         }).show();
         console.log(`📢 Auto-stop notification shown: ${message}`);

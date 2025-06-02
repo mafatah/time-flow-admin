@@ -46,11 +46,11 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     // Define the download files available in public/downloads/
     const downloadFiles = {
-      windows: '/downloads/TimeFlow-Setup.exe',
-      'mac-intel': '/downloads/TimeFlow-Intel.dmg',
-      'mac-arm': '/downloads/TimeFlow-ARM.dmg',
-      'mac': '/downloads/TimeFlow-Intel.dmg', // Default to Intel for generic mac
-      linux: '/downloads/TimeFlow.AppImage'
+      windows: '/downloads/EbdaaWorkTime-Setup.exe',
+      'mac-intel': '/downloads/EbdaaWorkTime-Intel.dmg',
+      'mac-arm': '/downloads/EbdaaWorkTime-ARM.dmg',
+      'mac': '/downloads/EbdaaWorkTime-Intel.dmg', // Default to Intel for generic mac
+      linux: '/downloads/EbdaaWorkTime.AppImage'
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
@@ -59,7 +59,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       // Create a temporary link to trigger download
       const link = document.createElement('a');
       link.href = filePath;
-      link.download = filePath.split('/').pop() || 'TimeFlow-Desktop';
+      link.download = filePath.split('/').pop() || 'EbdaaWorkTime-Desktop';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -159,7 +159,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Download className="h-5 w-5" />
-          Ebdaa Time Desktop App
+          Ebdaa Work Time Desktop App
         </CardTitle>
         <CardDescription>
           Download the enterprise-ready desktop application with zero security warnings. Professional terminal-based installation bypasses all macOS Gatekeeper prompts for seamless deployment.

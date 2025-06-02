@@ -3,8 +3,8 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "author": "TimeFlow Team",
-  "description": "Time tracking and productivity monitoring application",
+  "author": "Ebdaa Digital Technology",
+  "description": "Ebdaa Work Time - Employee time tracking and productivity monitoring application",
   "overrides": {
     "nan": "2.16.0"
   },
@@ -118,7 +118,7 @@
   },
   "build": {
     "appId": "com.ebdaadt.timetracker",
-    "productName": "TimeFlow",
+    "productName": "Ebdaa Work Time",
     "directories": {
       "output": "dist",
       "buildResources": "build"

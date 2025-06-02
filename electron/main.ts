@@ -52,7 +52,7 @@ appEvents.on('auto-stop-tracking', (data) => {
     }
     
     new Notification({
-      title: 'TimeFlow - Auto-Stop',
+      title: 'Ebdaa Work Time - Auto-Stop',
       body: message
     }).show();
     
