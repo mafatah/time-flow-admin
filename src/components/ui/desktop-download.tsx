@@ -120,16 +120,13 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Use local public files for reliable downloads
-    const baseUrl = window.location.origin;
-    
-    // Define the download files from local public directory
+    // Use CDN or external hosting for large binary files (more reliable than build-time inclusion)
     const downloadFiles = {
-      windows: `${baseUrl}/downloads/TimeFlow-Setup.exe`,
-      'mac-intel': `${baseUrl}/downloads/TimeFlow-Intel.dmg`,
-      'mac-arm': `${baseUrl}/downloads/TimeFlow-ARM.dmg`,
-      'mac': `${baseUrl}/downloads/TimeFlow-Intel.dmg`, // Default to Intel for generic mac
-      linux: `${baseUrl}/downloads/TimeFlow.AppImage` // Add if you have Linux version
+      windows: `https://github.com/mafatah/time-flow-admin/releases/latest/download/TimeFlow-Setup.exe`,
+      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/latest/download/TimeFlow-Intel.dmg`,
+      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/latest/download/TimeFlow-ARM.dmg`,
+      'mac': `https://github.com/mafatah/time-flow-admin/releases/latest/download/TimeFlow-Intel.dmg`, // Default to Intel for generic mac
+      linux: `https://github.com/mafatah/time-flow-admin/releases/latest/download/TimeFlow.AppImage` // Add if you have Linux version
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
