@@ -25,34 +25,48 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         hasIntel: userAgent.includes('Intel'),
         hasARM64: userAgent.includes('ARM64'),
         hasSafari: userAgent.includes('Safari'),
-        safariVersion: userAgent.match(/Version\/(\d+)/)?.[1]
+        safariVersion: userAgent.match(/Version\/(\d+)/)?.[1],
+        macOSVersion: userAgent.match(/Mac OS X (\d+_\d+)/)?.[1]
       });
       
       if (platform.includes('Mac') || userAgent.includes('Mac')) {
-        // Improved Apple Silicon detection
-        // Check for explicit Intel indication first
-        if (userAgent.includes('Intel')) {
-          setOs('mac-intel');
-        } 
-        // Check for ARM64 or Apple Silicon indicators
-        else if (
-          userAgent.includes('ARM64') || 
-          platform.includes('ARM') ||
-          // Check for newer Safari versions that don't include Intel
-          (userAgent.includes('Safari') && !userAgent.includes('Intel') && 
-           (userAgent.includes('Version/15') || userAgent.includes('Version/16') || 
-            userAgent.includes('Version/17') || userAgent.includes('Version/18')))
-        ) {
-          setOs('mac-arm');
+        // More comprehensive Apple Silicon detection
+        let isAppleSilicon = false;
+        
+        // Method 1: Check for explicit ARM indicators
+        if (userAgent.includes('ARM64') || platform.includes('ARM')) {
+          isAppleSilicon = true;
         }
-        // Default to ARM for modern macOS without Intel markers
+        // Method 2: Check if explicitly Intel
+        else if (userAgent.includes('Intel')) {
+          isAppleSilicon = false;
+        }
+        // Method 3: For Safari without Intel marker (common on Apple Silicon)
+        else if (userAgent.includes('Safari') && !userAgent.includes('Intel')) {
+          // Check for modern Safari versions (15+ typically on Apple Silicon)
+          const safariVersion = userAgent.match(/Version\/(\d+)/)?.[1];
+          if (safariVersion && parseInt(safariVersion) >= 15) {
+            isAppleSilicon = true;
+          }
+        }
+        // Method 4: Check for modern macOS versions (11+ likely Apple Silicon)
         else if (!userAgent.includes('Intel')) {
-          setOs('mac-arm');
+          const macOSMatch = userAgent.match(/Mac OS X (\d+)_(\d+)/);
+          if (macOSMatch) {
+            const majorVersion = parseInt(macOSMatch[1]);
+            // macOS 11+ (Big Sur and later) often indicate Apple Silicon
+            if (majorVersion >= 11) {
+              isAppleSilicon = true;
+            }
+          } else {
+            // If no version info and no Intel, assume Apple Silicon for modern browsers
+            isAppleSilicon = true;
+          }
         }
-        // Fallback to Intel
-        else {
-          setOs('mac-intel');
-        }
+        
+        console.log('Apple Silicon Detection Result:', isAppleSilicon);
+        setOs(isAppleSilicon ? 'mac-arm' : 'mac-intel');
+        
       } else if (platform.includes('Win') || userAgent.includes('Windows')) {
         setOs('windows');
       } else if (platform.includes('Linux') || userAgent.includes('Linux')) {
@@ -210,6 +224,29 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
               {getOSIcon(os)}
               <span className="ml-1">Your System: {getOSName(os)}</span>
             </Badge>
+          </div>
+
+          {/* Debug Override Section */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <div className="text-sm font-medium text-yellow-800 mb-2">Debug: Force Download Type</div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleDownload('mac-arm')}
+                className="text-xs"
+              >
+                Force ARM Download
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleDownload('mac-intel')}
+                className="text-xs"
+              >
+                Force Intel Download
+              </Button>
+            </div>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
