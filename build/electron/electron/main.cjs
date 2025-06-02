@@ -57,6 +57,41 @@ let tray = null;
 let isTracking = false;
 let trackingStartTime = null;
 let timerInterval = null;
+// Check if running from DMG and prevent crashes
+function checkDMGAndPreventCrash() {
+    const appPath = electron_1.app.getAppPath();
+    console.log('🔍 App path:', appPath);
+    // Check if running from /Volumes (DMG mount point)
+    if (appPath.includes('/Volumes/')) {
+        console.log('⚠️ WARNING: App is running from DMG volume!');
+        // Show critical warning dialog
+        electron_1.dialog.showErrorBox('Installation Required - Ebdaa Work Time', 'This application is running from the disk image (DMG) and will crash if the DMG is ejected.\n\n' +
+            'To fix this:\n' +
+            '1. Drag "Ebdaa Work Time.app" to your Applications folder\n' +
+            '2. Eject the DMG\n' +
+            '3. Launch the app from Applications folder\n\n' +
+            'The app will now close to prevent crashes.');
+        // Log the issue
+        console.log('🛑 Preventing app startup from DMG to avoid memory crashes');
+        console.log('   App path:', appPath);
+        console.log('   Expected path should be: /Applications/Ebdaa Work Time.app');
+        return false; // Indicate app should not continue
+    }
+    // Also check for other temporary mount points
+    const tempPaths = ['/var/folders/', '/tmp/', '/private/tmp/'];
+    const isTemporary = tempPaths.some(tempPath => appPath.includes(tempPath));
+    if (isTemporary) {
+        console.log('⚠️ WARNING: App is running from temporary location!');
+        electron_1.dialog.showErrorBox('Improper Installation - Ebdaa Work Time', 'This application is running from a temporary location and may not function properly.\n\n' +
+            'Please install the app to your Applications folder:\n' +
+            '1. Move "Ebdaa Work Time.app" to /Applications/\n' +
+            '2. Launch from Applications folder\n\n' +
+            'The app will now close.');
+        return false;
+    }
+    console.log('✅ App is running from proper installation location');
+    return true;
+}
 // Listen for screenshot events from activity monitor
 exports.appEvents.on('screenshot-captured', () => {
     showScreenshotNotification();
@@ -144,6 +179,12 @@ async function createWindow() {
     }
 }
 electron_1.app.whenReady().then(async () => {
+    // CRITICAL: Check if running from DMG and prevent crashes
+    if (!checkDMGAndPreventCrash()) {
+        console.log('🛑 App startup prevented due to DMG location - quitting safely');
+        electron_1.app.quit();
+        return;
+    }
     await createWindow();
     // Create system tray
     createTray();
