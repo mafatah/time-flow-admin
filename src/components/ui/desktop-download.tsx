@@ -250,29 +250,6 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
             </Badge>
           </div>
 
-          {/* Debug Override Section */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-            <div className="text-sm font-medium text-yellow-800 mb-2">Debug: Force Download Type</div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleDownload('mac-arm')}
-                className="text-xs"
-              >
-                Force ARM Download
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleDownload('mac-intel')}
-                className="text-xs"
-              >
-                Force Intel Download
-              </Button>
-            </div>
-          </div>
-          
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Windows Download */}
             <Button
