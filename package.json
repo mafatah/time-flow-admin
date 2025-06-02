@@ -151,10 +151,13 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "identity": null,
-      "hardenedRuntime": false,
+      "identity": "Ebdaa Digital Technology (6GW49LK9V9)",
+      "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "icon": "build/icon.icns"
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "icon": "build/icon.icns",
+      "notarize": false
     },
     "win": {
       "target": {
