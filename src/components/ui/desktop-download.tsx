@@ -109,13 +109,16 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Define the download files available in public/downloads/
+    // Use GitHub Releases for reliable large file hosting
+    const githubReleaseBase = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.0';
+    
+    // Define the download files from GitHub Releases
     const downloadFiles = {
-      windows: '/downloads/EbdaaWorkTime-Setup.exe',
-      'mac-intel': '/downloads/EbdaaWorkTime-Intel.dmg',
-      'mac-arm': '/downloads/EbdaaWorkTime-ARM.dmg',
-      'mac': '/downloads/EbdaaWorkTime-Intel.dmg', // Default to Intel for generic mac
-      linux: '/downloads/EbdaaWorkTime.AppImage'
+      windows: `${githubReleaseBase}/EbdaaWorkTime-Setup.exe`,
+      'mac-intel': `${githubReleaseBase}/EbdaaWorkTime-Intel.dmg`,
+      'mac-arm': `${githubReleaseBase}/EbdaaWorkTime-ARM.dmg`,
+      'mac': `${githubReleaseBase}/EbdaaWorkTime-Intel.dmg`, // Default to Intel for generic mac
+      linux: `${githubReleaseBase}/EbdaaWorkTime.AppImage`
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
@@ -129,18 +132,12 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     if (filePath) {
       try {
-        // Create a temporary link to trigger download
-        const link = document.createElement('a');
-        link.href = filePath;
-        link.download = filePath.split('/').pop() || 'EbdaaWorkTime-Desktop';
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Direct link to GitHub Releases - opens in new tab to avoid CORS issues
+        window.open(filePath, '_blank');
         
         // Show success message
         setTimeout(() => {
-          alert(`✅ Download started for ${getOSName(platform)}!\n\nFile: ${filePath.split('/').pop()}\nSize: ${getFileSize(platform)}\n\n📋 Installation Notes:\n• Windows: Run the .exe file as administrator\n• macOS: Open the .dmg file and drag to Applications\n• Linux: Make the .AppImage executable and run\n\n🔐 The app includes automatic screenshot capture and activity tracking capabilities.`);
+          alert(`✅ Download started for ${getOSName(platform)}!\n\nFile: ${filePath.split('/').pop()}\nSize: ${getFileSize(platform)}\n\n📋 Installation Notes:\n• Windows: Run the .exe file as administrator\n• macOS: Open the .dmg file and drag to Applications\n• Linux: Make the .AppImage executable and run\n\n🔐 The app includes automatic screenshot capture and activity tracking capabilities.\n\n📁 Downloaded from: GitHub Releases (reliable for large files)`);
           setDownloading(null);
         }, 500);
       } catch (error) {
