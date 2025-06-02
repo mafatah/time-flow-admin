@@ -28,3 +28,9 @@ build/
 # Build artifacts and releases
 releases/
 local-builds/
+
+# Desktop app binaries
+public/downloads/*.dmg
+public/downloads/*.exe
+public/downloads/*.AppImage
+dist/
