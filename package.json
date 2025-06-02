@@ -135,7 +135,10 @@
         "from": "build/dist",
         "to": "app",
         "filter": [
-          "**/*"
+          "**/*",
+          "!downloads/**/*",
+          "!*.dmg",
+          "!*.blockmap"
         ]
       }
     ],

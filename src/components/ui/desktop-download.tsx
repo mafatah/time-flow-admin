@@ -110,10 +110,10 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '110MB';
+        return '112MB';
       case 'mac-intel':
       case 'mac':
-        return '117MB';
+        return '118MB';
       case 'windows':
         return '85MB';
       case 'linux':
