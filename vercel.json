@@ -35,6 +35,45 @@
           "value": "text/html"
         }
       ]
+    },
+    {
+      "source": "/(.*\\.dmg)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/x-apple-diskimage"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment"
+        }
+      ]
+    },
+    {
+      "source": "/(.*\\.exe)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/x-msdownload"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment"
+        }
+      ]
+    },
+    {
+      "source": "/(.*\\.AppImage)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/x-executable"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment"
+        }
+      ]
     }
   ],
   "env": {

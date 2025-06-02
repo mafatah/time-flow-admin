@@ -18,15 +18,39 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       const userAgent = window.navigator.userAgent;
       const platform = window.navigator.platform;
       
+      // Debug logging
+      console.log('OS Detection Debug:', {
+        userAgent,
+        platform,
+        hasIntel: userAgent.includes('Intel'),
+        hasARM64: userAgent.includes('ARM64'),
+        hasSafari: userAgent.includes('Safari'),
+        safariVersion: userAgent.match(/Version\/(\d+)/)?.[1]
+      });
+      
       if (platform.includes('Mac') || userAgent.includes('Mac')) {
-        // Try to detect Apple Silicon vs Intel
-        // This is a heuristic approach as direct detection isn't always reliable in browser
-        const isLikelyAppleSilicon = !userAgent.includes('Intel') && 
-          (userAgent.includes('Safari') || userAgent.includes('Chrome'));
-        
-        if (isLikelyAppleSilicon) {
+        // Improved Apple Silicon detection
+        // Check for explicit Intel indication first
+        if (userAgent.includes('Intel')) {
+          setOs('mac-intel');
+        } 
+        // Check for ARM64 or Apple Silicon indicators
+        else if (
+          userAgent.includes('ARM64') || 
+          platform.includes('ARM') ||
+          // Check for newer Safari versions that don't include Intel
+          (userAgent.includes('Safari') && !userAgent.includes('Intel') && 
+           (userAgent.includes('Version/15') || userAgent.includes('Version/16') || 
+            userAgent.includes('Version/17') || userAgent.includes('Version/18')))
+        ) {
           setOs('mac-arm');
-        } else {
+        }
+        // Default to ARM for modern macOS without Intel markers
+        else if (!userAgent.includes('Intel')) {
+          setOs('mac-arm');
+        }
+        // Fallback to Intel
+        else {
           setOs('mac-intel');
         }
       } else if (platform.includes('Win') || userAgent.includes('Windows')) {
@@ -55,20 +79,34 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
     
+    console.log('Download Debug:', {
+      platform,
+      detectedOS: os,
+      filePath,
+      userAgent: navigator.userAgent
+    });
+    
     if (filePath) {
-      // Create a temporary link to trigger download
-      const link = document.createElement('a');
-      link.href = filePath;
-      link.download = filePath.split('/').pop() || 'EbdaaWorkTime-Desktop';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Show success message
-      setTimeout(() => {
-        alert(`✅ Download started for ${getOSName(platform)}!\n\nFile: ${filePath.split('/').pop()}\nSize: ${getFileSize(platform)}\n\n📋 Installation Notes:\n• Windows: Run the .exe file as administrator\n• macOS: Open the .dmg file and drag to Applications\n• Linux: Make the .AppImage executable and run\n\n🔐 The app includes automatic screenshot capture and activity tracking capabilities.`);
+      try {
+        // Create a temporary link to trigger download
+        const link = document.createElement('a');
+        link.href = filePath;
+        link.download = filePath.split('/').pop() || 'EbdaaWorkTime-Desktop';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Show success message
+        setTimeout(() => {
+          alert(`✅ Download started for ${getOSName(platform)}!\n\nFile: ${filePath.split('/').pop()}\nSize: ${getFileSize(platform)}\n\n📋 Installation Notes:\n• Windows: Run the .exe file as administrator\n• macOS: Open the .dmg file and drag to Applications\n• Linux: Make the .AppImage executable and run\n\n🔐 The app includes automatic screenshot capture and activity tracking capabilities.`);
+          setDownloading(null);
+        }, 500);
+      } catch (error) {
+        console.error('Download error:', error);
+        alert('❌ Download failed. Please try again or contact your administrator.');
         setDownloading(null);
-      }, 500);
+      }
     } else {
       alert('❌ Download file not found. Please contact your administrator.');
       setDownloading(null);
