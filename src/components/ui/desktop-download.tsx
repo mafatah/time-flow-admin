@@ -2,16 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Download, Monitor, Apple, Laptop } from 'lucide-react';
+import { Download, Monitor, Apple, Laptop, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface DesktopDownloadProps {
   variant?: 'full' | 'compact';
   className?: string;
 }
 
+interface DownloadNotification {
+  platform: string;
+  filename: string;
+  size: string;
+  show: boolean;
+}
+
 const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', className = '' }) => {
   const [os, setOs] = useState<'windows' | 'mac' | 'mac-intel' | 'mac-arm' | 'linux' | 'unknown'>('unknown');
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [notification, setNotification] = useState<DownloadNotification | null>(null);
 
   useEffect(() => {
     const detectOS = () => {
@@ -122,6 +130,8 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
+    const filename = filePath?.split('/').pop() || '';
+    const fileSize = getFileSize(platform);
     
     console.log('Download Debug:', {
       platform,
@@ -132,22 +142,67 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     if (filePath) {
       try {
-        // Direct link to GitHub Releases - opens in new tab to avoid CORS issues
-        window.open(filePath, '_blank');
+        // Create invisible link element for direct download
+        const link = document.createElement('a');
+        link.href = filePath;
+        link.download = filename;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
         
-        // Show success message
+        // Add to DOM temporarily
+        document.body.appendChild(link);
+        
+        // Trigger download
+        link.click();
+        
+        // Clean up
+        document.body.removeChild(link);
+        
+        // Show non-blocking success notification
+        setNotification({
+          platform: getOSName(platform),
+          filename,
+          size: fileSize,
+          show: true
+        });
+        
+        setDownloading(null);
+        
+        // Auto-hide notification after 8 seconds
         setTimeout(() => {
-          alert(`✅ Download started for ${getOSName(platform)}!\n\nFile: ${filePath.split('/').pop()}\nSize: ${getFileSize(platform)}\n\n📋 Installation Notes:\n• Windows: Run the .exe file as administrator\n• macOS: Open the .dmg file and drag to Applications\n• Linux: Make the .AppImage executable and run\n\n🔐 The app includes automatic screenshot capture and activity tracking capabilities.\n\n📁 Downloaded from: GitHub Releases (reliable for large files)`);
-          setDownloading(null);
-        }, 500);
+          setNotification(prev => prev ? { ...prev, show: false } : null);
+        }, 8000);
+        
       } catch (error) {
         console.error('Download error:', error);
-        alert('❌ Download failed. Please try again or contact your administrator.');
+        // Show error notification instead of alert
+        setNotification({
+          platform: 'Error',
+          filename: 'Download failed',
+          size: '',
+          show: true
+        });
         setDownloading(null);
+        
+        // Auto-hide error notification after 5 seconds
+        setTimeout(() => {
+          setNotification(prev => prev ? { ...prev, show: false } : null);
+        }, 5000);
       }
     } else {
-      alert('❌ Download file not found. Please contact your administrator.');
+      // Show error notification instead of alert
+      setNotification({
+        platform: 'Error',
+        filename: 'Download file not found',
+        size: '',
+        show: true
+      });
       setDownloading(null);
+      
+      // Auto-hide error notification after 5 seconds
+      setTimeout(() => {
+        setNotification(prev => prev ? { ...prev, show: false } : null);
+      }, 5000);
     }
   };
   
@@ -203,125 +258,231 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     const normalizedOS = os.startsWith('mac') ? os : os; // Keep the specific mac variant for proper DMG selection
     
     return (
-      <div className={`flex flex-col sm:flex-row gap-2 ${className}`}>
-        <Badge variant="outline" className="w-fit">
-          {getOSIcon(os)}
-          <span className="ml-1">{getOSName(os)} Detected</span>
-        </Badge>
-        <Button
-          size="sm"
-          onClick={() => handleDownload(normalizedOS)}
-          disabled={downloading === normalizedOS}
-          className="flex items-center gap-2"
-        >
-          {downloading === normalizedOS ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-background border-t-transparent" />
-              <span>Downloading...</span>
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              <span>Download Desktop App</span>
-            </>
-          )}
-        </Button>
+      <div className={`relative ${className}`}>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Badge variant="outline" className="w-fit">
+            {getOSIcon(os)}
+            <span className="ml-1">{getOSName(os)} Detected</span>
+          </Badge>
+          <Button
+            size="sm"
+            onClick={() => handleDownload(normalizedOS)}
+            disabled={downloading === normalizedOS}
+            className="flex items-center gap-2"
+          >
+            {downloading === normalizedOS ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-background border-t-transparent" />
+                <span>Downloading...</span>
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                <span>Download Desktop App</span>
+              </>
+            )}
+          </Button>
+        </div>
+        
+        {/* Download notification */}
+        {notification && (
+          <div className={`fixed top-4 right-4 z-50 transition-all duration-300 ${
+            notification.show ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'
+          }`}>
+            <div className={`p-4 rounded-lg shadow-lg border max-w-sm ${
+              notification.platform === 'Error' 
+                ? 'bg-red-50 border-red-200 text-red-800' 
+                : 'bg-green-50 border-green-200 text-green-800'
+            }`}>
+              <div className="flex items-start gap-3">
+                {notification.platform === 'Error' ? (
+                  <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                ) : (
+                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                )}
+                <div className="flex-1">
+                  <h4 className="font-medium text-sm mb-1">
+                    {notification.platform === 'Error' ? 'Download Failed' : `Download started for ${notification.platform}!`}
+                  </h4>
+                  {notification.platform !== 'Error' && (
+                    <>
+                      <p className="text-xs opacity-90 mb-2">
+                        File: {notification.filename}<br />
+                        Size: {notification.size}
+                      </p>
+                      <div className="text-xs opacity-80">
+                        <strong>Installation Notes:</strong><br />
+                        • Windows: Run as administrator<br />
+                        • macOS: Drag to Applications<br />
+                        • Linux: Make executable and run
+                      </div>
+                    </>
+                  )}
+                  {notification.platform === 'Error' && (
+                    <p className="text-xs opacity-90">
+                      {notification.filename}. Please try again or contact your administrator.
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setNotification(prev => prev ? { ...prev, show: false } : null)}
+                  className="text-xs opacity-60 hover:opacity-100"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Download className="h-5 w-5" />
-          Ebdaa Work Time Desktop App
-        </CardTitle>
-        <CardDescription>
-          Download the enterprise-ready desktop application with zero security warnings. Professional terminal-based installation bypasses all macOS Gatekeeper prompts for seamless deployment.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">
-              {getOSIcon(os)}
-              <span className="ml-1">Your System: {getOSName(os)}</span>
-            </Badge>
-          </div>
+    <div className={`relative ${className}`}>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5" />
+            Ebdaa Work Time Desktop App
+          </CardTitle>
+          <CardDescription>
+            Download the enterprise-ready desktop application with zero security warnings. Professional terminal-based installation bypasses all macOS Gatekeeper prompts for seamless deployment.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">
+                {getOSIcon(os)}
+                <span className="ml-1">Your System: {getOSName(os)}</span>
+              </Badge>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Windows Download */}
-            <Button
-              variant={os === 'windows' ? 'default' : 'outline'}
-              onClick={() => handleDownload('windows')}
-              disabled={downloading === 'windows'}
-              className="flex flex-col items-center gap-2 h-auto p-4"
-            >
-              {downloading === 'windows' ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-background border-t-transparent" />
-              ) : (
-                <Monitor className="h-5 w-5" />
-              )}
-              <div className="text-center">
-                <div className="font-medium">Windows</div>
-                <div className="text-xs opacity-70">Windows 10/11 • {getFileSize('windows')}</div>
-              </div>
-            </Button>
-
-            {/* macOS Download */}
-            <Button
-              variant={os.startsWith('mac') ? 'default' : 'outline'}
-              onClick={() => handleDownload(os.startsWith('mac') ? os : 'mac')}
-              disabled={downloading === (os.startsWith('mac') ? os : 'mac')}
-              className="flex flex-col items-center gap-2 h-auto p-4"
-            >
-              {downloading === (os.startsWith('mac') ? os : 'mac') ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-background border-t-transparent" />
-              ) : (
-                <Apple className="h-5 w-5" />
-              )}
-              <div className="text-center">
-                <div className="font-medium">macOS</div>
-                <div className="text-xs opacity-70">
-                  {os === 'mac-arm' ? `Apple Silicon • ${getFileSize('mac-arm')}` : 
-                   os === 'mac-intel' ? `Intel • ${getFileSize('mac-intel')}` : 
-                   `Auto-detected • ${getFileSize('mac')}`}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Windows Download */}
+              <Button
+                variant={os === 'windows' ? 'default' : 'outline'}
+                onClick={() => handleDownload('windows')}
+                disabled={downloading === 'windows'}
+                className="flex flex-col items-center gap-2 h-auto p-4"
+              >
+                {downloading === 'windows' ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-background border-t-transparent" />
+                ) : (
+                  <Monitor className="h-5 w-5" />
+                )}
+                <div className="text-center">
+                  <div className="font-medium">Windows</div>
+                  <div className="text-xs opacity-70">Windows 10/11 • {getFileSize('windows')}</div>
                 </div>
-              </div>
-            </Button>
+              </Button>
 
-            {/* Linux Download */}
-            <Button
-              variant={os === 'linux' ? 'default' : 'outline'}
-              onClick={() => handleDownload('linux')}
-              disabled={downloading === 'linux'}
-              className="flex flex-col items-center gap-2 h-auto p-4"
-            >
-              {downloading === 'linux' ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-background border-t-transparent" />
-              ) : (
-                <Laptop className="h-5 w-5" />
-              )}
-              <div className="text-center">
-                <div className="font-medium">Linux</div>
-                <div className="text-xs opacity-70">AppImage • {getFileSize('linux')}</div>
-              </div>
-            </Button>
+              {/* macOS Download */}
+              <Button
+                variant={os.startsWith('mac') ? 'default' : 'outline'}
+                onClick={() => handleDownload(os.startsWith('mac') ? os : 'mac')}
+                disabled={downloading === (os.startsWith('mac') ? os : 'mac')}
+                className="flex flex-col items-center gap-2 h-auto p-4"
+              >
+                {downloading === (os.startsWith('mac') ? os : 'mac') ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-background border-t-transparent" />
+                ) : (
+                  <Apple className="h-5 w-5" />
+                )}
+                <div className="text-center">
+                  <div className="font-medium">macOS</div>
+                  <div className="text-xs opacity-70">
+                    {os === 'mac-arm' ? `Apple Silicon • ${getFileSize('mac-arm')}` : 
+                     os === 'mac-intel' ? `Intel • ${getFileSize('mac-intel')}` : 
+                     `Auto-detected • ${getFileSize('mac')}`}
+                  </div>
+                </div>
+              </Button>
+
+              {/* Linux Download */}
+              <Button
+                variant={os === 'linux' ? 'default' : 'outline'}
+                onClick={() => handleDownload('linux')}
+                disabled={downloading === 'linux'}
+                className="flex flex-col items-center gap-2 h-auto p-4"
+              >
+                {downloading === 'linux' ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-background border-t-transparent" />
+                ) : (
+                  <Laptop className="h-5 w-5" />
+                )}
+                <div className="text-center">
+                  <div className="font-medium">Linux</div>
+                  <div className="text-xs opacity-70">AppImage • {getFileSize('linux')}</div>
+                </div>
+              </Button>
+            </div>
+
+            <div className="bg-muted/50 p-3 rounded-lg">
+              <h4 className="font-medium text-sm mb-2">Features included:</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>• Random screenshot capture (2 per 10 minutes)</li>
+                <li>• Activity and idle time tracking</li>
+                <li>• Application usage monitoring</li>
+                <li>• Real-time sync with dashboard</li>
+              </ul>
+            </div>
           </div>
-
-          <div className="bg-muted/50 p-3 rounded-lg">
-            <h4 className="font-medium text-sm mb-2">Features included:</h4>
-            <ul className="text-sm space-y-1 text-muted-foreground">
-              <li>• Random screenshot capture (2 per 10 minutes)</li>
-              <li>• Activity and idle time tracking</li>
-              <li>• Application usage monitoring</li>
-              <li>• Real-time sync with dashboard</li>
-            </ul>
+        </CardContent>
+      </Card>
+      
+      {/* Download notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 transition-all duration-300 ${
+          notification.show ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'
+        }`}>
+          <div className={`p-4 rounded-lg shadow-lg border max-w-sm ${
+            notification.platform === 'Error' 
+              ? 'bg-red-50 border-red-200 text-red-800' 
+              : 'bg-green-50 border-green-200 text-green-800'
+          }`}>
+            <div className="flex items-start gap-3">
+              {notification.platform === 'Error' ? (
+                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+              ) : (
+                <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+              )}
+              <div className="flex-1">
+                <h4 className="font-medium text-sm mb-1">
+                  {notification.platform === 'Error' ? 'Download Failed' : `Download started for ${notification.platform}!`}
+                </h4>
+                {notification.platform !== 'Error' && (
+                  <>
+                    <p className="text-xs opacity-90 mb-2">
+                      File: {notification.filename}<br />
+                      Size: {notification.size}
+                    </p>
+                    <div className="text-xs opacity-80">
+                      <strong>Installation Notes:</strong><br />
+                      • Windows: Run as administrator<br />
+                      • macOS: Drag to Applications<br />
+                      • Linux: Make executable and run
+                    </div>
+                  </>
+                )}
+                {notification.platform === 'Error' && (
+                  <p className="text-xs opacity-90">
+                    {notification.filename}. Please try again or contact your administrator.
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setNotification(prev => prev ? { ...prev, show: false } : null)}
+                className="text-xs opacity-60 hover:opacity-100"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 };
 
