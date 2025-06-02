@@ -26,45 +26,72 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         hasARM64: userAgent.includes('ARM64'),
         hasSafari: userAgent.includes('Safari'),
         safariVersion: userAgent.match(/Version\/(\d+)/)?.[1],
-        macOSVersion: userAgent.match(/Mac OS X (\d+_\d+)/)?.[1]
+        macOSVersion: userAgent.match(/Mac OS X (\d+_\d+)/)?.[1],
+        screenWidth: window.screen.width,
+        devicePixelRatio: window.devicePixelRatio
       });
       
       if (platform.includes('Mac') || userAgent.includes('Mac')) {
-        // More comprehensive Apple Silicon detection
+        // Advanced Apple Silicon detection with multiple methods
         let isAppleSilicon = false;
+        let confidence = 0;
         
         // Method 1: Check for explicit ARM indicators
         if (userAgent.includes('ARM64') || platform.includes('ARM')) {
           isAppleSilicon = true;
+          confidence = 100;
         }
         // Method 2: Check if explicitly Intel
         else if (userAgent.includes('Intel')) {
-          isAppleSilicon = false;
-        }
-        // Method 3: For Safari without Intel marker (common on Apple Silicon)
-        else if (userAgent.includes('Safari') && !userAgent.includes('Intel')) {
-          // Check for modern Safari versions (15+ typically on Apple Silicon)
+          // Safari on Apple Silicon often reports Intel for compatibility
+          // Use additional heuristics to detect Apple Silicon
+          
           const safariVersion = userAgent.match(/Version\/(\d+)/)?.[1];
-          if (safariVersion && parseInt(safariVersion) >= 15) {
+          const macOSMatch = userAgent.match(/Mac OS X (\d+)_(\d+)/);
+          
+          // Check for modern Safari (16+) with certain characteristics
+          if (safariVersion && parseInt(safariVersion) >= 16) {
+            confidence += 30;
+          }
+          
+          // Check for modern screen characteristics (Apple Silicon Macs often have high DPI)
+          if (window.devicePixelRatio >= 2) {
+            confidence += 25;
+          }
+          
+          // Check for common Apple Silicon screen sizes
+          const screenWidth = window.screen.width;
+          if (screenWidth === 1440 || screenWidth === 1512 || screenWidth === 1728 || screenWidth === 1800) {
+            confidence += 25;
+          }
+          
+          // Check for macOS version patterns (Apple Silicon came with Big Sur)
+          if (macOSMatch) {
+            const major = parseInt(macOSMatch[1]);
+            const minor = parseInt(macOSMatch[2]);
+            // macOS 11.0+ (Big Sur) or 10.16+ indicates potential Apple Silicon
+            if (major >= 11 || (major === 10 && minor >= 16)) {
+              confidence += 20;
+            }
+          }
+          
+          // If confidence is high enough, assume Apple Silicon despite "Intel" in UA
+          if (confidence >= 60) {
             isAppleSilicon = true;
           }
         }
-        // Method 4: Check for modern macOS versions (11+ likely Apple Silicon)
-        else if (!userAgent.includes('Intel')) {
-          const macOSMatch = userAgent.match(/Mac OS X (\d+)_(\d+)/);
-          if (macOSMatch) {
-            const majorVersion = parseInt(macOSMatch[1]);
-            // macOS 11+ (Big Sur and later) often indicate Apple Silicon
-            if (majorVersion >= 11) {
-              isAppleSilicon = true;
-            }
-          } else {
-            // If no version info and no Intel, assume Apple Silicon for modern browsers
-            isAppleSilicon = true;
-          }
+        // Method 3: For other cases without Intel marker
+        else {
+          isAppleSilicon = true;
+          confidence = 70;
         }
         
-        console.log('Apple Silicon Detection Result:', isAppleSilicon);
+        console.log('Apple Silicon Detection:', {
+          result: isAppleSilicon,
+          confidence: confidence,
+          reason: isAppleSilicon ? 'Detected as Apple Silicon' : 'Detected as Intel'
+        });
+        
         setOs(isAppleSilicon ? 'mac-arm' : 'mac-intel');
         
       } else if (platform.includes('Win') || userAgent.includes('Windows')) {
