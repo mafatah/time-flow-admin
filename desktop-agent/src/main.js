@@ -1,4 +1,4 @@
-const { app, BrowserWindow, powerMonitor, screen, ipcMain, Notification, Tray, Menu } = require('electron');
+const { app, BrowserWindow, powerMonitor, screen, ipcMain, Notification, Tray, Menu, desktopCapturer, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const screenshot = require('screenshot-desktop');
@@ -655,13 +655,82 @@ function extractDomain(url) {
   }
 }
 
+// Add this function before captureScreenshot
+async function checkMacScreenPermissions() {
+  if (process.platform === 'darwin') {
+    try {
+      // Check if we have screen capture permissions on macOS
+      const hasPermission = systemPreferences.getMediaAccessStatus('screen');
+      
+      if (hasPermission !== 'granted') {
+        console.log('🔒 macOS Screen Recording permission not granted');
+        console.log('📋 Please grant Screen Recording permission in System Preferences:');
+        console.log('   1. Go to System Preferences > Security & Privacy > Privacy');
+        console.log('   2. Select "Screen Recording" from the left sidebar');
+        console.log('   3. Add and enable TimeFlow/Electron app');
+        console.log('   4. Restart the application');
+        
+        // Try to request permission
+        const granted = await systemPreferences.askForMediaAccess('screen');
+        if (!granted) {
+          console.log('❌ Screen Recording permission denied');
+          return false;
+        }
+      }
+      
+      console.log('✅ macOS Screen Recording permission granted');
+      return true;
+    } catch (error) {
+      console.error('❌ Permission check failed:', error);
+      return false;
+    }
+  }
+  return true; // Not macOS, assume OK
+}
+
 // === ENHANCED SCREENSHOT CAPTURE WITH ANTI-CHEAT ===
 async function captureScreenshot() {
   try {
     console.log('📸 Capturing screenshot...');
     
-    // Capture screenshot using the screenshot module
-    const img = await screenshot({ format: 'png', quality: appSettings.screenshot_quality });
+    // Check macOS permissions first
+    const hasPermission = await checkMacScreenPermissions();
+    if (!hasPermission) {
+      throw new Error('Screen Recording permission not granted on macOS');
+    }
+    
+    // Try Electron's desktopCapturer first (better for Electron apps)
+    let img;
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: 1920, height: 1080 }
+      });
+      
+      if (sources && sources.length > 0) {
+        // Get the primary screen
+        const primarySource = sources[0];
+        img = primarySource.thumbnail.toPNG();
+        console.log('✅ Screenshot captured using Electron desktopCapturer');
+      } else {
+        throw new Error('No screen sources available');
+      }
+    } catch (electronError) {
+      console.log('⚠️ Electron desktopCapturer failed, trying screenshot-desktop...');
+      
+      // Fallback to screenshot-desktop
+      const screenshot = require('screenshot-desktop');
+      img = await screenshot({ 
+        format: 'png', 
+        quality: appSettings.screenshot_quality,
+        // Add macOS specific options
+        ...(process.platform === 'darwin' && {
+          displayId: 0, // Primary display
+          format: 'png'
+        })
+      });
+      console.log('✅ Screenshot captured using screenshot-desktop');
+    }
     
     // Calculate activity metrics from recent activity
     const activityPercent = calculateActivityPercent();
@@ -1439,3 +1508,30 @@ function initializeComponents() {
   syncManager = new SyncManager(config, supabase);
   console.log('📱 TimeFlow Desktop Agent initialized');
 }
+
+// Add the IPC handler for Mac permission checking
+ipcMain.handle('check-mac-permissions', async () => {
+  try {
+    if (process.platform === 'darwin') {
+      const hasPermission = systemPreferences.getMediaAccessStatus('screen');
+      return {
+        hasPermission: hasPermission === 'granted',
+        status: hasPermission,
+        platform: 'macOS'
+      };
+    } else {
+      return {
+        hasPermission: true,
+        status: 'not-applicable',
+        platform: process.platform
+      };
+    }
+  } catch (error) {
+    console.error('❌ Permission check failed:', error);
+    return {
+      hasPermission: false,
+      status: 'error',
+      error: error.message
+    };
+  }
+});

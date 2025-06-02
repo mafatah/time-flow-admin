@@ -117,19 +117,16 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Use GitHub Releases for reliable large file hosting - PUBLIC ACCESS
-    const githubReleaseBase = 'https://github.com/mafatah/time-flow-admin/releases/download/v1.0.0';
+    // Use local public files for reliable downloads
+    const baseUrl = window.location.origin;
     
-    // Alternative: Direct public file hosting (uncomment if GitHub fails)
-    // const publicHostBase = 'https://timeflow-downloads.netlify.app/releases';
-    
-    // Define the download files from GitHub Releases - ALL PUBLIC
+    // Define the download files from local public directory
     const downloadFiles = {
-      windows: `${githubReleaseBase}/EbdaaWorkTime-Setup.exe`,
-      'mac-intel': `${githubReleaseBase}/EbdaaWorkTime-Intel.dmg`,
-      'mac-arm': `${githubReleaseBase}/EbdaaWorkTime-ARM.dmg`,
-      'mac': `${githubReleaseBase}/EbdaaWorkTime-Intel.dmg`, // Default to Intel for generic mac
-      linux: `${githubReleaseBase}/EbdaaWorkTime.AppImage`
+      windows: `${baseUrl}/downloads/EbdaaWorkTime-Setup.exe`,
+      'mac-intel': `${baseUrl}/downloads/EbdaaWorkTime-Intel.dmg`,
+      'mac-arm': `${baseUrl}/downloads/EbdaaWorkTime-ARM.dmg`,
+      'mac': `${baseUrl}/downloads/EbdaaWorkTime-Intel.dmg`, // Default to Intel for generic mac
+      linux: `${baseUrl}/downloads/EbdaaWorkTime.AppImage` // Add if you have Linux version
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
@@ -141,21 +138,17 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       detectedOS: os,
       filePath,
       userAgent: navigator.userAgent,
-      isPublicDownload: true
+      isLocalDownload: true
     });
     
     if (filePath) {
       try {
-        // Create invisible link element for direct download - NO AUTH REQUIRED
+        // Create invisible link element for direct download
         const link = document.createElement('a');
         link.href = filePath;
         link.download = filename;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
-        
-        // Force download by setting CORS and referrer policy for public access
-        link.setAttribute('crossorigin', 'anonymous');
-        link.setAttribute('referrerpolicy', 'no-referrer');
         
         // Add to DOM temporarily
         document.body.appendChild(link);
@@ -186,7 +179,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         // Show error notification instead of alert
         setNotification({
           platform: 'Error',
-          filename: 'Download failed - this is a public download, no login required',
+          filename: 'Download failed - please try again',
           size: '',
           show: true
         });
@@ -201,7 +194,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       // Show error notification instead of alert
       setNotification({
         platform: 'Error',
-        filename: 'Download file not found - this is a public download',
+        filename: 'Download file not found - please try again',
         size: '',
         show: true
       });

@@ -77,6 +77,9 @@ async function initializeApp() {
         // Add test buttons after dashboard is loaded
         addTestButtons();
         
+        // Add Mac permission check
+        checkMacPermissions();
+        
         console.log('✅ App initialization complete');
     } catch (error) {
         console.error('❌ App initialization failed:', error);
@@ -1008,6 +1011,55 @@ function addTestButtons() {
             document.getElementById('testScreenshotBtn')?.addEventListener('click', testScreenshotCapture);
             document.getElementById('manualScreenshotBtn')?.addEventListener('click', triggerManualScreenshot);
             document.getElementById('refreshGalleryBtn')?.addEventListener('click', updateScreenshotGallery);
+        }
+    }
+}
+
+// Add this function after setupIpcListeners
+function checkMacPermissions() {
+    if (navigator.platform.includes('Mac')) {
+        console.log('🍎 macOS detected - checking screen recording permissions...');
+        
+        // Add a permission check button for Mac users
+        const settingsContent = document.querySelector('#settingsPage .grid');
+        if (settingsContent) {
+            const permissionCard = document.createElement('div');
+            permissionCard.className = 'bg-white rounded-lg shadow p-6';
+            permissionCard.innerHTML = `
+                <h3 class="font-semibold text-gray-900 mb-2">🔒 macOS Permissions</h3>
+                <p class="text-sm text-gray-600 mb-4">
+                    On macOS, TimeFlow needs Screen Recording permission to capture screenshots.
+                </p>
+                <button id="checkPermissionsBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Check Permissions
+                </button>
+                <div id="permissionStatus" class="mt-3 text-sm"></div>
+            `;
+            
+            settingsContent.appendChild(permissionCard);
+            
+            // Add click handler
+            document.getElementById('checkPermissionsBtn').addEventListener('click', async () => {
+                const statusDiv = document.getElementById('permissionStatus');
+                statusDiv.innerHTML = '<span class="text-blue-600">Checking permissions...</span>';
+                
+                try {
+                    const result = await ipcRenderer.invoke('check-mac-permissions');
+                    if (result.hasPermission) {
+                        statusDiv.innerHTML = '<span class="text-green-600">✅ Screen Recording permission granted</span>';
+                    } else {
+                        statusDiv.innerHTML = `
+                            <span class="text-red-600">❌ Screen Recording permission needed</span>
+                            <br><span class="text-sm text-gray-600">
+                                Please go to System Preferences > Security & Privacy > Privacy > Screen Recording
+                                and enable TimeFlow
+                            </span>
+                        `;
+                    }
+                } catch (error) {
+                    statusDiv.innerHTML = '<span class="text-red-600">❌ Permission check failed</span>';
+                }
+            });
         }
     }
 }
