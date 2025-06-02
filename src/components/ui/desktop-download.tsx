@@ -132,17 +132,30 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
     const filename = filePath?.split('/').pop() || '';
     const fileSize = getFileSize(platform);
+    const expectedBytes = getExpectedBytes(platform);
     
     console.log('Download Debug:', {
       platform,
       detectedOS: os,
       filePath,
+      expectedSize: expectedBytes,
       userAgent: navigator.userAgent,
       isLocalDownload: true
     });
     
     if (filePath) {
       try {
+        // Verify file integrity before download
+        if (expectedBytes > 0) {
+          console.log('🔍 Verifying file integrity...');
+          const isValid = await verifyDownload(filePath, expectedBytes);
+          
+          if (!isValid) {
+            throw new Error('File size mismatch - file may be corrupted');
+          }
+          console.log('✅ File verification passed');
+        }
+        
         // Create invisible link element for direct download
         const link = document.createElement('a');
         link.href = filePath;
@@ -150,16 +163,26 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         
-        // Add to DOM temporarily
-        document.body.appendChild(link);
+        // Add cache-busting parameter to ensure fresh download
+        const cacheBuster = Date.now();
+        const downloadUrl = `${filePath}?v=${cacheBuster}`;
         
-        // Trigger download immediately
-        link.click();
+        // Try alternative download method for large files (more reliable)
+        try {
+          console.log('🚀 Starting download with fetch method...');
+          await downloadWithProgress(downloadUrl, filename);
+          console.log('✅ Download completed successfully');
+        } catch (fetchError) {
+          console.log('⚠️ Fetch download failed, trying direct link method...');
+          
+          // Fallback to direct link method
+          link.href = downloadUrl;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
         
-        // Clean up
-        document.body.removeChild(link);
-        
-        // Show non-blocking success notification
+        // Show non-blocking success notification with file info
         setNotification({
           platform: getOSName(platform),
           filename,
@@ -169,26 +192,27 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         
         setDownloading(null);
         
-        // Auto-hide notification after 8 seconds
+        // Auto-hide notification after 10 seconds (longer for large files)
         setTimeout(() => {
           setNotification(prev => prev ? { ...prev, show: false } : null);
-        }, 8000);
+        }, 10000);
         
       } catch (error) {
         console.error('Download error:', error);
-        // Show error notification instead of alert
+        // Show detailed error notification
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         setNotification({
           platform: 'Error',
-          filename: 'Download failed - please try again',
+          filename: `Download failed: ${errorMessage}. Please try again or contact support.`,
           size: '',
           show: true
         });
         setDownloading(null);
         
-        // Auto-hide error notification after 5 seconds
+        // Auto-hide error notification after 8 seconds
         setTimeout(() => {
           setNotification(prev => prev ? { ...prev, show: false } : null);
-        }, 5000);
+        }, 8000);
       }
     } else {
       // Show error notification instead of alert
@@ -242,16 +266,90 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '112MB';
+        return '118MB';
       case 'mac-intel':
       case 'mac':
-        return '118MB';
+        return '124MB';
       case 'windows':
-        return '85MB';
+        return '91MB';
       case 'linux':
         return '120MB';
       default:
         return '';
+    }
+  };
+
+  const getExpectedBytes = (platform: string) => {
+    switch (platform) {
+      case 'mac-arm':
+        return 123648729; // Actual ARM DMG size
+      case 'mac-intel':
+      case 'mac':
+        return 130166449; // Actual Intel DMG size  
+      case 'windows':
+        return 95090436; // Actual EXE size
+      default:
+        return 0;
+    }
+  };
+
+  // Add file verification function
+  const verifyDownload = async (url: string, expectedSize: number): Promise<boolean> => {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      const contentLength = response.headers.get('content-length');
+      
+      if (contentLength) {
+        const actualSize = parseInt(contentLength);
+        const sizeDiff = Math.abs(actualSize - expectedSize);
+        const tolerance = expectedSize * 0.01; // 1% tolerance
+        
+        console.log('File verification:', {
+          expected: expectedSize,
+          actual: actualSize,
+          difference: sizeDiff,
+          tolerance: tolerance,
+          valid: sizeDiff <= tolerance
+        });
+        
+        return sizeDiff <= tolerance;
+      }
+      
+      return true; // If no content-length header, assume OK
+    } catch (error) {
+      console.warn('Could not verify file size:', error);
+      return true; // If verification fails, proceed anyway
+    }
+  };
+
+  // Add alternative download method for large files
+  const downloadWithProgress = async (url: string, filename: string): Promise<void> => {
+    try {
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      
+      // Create download link
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up object URL
+      window.URL.revokeObjectURL(downloadUrl);
+      
+    } catch (error) {
+      console.error('Progress download failed:', error);
+      throw error;
     }
   };
 

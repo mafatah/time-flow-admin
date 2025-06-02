@@ -1,0 +1,18 @@
+# Force download for DMG and EXE files
+<Files "*.dmg">
+    Header set Content-Type "application/x-apple-diskimage"
+    Header set Content-Disposition "attachment"
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+</Files>
+
+<Files "*.exe">
+    Header set Content-Type "application/octet-stream"
+    Header set Content-Disposition "attachment"
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+</Files>
+
+# Allow large file downloads
+LimitRequestBody 0
+
+# Prevent timeout for large downloads
+TimeOut 600 
