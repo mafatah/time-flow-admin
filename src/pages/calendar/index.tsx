@@ -339,214 +339,216 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Time Tracking Calendar</h1>
-          <p className="text-muted-foreground">Click on any time block to see details. Green = Active sessions, Orange = Long sessions (8+ hours)</p>
+    <div className="calendar-page-container">
+      <div className="container mx-auto p-6 space-y-6 max-w-full overflow-x-hidden">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-3xl font-bold truncate">Time Tracking Calendar</h1>
+            <p className="text-muted-foreground text-sm">Click on any time block to see details. Green = Active sessions, Orange = Long sessions (8+ hours)</p>
+          </div>
+          
+          {/* View Controls */}
+          <div className="calendar-controls flex-shrink-0">
+            <Button
+              variant={currentView === 'month' ? 'default' : 'outline'}
+              onClick={() => setCurrentView('month')}
+              size="sm"
+            >
+              Month
+            </Button>
+            <Button
+              variant={currentView === 'week' ? 'default' : 'outline'}
+              onClick={() => setCurrentView('week')}
+              size="sm"
+            >
+              Week
+            </Button>
+            <Button
+              variant={currentView === 'day' ? 'default' : 'outline'}
+              onClick={() => setCurrentView('day')}
+              size="sm"
+            >
+              Day
+            </Button>
+            <Button
+              variant={currentView === 'agenda' ? 'default' : 'outline'}
+              onClick={() => setCurrentView('agenda')}
+              size="sm"
+            >
+              Agenda
+            </Button>
+          </div>
         </div>
-        
-        {/* View Controls */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant={currentView === 'month' ? 'default' : 'outline'}
-            onClick={() => setCurrentView('month')}
-            size="sm"
-          >
-            Month
-          </Button>
-          <Button
-            variant={currentView === 'week' ? 'default' : 'outline'}
-            onClick={() => setCurrentView('week')}
-            size="sm"
-          >
-            Week
-          </Button>
-          <Button
-            variant={currentView === 'day' ? 'default' : 'outline'}
-            onClick={() => setCurrentView('day')}
-            size="sm"
-          >
-            Day
-          </Button>
-          <Button
-            variant={currentView === 'agenda' ? 'default' : 'outline'}
-            onClick={() => setCurrentView('agenda')}
-            size="sm"
-          >
-            Agenda
-          </Button>
-        </div>
-      </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Employee</label>
-              <Select value={selectedUser} onValueChange={setSelectedUser}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Users" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.full_name || user.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium mb-2 block">Project</label>
-              <Select value={selectedProject} onValueChange={setSelectedProject}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Projects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Filters */}
+        <Card className="w-full">
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Employee</label>
+                <Select value={selectedUser} onValueChange={setSelectedUser}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Users" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Users</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.full_name || user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">Project</label>
+                <Select value={selectedProject} onValueChange={setSelectedProject}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Projects" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="flex items-center gap-2">
-              <Button onClick={() => setCurrentDate(new Date())} variant="outline" size="sm">
-                Today
-              </Button>
-              <Button onClick={() => fetchTimeLogs()} variant="outline" size="sm">
-                Refresh
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Legend */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-500 rounded"></div>
-              <span>Active Sessions</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-orange-500 rounded"></div>
-              <span>Long Sessions (8+ hours)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-blue-500 rounded"></div>
-              <span>Medium Sessions (4-8 hours)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-500 rounded"></div>
-              <span>Short Sessions (&lt;4 hours)</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Calendar */}
-      <Card>
-        <CardContent className="pt-6">
-          <div style={{ height: 600 }}>
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <p>Loading calendar...</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button onClick={() => setCurrentDate(new Date())} variant="outline" size="sm">
+                  Today
+                </Button>
+                <Button onClick={() => fetchTimeLogs()} variant="outline" size="sm">
+                  Refresh
+                </Button>
               </div>
-            ) : (
-              <Calendar
-                localizer={localizer}
-                events={events}
-                startAccessor="start"
-                endAccessor="end"
-                style={{ height: '100%' }}
-                view={currentView}
-                onView={setCurrentView}
-                date={currentDate}
-                onNavigate={setCurrentDate}
-                onSelectEvent={handleSelectEvent}
-                onSelectSlot={handleSelectSlot}
-                selectable
-                eventPropGetter={eventStyleGetter}
-                components={{
-                  event: EventComponent,
-                  week: {
-                    header: WeekHeader
-                  },
-                  dateCellWrapper: DayCellWrapper
-                }}
-                formats={{
-                  timeGutterFormat: 'HH:mm',
-                  dayHeaderFormat: 'ddd MMM DD',
-                  dayRangeHeaderFormat: ({ start, end }, culture, localizer) =>
-                    `${localizer?.format(start, 'MMM DD', culture) || ''} - ${localizer?.format(end, 'MMM DD', culture) || ''}`,
-                  agendaTimeFormat: 'HH:mm',
-                  agendaTimeRangeFormat: ({ start, end }, culture, localizer) =>
-                    `${localizer?.format(start, 'HH:mm', culture) || ''} - ${localizer?.format(end, 'HH:mm', culture) || ''}`
-                }}
-                min={new Date(2023, 0, 1, 6, 0)} // Start at 6 AM
-                max={new Date(2023, 0, 1, 22, 0)} // End at 10 PM
-                step={30}
-                timeslots={2}
-                scrollToTime={new Date(2023, 0, 1, 8, 0)} // Scroll to 8 AM
-              />
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Event Details Modal */}
-      {selectedEvent && (
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle>Session Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="font-medium">Employee:</label>
-                <p>{selectedEvent.resource.user}</p>
-              </div>
-              <div>
-                <label className="font-medium">Project:</label>
-                <p>{selectedEvent.resource.project}</p>
-              </div>
-              <div>
-                <label className="font-medium">Start Time:</label>
-                <p>{moment(selectedEvent.start).format('YYYY-MM-DD HH:mm')}</p>
-              </div>
-              <div>
-                <label className="font-medium">End Time:</label>
-                <p>{moment(selectedEvent.end).format('YYYY-MM-DD HH:mm')}</p>
-              </div>
-              <div>
-                <label className="font-medium">Duration:</label>
-                <p>{selectedEvent.resource.duration}</p>
-              </div>
-              <div>
-                <label className="font-medium">Status:</label>
-                <Badge variant={selectedEvent.resource.status === 'active' ? 'default' : 'secondary'}>
-                  {selectedEvent.resource.status}
-                </Badge>
-              </div>
-            </div>
-            <div className="mt-4">
-              <Button variant="outline" onClick={() => setSelectedEvent(null)}>
-                Close
-              </Button>
             </div>
           </CardContent>
         </Card>
-      )}
+
+        {/* Legend */}
+        <Card className="w-full">
+          <CardContent className="pt-4">
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-green-500 rounded flex-shrink-0"></div>
+                <span>Active Sessions</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-orange-500 rounded flex-shrink-0"></div>
+                <span>Long Sessions (8+ hours)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-blue-500 rounded flex-shrink-0"></div>
+                <span>Medium Sessions (4-8 hours)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-gray-500 rounded flex-shrink-0"></div>
+                <span>Short Sessions (&lt;4 hours)</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Calendar */}
+        <Card className="w-full">
+          <CardContent className="pt-6 p-2 lg:p-6">
+            <div className="calendar-container" style={{ height: 600, overflow: 'hidden' }}>
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <p>Loading calendar...</p>
+                </div>
+              ) : (
+                <Calendar
+                  localizer={localizer}
+                  events={events}
+                  startAccessor="start"
+                  endAccessor="end"
+                  style={{ height: '100%', minHeight: 500 }}
+                  view={currentView}
+                  onView={setCurrentView}
+                  date={currentDate}
+                  onNavigate={setCurrentDate}
+                  onSelectEvent={handleSelectEvent}
+                  onSelectSlot={handleSelectSlot}
+                  selectable
+                  eventPropGetter={eventStyleGetter}
+                  components={{
+                    event: EventComponent,
+                    week: {
+                      header: WeekHeader
+                    },
+                    dateCellWrapper: DayCellWrapper
+                  }}
+                  formats={{
+                    timeGutterFormat: 'HH:mm',
+                    dayHeaderFormat: 'ddd MMM DD',
+                    dayRangeHeaderFormat: ({ start, end }, culture, localizer) =>
+                      `${localizer?.format(start, 'MMM DD', culture) || ''} - ${localizer?.format(end, 'MMM DD', culture) || ''}`,
+                    agendaTimeFormat: 'HH:mm',
+                    agendaTimeRangeFormat: ({ start, end }, culture, localizer) =>
+                      `${localizer?.format(start, 'HH:mm', culture) || ''} - ${localizer?.format(end, 'HH:mm', culture) || ''}`
+                  }}
+                  min={new Date(2023, 0, 1, 6, 0)} // Start at 6 AM
+                  max={new Date(2023, 0, 1, 22, 0)} // End at 10 PM
+                  step={30}
+                  timeslots={2}
+                  scrollToTime={new Date(2023, 0, 1, 8, 0)} // Scroll to 8 AM
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Event Details Modal */}
+        {selectedEvent && (
+          <Card className="mt-4 w-full">
+            <CardHeader>
+              <CardTitle>Session Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-medium">Employee:</label>
+                  <p>{selectedEvent.resource.user}</p>
+                </div>
+                <div>
+                  <label className="font-medium">Project:</label>
+                  <p>{selectedEvent.resource.project}</p>
+                </div>
+                <div>
+                  <label className="font-medium">Start Time:</label>
+                  <p>{moment(selectedEvent.start).format('YYYY-MM-DD HH:mm')}</p>
+                </div>
+                <div>
+                  <label className="font-medium">End Time:</label>
+                  <p>{moment(selectedEvent.end).format('YYYY-MM-DD HH:mm')}</p>
+                </div>
+                <div>
+                  <label className="font-medium">Duration:</label>
+                  <p>{selectedEvent.resource.duration}</p>
+                </div>
+                <div>
+                  <label className="font-medium">Status:</label>
+                  <Badge variant={selectedEvent.resource.status === 'active' ? 'default' : 'secondary'}>
+                    {selectedEvent.resource.status}
+                  </Badge>
+                </div>
+              </div>
+              <div className="mt-4">
+                <Button variant="outline" onClick={() => setSelectedEvent(null)}>
+                  Close
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

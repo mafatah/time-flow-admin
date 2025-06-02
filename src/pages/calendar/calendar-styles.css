@@ -5,6 +5,16 @@
   border: 1px solid #e2e8f0 !important;
   border-radius: 8px !important;
   overflow: hidden !important;
+  /* Fix for calendar going out of screen */
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* Prevent calendar from overflowing container */
+.calendar-container {
+  overflow-x: auto !important;
+  max-width: 100vw !important;
+  width: 100% !important;
 }
 
 /* General event styling */
@@ -20,6 +30,10 @@
   position: relative !important;
   z-index: 1 !important;
   cursor: pointer !important;
+  /* Ensure events don't overflow */
+  max-width: 100% !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
 .rbc-event:hover {
@@ -43,6 +57,7 @@
   min-height: 120px !important;
   position: relative !important;
   border: 1px solid #f1f5f9 !important;
+  overflow: hidden !important; /* Prevent content overflow */
 }
 
 .rbc-month-view .rbc-events-container {
@@ -139,6 +154,7 @@
   background-color: #fafafa !important;
   border-right: 1px solid #e2e8f0 !important;
   width: 60px !important;
+  flex-shrink: 0 !important; /* Prevent shrinking */
 }
 
 /* Header styling */
@@ -149,6 +165,10 @@
   border-bottom: 2px solid #e2e8f0 !important;
   font-size: 14px !important;
   text-align: center !important;
+  /* Ensure headers don't overflow */
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
 .rbc-header + .rbc-header {
@@ -164,6 +184,9 @@
   align-items: center !important;
   flex-wrap: wrap !important;
   gap: 8px !important;
+  /* Prevent toolbar overflow */
+  overflow: visible !important;
+  max-width: 100% !important;
 }
 
 .rbc-toolbar button {
@@ -176,6 +199,9 @@
   font-size: 13px !important;
   cursor: pointer !important;
   transition: all 0.2s ease !important;
+  /* Prevent button overflow */
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
 }
 
 .rbc-toolbar button:hover {
@@ -196,12 +222,19 @@
   font-weight: 600 !important;
   color: #1e293b !important;
   margin: 0 16px !important;
+  /* Prevent label overflow */
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 200px !important;
 }
 
 /* Today button styling */
 .rbc-btn-group {
   display: flex !important;
   gap: 4px !important;
+  flex-wrap: wrap !important; /* Allow wrapping on small screens */
 }
 
 .rbc-btn-group button {
@@ -263,10 +296,14 @@
 .rbc-time-view {
   border: 1px solid #e2e8f0 !important;
   border-radius: 6px !important;
+  /* Ensure proper containment */
+  overflow: hidden !important;
 }
 
 .rbc-time-content {
   border-top: 1px solid #e2e8f0 !important;
+  /* Add horizontal scroll if needed */
+  overflow-x: auto !important;
 }
 
 /* Custom day cell styling */
@@ -275,7 +312,62 @@
   overflow: visible !important;
 }
 
+/* Fix for horizontal scrolling and layout issues */
+.rbc-time-header {
+  overflow: hidden !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.rbc-time-header-content {
+  min-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.rbc-time-column {
+  overflow: hidden !important;
+  border-right: 1px solid #f1f5f9 !important;
+}
+
+/* Week/day view column headers */
+.rbc-time-header .rbc-header {
+  flex: 1 !important;
+  min-width: 80px !important; /* Minimum column width */
+  overflow: hidden !important;
+}
+
+/* Ensure proper layout on smaller screens */
+.rbc-time-view .rbc-allday-cell {
+  display: none !important; /* Hide all-day section to save space */
+}
+
 /* Responsive adjustments */
+@media (max-width: 1024px) {
+  .rbc-calendar {
+    font-size: 14px !important;
+  }
+  
+  .rbc-time-view .rbc-time-gutter {
+    width: 50px !important;
+  }
+  
+  .rbc-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  
+  .rbc-toolbar .rbc-btn-group {
+    justify-content: center !important;
+  }
+  
+  .rbc-toolbar .rbc-toolbar-label {
+    order: -1 !important;
+    margin: 0 !important;
+    text-align: center !important;
+    max-width: none !important;
+  }
+}
+
 @media (max-width: 768px) {
   .rbc-month-view .rbc-event {
     font-size: 10px !important;
@@ -291,23 +383,28 @@
     min-height: 32px !important;
   }
   
-  .rbc-toolbar {
-    flex-direction: column !important;
-    gap: 12px !important;
-  }
-  
-  .rbc-toolbar .rbc-toolbar-label {
-    order: -1 !important;
-    margin: 0 !important;
-  }
-  
   .rbc-time-view .rbc-time-gutter {
-    width: 50px !important;
+    width: 40px !important;
   }
   
   .rbc-time-view .rbc-time-gutter .rbc-time-slot {
     font-size: 10px !important;
-    padding: 1px 4px !important;
+    padding: 1px 2px !important;
+  }
+  
+  .rbc-header {
+    font-size: 12px !important;
+    padding: 4px 2px !important;
+  }
+  
+  /* Make calendar container horizontally scrollable on mobile */
+  .calendar-container {
+    overflow-x: scroll !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .rbc-calendar {
+    min-width: 600px !important; /* Minimum width to maintain usability */
   }
 }
 
@@ -322,8 +419,17 @@
   }
   
   .rbc-header {
-    padding: 4px 2px !important;
+    padding: 4px 1px !important;
+    font-size: 11px !important;
+  }
+  
+  .rbc-toolbar button {
+    padding: 4px 8px !important;
     font-size: 12px !important;
+  }
+  
+  .rbc-toolbar .rbc-toolbar-label {
+    font-size: 16px !important;
   }
 }
 
@@ -341,4 +447,43 @@
   .rbc-toolbar {
     display: none !important;
   }
+}
+
+/* Additional fixes for container overflow */
+.calendar-page-container {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  padding: 0 !important;
+}
+
+.calendar-page-container .container {
+  max-width: 100% !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+/* Fix for cards going off-screen */
+.calendar-page-container .grid {
+  margin: 0 !important;
+}
+
+.calendar-page-container .card {
+  margin: 8px 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Ensure buttons don't wrap poorly */
+.calendar-controls {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 12px !important;
+  overflow: visible !important;
+}
+
+.calendar-controls > * {
+  flex-shrink: 0 !important;
 } 
