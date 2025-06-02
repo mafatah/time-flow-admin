@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "test-mac": "electron test-mac-permissions.js",
+    "test-screenshot": "node test-screenshot.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
