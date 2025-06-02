@@ -125,11 +125,11 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     // Define the download files from local public directory
     const downloadFiles = {
-      windows: `${baseUrl}/downloads/EbdaaWorkTime-Setup.exe`,
-      'mac-intel': `${baseUrl}/downloads/EbdaaWorkTime-Intel.dmg`,
-      'mac-arm': `${baseUrl}/downloads/EbdaaWorkTime-ARM.dmg`,
-      'mac': `${baseUrl}/downloads/EbdaaWorkTime-Intel.dmg`, // Default to Intel for generic mac
-      linux: `${baseUrl}/downloads/EbdaaWorkTime.AppImage` // Add if you have Linux version
+      windows: `${baseUrl}/downloads/TimeFlow-Setup.exe`,
+      'mac-intel': `${baseUrl}/downloads/TimeFlow-Intel.dmg`,
+      'mac-arm': `${baseUrl}/downloads/TimeFlow-ARM.dmg`,
+      'mac': `${baseUrl}/downloads/TimeFlow-Intel.dmg`, // Default to Intel for generic mac
+      linux: `${baseUrl}/downloads/TimeFlow.AppImage` // Add if you have Linux version
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
@@ -282,12 +282,12 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '118MB';
+        return '114MB';
       case 'mac-intel':
       case 'mac':
-        return '124MB';
+        return '119MB';
       case 'windows':
-        return '91MB';
+        return '85MB';
       case 'linux':
         return '120MB';
       default:
@@ -298,12 +298,12 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 123648729; // Actual ARM DMG size
+        return 119561630; // Actual ARM DMG size
       case 'mac-intel':
       case 'mac':
-        return 130166449; // Actual Intel DMG size  
+        return 124669402; // Actual Intel DMG size  
       case 'windows':
-        return 95090436; // Actual EXE size
+        return 88816714; // Actual EXE size
       default:
         return 0;
     }
