@@ -171,11 +171,18 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         
-        // Add cache-busting parameter to ensure fresh download
-        const cacheBuster = Date.now();
-        const downloadUrl = `${filePath}?v=${cacheBuster}`;
+        // Don't use cache-busting for binary files as it can cause corruption
+        // const cacheBuster = Date.now();
+        // const downloadUrl = `${filePath}?v=${cacheBuster}`;
         
-        // Try alternative download method for large files (more reliable)
+        // Use simple direct link method for binary files (most reliable)
+        console.log('🚀 Starting download with direct link method...');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Remove the fetch-based download method as it can corrupt binary files
+        /*
         try {
           console.log('🚀 Starting download with fetch method...');
           await downloadWithProgress(downloadUrl, filename);
@@ -189,6 +196,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
           link.click();
           document.body.removeChild(link);
         }
+        */
         
         // Show non-blocking success notification with file info
         setNotification({

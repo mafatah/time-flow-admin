@@ -1,18 +1,39 @@
-# Force download for DMG and EXE files
+# Force download for DMG and EXE files with proper binary handling
 <Files "*.dmg">
     Header set Content-Type "application/x-apple-diskimage"
     Header set Content-Disposition "attachment"
     Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Content-Transfer-Encoding "binary"
+    # Disable compression for binary files
+    SetEnv no-gzip 1
 </Files>
 
 <Files "*.exe">
     Header set Content-Type "application/octet-stream"
     Header set Content-Disposition "attachment"
     Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Content-Transfer-Encoding "binary"
+    # Disable compression for binary files
+    SetEnv no-gzip 1
 </Files>
 
 # Allow large file downloads
 LimitRequestBody 0
 
 # Prevent timeout for large downloads
-TimeOut 600 
+TimeOut 600
+
+# Disable ETags for binary files (can cause corruption)
+<Files "*.dmg">
+    Header unset ETag
+    FileETag None
+</Files>
+
+<Files "*.exe">
+    Header unset ETag
+    FileETag None
+</Files>
+
+# Ensure proper MIME types
+AddType application/x-apple-diskimage .dmg
+AddType application/octet-stream .exe 
