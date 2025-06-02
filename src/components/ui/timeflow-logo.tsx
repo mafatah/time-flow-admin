@@ -131,7 +131,7 @@ const EbdaaTimeLogo: React.FC<EbdaaTimeLogoProps> = ({
       
       {showText && (
         <div className="flex flex-col">
-          <span className="font-bold text-lg text-primary">Ebdaa Time</span>
+          <span className="font-bold text-lg text-primary">Ebdaa Work Time</span>
           <span className="text-xs text-muted-foreground">Employee Tracking</span>
         </div>
       )}

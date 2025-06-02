@@ -21,7 +21,7 @@ const DownloadPage = () => {
           <div className="flex items-center gap-3">
             <EbdaaTimeLogo size={40} />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Download TimeFlow Desktop</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Download Ebdaa Work Time Desktop</h1>
               <p className="text-gray-600">Download the desktop app directly - no login required</p>
             </div>
           </div>
