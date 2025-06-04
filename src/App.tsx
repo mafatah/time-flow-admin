@@ -27,6 +27,7 @@ import UrlsViewer from '@/pages/screenshots/urls-viewer';
 import SettingsPage from '@/pages/settings';
 import CalendarPage from '@/pages/calendar';
 import TimeTrackingPage from '@/pages/time-tracking';
+import TimeLogsPage from '@/pages/time-logs';
 import EmployeeSettingsPage from '@/pages/employee-settings';
 import FinancePage from '@/pages/finance';
 import SuspiciousActivityPage from '@/pages/suspicious-activity';
@@ -305,6 +306,16 @@ function AppRoutes() {
           <AdminRoute>
             <AppLayout>
               <TimeTrackingPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/time-logs" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <TimeLogsPage />
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>

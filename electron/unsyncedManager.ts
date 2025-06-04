@@ -18,6 +18,11 @@ interface ScreenshotMeta {
   project_id: string;
   image_url: string;
   captured_at: string;
+  activity_percent?: number;
+  focus_percent?: number;
+  mouse_clicks?: number;
+  keystrokes?: number;
+  mouse_movements?: number;
 }
 
 interface UnsyncedData {

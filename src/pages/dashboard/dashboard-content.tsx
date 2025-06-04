@@ -62,13 +62,13 @@ export function DashboardContent() {
     const now = new Date();
     switch (dateRange) {
       case 'today':
-        return { start: startOfDay(now), end: endOfDay(now) };
+        return { start: new Date(Date.now() - 24 * 60 * 60 * 1000), end: now };
       case 'week':
         return { start: startOfDay(subDays(now, 7)), end: endOfDay(now) };
       case 'month':
         return { start: startOfDay(subDays(now, 30)), end: endOfDay(now) };
       default:
-        return { start: startOfDay(now), end: endOfDay(now) };
+        return { start: new Date(Date.now() - 24 * 60 * 60 * 1000), end: now };
     }
   };
 
@@ -99,11 +99,10 @@ export function DashboardContent() {
 
       const activeUserIds = new Set(logs.map((log: any) => log.user_id));
       const totalHours = logs.reduce((sum: number, log: any) => {
-        if (log.end_time) {
-          const duration = new Date(log.end_time).getTime() - new Date(log.start_time).getTime();
-          return sum + duration / (1000 * 60 * 60);
-        }
-        return sum;
+        if (!log.start_time) return sum;
+        const start = new Date(log.start_time);
+        const end = log.end_time ? new Date(log.end_time) : new Date(); // Use current time for ongoing sessions
+        return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
       }, 0);
 
       setStats({

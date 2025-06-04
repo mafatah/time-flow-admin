@@ -4,11 +4,83 @@ exports.initSystemMonitor = initSystemMonitor;
 const electron_1 = require("electron");
 const tracker_1 = require("./tracker.cjs");
 const activityMonitor_1 = require("./activityMonitor.cjs");
+const node_global_key_listener_1 = require("node-global-key-listener");
+const { screen } = require('electron');
 // Track system state
 let wasSystemSuspended = false;
 let suspendTime = null;
+let inputMonitoringActive = false;
+// Track input events for activity detection
+let lastMousePosition = { x: 0, y: 0, lastUpdateTime: 0 };
+let mouseMoveThreshold = 5; // Lower threshold for better detection
+let inputCheckInterval = null;
+// node-global-key-listener instances
+let keyListener = null;
+// Debounce tracking for unified input events
+let lastKeystrokeTime = 0;
+const KEYSTROKE_DEBOUNCE_MS = 200; // milliseconds
+// macOS-specific tracking
+let lastMouseDownTime = 0;
+let lastKeyPressTime = 0;
+let consecutiveIdleChecks = 0;
+// Windows-specific tracking
+let winLastMouseDown = false;
+let winLastKeyDown = false;
+let winLastMouseClickTime = 0;
+let winLastKeyPressTime = 0;
+let winClickCheckInterval = null;
+let winKeyCheckInterval = null;
+let winTestingSimulationInterval = null;
+// Helper to check if event name is a mouse button OR keyboard input
+function isInputEvent(name, vKey) {
+    if (!name)
+        return false;
+    const n = name.toUpperCase();
+    // Count ALL input as unified activity: mouse buttons, keyboard keys, etc.
+    return (n.includes('MOUSE') || // Any mouse event
+        (vKey >= 0 && vKey <= 255) // Any key/button event
+    );
+}
+// Cross-platform mouse button detection
+function isMouseButtonEvent(name, vKey) {
+    if (!name)
+        return false;
+    const n = name.toUpperCase();
+    // macOS mouse button names
+    if (n === 'MOUSE LEFT' || n === 'MOUSE RIGHT' || n === 'MOUSE MIDDLE') {
+        return true;
+    }
+    // Windows mouse button names (might be different)
+    if (n.includes('MOUSE BUTTON') || n.includes('MOUSE BTN')) {
+        return true;
+    }
+    // Windows virtual key codes for mouse buttons
+    if (process.platform === 'win32') {
+        // VK_LBUTTON = 0x01, VK_RBUTTON = 0x02, VK_MBUTTON = 0x04
+        if (vKey === 0x01 || vKey === 0x02 || vKey === 0x04) {
+            return true;
+        }
+    }
+    // macOS sometimes uses vKey 0 for mouse buttons
+    if (process.platform === 'darwin' && vKey === 0 && n.includes('MOUSE')) {
+        return true;
+    }
+    return false;
+}
 function initSystemMonitor() {
-    console.log('🔌 Initializing system monitor...');
+    console.log('🔌 Initializing CROSS-PLATFORM system monitor (node-global-key-listener)...');
+    console.log('🔥 LATEST VERSION WITH CROSS-PLATFORM UNIFIED INPUT DETECTION ACTIVE 🔥');
+    console.log(`🌐 Current Platform: ${process.platform} (${process.arch})`);
+    // Platform compatibility check
+    if (process.platform !== 'darwin' && process.platform !== 'win32' && process.platform !== 'linux') {
+        console.warn(`⚠️ WARNING: Platform '${process.platform}' may not be fully supported. Supported platforms: macOS (darwin), Windows (win32), Linux (linux)`);
+    }
+    else {
+        console.log(`✅ Platform '${process.platform}' is officially supported!`);
+    }
+    // NUCLEAR OPTION: Kill all legacy detection systems
+    killAllLegacyDetection();
+    startInputMonitoring();
     // Handle system suspend (laptop closed, sleep mode)
     electron_1.powerMonitor.on('suspend', () => {
         console.log('💤 System suspended (laptop closed or sleep mode)');
@@ -19,6 +91,7 @@ function initSystemMonitor() {
             (0, tracker_1.stopTracking)();
             (0, activityMonitor_1.stopActivityMonitoring)();
         }
+        stopInputMonitoring();
     });
     // Handle system resume (laptop opened, wake up)
     electron_1.powerMonitor.on('resume', () => {
@@ -28,9 +101,9 @@ function initSystemMonitor() {
         console.log(`⏱️ System was suspended for ${suspendMinutes} minutes`);
         wasSystemSuspended = false;
         suspendTime = null;
+        startInputMonitoring();
         const session = (0, tracker_1.loadSession)();
         if (session) {
-            // Auto-resume if suspend was brief (less than 5 minutes), otherwise ask user
             if (suspendDuration < 5 * 60 * 1000) {
                 console.log('🔄 Auto-resuming tracking (short suspend)');
                 (0, tracker_1.startTracking)();
@@ -39,7 +112,6 @@ function initSystemMonitor() {
                 }
             }
             else {
-                // Show dialog for longer suspends
                 try {
                     const result = electron_1.dialog.showMessageBoxSync({
                         type: 'question',
@@ -68,43 +140,231 @@ function initSystemMonitor() {
             }
         }
     });
-    // Handle AC power changes (useful for laptops)
     electron_1.powerMonitor.on('on-ac', () => {
         console.log('🔌 AC power connected');
     });
     electron_1.powerMonitor.on('on-battery', () => {
         console.log('🔋 Running on battery power');
     });
-    // Handle shutdown/logout
     electron_1.powerMonitor.on('shutdown', () => {
         console.log('🚪 System shutdown detected');
+        stopInputMonitoring();
         if ((0, tracker_1.loadSession)()) {
             (0, tracker_1.stopTracking)();
             (0, activityMonitor_1.stopActivityMonitoring)();
         }
     });
-    // Handle lock screen
     electron_1.powerMonitor.on('lock-screen', () => {
         console.log('🔒 Screen locked');
-        // Don't auto-stop on lock screen, but note it
-        // Users might lock screen but continue working
     });
     electron_1.powerMonitor.on('unlock-screen', () => {
         console.log('🔓 Screen unlocked');
     });
-    // Handle thermal state changes (may indicate performance issues affecting screenshots)
     electron_1.powerMonitor.on('thermal-state-change', (state) => {
         console.log('🌡️ Thermal state changed:', state);
         if (state === 'critical') {
             console.log('⚠️ System thermal state is critical - monitoring may be affected');
         }
     });
-    // Handle app being put in background/foreground
     electron_1.app.on('browser-window-blur', () => {
         console.log('👁️ App lost focus');
     });
     electron_1.app.on('browser-window-focus', () => {
         console.log('👁️ App gained focus');
     });
-    console.log('✅ System monitor initialized with enhanced event handling');
+    console.log('✅ UNIFIED system monitor initialized');
+}
+function startInputMonitoring() {
+    if (inputMonitoringActive)
+        return;
+    console.log("🚀🚀🚀 [CROSS_PLATFORM_LISTENER_ACTIVE] CROSS-PLATFORM input monitoring is starting NOW. 🚀🚀🚀");
+    console.log(`🎧 Starting CROSS-PLATFORM ${process.platform} input monitoring...`);
+    console.log(`🌐 Platform: ${process.platform} | Architecture: ${process.arch} | Node: ${process.version}`);
+    inputMonitoringActive = true;
+    try {
+        // 1. Mouse position monitoring (existing reliable method)
+        inputCheckInterval = setInterval(async () => {
+            if (!inputMonitoringActive)
+                return;
+            try {
+                await detectMouseMovement();
+            }
+            catch (error) {
+                if (Math.random() < 0.01) { // Reduce logging frequency
+                    console.log('⚠️ Mouse movement detection error (normal):', error.message);
+                }
+            }
+        }, 200); // Poll mouse position every 200ms
+        // 2. BOTH Keyboard AND Mouse Click detection using node-global-key-listener
+        if (!keyListener) {
+            keyListener = new node_global_key_listener_1.GlobalKeyboardListener();
+            keyListener.addListener((e, down) => {
+                if (!inputMonitoringActive)
+                    return;
+                const now = Date.now();
+                // RAW EVENT LOGGING - VERY IMPORTANT
+                // console.log(`[RAW_INPUT_EVENT] state: ${e.state}, vKey: ${e.vKey}, name: ${e.name}, type: ${(e as any).type}`);
+                if (e.state === "UP") { // Process on key/button release
+                    // console.log(`[DEBUG_PROCESSING] Processing UP event: vKey=${e.vKey}, name=${e.name}, isInputEvent=${isInputEvent(e.name, e.vKey)}, platform=${process.platform}`);
+                    // UNIFIED INPUT DETECTION - Both keyboard and mouse clicks
+                    if (isInputEvent(e.name, e.vKey)) {
+                        const timeSinceLastInput = now - lastKeystrokeTime;
+                        // console.log(`[DEBUG_DEBOUNCE] Time since last input: ${timeSinceLastInput}ms, debounce threshold: ${KEYSTROKE_DEBOUNCE_MS}ms`);
+                        if (timeSinceLastInput > KEYSTROKE_DEBOUNCE_MS) {
+                            const eventName = e.name ? e.name.toUpperCase() : "";
+                            // console.log(`[DEBUG_CLASSIFICATION] Event name (uppercase): "${eventName}", vKey: ${e.vKey}, platform: ${process.platform}`);
+                            // Cross-platform mouse button detection
+                            if (isMouseButtonEvent(e.name, e.vKey)) {
+                                // Record as mouse click
+                                (0, activityMonitor_1.recordRealActivity)('mouse_click', 1);
+                                lastKeystrokeTime = now;
+                                // console.log(`🖱️ 🎯 CROSS-PLATFORM MOUSE CLICK detected (vKey: ${e.vKey}, name: ${e.name}, platform: ${process.platform}) - recorded as mouse_click 🎯`);
+                            }
+                            else {
+                                // Record keyboard events
+                                (0, activityMonitor_1.recordRealActivity)('keystroke', 1);
+                                lastKeystrokeTime = now;
+                                // console.log(`⌨️ 🎯 CROSS-PLATFORM KEYSTROKE detected (vKey: ${e.vKey}, name: ${e.name}, platform: ${process.platform}) - recorded as keystroke 🎯`);
+                            }
+                        }
+                        else {
+                            // console.log(`[DEBUG_DEBOUNCE] Event SKIPPED due to debouncing (${timeSinceLastInput}ms < ${KEYSTROKE_DEBOUNCE_MS}ms)`);
+                        }
+                    }
+                    else {
+                        // console.log(`❌ IGNORED EVENT (vKey: ${e.vKey}, name: ${e.name}) - not recognized as input by isInputEvent()`);
+                    }
+                }
+            });
+            console.log('✅ UNIFIED input listener (node-global-key-listener) started for BOTH keyboard and mouse.');
+        }
+        // Log that monitoring has started
+        console.log('   🖱️ Mouse movements: 200ms polling');
+        console.log('   ⌨️🖱️ Keystrokes & Mouse clicks: node-global-key-listener events');
+    }
+    catch (error) {
+        console.error('❌ Failed to start SIMPLIFIED input monitoring:', error);
+        // Fallback or further error handling if node-global-key-listener fails
+        if (keyListener) {
+            keyListener.kill();
+            keyListener = null;
+        }
+    }
+}
+function detectMouseMovement() {
+    try {
+        // Commented out to reduce log noise during debugging
+        // console.log('[DEBUG_MOUSE_MOVE] detectMouseMovement called.');
+        // Platform-specific position detection
+        let currentX = 0, currentY = 0;
+        // console.log(`[DEBUG_MOUSE_MOVE] Platform: ${process.platform}. Attempting to get cursor position via Electron API.`);
+        try {
+            const point = screen.getCursorScreenPoint();
+            currentX = point.x;
+            currentY = point.y;
+            // console.log(`[DEBUG_MOUSE_MOVE] Electron API: currentX=${currentX}, currentY=${currentY}`);
+        }
+        catch (error) {
+            // console.error('[DEBUG_MOUSE_MOVE] Electron screen module is not available.');
+            return; // Exit if we can't get cursor position
+        }
+        if (process.platform !== 'darwin' && process.platform !== 'win32' && process.platform !== 'linux') {
+            // console.log(`[DEBUG_MOUSE_MOVE] Platform not supported for mouse movement: ${process.platform}`);
+            return;
+        }
+        // Calculate movement distance
+        const deltaX = currentX - lastMousePosition.x;
+        const deltaY = currentY - lastMousePosition.y;
+        const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        // console.log(`[DEBUG_MOUSE_MOVE] lastX=${lastMousePosition.x}, lastY=${lastMousePosition.y}, totalMovement=${totalMovement}, threshold=${mouseMoveThreshold}`);
+        // Only record significant movements
+        if (totalMovement >= mouseMoveThreshold) {
+            const movementCount = Math.floor(totalMovement / 10); // 1 movement per 10 pixels
+            (0, activityMonitor_1.recordRealActivity)('mouse_movement', movementCount);
+            console.log(`🖱️ Real mouse movement detected: ${totalMovement}px, recorded ${movementCount} movements`);
+            // Update last position
+            lastMousePosition.x = currentX;
+            lastMousePosition.y = currentY;
+        }
+        else {
+            // console.log(`[DEBUG_MOUSE_MOVE] No significant movement: ${totalMovement}px`); // This can be noisy, leave commented for now
+        }
+    }
+    catch (error) {
+        // console.error('[DEBUG_MOUSE_MOVE] Error in detectMouseMovement:', error.message, error.stack);
+    }
+}
+function stopInputMonitoring() {
+    if (!inputMonitoringActive)
+        return;
+    console.log('🛑 Stopping UNIFIED input monitoring...');
+    inputMonitoringActive = false;
+    if (inputCheckInterval) {
+        clearInterval(inputCheckInterval);
+        inputCheckInterval = null;
+    }
+    if (keyListener) {
+        try {
+            keyListener.kill();
+            console.log('✅ node-global-key-listener stopped.');
+        }
+        catch (err) {
+            console.error('Error stopping node-global-key-listener:', err);
+        }
+        keyListener = null;
+    }
+    // Clear any remaining Windows-specific intervals if they were used
+    if (winClickCheckInterval) {
+        clearInterval(winClickCheckInterval);
+        winClickCheckInterval = null;
+    }
+    if (winKeyCheckInterval) {
+        clearInterval(winKeyCheckInterval);
+        winKeyCheckInterval = null;
+    }
+    console.log('✅ UNIFIED input monitoring stopped');
+}
+function killAllLegacyDetection() {
+    console.log('💥 NUCLEAR SHUTDOWN: Killing ALL legacy detection systems...');
+    // Clear ALL possible intervals that might be running legacy code
+    for (let i = 1; i < 9999; i++) {
+        clearInterval(i);
+        clearTimeout(i);
+    }
+    // Disable any global AppleScript execution
+    if (global.legacyInputDetection) {
+        global.legacyInputDetection.stop?.();
+        delete global.legacyInputDetection;
+    }
+    // Override any legacy functions that might still be active
+    if (global.startMouseTracking) {
+        global.startMouseTracking = () => { console.log('🚫 Legacy mouse tracking BLOCKED'); };
+    }
+    if (global.startKeyboardTracking) {
+        global.startKeyboardTracking = () => { console.log('🚫 Legacy keyboard tracking BLOCKED'); };
+    }
+    // BLOCK ALL APPLESCRIPT INPUT DETECTION
+    const originalExec = require('child_process').exec;
+    const originalExecSync = require('child_process').execSync;
+    const util = require('util');
+    // Override exec functions to block AppleScript input detection
+    require('child_process').exec = function (command, ...args) {
+        if (typeof command === 'string' && command.includes('osascript') &&
+            (command.includes('button pressed') || command.includes('mouse state') ||
+                command.includes('keys pressed') || command.includes('key down'))) {
+            console.log('🚫 BLOCKED legacy AppleScript input detection:', command.substring(0, 50) + '...');
+            return originalExec('echo "BLOCKED"', ...args);
+        }
+        return originalExec(command, ...args);
+    };
+    require('child_process').execSync = function (command, ...args) {
+        if (typeof command === 'string' && command.includes('osascript') &&
+            (command.includes('button pressed') || command.includes('mouse state') ||
+                command.includes('keys pressed') || command.includes('key down'))) {
+            console.log('🚫 BLOCKED legacy AppleScript input detection:', command.substring(0, 50) + '...');
+            return 'BLOCKED';
+        }
+        return originalExecSync(command, ...args);
+    };
+    console.log('✅ ALL legacy detection systems terminated');
 }

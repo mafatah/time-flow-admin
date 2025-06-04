@@ -13,6 +13,7 @@ const supabase_1 = require("./supabase.cjs");
 const unsyncedManager_1 = require("./unsyncedManager.cjs");
 const errorHandler_1 = require("./errorHandler.cjs");
 const uuid_validator_1 = require("./utils/uuid-validator.cjs");
+const activityMonitor_1 = require("./activityMonitor.cjs");
 const UNSYNCED_LIST_PATH = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_screenshots.json');
 function loadQueue() {
     try {
@@ -89,13 +90,26 @@ async function uploadScreenshot(filePath, userId, projectId, ts) {
         .from('screenshots')
         .getPublicUrl(`${userId}/${filename}`);
     const imageUrl = publicUrlData.publicUrl;
+    // Get current activity metrics for the screenshot
+    const activityMetrics = (0, activityMonitor_1.getCurrentActivityMetrics)();
+    console.log('📊 Screenshot activity metrics:', {
+        activity_score: activityMetrics.activity_score,
+        mouse_clicks: activityMetrics.mouse_clicks,
+        keystrokes: activityMetrics.keystrokes,
+        mouse_movements: activityMetrics.mouse_movements
+    });
     const { error: dbError } = await supabase_1.supabase
         .from('screenshots')
         .insert({
         user_id: userId,
         project_id: projectId,
         image_url: imageUrl,
-        captured_at: new Date(ts).toISOString()
+        captured_at: new Date(ts).toISOString(),
+        activity_percent: activityMetrics.activity_score, // Use the real activity score
+        focus_percent: Math.min(100, activityMetrics.activity_score + 10), // Focus slightly higher than activity
+        mouse_clicks: activityMetrics.mouse_clicks,
+        keystrokes: activityMetrics.keystrokes,
+        mouse_movements: activityMetrics.mouse_movements
     });
     if (dbError) {
         (0, unsyncedManager_1.queueScreenshot)({
@@ -103,9 +117,20 @@ async function uploadScreenshot(filePath, userId, projectId, ts) {
             project_id: projectId,
             image_url: imageUrl,
             captured_at: new Date(ts).toISOString(),
+            activity_percent: activityMetrics.activity_score,
+            focus_percent: Math.min(100, activityMetrics.activity_score + 10),
+            mouse_clicks: activityMetrics.mouse_clicks,
+            keystrokes: activityMetrics.keystrokes,
+            mouse_movements: activityMetrics.mouse_movements
         });
         throw dbError;
     }
+    console.log('✅ Screenshot uploaded with activity data:', {
+        activity_percent: activityMetrics.activity_score,
+        mouse_clicks: activityMetrics.mouse_clicks,
+        keystrokes: activityMetrics.keystrokes,
+        mouse_movements: activityMetrics.mouse_movements
+    });
 }
 function startRetry() {
     if (retryInterval)

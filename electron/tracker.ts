@@ -30,6 +30,11 @@ export function setUserId(id: string) {
   console.log(`Set user ID: ${userId}`);
 }
 
+// Get the current user ID
+export function getUserId(): string | null {
+  return userId;
+}
+
 // Set the current project ID for tracking
 export function setProjectId(id: string) {
   const validatedId = validateAndGetUUID(id, generateDefaultProjectUUID());
@@ -204,6 +209,26 @@ export async function stopTracking() {
       });
     }
   }
+
+  // --- NEW: End all active sessions for this user/project ---
+  if (userId && currentProjectId) {
+    try {
+      const { error } = await supabase
+        .from('time_logs')
+        .update({ end_time: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('project_id', currentProjectId)
+        .is('end_time', null);
+      if (error) {
+        console.error('Failed to end all active sessions:', error);
+      } else {
+        console.log('✅ All active sessions ended for user:', userId);
+      }
+    } catch (err) {
+      console.error('Failed to end all active sessions:', err);
+    }
+  }
+  // --- END NEW ---
 
   clearSession();
   currentTimeLogId = null;

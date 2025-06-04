@@ -1,4 +1,3 @@
-
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils";
 
@@ -11,8 +10,8 @@ export function MainLayout({ children, className }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
-      <div className="flex-1 ml-64">
-        <main className={cn("w-full min-h-screen", className)}>
+      <div className="flex-1 ml-72">
+        <main className={cn("w-full min-h-screen bg-gray-50", className)}>
           {children}
         </main>
       </div>

@@ -107,7 +107,6 @@ export default function ReportsPage() {
             email
           )
         `)
-        .filter('end_time', 'not.is', null)
         .gte('start_time', startDate.toISOString())
         .lte('start_time', endDate.toISOString());
 
@@ -143,37 +142,37 @@ export default function ReportsPage() {
     const dailyActivity: { [key: string]: { hours: number; users: Set<string> } } = {};
 
     timeLogs.forEach(log => {
-      if (log.end_time) {
-        const start = new Date(log.start_time).getTime();
-        const end = new Date(log.end_time).getTime();
-        const hours = (end - start) / (1000 * 60 * 60);
-        
-        totalHours += hours;
+      if (!log.start_time) return; // Skip invalid logs
+      
+      const start = new Date(log.start_time).getTime();
+      const end = log.end_time ? new Date(log.end_time).getTime() : new Date().getTime(); // Use current time for ongoing sessions
+      const hours = (end - start) / (1000 * 60 * 60);
+      
+      totalHours += hours;
 
-        // User hours
-        const userId = log.user_id;
-        const userName = log.users?.full_name || 'Unknown User';
-        if (!userHours[userId]) {
-          userHours[userId] = { name: userName, hours: 0 };
-        }
-        userHours[userId].hours += hours;
-
-        // Project hours
-        const projectId = log.project_id || 'no-project';
-        const projectName = log.projects?.name || 'No Project';
-        if (!projectHours[projectId]) {
-          projectHours[projectId] = { name: projectName, hours: 0 };
-        }
-        projectHours[projectId].hours += hours;
-
-        // Daily activity
-        const date = format(new Date(log.start_time), 'yyyy-MM-dd');
-        if (!dailyActivity[date]) {
-          dailyActivity[date] = { hours: 0, users: new Set() };
-        }
-        dailyActivity[date].hours += hours;
-        dailyActivity[date].users.add(userId);
+      // User hours
+      const userId = log.user_id;
+      const userName = log.users?.full_name || 'Unknown User';
+      if (!userHours[userId]) {
+        userHours[userId] = { name: userName, hours: 0 };
       }
+      userHours[userId].hours += hours;
+
+      // Project hours
+      const projectId = log.project_id || 'no-project';
+      const projectName = log.projects?.name || 'No Project';
+      if (!projectHours[projectId]) {
+        projectHours[projectId] = { name: projectName, hours: 0 };
+      }
+      projectHours[projectId].hours += hours;
+
+      // Daily activity
+      const date = format(new Date(log.start_time), 'yyyy-MM-dd');
+      if (!dailyActivity[date]) {
+        dailyActivity[date] = { hours: 0, users: new Set() };
+      }
+      dailyActivity[date].hours += hours;
+      dailyActivity[date].users.add(userId);
     });
 
     // Sort and get top projects/users

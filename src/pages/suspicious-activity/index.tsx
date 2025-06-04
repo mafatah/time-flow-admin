@@ -141,8 +141,8 @@ export default function SuspiciousActivityPage() {
         .from('screenshots')
         .select('*')
         .eq('user_id', userId)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString());
+        .gte('captured_at', startDate.toISOString())
+        .lte('captured_at', endDate.toISOString());
 
       if (screenshotError) throw screenshotError;
 
@@ -171,8 +171,8 @@ export default function SuspiciousActivityPage() {
         .from('idle_logs')
         .select('*')
         .eq('user_id', userId)
-        .gte('start_time', startDate.toISOString())
-        .lte('start_time', endDate.toISOString());
+        .gte('idle_start', startDate.toISOString())
+        .lte('idle_start', endDate.toISOString());
 
       if (idleError) throw idleError;
 
@@ -248,9 +248,9 @@ export default function SuspiciousActivityPage() {
 
     // Calculate idle time
     const totalIdleTime = idleLogs.reduce((sum, log) => {
-      if (log.end_time) {
-        const start = new Date(log.start_time);
-        const end = new Date(log.end_time);
+      if (log.idle_end) {
+        const start = new Date(log.idle_start);
+        const end = new Date(log.idle_end);
         return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60); // hours
       }
       return sum;

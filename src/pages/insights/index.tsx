@@ -48,6 +48,17 @@ interface UserProductivity {
   apps_used: number;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+}
+
 export default function InsightsPage() {
   const { userDetails } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData>({
@@ -64,27 +75,70 @@ export default function InsightsPage() {
   const [userProductivity, setUserProductivity] = useState<UserProductivity[]>([]);
   const [dateRange, setDateRange] = useState('week');
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedUser, setSelectedUser] = useState<string>('all');
+  const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+
+  useEffect(() => {
+    if (userDetails?.role === 'admin') {
+      fetchFiltersData();
+    }
+  }, [userDetails]);
 
   useEffect(() => {
     if (userDetails?.role === 'admin') {
       fetchAllData();
     }
-  }, [userDetails, dateRange, selectedDate]);
+  }, [userDetails, dateRange, selectedDate, selectedUser, selectedProject]);
+
+  const fetchFiltersData = async () => {
+    try {
+      // Fetch users
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .eq('role', 'employee')
+        .order('full_name');
+
+      // Fetch projects
+      const { data: projectsData } = await supabase
+        .from('projects')
+        .select('id, name')
+        .order('name');
+
+      // Map full_name to name for consistency with interface
+      const mappedUsers = (usersData || []).map(user => ({
+        id: user.id,
+        name: user.full_name,
+        email: user.email
+      }));
+
+      setUsers(mappedUsers);
+      setProjects(projectsData || []);
+    } catch (error) {
+      console.error('Error fetching filter data:', error);
+    }
+  };
 
   const fetchAllData = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
       const { start, end } = getDateRange();
-
       await Promise.all([
         fetchDashboardStats(start, end),
         fetchTimeSeriesData(start, end),
         fetchProjectBreakdown(start, end),
         fetchUserProductivityData(start, end)
       ]);
+      setLastRefresh(new Date());
     } catch (error) {
-      console.error('Error fetching insights data:', error);
+      console.error('Error fetching data:', error);
+      setError('Failed to load insights data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -92,45 +146,80 @@ export default function InsightsPage() {
 
   const fetchDashboardStats = async (start: Date, end: Date) => {
     try {
-      // Get active users count
-      const { data: usersData } = await supabase
+      // Get active users count (filtered if specific user selected)
+      let usersQuery = supabase
         .from('users')
         .select('id')
         .eq('role', 'employee');
+      
+      if (selectedUser !== 'all') {
+        usersQuery = usersQuery.eq('id', selectedUser);
+      }
+      
+      const { data: usersData } = await usersQuery;
 
-      // Get time logs for total hours
-      const { data: timeLogsData } = await supabase
+      // Get time logs for total hours (with filters)
+      let timeLogsQuery = supabase
         .from('time_logs')
-        .select('start_time, end_time')
+        .select('start_time, end_time, user_id, project_id')
         .gte('start_time', start.toISOString())
-        .lte('start_time', end.toISOString())
-        .not('end_time', 'is', null);
+        .lte('start_time', end.toISOString());
+      
+      if (selectedUser !== 'all') {
+        timeLogsQuery = timeLogsQuery.eq('user_id', selectedUser);
+      }
+      if (selectedProject !== 'all') {
+        timeLogsQuery = timeLogsQuery.eq('project_id', selectedProject);
+      }
+      
+      const { data: timeLogsData } = await timeLogsQuery;
 
-      // Get screenshots count and activity data
-      const { data: screenshotsData } = await supabase
+      // Get screenshots count and activity data (with filters)
+      let screenshotsQuery = supabase
         .from('screenshots')
-        .select('activity_percent, focus_percent')
+        .select('activity_percent, focus_percent, user_id, project_id')
         .gte('captured_at', start.toISOString())
         .lte('captured_at', end.toISOString());
+      
+      if (selectedUser !== 'all') {
+        screenshotsQuery = screenshotsQuery.eq('user_id', selectedUser);
+      }
+      if (selectedProject !== 'all') {
+        screenshotsQuery = screenshotsQuery.eq('project_id', selectedProject);
+      }
+      
+      const { data: screenshotsData } = await screenshotsQuery;
 
-      // Get unique apps and websites
-      const { data: appsData } = await supabase
+      // Get unique apps and websites (with filters)
+      let appsQuery = supabase
         .from('app_logs')
-        .select('app_name')
+        .select('app_name, user_id')
         .gte('timestamp', start.toISOString())
         .lte('timestamp', end.toISOString());
+      
+      if (selectedUser !== 'all') {
+        appsQuery = appsQuery.eq('user_id', selectedUser);
+      }
+      
+      const { data: appsData } = await appsQuery;
 
-      const { data: urlsData } = await supabase
+      let urlsQuery = supabase
         .from('url_logs')
-        .select('domain')
+        .select('domain, user_id')
         .gte('timestamp', start.toISOString())
         .lte('timestamp', end.toISOString());
+      
+      if (selectedUser !== 'all') {
+        urlsQuery = urlsQuery.eq('user_id', selectedUser);
+      }
+      
+      const { data: urlsData } = await urlsQuery;
 
-      // Calculate totals
+      // Calculate totals (including ongoing sessions)
       const totalActiveHours = (timeLogsData || []).reduce((sum, log) => {
-        if (!log.start_time || !log.end_time) return sum;
+        if (!log.start_time) return sum;
         const start = new Date(log.start_time);
-        const end = new Date(log.end_time);
+        const end = log.end_time ? new Date(log.end_time) : new Date(); // Use current time for ongoing sessions
         return sum + differenceInHours(end, start);
       }, 0);
 
@@ -170,25 +259,42 @@ export default function InsightsPage() {
         const dayStart = startOfDay(currentDay);
         const dayEnd = endOfDay(currentDay);
 
-        // Get time logs for this day
-        const { data: timeLogsData } = await supabase
+        // Get time logs for this day (with filters)
+        let timeLogsQuery = supabase
           .from('time_logs')
-          .select('start_time, end_time')
+          .select('start_time, end_time, user_id, project_id')
           .gte('start_time', dayStart.toISOString())
-          .lte('start_time', dayEnd.toISOString())
-          .not('end_time', 'is', null);
+          .lte('start_time', dayEnd.toISOString());
+        
+        if (selectedUser !== 'all') {
+          timeLogsQuery = timeLogsQuery.eq('user_id', selectedUser);
+        }
+        if (selectedProject !== 'all') {
+          timeLogsQuery = timeLogsQuery.eq('project_id', selectedProject);
+        }
+        
+        const { data: timeLogsData } = await timeLogsQuery;
 
-        // Get screenshots for this day
-        const { data: screenshotsData } = await supabase
+        // Get screenshots for this day (with filters)
+        let screenshotsQuery = supabase
           .from('screenshots')
-          .select('activity_percent')
+          .select('activity_percent, user_id, project_id')
           .gte('captured_at', dayStart.toISOString())
           .lte('captured_at', dayEnd.toISOString());
+        
+        if (selectedUser !== 'all') {
+          screenshotsQuery = screenshotsQuery.eq('user_id', selectedUser);
+        }
+        if (selectedProject !== 'all') {
+          screenshotsQuery = screenshotsQuery.eq('project_id', selectedProject);
+        }
+        
+        const { data: screenshotsData } = await screenshotsQuery;
 
         const dayHours = (timeLogsData || []).reduce((sum, log) => {
-          if (!log.start_time || !log.end_time) return sum;
+          if (!log.start_time) return sum;
           const logStart = new Date(log.start_time);
-          const logEnd = new Date(log.end_time);
+          const logEnd = log.end_time ? new Date(log.end_time) : new Date(); // Use current time for ongoing sessions
           return sum + differenceInHours(logEnd, logStart);
         }, 0);
 
@@ -212,21 +318,32 @@ export default function InsightsPage() {
 
   const fetchProjectBreakdown = async (start: Date, end: Date) => {
     try {
-      const { data } = await supabase
+      let query = supabase
         .from('time_logs')
         .select(`
           start_time, 
           end_time, 
           user_id,
+          project_id,
           projects!inner(name)
         `)
         .gte('start_time', start.toISOString())
-        .lte('start_time', end.toISOString())
-        .not('end_time', 'is', null);
+        .lte('start_time', end.toISOString());
+      
+      if (selectedUser !== 'all') {
+        query = query.eq('user_id', selectedUser);
+      }
+      if (selectedProject !== 'all') {
+        query = query.eq('project_id', selectedProject);
+      }
+      
+      const { data } = await query;
 
       const projectStats = (data || []).reduce((acc: any, log: any) => {
         const projectName = log.projects?.name || 'No Project';
-        const hours = differenceInHours(new Date(log.end_time), new Date(log.start_time));
+        const logStart = new Date(log.start_time);
+        const logEnd = log.end_time ? new Date(log.end_time) : new Date(); // Use current time for ongoing sessions
+        const hours = differenceInHours(logEnd, logStart);
         
         if (!acc[projectName]) {
           acc[projectName] = { hours: 0, users: new Set() };
@@ -257,22 +374,33 @@ export default function InsightsPage() {
 
   const fetchUserProductivityData = async (start: Date, end: Date) => {
     try {
-      const { data: timeLogsData } = await supabase
+      let timeLogsQuery = supabase
         .from('time_logs')
         .select(`
           start_time, 
           end_time, 
           user_id,
+          project_id,
           users!inner(full_name, email)
         `)
         .gte('start_time', start.toISOString())
-        .lte('start_time', end.toISOString())
-        .not('end_time', 'is', null);
+        .lte('start_time', end.toISOString());
+      
+      if (selectedUser !== 'all') {
+        timeLogsQuery = timeLogsQuery.eq('user_id', selectedUser);
+      }
+      if (selectedProject !== 'all') {
+        timeLogsQuery = timeLogsQuery.eq('project_id', selectedProject);
+      }
+      
+      const { data: timeLogsData } = await timeLogsQuery;
 
       const userStats = (timeLogsData || []).reduce((acc: any, log: any) => {
         const userId = log.user_id;
         const userName = log.users?.full_name || log.users?.email || 'Unknown User';
-        const hours = differenceInHours(new Date(log.end_time), new Date(log.start_time));
+        const logStart = new Date(log.start_time);
+        const logEnd = log.end_time ? new Date(log.end_time) : new Date(); // Use current time for ongoing sessions
+        const hours = differenceInHours(logEnd, logStart);
         
         if (!acc[userId]) {
           acc[userId] = { user_name: userName, hours: 0 };
@@ -285,19 +413,27 @@ export default function InsightsPage() {
       const userProductivityData: UserProductivity[] = [];
       
       for (const [userId, userData] of Object.entries(userStats) as [string, any][]) {
-        const { data: screenshotsData } = await supabase
+        let screenshotsQuery = supabase
           .from('screenshots')
           .select('activity_percent')
           .eq('user_id', userId)
           .gte('captured_at', start.toISOString())
           .lte('captured_at', end.toISOString());
+        
+        if (selectedProject !== 'all') {
+          screenshotsQuery = screenshotsQuery.eq('project_id', selectedProject);
+        }
+        
+        const { data: screenshotsData } = await screenshotsQuery;
 
-        const { data: appsData } = await supabase
+        let appsQuery = supabase
           .from('app_logs')
           .select('app_name')
           .eq('user_id', userId)
           .gte('timestamp', start.toISOString())
           .lte('timestamp', end.toISOString());
+        
+        const { data: appsData } = await appsQuery;
 
         const avgActivity = screenshotsData && screenshotsData.length > 0
           ? screenshotsData.reduce((sum, s) => sum + (s.activity_percent || 0), 0) / screenshotsData.length
@@ -344,6 +480,29 @@ export default function InsightsPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Productivity Insights</h1>
+            <p className="text-muted-foreground">Comprehensive overview of team productivity and engagement</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-red-600 text-lg font-semibold mb-2">Error Loading Data</div>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={fetchAllData} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -356,6 +515,11 @@ export default function InsightsPage() {
             <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
             {loading ? 'Loading...' : 'Refresh'}
           </Button>
+          {lastRefresh && (
+            <span className="text-sm text-muted-foreground">
+              Last updated: {lastRefresh.toLocaleTimeString()}
+            </span>
+          )}
         </div>
       </div>
 
@@ -392,6 +556,81 @@ export default function InsightsPage() {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* User and Project Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+            {(selectedUser !== 'all' || selectedProject !== 'all') && (
+              <div className="flex gap-2 ml-auto">
+                {selectedUser !== 'all' && (
+                  <Badge variant="secondary" className="text-xs">
+                    User: {users.find(u => u.id === selectedUser)?.name || 'Unknown'}
+                  </Badge>
+                )}
+                {selectedProject !== 'all' && (
+                  <Badge variant="secondary" className="text-xs">
+                    Project: {projects.find(p => p.id === selectedProject)?.name || 'Unknown'}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select User</label>
+              <Select value={selectedUser} onValueChange={setSelectedUser}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select user" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select Project</label>
+              <Select value={selectedProject} onValueChange={setSelectedProject}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {(selectedUser !== 'all' || selectedProject !== 'all') && (
+            <div className="mt-4 pt-4 border-t">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setSelectedUser('all');
+                  setSelectedProject('all');
+                }}
+                className="text-xs"
+              >
+                Clear All Filters
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

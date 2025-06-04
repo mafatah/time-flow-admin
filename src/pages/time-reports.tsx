@@ -209,13 +209,11 @@ export default function TimeReports() {
   };
 
   const getTotalHours = (): string => {
-    const totalMs = reports
-      .filter(report => report.end_time)
-      .reduce((total, report) => {
-        const start = new Date(report.start_time);
-        const end = new Date(report.end_time!);
-        return total + (end.getTime() - start.getTime());
-      }, 0);
+    const totalMs = reports.reduce((total, report) => {
+      const start = new Date(report.start_time);
+      const end = report.end_time ? new Date(report.end_time) : new Date(); // Use current time for ongoing sessions
+      return total + (end.getTime() - start.getTime());
+    }, 0);
 
     const hours = Math.floor(totalMs / (1000 * 60 * 60));
     const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));

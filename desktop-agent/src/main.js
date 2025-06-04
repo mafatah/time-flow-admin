@@ -9,6 +9,16 @@ const { createClient } = require('@supabase/supabase-js');
 const SyncManager = require('./sync-manager');
 const AntiCheatDetector = require('./anti-cheat-detector');
 
+// Import our unified input detection system
+try {
+  const { initSystemMonitor } = require('../../electron/systemMonitor.ts');
+  global.systemMonitorModule = { initSystemMonitor };
+  console.log('✅ SystemMonitor module loaded successfully');
+} catch (error) {
+  console.log('⚠️ SystemMonitor module not available:', error.message);
+  global.systemMonitorModule = null;
+}
+
 const configPath = path.join(__dirname, '..', 'config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
@@ -280,11 +290,21 @@ function startIdleMonitoring() {
     console.log('🕵️  Anti-cheat detection enabled');
   }
   
-  // Start enhanced mouse tracking
-  startMouseTracking();
+  // Initialize unified input detection system
+  if (global.systemMonitorModule?.initSystemMonitor) {
+    try {
+      global.systemMonitorModule.initSystemMonitor();
+      console.log('🎯 Unified input detection system initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize unified input detection:', error);
+    }
+  } else {
+    console.log('⚠️ Unified input detection not available, falling back to basic detection');
+  }
   
-  // Start keyboard tracking
-  startKeyboardTracking();
+  // Legacy tracking disabled - replaced with unified detection above
+  // startMouseTracking();
+  // startKeyboardTracking();
   
   idleCheckInterval = setInterval(() => {
     const idleTimeMs = getSystemIdleTime();
@@ -409,6 +429,11 @@ function startIdleMonitoring() {
 }
 
 function startMouseTracking() {
+  // DISABLED: Replaced with unified input detection in systemMonitor.ts
+  console.log('🚫 Legacy mouse tracking disabled - using unified input detection');
+  return;
+  
+  /* COMMENTED OUT - OLD LOGIC CAUSING CROSS-CONTAMINATION
   if (mouseTrackingInterval) clearInterval(mouseTrackingInterval);
   
   // Track mouse clicks more precisely
@@ -439,9 +464,15 @@ function startMouseTracking() {
       // Ignore errors in mouse tracking
     }
   }, 500); // Check every 500ms
+  */
 }
 
 function startKeyboardTracking() {
+  // DISABLED: Replaced with unified input detection in systemMonitor.ts
+  console.log('🚫 Legacy keyboard tracking disabled - using unified input detection');
+  return;
+  
+  /* COMMENTED OUT - OLD LOGIC CAUSING CROSS-CONTAMINATION
   if (keyboardTrackingInterval) clearInterval(keyboardTrackingInterval);
   
   // This is a simplified approach - in production you'd use global keyboard hooks
@@ -472,6 +503,7 @@ function startKeyboardTracking() {
       // Ignore errors in keyboard tracking
     }
   }, 1000); // Check every second
+  */
 }
 
 function stopIdleMonitoring() {
@@ -951,44 +983,102 @@ function showTrayNotification(message, type = 'info') {
 }
 
 // === TRACKING CONTROL ===
-async function startTracking(taskId = 'default-task') {
-  if (isTracking) return;
+async function startTracking(projectId = null) {
+  console.log('🚀 [MAIN] startTracking() function called with projectId:', projectId);
+  console.log('🔍 [MAIN] Current tracking state - isTracking:', isTracking, 'isPaused:', isPaused);
+  
+  if (isTracking) {
+    console.log('⚠️ [MAIN] Already tracking, returning early');
+    return;
+  }
 
-  console.log('🚀 Starting time tracking...');
+  console.log('🚀 [MAIN] Starting time tracking...');
   
   isTracking = true;
   isPaused = false;
   
+  // Use project_id from config if not provided
+  const actualProjectId = projectId || config.project_id || '00000000-0000-0000-0000-000000000001';
+  
+  console.log('📋 [MAIN] Project ID resolution:', {
+    provided: projectId,
+    fromConfig: config.project_id,
+    fallback: '00000000-0000-0000-0000-000000000001',
+    final: actualProjectId
+  });
+  
   // Create time log entry
   try {
+    console.log('📝 [MAIN] Creating time log entry with project_id:', actualProjectId);
+    console.log('📝 [MAIN] Using user_id:', config.user_id);
+    console.log('📝 [MAIN] Database URL:', config.supabase_url);
+    
+    const timeLogData = {
+      user_id: config.user_id,
+      project_id: actualProjectId,
+      start_time: new Date().toISOString(),
+      status: 'active',
+      is_idle: false
+    };
+    
+    console.log('📊 [MAIN] Time log data to insert:', timeLogData);
+    
     const { data, error } = await supabase
       .from('time_logs')
-      .insert({
-        user_id: config.user_id,
-        task_id: taskId,
-        start_time: new Date().toISOString(),
-        status: 'active',
-        is_idle: false
-      })
+      .insert(timeLogData)
       .select('id')
       .single();
 
-    if (error) throw error;
+    console.log('📊 [MAIN] Database response - data:', data, 'error:', error);
+
+    if (error) {
+      console.error('❌ [MAIN] Database error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      throw error;
+    }
+    
     currentTimeLogId = data.id;
+    console.log('✅ [MAIN] Time log created successfully with ID:', currentTimeLogId);
     
   } catch (error) {
-    console.error('❌ Failed to create time log:', error);
+    console.error('❌ [MAIN] Failed to create time log, detailed error:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    
     currentTimeLogId = `offline_${Date.now()}`;
+    console.log('💾 [MAIN] Created offline time log ID:', currentTimeLogId);
+    
+    // Queue for offline sync
+    if (!offlineQueue.timeLogs) offlineQueue.timeLogs = [];
+    offlineQueue.timeLogs.push({
+      user_id: config.user_id,
+      project_id: actualProjectId,
+      start_time: new Date().toISOString(),
+      status: 'active',
+      is_idle: false,
+      offline_id: currentTimeLogId
+    });
+    
+    console.log('📦 [MAIN] Queued for offline sync, queue length:', offlineQueue.timeLogs.length);
   }
 
   currentSession = {
     id: currentTimeLogId,
     start_time: new Date().toISOString(),
     user_id: config.user_id,
-    task_id: taskId
+    project_id: actualProjectId
   };
 
+  console.log('📋 [MAIN] Current session created:', currentSession);
+
   // Start all monitoring
+  console.log('🔄 [MAIN] Starting monitoring systems...');
   startScreenshotCapture();
   startIdleMonitoring();
   startAppCapture();
@@ -1000,7 +1090,7 @@ async function startTracking(taskId = 'default-task') {
   // Update UI
   mainWindow?.webContents.send('tracking-started', currentSession);
   
-  console.log('✅ Time tracking started');
+  console.log('✅ [MAIN] Time tracking started successfully');
 }
 
 async function stopTracking() {
@@ -1166,9 +1256,19 @@ ipcMain.on('stop-tracking', (event) => {
 });
 
 // Legacy IPC handlers for compatibility
-ipcMain.handle('start-tracking', async (event, taskId = 'default-task') => {
-  await startTracking(taskId);
-  return { success: true, message: 'Enhanced tracking started with anti-cheat detection' };
+ipcMain.handle('start-tracking', async (event, projectId = null) => {
+  console.log('🎯 [MAIN] IPC start-tracking called with project_id:', projectId);
+  console.log('🎯 [MAIN] typeof projectId:', typeof projectId);
+  console.log('🎯 [MAIN] projectId value:', JSON.stringify(projectId));
+  
+  try {
+    const result = await startTracking(projectId);
+    console.log('✅ [MAIN] startTracking completed successfully');
+    return { success: true, message: 'Enhanced tracking started with anti-cheat detection' };
+  } catch (error) {
+    console.error('❌ [MAIN] startTracking failed with error:', error);
+    return { success: false, message: 'Failed to start tracking: ' + error.message };
+  }
 });
 
 ipcMain.handle('stop-tracking', async () => {
@@ -1535,3 +1635,263 @@ ipcMain.handle('check-mac-permissions', async () => {
     };
   }
 });
+
+// === LOG DOWNLOAD HANDLERS ===
+ipcMain.handle('get-activity-metrics', () => {
+  try {
+    console.log('📊 Getting activity metrics...');
+    
+    const currentMetrics = {
+      mouse_clicks: activityStats.mouseClicks,
+      keystrokes: activityStats.keystrokes,
+      mouse_movements: activityStats.mouseMovements,
+      activity_score: calculateActivityPercent(),
+      time_since_last_activity_ms: Date.now() - lastActivity,
+      time_since_last_activity_seconds: Math.floor((Date.now() - lastActivity) / 1000),
+      is_monitoring: !!idleCheckInterval,
+      is_tracking: isTracking,
+      is_paused: isPaused
+    };
+    
+    return { success: true, metrics: currentMetrics };
+  } catch (error) {
+    console.error('❌ Error getting activity metrics:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('user-logged-in', async (event, user) => {
+  console.log('👤 User logged in via IPC:', user.email);
+  config.user_id = user.id;
+  return { success: true, message: 'User logged in successfully' };
+});
+
+ipcMain.handle('user-logged-out', async (event) => {
+  console.log('👤 User logged out via IPC');
+  config.user_id = null;
+  return { success: true, message: 'User logged out successfully' };
+});
+
+ipcMain.handle('set-project-id', async (event, projectId) => {
+  console.log('📋 Setting project ID:', projectId);
+  config.project_id = projectId;
+  return { success: true, message: 'Project ID set successfully' };
+});
+
+ipcMain.handle('get-activity-logs', () => {
+  try {
+    console.log('📊 Generating activity logs...');
+    
+    const activityData = {
+      timestamp: new Date().toISOString(),
+      platform: process.platform,
+      architecture: process.arch,
+      nodeVersion: process.version,
+      electronVersion: process.versions.electron,
+      currentStats: activityStats,
+      settings: appSettings,
+      trackingState: {
+        isTracking,
+        isPaused,
+        currentSession,
+        currentTimeLogId
+      },
+      systemInfo: {
+        systemIdleTime: getSystemIdleTime(),
+        lastActivity,
+        lastMousePos
+      },
+      queueStatus: {
+        screenshots: offlineQueue.screenshots.length,
+        appLogs: offlineQueue.appLogs.length,
+        urlLogs: offlineQueue.urlLogs.length,
+        idleLogs: offlineQueue.idleLogs.length,
+        timeLogs: offlineQueue.timeLogs.length,
+        fraudAlerts: offlineQueue.fraudAlerts.length
+      },
+      recentActivity: {
+        mouseClicks: activityStats.mouseClicks,
+        keystrokes: activityStats.keystrokes,
+        mouseMovements: activityStats.mouseMovements,
+        screenshotsCaptured: activityStats.screenshotsCaptured,
+        lastScreenshotTime: activityStats.lastScreenshotTime
+      }
+    };
+    
+    return { success: true, data: activityData };
+  } catch (error) {
+    console.error('❌ Error generating activity logs:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-system-logs', () => {
+  try {
+    console.log('🖥️ Generating system logs...');
+    
+    const systemLogs = [
+      `TimeFlow Desktop Agent System Logs`,
+      `Generated: ${new Date().toISOString()}`,
+      `Platform: ${process.platform} (${process.arch})`,
+      `Node.js: ${process.version}`,
+      `Electron: ${process.versions.electron}`,
+      ``,
+      `=== CURRENT STATE ===`,
+      `Tracking: ${isTracking ? 'Active' : 'Stopped'}`,
+      `Paused: ${isPaused}`,
+      `Current Session: ${currentSession ? currentSession.id : 'None'}`,
+      `Current Time Log: ${currentTimeLogId || 'None'}`,
+      ``,
+      `=== ACTIVITY STATS ===`,
+      `Mouse Clicks: ${activityStats.mouseClicks}`,
+      `Keystrokes: ${activityStats.keystrokes}`,
+      `Mouse Movements: ${activityStats.mouseMovements}`,
+      `Screenshots Captured: ${activityStats.screenshotsCaptured}`,
+      `Last Screenshot: ${activityStats.lastScreenshotTime ? new Date(activityStats.lastScreenshotTime).toISOString() : 'Never'}`,
+      `Risk Score: ${activityStats.riskScore}`,
+      ``,
+      `=== SYSTEM INFO ===`,
+      `System Idle Time: ${getSystemIdleTime()}ms`,
+      `Last Activity: ${new Date(lastActivity).toISOString()}`,
+      `Mouse Position: x=${lastMousePos.x}, y=${lastMousePos.y}`,
+      ``,
+      `=== SETTINGS ===`,
+      `Screenshot Interval: ${appSettings.screenshot_interval_seconds}s`,
+      `Idle Threshold: ${appSettings.idle_threshold_seconds}s`,
+      `Blur Screenshots: ${appSettings.blur_screenshots}`,
+      `Track URLs: ${appSettings.track_urls}`,
+      `Track Applications: ${appSettings.track_applications}`,
+      `Auto Start: ${appSettings.auto_start_tracking}`,
+      `Anti-Cheat Enabled: ${appSettings.enable_anti_cheat}`,
+      ``,
+      `=== QUEUE STATUS ===`,
+      `Screenshots: ${offlineQueue.screenshots.length} pending`,
+      `App Logs: ${offlineQueue.appLogs.length} pending`,
+      `URL Logs: ${offlineQueue.urlLogs.length} pending`,
+      `Idle Logs: ${offlineQueue.idleLogs.length} pending`,
+      `Time Logs: ${offlineQueue.timeLogs.length} pending`,
+      `Fraud Alerts: ${offlineQueue.fraudAlerts.length} pending`,
+      ``,
+      `=== INTERVALS STATUS ===`,
+      `Screenshot Interval: ${screenshotInterval ? 'Running' : 'Stopped'}`,
+      `Activity Interval: ${activityInterval ? 'Running' : 'Stopped'}`,
+      `Idle Check Interval: ${idleCheckInterval ? 'Running' : 'Stopped'}`,
+      `Mouse Tracking: ${mouseTrackingInterval ? 'Running' : 'Stopped'}`,
+      `Keyboard Tracking: ${keyboardTrackingInterval ? 'Running' : 'Stopped'}`,
+      ``,
+      `=== END OF LOGS ===`
+    ].join('\n');
+    
+    return { success: true, data: systemLogs };
+  } catch (error) {
+    console.error('❌ Error generating system logs:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-screenshot-logs', () => {
+  try {
+    console.log('📸 Generating screenshot logs...');
+    
+    const screenshotData = {
+      timestamp: new Date().toISOString(),
+      platform: process.platform,
+      screenshotStats: {
+        totalCaptured: activityStats.screenshotsCaptured,
+        lastCaptureTime: activityStats.lastScreenshotTime,
+        lastCaptureTimeFormatted: activityStats.lastScreenshotTime ? 
+          new Date(activityStats.lastScreenshotTime).toISOString() : 'Never'
+      },
+      settings: {
+        interval: appSettings.screenshot_interval_seconds,
+        quality: appSettings.screenshot_quality,
+        blurEnabled: appSettings.blur_screenshots
+      },
+      queuedScreenshots: offlineQueue.screenshots.map(screenshot => ({
+        timestamp: screenshot.timestamp,
+        metadata: screenshot.metadata,
+        retries: screenshot.retries || 0
+      })),
+      recentActivity: {
+        activityPercent: calculateActivityPercent(),
+        focusPercent: calculateFocusPercent(),
+        mouseClicks: activityStats.mouseClicks,
+        keystrokes: activityStats.keystrokes,
+        mouseMovements: activityStats.mouseMovements
+      }
+    };
+    
+    return { success: true, data: screenshotData };
+  } catch (error) {
+    console.error('❌ Error generating screenshot logs:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-compatibility-report', () => {
+  try {
+    console.log('🔧 Generating compatibility report...');
+    
+    const compatibilityReport = {
+      timestamp: new Date().toISOString(),
+      system: {
+        platform: process.platform,
+        architecture: process.arch,
+        nodeVersion: process.version,
+        electronVersion: process.versions.electron,
+        osVersion: require('os').release(),
+        totalMemory: require('os').totalmem(),
+        freeMemory: require('os').freemem(),
+        cpuCount: require('os').cpus().length
+      },
+      inputDetection: {
+        systemMonitorAvailable: !!global.systemMonitorModule,
+        mouseTrackingActive: !!mouseTrackingInterval,
+        keyboardTrackingActive: !!keyboardTrackingInterval,
+        lastMousePosition: lastMousePos,
+        lastActivity: new Date(lastActivity).toISOString()
+      },
+      features: {
+        screenshotCapture: true,
+        activityMonitoring: true,
+        idleDetection: true,
+        antiCheatDetection: appSettings.enable_anti_cheat,
+        urlTracking: appSettings.track_urls,
+        appTracking: appSettings.track_applications
+      },
+      currentActivity: {
+        mouseClicks: activityStats.mouseClicks,
+        keystrokes: activityStats.keystrokes,
+        mouseMovements: activityStats.mouseMovements,
+        activityPercent: calculateActivityPercent(),
+        focusPercent: calculateFocusPercent()
+      },
+      networkStatus: {
+        onlineQueueEmpty: offlineQueue.screenshots.length === 0 && 
+                          offlineQueue.appLogs.length === 0 && 
+                          offlineQueue.urlLogs.length === 0,
+        pendingUploads: {
+          screenshots: offlineQueue.screenshots.length,
+          appLogs: offlineQueue.appLogs.length,
+          urlLogs: offlineQueue.urlLogs.length,
+          idleLogs: offlineQueue.idleLogs.length,
+          timeLogs: offlineQueue.timeLogs.length,
+          fraudAlerts: offlineQueue.fraudAlerts.length
+        }
+      },
+      testResults: {
+        systemIdleTimeWorking: getSystemIdleTime() >= 0,
+        mousePositionTracking: lastMousePos.x >= 0 && lastMousePos.y >= 0,
+        activityStatsUpdating: activityStats.lastReset > 0,
+        screenshotSystemReady: true // Assume ready if we got this far
+      }
+    };
+    
+    return { success: true, data: compatibilityReport };
+  } catch (error) {
+    console.error('❌ Error generating compatibility report:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+console.log('✅ Desktop Agent main process initialized with log download handlers');

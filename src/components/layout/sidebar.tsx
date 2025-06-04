@@ -25,7 +25,15 @@ import {
   User,
   ChevronRight,
   Home,
-  ClipboardList
+  ClipboardList,
+  Eye,
+  FileText,
+  Target,
+  PieChart,
+  MousePointer,
+  Keyboard,
+  BookOpen,
+  Briefcase
 } from "lucide-react";
 
 const Sidebar = () => {
@@ -44,125 +52,159 @@ const Sidebar = () => {
   const isAdmin = userRole === 'admin' || userRole === 'manager';
   const isEmployee = userRole === 'employee';
 
-  // Employee navigation items
+  // Employee navigation items - better organized
   const employeeNavItems = isEmployee ? [
     {
-      title: "Employee",
+      title: "WORKSPACE",
       items: [
         {
           title: "Dashboard",
           href: "/employee",
-          icon: LayoutDashboard
+          icon: Home,
+          description: "Overview & stats"
         },
         {
           title: "Time Tracker",
           href: "/employee/time-tracker",
-          icon: Timer
-        },
+          icon: Timer,
+          description: "Track your work time"
+        }
+      ]
+    },
+    {
+      title: "REPORTS",
+      items: [
         {
-          title: "Reports",
+          title: "My Reports",
           href: "/employee/reports",
-          icon: BarChart3
+          icon: FileText,
+          description: "View your activity reports"
         }
         // TODO: Add idle time page when implemented
         // {
         //   title: "Idle Time",
         //   href: "/employee/idle-time",
-        //   icon: Coffee
+        //   icon: Coffee,
+        //   description: "Track idle periods"
         // }
       ]
     }
   ] : [];
 
-  // Admin navigation items
+  // Admin navigation items - improved grouping and organization
   const adminNavItems = isAdmin ? [
     {
-      title: "Admin",
+      title: "CORE MANAGEMENT",
       items: [
         {
           title: "Dashboard",
           href: "/dashboard",
-          icon: LayoutDashboard
+          icon: LayoutDashboard,
+          description: "Main overview"
         },
         {
           title: "Users",
           href: "/users",
-          icon: Users
+          icon: Users,
+          description: "Manage employees"
         },
         {
           title: "Projects",
           href: "/projects",
-          icon: FolderOpen
-        },
-        {
-          title: "Time Tracking",
-          href: "/time-tracking",
-          icon: Clock
+          icon: Briefcase,
+          description: "Project management"
         }
       ]
     },
     {
-      title: "Monitoring",
+      title: "TIME MANAGEMENT",
       items: [
         {
-          title: "Screenshots",
-          href: "/screenshots",
-          icon: Camera
+          title: "Time Tracking",
+          href: "/time-tracking",
+          icon: Clock,
+          description: "Active time tracking"
+        },
+        {
+          title: "Time Logs",
+          href: "/time-logs",
+          icon: ClipboardList,
+          description: "Historical time data"
         },
         {
           title: "Calendar",
           href: "/calendar",
-          icon: Calendar
-        },
-        {
-          title: "Settings",
-          href: "/settings",
-          icon: Settings
+          icon: Calendar,
+          description: "Schedule overview"
         }
       ]
     },
     {
-      title: "Reports",
+      title: "ACTIVITY MONITORING",
       items: [
         {
-          title: "Insights", 
-          href: "/insights",
-          icon: TrendingUp
+          title: "Screenshots",
+          href: "/screenshots",
+          icon: Camera,
+          description: "Screen captures"
         },
         {
-          title: "Analytics",
-          href: "/reports",
-          icon: BarChart3
-        },
-        {
-          title: "Time Reports",
-          href: "/reports/time-reports",
-          icon: Activity
-        },
-        {
-          title: "Apps & URLs",
+          title: "App Activity",
           href: "/reports/apps-urls-idle",
-          icon: TrendingUp
-        }
-      ]
-    },
-    {
-      title: "Management",
-      items: [
-        {
-          title: "Employee Settings",
-          href: "/employee-settings",
-          icon: User
-        },
-        {
-          title: "Finance & Payroll",
-          href: "/finance",
-          icon: DollarSign
+          icon: Monitor,
+          description: "Apps & URL tracking"
         },
         {
           title: "Suspicious Activity",
           href: "/suspicious-activity",
-          icon: Shield
+          icon: AlertTriangle,
+          description: "Security alerts"
+        }
+      ]
+    },
+    {
+      title: "ANALYTICS & INSIGHTS",
+      items: [
+        {
+          title: "Productivity Insights", 
+          href: "/insights",
+          icon: TrendingUp,
+          description: "Performance analytics"
+        },
+        {
+          title: "Detailed Reports",
+          href: "/reports",
+          icon: BarChart3,
+          description: "Comprehensive analytics"
+        },
+        {
+          title: "Time Reports",
+          href: "/reports/time-reports",
+          icon: Activity,
+          description: "Time analysis"
+        }
+      ]
+    },
+    {
+      title: "ADMINISTRATION",
+      items: [
+        {
+          title: "Employee Settings",
+          href: "/employee-settings",
+          icon: UserCheck,
+          description: "Employee configuration"
+        },
+        {
+          title: "Finance & Payroll",
+          href: "/finance",
+          icon: DollarSign,
+          description: "Financial management"
+        },
+        {
+          title: "System Settings",
+          href: "/settings",
+          icon: Settings,
+          description: "Global configuration"
         }
       ]
     }
@@ -172,31 +214,40 @@ const Sidebar = () => {
   const allNavItems = [...employeeNavItems, ...adminNavItems];
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 h-screen overflow-y-auto fixed left-0 top-0 z-50">
-      <div className="p-6">
-        <div className="flex items-center mb-2">
-          <EbdaaTimeLogo size={32} />
-          <div className="ml-2">
-            <h1 className="text-xl font-bold text-gray-900">Ebdaa Time</h1>
-            <p className="text-sm text-gray-500">Admin Dashboard</p>
+    <div className="w-72 bg-gradient-to-b from-slate-50 to-white border-r border-gray-200 h-screen overflow-y-auto fixed left-0 top-0 z-50 shadow-sm">
+      {/* Header */}
+      <div className="p-6 border-b border-gray-100">
+        <div className="flex items-center mb-3">
+          <EbdaaTimeLogo size={36} />
+          <div className="ml-3">
+            <h1 className="text-xl font-bold text-gray-900">TimeFlow</h1>
+            <p className="text-sm text-blue-600 font-medium">
+              {isAdmin ? 'Admin Console' : 'Employee Portal'}
+            </p>
           </div>
         </div>
-        <p className="text-sm text-gray-600 mt-1">
-          {isAdmin ? 'Admin Panel' : 'Employee Tracking'}
-        </p>
         {userDetails && (
-          <p className="text-xs text-gray-500 mt-1">
-            {userDetails.full_name} ({userDetails.role})
-          </p>
+          <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+            <p className="text-sm font-medium text-gray-900">
+              {userDetails.full_name}
+            </p>
+            <p className="text-xs text-blue-600 capitalize font-medium">
+              {userDetails.role}
+            </p>
+          </div>
         )}
       </div>
       
-      <nav className="px-4 space-y-6 pb-6">
+      {/* Navigation */}
+      <nav className="px-4 py-6 space-y-8">
         {allNavItems.map((section) => (
           <div key={section.title}>
-            <h3 className="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              {section.title}
-            </h3>
+            <div className="flex items-center mb-4">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                {section.title}
+              </h3>
+              <div className="flex-1 h-px bg-gray-200 ml-3"></div>
+            </div>
             <div className="space-y-1">
               {section.items.map((item) => {
                 const Icon = item.icon;
@@ -207,14 +258,34 @@ const Sidebar = () => {
                     key={item.href}
                     to={item.href}
                     className={cn(
-                      "flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors",
+                      "group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 relative",
                       isActive
-                        ? "bg-blue-100 text-blue-700 border-r-2 border-blue-700"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                        ? "bg-blue-500 text-white shadow-lg shadow-blue-500/25"
+                        : "text-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:shadow-sm"
                     )}
                   >
-                    <Icon className="mr-3 h-5 w-5" />
-                    {item.title}
+                    <Icon className={cn(
+                      "mr-3 h-5 w-5 transition-colors",
+                      isActive 
+                        ? "text-white" 
+                        : "text-gray-500 group-hover:text-blue-600"
+                    )} />
+                    <div className="flex-1">
+                      <div className="font-medium">{item.title}</div>
+                      {item.description && (
+                        <div className={cn(
+                          "text-xs mt-0.5 transition-colors",
+                          isActive 
+                            ? "text-blue-100" 
+                            : "text-gray-500 group-hover:text-blue-500"
+                        )}>
+                          {item.description}
+                        </div>
+                      )}
+                    </div>
+                    {isActive && (
+                      <ChevronRight className="h-4 w-4 text-white ml-2" />
+                    )}
                   </Link>
                 );
               })}
@@ -223,13 +294,18 @@ const Sidebar = () => {
         ))}
         
         {/* Logout Button */}
-        <div className="mt-8 border-t pt-4">
+        <div className="pt-6 border-t border-gray-200">
           <button
             onClick={signOut}
-            className="w-full flex items-center px-2 py-2 text-sm font-medium rounded-md text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+            className="w-full flex items-center px-3 py-3 text-sm font-medium rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 group"
           >
-            <LogOut className="mr-3 h-5 w-5" />
-            Sign Out
+            <LogOut className="mr-3 h-5 w-5 text-red-500 group-hover:text-red-600" />
+            <div>
+              <div className="font-medium">Sign Out</div>
+              <div className="text-xs text-red-500 group-hover:text-red-600">
+                End session
+              </div>
+            </div>
           </button>
         </div>
       </nav>

@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setUserId = setUserId;
+exports.getUserId = getUserId;
 exports.setProjectId = setProjectId;
 exports.updateTimeLogStatus = updateTimeLogStatus;
 exports.startTracking = startTracking;
@@ -30,6 +31,10 @@ function setUserId(id) {
     const validatedId = (0, uuid_validator_1.validateAndGetUUID)(id, (0, crypto_1.randomUUID)());
     userId = validatedId;
     console.log(`Set user ID: ${userId}`);
+}
+// Get the current user ID
+function getUserId() {
+    return userId;
 }
 // Set the current project ID for tracking
 function setProjectId(id) {
@@ -196,6 +201,27 @@ async function stopTracking() {
             });
         }
     }
+    // --- NEW: End all active sessions for this user/project ---
+    if (userId && currentProjectId) {
+        try {
+            const { error } = await supabase_1.supabase
+                .from('time_logs')
+                .update({ end_time: new Date().toISOString() })
+                .eq('user_id', userId)
+                .eq('project_id', currentProjectId)
+                .is('end_time', null);
+            if (error) {
+                console.error('Failed to end all active sessions:', error);
+            }
+            else {
+                console.log('✅ All active sessions ended for user:', userId);
+            }
+        }
+        catch (err) {
+            console.error('Failed to end all active sessions:', err);
+        }
+    }
+    // --- END NEW ---
     (0, sessionManager_1.clearSession)();
     currentTimeLogId = null;
 }

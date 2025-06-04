@@ -116,6 +116,11 @@ function setupEventListeners() {
                 if (targetPage === 'screenshots') {
                     setTimeout(loadRecentScreenshots, 100);
                 }
+                
+                // Load reports when navigating to reports page
+                if (targetPage === 'reports') {
+                    setTimeout(loadEmployeeReports, 100);
+                }
             }
         });
     });
@@ -138,6 +143,43 @@ function setupEventListeners() {
     if (trackerStartBtn) trackerStartBtn.addEventListener('click', startTracking);
     if (trackerPauseBtn) trackerPauseBtn.addEventListener('click', pauseTracking);
     if (trackerStopBtn) trackerStopBtn.addEventListener('click', stopTracking);
+    
+    // === PROJECT SELECTION EVENTS ===
+    const projectSelect = document.getElementById('projectSelect');
+    if (projectSelect) {
+        projectSelect.addEventListener('change', handleProjectSelection);
+    }
+    
+    const dashboardProjectSelect = document.getElementById('dashboardProjectSelect');
+    if (dashboardProjectSelect) {
+        dashboardProjectSelect.addEventListener('change', handleDashboardProjectSelection);
+    }
+    
+    // === DEBUG ACTIVITY TESTING EVENTS ===
+    const downloadActivityLogs = document.getElementById('downloadActivityLogs');
+    if (downloadActivityLogs) {
+        downloadActivityLogs.addEventListener('click', downloadActivityLogsFile);
+    }
+    
+    const downloadSystemLogs = document.getElementById('downloadSystemLogs');
+    if (downloadSystemLogs) {
+        downloadSystemLogs.addEventListener('click', downloadSystemLogsFile);
+    }
+    
+    const downloadScreenshotLogs = document.getElementById('downloadScreenshotLogs');
+    if (downloadScreenshotLogs) {
+        downloadScreenshotLogs.addEventListener('click', downloadScreenshotLogsFile);
+    }
+
+    const refreshMetrics = document.getElementById('refreshMetrics');
+    if (refreshMetrics) {
+        refreshMetrics.addEventListener('click', updateActivityMetricsDisplay);
+    }
+    
+    const exportCompatibilityReport = document.getElementById('exportCompatibilityReport');
+    if (exportCompatibilityReport) {
+        exportCompatibilityReport.addEventListener('click', exportCompatibilityReportFile);
+    }
     
     // === LOGOUT EVENT ===
     const logoutBtn = document.getElementById('logoutBtn');
@@ -385,6 +427,9 @@ function showMainApp() {
     updateTrackingButtons();
     updateTrackingStatus();
     
+    // Load user projects for selection
+    loadProjects();
+    
     console.log('📱 Showing main application');
 }
 
@@ -463,17 +508,92 @@ function showPage(pageId) {
 
 // === TIME TRACKING FUNCTIONALITY ===
 async function startTracking() {
+    console.log('🎯 [RENDERER] startTracking() function called');
+    
     if (!currentUser) {
+        console.log('❌ [RENDERER] No current user, cannot start tracking');
         showNotification('Please log in first', 'error');
         return;
     }
     
-    console.log('▶️ Starting time tracking...');
+    console.log('👤 [RENDERER] Current user:', currentUser);
+    
+    // Check if we're on the Time Tracker page and if a project is selected
+    const currentPage = document.querySelector('.page-section.active');
+    const isTimeTrackerPage = currentPage && currentPage.id === 'timetrackerPage';
+    const isDashboardPage = currentPage && currentPage.id === 'dashboardPage';
+    
+    console.log('📄 [RENDERER] Current page check:', {
+        currentPageId: currentPage?.id,
+        isTimeTrackerPage,
+        isDashboardPage
+    });
+    
+    let selectedProjectId = null;
+    
+    if (isTimeTrackerPage) {
+        const projectSelect = document.getElementById('projectSelect');
+        const projectSelectError = document.getElementById('projectSelectError');
+        
+        console.log('🔍 [RENDERER] Time Tracker page - checking project selection');
+        console.log('📋 [RENDERER] Project select element:', projectSelect);
+        console.log('📋 [RENDERER] Project select value:', projectSelect?.value);
+        
+        if (!projectSelect || !projectSelect.value) {
+            console.log('❌ [RENDERER] No project selected on Time Tracker page');
+            // Show error message
+            if (projectSelectError) {
+                projectSelectError.style.display = 'block';
+            }
+            showNotification('Please select a project before starting tracking', 'error');
+            return;
+        }
+        
+        selectedProjectId = projectSelect.value;
+        console.log('✅ [RENDERER] Time Tracker project selected:', selectedProjectId);
+        
+        // Hide error message if visible
+        if (projectSelectError) {
+            projectSelectError.style.display = 'none';
+        }
+    }
+    
+    if (isDashboardPage) {
+        const dashboardProjectSelect = document.getElementById('dashboardProjectSelect');
+        const dashboardProjectSelectError = document.getElementById('dashboardProjectSelectError');
+        
+        console.log('🔍 [RENDERER] Dashboard page - checking project selection');
+        console.log('📋 [RENDERER] Dashboard project select element:', dashboardProjectSelect);
+        console.log('📋 [RENDERER] Dashboard project select value:', dashboardProjectSelect?.value);
+        
+        if (!dashboardProjectSelect || !dashboardProjectSelect.value) {
+            console.log('❌ [RENDERER] No project selected on Dashboard page');
+            // Show error message
+            if (dashboardProjectSelectError) {
+                dashboardProjectSelectError.style.display = 'block';
+            }
+            showNotification('Please select a project before starting tracking', 'error');
+            return;
+        }
+        
+        selectedProjectId = dashboardProjectSelect.value;
+        console.log('✅ [RENDERER] Dashboard project selected:', selectedProjectId);
+        
+        // Hide error message if visible
+        if (dashboardProjectSelectError) {
+            dashboardProjectSelectError.style.display = 'none';
+        }
+    }
+    
+    console.log('🎯 [RENDERER] Final selected project ID:', selectedProjectId);
+    console.log('▶️ [RENDERER] Starting time tracking with project:', selectedProjectId);
     
     try {
         isTracking = true;
         trackingStatus = 'active';
         sessionStartTime = new Date();
+        
+        console.log('🔄 [RENDERER] Local state updated, calling main process...');
         
         // Update UI immediately
         updateTrackingButtons();
@@ -482,17 +602,26 @@ async function startTracking() {
         // Start session timer
         startSessionTimer();
         
-        // Notify main process
-        const result = await ipcRenderer.invoke('start-tracking', currentUser.id);
+        console.log('📡 [RENDERER] About to call ipcRenderer.invoke with:', {
+            method: 'start-tracking',
+            projectId: selectedProjectId
+        });
+        
+        // Notify main process with the selected project ID
+        const result = await ipcRenderer.invoke('start-tracking', selectedProjectId);
+        
+        console.log('✅ [RENDERER] IPC call completed, result:', result);
         
         if (result && result.success) {
+            console.log('🎉 [RENDERER] Tracking started successfully!');
             showNotification('⏱️ Time tracking started!', 'success');
         } else {
+            console.log('❌ [RENDERER] Tracking start failed:', result);
             showNotification(result ? result.message : 'Failed to start tracking', 'error');
         }
         
     } catch (error) {
-        console.error('❌ Error starting tracking:', error);
+        console.error('❌ [RENDERER] Error starting tracking:', error);
         showNotification('Failed to start tracking', 'error');
         
         // Reset state on error
@@ -615,16 +744,27 @@ function updateTrackingButtons() {
         
     } else {
         // Stopped state
+        
+        // For dashboard start button, check if project is selected
+        const dashboardProjectSelect = document.getElementById('dashboardProjectSelect');
+        const hasDashboardProjectSelected = dashboardProjectSelect && dashboardProjectSelect.value;
+        
         if (startBtn) {
-            startBtn.disabled = false;
+            startBtn.disabled = !hasDashboardProjectSelected;
             startBtn.innerHTML = '<i data-lucide="play" style="width: 20px; height: 20px;"></i><span>Start Tracking</span>';
+            startBtn.title = hasDashboardProjectSelected ? '' : 'Select a project first';
         }
         if (pauseBtn) pauseBtn.disabled = true;
         if (stopBtn) stopBtn.disabled = true;
         
+        // For tracker start button, check if project is selected
+        const projectSelect = document.getElementById('projectSelect');
+        const hasProjectSelected = projectSelect && projectSelect.value;
+        
         if (trackerStartBtn) {
-            trackerStartBtn.disabled = false;
+            trackerStartBtn.disabled = !hasProjectSelected;
             trackerStartBtn.innerHTML = '<i data-lucide="play" style="width: 20px; height: 20px;"></i><span>Start</span>';
+            trackerStartBtn.title = hasProjectSelected ? '' : 'Select a project first';
         }
         if (trackerPauseBtn) trackerPauseBtn.disabled = true;
         if (trackerStopBtn) trackerStopBtn.disabled = true;
@@ -1061,5 +1201,646 @@ function checkMacPermissions() {
                 }
             });
         }
+    }
+}
+
+// === PROJECT SELECTION FUNCTIONALITY ===
+async function loadProjects() {
+    if (!currentUser || !supabaseClient) {
+        console.log('⚠️ Cannot load projects: user not logged in or Supabase not available');
+        return;
+    }
+    
+    console.log('🔄 Loading projects for user:', currentUser.id);
+    
+    try {
+        // Query projects from employee_project_assignments
+        const { data: assignments, error: assignmentError } = await supabaseClient
+            .from('employee_project_assignments')
+            .select(`
+                project_id,
+                projects (
+                    id,
+                    name,
+                    description
+                )
+            `)
+            .eq('user_id', currentUser.id);
+
+        if (assignmentError) {
+            console.error('❌ Error loading project assignments:', assignmentError);
+            showNotification('Failed to load projects', 'error');
+            return;
+        }
+
+        console.log('✅ Project assignments loaded:', assignments);
+        
+        const projectSelect = document.getElementById('projectSelect');
+        const dashboardProjectSelect = document.getElementById('dashboardProjectSelect');
+        
+        // Clear existing options for both dropdowns
+        if (projectSelect) {
+            projectSelect.innerHTML = '<option value="">Choose a project to track time...</option>';
+        }
+        if (dashboardProjectSelect) {
+            dashboardProjectSelect.innerHTML = '<option value="">Choose a project to track time...</option>';
+        }
+        
+        if (!assignments || assignments.length === 0) {
+            const noProjectsOption = '<option value="" disabled>No projects assigned</option>';
+            if (projectSelect) projectSelect.innerHTML += noProjectsOption;
+            if (dashboardProjectSelect) dashboardProjectSelect.innerHTML += noProjectsOption;
+            showNotification('No projects assigned to your account', 'info');
+            return;
+        }
+        
+        // Add projects to both dropdowns
+        assignments.forEach(assignment => {
+            if (assignment.projects) {
+                // Add to Time Tracker dropdown
+                if (projectSelect) {
+                    const option = document.createElement('option');
+                    option.value = assignment.project_id;
+                    option.textContent = assignment.projects.name;
+                    projectSelect.appendChild(option);
+                }
+                
+                // Add to Dashboard dropdown
+                if (dashboardProjectSelect) {
+                    const option = document.createElement('option');
+                    option.value = assignment.project_id;
+                    option.textContent = assignment.projects.name;
+                    dashboardProjectSelect.appendChild(option);
+                }
+            }
+        });
+        
+        console.log(`✅ Added ${assignments.length} projects to both dropdowns`);
+        
+    } catch (error) {
+        console.error('❌ Error loading projects:', error);
+        showNotification('Failed to load projects: ' + error.message, 'error');
+    }
+}
+
+async function handleProjectSelection() {
+    const projectSelect = document.getElementById('projectSelect');
+    const projectSelectError = document.getElementById('projectSelectError');
+    const selectedProjectInfo = document.getElementById('selectedProjectInfo');
+    const selectedProjectName = document.getElementById('selectedProjectName');
+    const trackerStartBtn = document.getElementById('trackerStartBtn');
+    const trackerStatus = document.getElementById('trackerStatus');
+    
+    if (!projectSelect) return;
+    
+    const selectedProjectId = projectSelect.value;
+    
+    // Hide error message
+    if (projectSelectError) {
+        projectSelectError.style.display = 'none';
+    }
+    
+    if (!selectedProjectId) {
+        // No project selected
+        if (selectedProjectInfo) {
+            selectedProjectInfo.style.display = 'none';
+        }
+        if (trackerStartBtn) {
+            trackerStartBtn.disabled = true;
+            trackerStartBtn.title = 'Select a project first';
+        }
+        if (trackerStatus) {
+            trackerStatus.textContent = 'Select a project to start tracking';
+        }
+        
+        // Notify main process to clear project ID
+        await ipcRenderer.invoke('set-project-id', null);
+        return;
+    }
+    
+    // Project selected
+    const selectedOption = projectSelect.selectedOptions[0];
+    const projectName = selectedOption.textContent;
+    
+    console.log('📋 Project selected:', { id: selectedProjectId, name: projectName });
+    
+    // Show selected project info
+    if (selectedProjectInfo && selectedProjectName) {
+        selectedProjectName.textContent = projectName;
+        selectedProjectInfo.style.display = 'block';
+    }
+    
+    // Enable start button if not tracking
+    if (trackerStartBtn && trackingStatus === 'stopped') {
+        trackerStartBtn.disabled = false;
+        trackerStartBtn.title = '';
+    }
+    
+    // Update status
+    if (trackerStatus) {
+        trackerStatus.textContent = trackingStatus === 'stopped' ? 
+            'Ready to start tracking' : 
+            trackingStatus === 'active' ? 'Currently tracking time' : 'Session paused';
+    }
+    
+    // Notify main process about project selection
+    try {
+        await ipcRenderer.invoke('set-project-id', selectedProjectId);
+        console.log('✅ Project ID sent to main process:', selectedProjectId);
+        showNotification(`Project "${projectName}" selected`, 'success');
+    } catch (error) {
+        console.error('❌ Error setting project ID:', error);
+        showNotification('Failed to set project', 'error');
+    }
+}
+
+async function handleDashboardProjectSelection() {
+    const dashboardProjectSelect = document.getElementById('dashboardProjectSelect');
+    const dashboardProjectSelectError = document.getElementById('dashboardProjectSelectError');
+    const dashboardSelectedProjectInfo = document.getElementById('dashboardSelectedProjectInfo');
+    const dashboardSelectedProjectName = document.getElementById('dashboardSelectedProjectName');
+    const startBtn = document.getElementById('startBtn');
+    
+    if (!dashboardProjectSelect) return;
+    
+    const selectedProjectId = dashboardProjectSelect.value;
+    
+    // Hide error message
+    if (dashboardProjectSelectError) {
+        dashboardProjectSelectError.style.display = 'none';
+    }
+    
+    if (!selectedProjectId) {
+        // No project selected
+        if (dashboardSelectedProjectInfo) {
+            dashboardSelectedProjectInfo.style.display = 'none';
+        }
+        if (startBtn) {
+            startBtn.disabled = true;
+            startBtn.title = 'Select a project first';
+        }
+        
+        // Notify main process to clear project ID
+        await ipcRenderer.invoke('set-project-id', null);
+        return;
+    }
+    
+    // Project selected
+    const selectedOption = dashboardProjectSelect.selectedOptions[0];
+    const projectName = selectedOption.textContent;
+    
+    console.log('📋 Dashboard project selected:', { id: selectedProjectId, name: projectName });
+    
+    // Show selected project info
+    if (dashboardSelectedProjectInfo && dashboardSelectedProjectName) {
+        dashboardSelectedProjectName.textContent = projectName;
+        dashboardSelectedProjectInfo.style.display = 'block';
+    }
+    
+    // Enable start button if not tracking
+    if (startBtn && trackingStatus === 'stopped') {
+        startBtn.disabled = false;
+        startBtn.title = '';
+    }
+    
+    // Notify main process about project selection
+    try {
+        await ipcRenderer.invoke('set-project-id', selectedProjectId);
+        console.log('✅ Dashboard project ID sent to main process:', selectedProjectId);
+        showNotification(`Project "${projectName}" selected`, 'success');
+    } catch (error) {
+        console.error('❌ Error setting dashboard project ID:', error);
+        showNotification('Failed to set project', 'error');
+    }
+}
+
+// === DEBUG ACTIVITY TESTING FUNCTIONS ===
+async function updateActivityMetricsDisplay() {
+    try {
+        const result = await ipcRenderer.invoke('get-activity-metrics');
+        const metricsDisplay = document.getElementById('activityMetrics');
+        
+        if (!metricsDisplay) return;
+        
+        if (result.success && result.metrics) {
+            const metrics = result.metrics;
+            metricsDisplay.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px;">
+                    <div>🖱️ Mouse Clicks: <strong>${metrics.mouse_clicks}</strong></div>
+                    <div>⌨️ Keystrokes: <strong>${metrics.keystrokes}</strong></div>
+                    <div>↔️ Mouse Moves: <strong>${metrics.mouse_movements}</strong></div>
+                    <div>📊 Activity Score: <strong>${metrics.activity_score}%</strong></div>
+                    <div>🕐 Last Activity: <strong>${metrics.time_since_last_activity_seconds}s ago</strong></div>
+                    <div>🔍 Monitoring: <strong>${metrics.is_monitoring ? 'Active' : 'Stopped'}</strong></div>
+                </div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6b7280;">
+                    Updated: ${new Date().toLocaleTimeString()}
+                </div>
+            `;
+        } else {
+            metricsDisplay.innerHTML = `
+                <div style="color: #dc2626;">
+                    ❌ Failed to get metrics: ${result.error || 'Unknown error'}
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('❌ Error updating activity metrics:', error);
+        const metricsDisplay = document.getElementById('activityMetrics');
+        if (metricsDisplay) {
+            metricsDisplay.innerHTML = `
+                <div style="color: #dc2626;">
+                    ❌ Error: ${error.message}
+                </div>
+            `;
+        }
+    }
+}
+
+// Auto-update activity metrics when on dashboard
+setInterval(() => {
+    const dashboardPage = document.getElementById('dashboardPage');
+    if (dashboardPage && dashboardPage.classList.contains('active')) {
+        updateActivityMetricsDisplay();
+    }
+}, 3000); // Update every 3 seconds
+
+// === LOG DOWNLOAD FUNCTIONS ===
+async function downloadActivityLogsFile() {
+    try {
+        showNotification('Generating activity logs...', 'info');
+        
+        const result = await ipcRenderer.invoke('get-activity-logs');
+        if (result.success) {
+            downloadFile('activity-logs.json', JSON.stringify(result.data, null, 2), 'application/json');
+            showNotification('✅ Activity logs downloaded successfully!', 'success');
+        } else {
+            showNotification(`❌ Failed to get activity logs: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error downloading activity logs:', error);
+        showNotification(`❌ Error: ${error.message}`, 'error');
+    }
+}
+
+async function downloadSystemLogsFile() {
+    try {
+        showNotification('Generating system logs...', 'info');
+        
+        const result = await ipcRenderer.invoke('get-system-logs');
+        if (result.success) {
+            downloadFile('system-logs.txt', result.data, 'text/plain');
+            showNotification('✅ System logs downloaded successfully!', 'success');
+        } else {
+            showNotification(`❌ Failed to get system logs: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error downloading system logs:', error);
+        showNotification(`❌ Error: ${error.message}`, 'error');
+    }
+}
+
+async function downloadScreenshotLogsFile() {
+    try {
+        showNotification('Generating screenshot logs...', 'info');
+        
+        const result = await ipcRenderer.invoke('get-screenshot-logs');
+        if (result.success) {
+            downloadFile('screenshot-logs.json', JSON.stringify(result.data, null, 2), 'application/json');
+            showNotification('✅ Screenshot logs downloaded successfully!', 'success');
+        } else {
+            showNotification(`❌ Failed to get screenshot logs: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error downloading screenshot logs:', error);
+        showNotification(`❌ Error: ${error.message}`, 'error');
+    }
+}
+
+async function exportCompatibilityReportFile() {
+    try {
+        showNotification('Generating compatibility report...', 'info');
+        
+        const result = await ipcRenderer.invoke('get-compatibility-report');
+        if (result.success) {
+            downloadFile('compatibility-report.json', JSON.stringify(result.data, null, 2), 'application/json');
+            showNotification('✅ Compatibility report downloaded successfully!', 'success');
+        } else {
+            showNotification(`❌ Failed to generate compatibility report: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error generating compatibility report:', error);
+        showNotification(`❌ Error: ${error.message}`, 'error');
+    }
+}
+
+function downloadFile(filename, content, contentType) {
+    const blob = new Blob([content], { type: contentType });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+}
+
+// === REPORTS FUNCTIONALITY ===
+async function loadEmployeeReports() {
+    if (!currentUser) {
+        console.log('⚠️ No user logged in, cannot load reports');
+        return;
+    }
+
+    try {
+        console.log('📊 Loading employee reports...');
+        
+        // Calculate date ranges
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfWeek = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+        const startOfMonth = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+        // Get time logs for different periods
+        const [todayLogs, weekLogs, monthLogs] = await Promise.all([
+            getTimeLogsForPeriod(startOfToday, now),
+            getTimeLogsForPeriod(startOfWeek, now),
+            getTimeLogsForPeriod(startOfMonth, now)
+        ]);
+
+        // Get activity data (screenshots with activity metrics)
+        const activityData = await getActivityData(startOfWeek, now);
+
+        // Calculate totals
+        const todayHours = calculateTotalHours(todayLogs);
+        const weekHours = calculateTotalHours(weekLogs);
+        const monthHours = calculateTotalHours(monthLogs);
+
+        // Calculate average activity score
+        const avgActivityScore = activityData.length > 0 
+            ? Math.round(activityData.reduce((sum, activity) => sum + (activity.activity_percent || 0), 0) / activityData.length)
+            : 0;
+
+        // Update the reports page UI
+        updateReportsDisplay({
+            todayHours,
+            weekHours,
+            monthHours,
+            avgActivityScore,
+            todayLogs,
+            weekLogs,
+            activityData
+        });
+
+    } catch (error) {
+        console.error('❌ Failed to load employee reports:', error);
+        showNotification('Failed to load reports: ' + error.message, 'error');
+    }
+}
+
+async function getTimeLogsForPeriod(startDate, endDate) {
+    const { data, error } = await supabaseClient
+        .from('time_logs')
+        .select(`
+            id,
+            start_time,
+            end_time,
+            user_id,
+            project_id,
+            projects (name)
+        `)
+        .eq('user_id', currentUser.id)
+        .gte('start_time', startDate.toISOString())
+        .lte('start_time', endDate.toISOString())
+        .order('start_time', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching time logs:', error);
+        return [];
+    }
+
+    return data || [];
+}
+
+async function getActivityData(startDate, endDate) {
+    const { data, error } = await supabaseClient
+        .from('screenshots')
+        .select('activity_percent, focus_percent, captured_at, mouse_clicks, keystrokes, mouse_movements')
+        .eq('user_id', currentUser.id)
+        .gte('captured_at', startDate.toISOString())
+        .lte('captured_at', endDate.toISOString())
+        .order('captured_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching activity data:', error);
+        return [];
+    }
+
+    return data || [];
+}
+
+function calculateTotalHours(timeLogs) {
+    let totalMs = 0;
+    const now = new Date();
+    
+    timeLogs.forEach(log => {
+        const start = new Date(log.start_time);
+        // For active sessions (no end_time), use current time
+        // For completed sessions, use the actual end_time
+        const end = log.end_time ? new Date(log.end_time) : now;
+        
+        const duration = end.getTime() - start.getTime();
+        
+        // Only add positive durations and cap at 24 hours to avoid unrealistic values
+        if (duration > 0) {
+            const maxDuration = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+            totalMs += Math.min(duration, maxDuration);
+        }
+    });
+    
+    return Math.round((totalMs / (1000 * 60 * 60)) * 100) / 100; // Round to 2 decimal places
+}
+
+function updateReportsDisplay(reportData) {
+    const reportsPage = document.getElementById('reportsPage');
+    if (!reportsPage) return;
+
+    const { todayHours, weekHours, monthHours, avgActivityScore, todayLogs, weekLogs, activityData } = reportData;
+
+    // Create comprehensive reports HTML
+    reportsPage.innerHTML = `
+        <div class="control-section">
+            <div class="control-header">
+                <div class="control-title">My Reports</div>
+                <div class="control-subtitle">Your time tracking reports and productivity insights</div>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px;">
+                <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 20px; border-radius: 12px;">
+                    <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Today</div>
+                    <div style="font-size: 28px; font-weight: 700;">${todayHours}h</div>
+                    <div style="font-size: 12px; opacity: 0.8;">${todayLogs.length} sessions</div>
+                </div>
+                
+                <div style="background: linear-gradient(135deg, #10b981, #047857); color: white; padding: 20px; border-radius: 12px;">
+                    <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">This Week</div>
+                    <div style="font-size: 28px; font-weight: 700;">${weekHours}h</div>
+                    <div style="font-size: 12px; opacity: 0.8;">${weekLogs.length} sessions</div>
+                </div>
+                
+                <div style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 20px; border-radius: 12px;">
+                    <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">This Month</div>
+                    <div style="font-size: 28px; font-weight: 700;">${monthHours}h</div>
+                    <div style="font-size: 12px; opacity: 0.8;">Total tracked</div>
+                </div>
+                
+                <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 20px; border-radius: 12px;">
+                    <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Activity Score</div>
+                    <div style="font-size: 28px; font-weight: 700;">${avgActivityScore}%</div>
+                    <div style="font-size: 12px; opacity: 0.8;">Average activity</div>
+                </div>
+            </div>
+
+            <!-- Recent Sessions -->
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1e293b;">Recent Sessions</h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid #e2e8f0;">
+                                <th style="text-align: left; padding: 12px 8px; font-size: 14px; color: #64748b; font-weight: 500;">Date</th>
+                                <th style="text-align: left; padding: 12px 8px; font-size: 14px; color: #64748b; font-weight: 500;">Project</th>
+                                <th style="text-align: left; padding: 12px 8px; font-size: 14px; color: #64748b; font-weight: 500;">Duration</th>
+                                <th style="text-align: left; padding: 12px 8px; font-size: 14px; color: #64748b; font-weight: 500;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${generateSessionsTableRows(weekLogs.slice(0, 10))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Activity Insights -->
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px;">
+                <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1e293b;">Activity Insights</h3>
+                ${generateActivityInsights(activityData)}
+            </div>
+        </div>
+    `;
+
+    // Reinitialize icons
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+
+function generateSessionsTableRows(timeLogs) {
+    if (!timeLogs || timeLogs.length === 0) {
+        return `
+            <tr>
+                <td colspan="4" style="text-align: center; padding: 20px; color: #64748b;">
+                    No recent sessions found
+                </td>
+            </tr>
+        `;
+    }
+
+    const now = new Date();
+    
+    return timeLogs.map(log => {
+        const startTime = new Date(log.start_time);
+        const endTime = log.end_time ? new Date(log.end_time) : null;
+        
+        // Calculate duration: if no end_time (active session), use current time
+        const effectiveEndTime = endTime || now;
+        const durationMs = effectiveEndTime.getTime() - startTime.getTime();
+        
+        // Convert to minutes and cap at reasonable values
+        let duration = Math.round(durationMs / (1000 * 60));
+        duration = Math.max(0, Math.min(duration, 24 * 60)); // Cap at 24 hours
+        
+        const projectName = log.projects?.name || 'Default Project';
+        const status = log.end_time ? 'Completed' : 'Active';
+        const statusColor = log.end_time ? '#10b981' : '#f59e0b';
+
+        return `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 12px 8px; font-size: 14px; color: #1e293b;">
+                    ${startTime.toLocaleDateString()} ${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                </td>
+                <td style="padding: 12px 8px; font-size: 14px; color: #1e293b;">${projectName}</td>
+                <td style="padding: 12px 8px; font-size: 14px; color: #1e293b;">
+                    ${duration} min ${!log.end_time ? '(ongoing)' : ''}
+                </td>
+                <td style="padding: 12px 8px;">
+                    <span style="background: ${statusColor}20; color: ${statusColor}; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 500;">
+                        ${status}
+                    </span>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function generateActivityInsights(activityData) {
+    if (!activityData || activityData.length === 0) {
+        return `
+            <div style="text-align: center; color: #64748b; padding: 20px;">
+                No activity data available for this period
+            </div>
+        `;
+    }
+
+    const totalClicks = activityData.reduce((sum, activity) => sum + (activity.mouse_clicks || 0), 0);
+    const totalKeystrokes = activityData.reduce((sum, activity) => sum + (activity.keystrokes || 0), 0);
+    const totalMovements = activityData.reduce((sum, activity) => sum + (activity.mouse_movements || 0), 0);
+    const avgFocusScore = Math.round(activityData.reduce((sum, activity) => sum + (activity.focus_percent || 0), 0) / activityData.length);
+
+    return `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+            <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: 700; color: #3b82f6; margin-bottom: 4px;">${totalClicks.toLocaleString()}</div>
+                <div style="font-size: 12px; color: #64748b;">Mouse Clicks</div>
+            </div>
+            
+            <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: 700; color: #10b981; margin-bottom: 4px;">${totalKeystrokes.toLocaleString()}</div>
+                <div style="font-size: 12px; color: #64748b;">Keystrokes</div>
+            </div>
+            
+            <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: 700; color: #8b5cf6; margin-bottom: 4px;">${totalMovements.toLocaleString()}</div>
+                <div style="font-size: 12px; color: #64748b;">Mouse Movements</div>
+            </div>
+            
+            <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                <div style="font-size: 24px; font-weight: 700; color: #f59e0b; margin-bottom: 4px;">${avgFocusScore}%</div>
+                <div style="font-size: 12px; color: #64748b;">Avg Focus Score</div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px; padding: 16px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px;">
+            <div style="color: #0369a1; font-size: 14px;">
+                <strong>💡 Insight:</strong> 
+                ${generateProductivityInsight(avgFocusScore, totalClicks, totalKeystrokes)}
+            </div>
+        </div>
+    `;
+}
+
+function generateProductivityInsight(focusScore, clicks, keystrokes) {
+    if (focusScore >= 80) {
+        return "Excellent focus and productivity! Keep up the great work.";
+    } else if (focusScore >= 60) {
+        return "Good productivity levels. Consider taking short breaks to maintain focus.";
+    } else if (focusScore >= 40) {
+        return "Moderate activity detected. Try using productivity techniques like the Pomodoro method.";
+    } else if (clicks > 0 || keystrokes > 0) {
+        return "Some activity detected. Make sure you're actively working on important tasks.";
+    } else {
+        return "Low activity detected. Ensure you're actively using your computer during work sessions.";
     }
 }

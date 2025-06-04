@@ -7,7 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/providers/auth-provider';
 import { format, startOfDay, endOfDay, addMinutes } from 'date-fns';
-import { Monitor, Search, Filter, Clock, Activity, Pause, Grid, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { Monitor, Search, Filter, Clock, Activity, Pause, Grid, Eye, ChevronDown, ChevronUp, X, Download } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 
 interface Screenshot {
   id: string;
@@ -39,18 +41,24 @@ interface ActivityPeriod {
 }
 
 export default function AppsViewer() {
+  const { userDetails } = useAuth();
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
   const [userFilter, setUserFilter] = useState<string>('all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('grid');
+  const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
   const [gridSize, setGridSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [expandedPeriods, setExpandedPeriods] = useState<Set<number>>(new Set());
-  const { userDetails } = useAuth();
+  
+  // Add modal states
+  const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -198,6 +206,37 @@ export default function AppsViewer() {
       case 'medium': return 'grid-cols-6';
       case 'large': return 'grid-cols-4';
       default: return 'grid-cols-6';
+    }
+  };
+
+  // Add modal handler functions
+  const handleViewScreenshot = (screenshot: Screenshot) => {
+    setSelectedScreenshot(screenshot);
+    setIsModalOpen(true);
+  };
+
+  const closeScreenshotModal = () => {
+    setSelectedScreenshot(null);
+    setIsModalOpen(false);
+  };
+
+  const handleDownloadScreenshot = async (imageUrl: string, fileName: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Screenshot downloaded');
+    } catch (error) {
+      console.error('Error downloading screenshot:', error);
+      toast.error('Failed to download screenshot');
     }
   };
 
@@ -392,7 +431,8 @@ export default function AppsViewer() {
                       return (
                         <div
                           key={screenshot.id}
-                          className="group relative bg-white rounded-lg shadow-sm border hover:shadow-md transition-all duration-200"
+                          className="group relative bg-white rounded-lg shadow-sm border hover:shadow-md transition-all duration-200 cursor-pointer"
+                          onClick={() => handleViewScreenshot(screenshot)}
                         >
                           <div className="aspect-video bg-gray-100 rounded-t-lg overflow-hidden">
                             <img
@@ -438,7 +478,8 @@ export default function AppsViewer() {
                             
                             <div className="flex justify-between items-center mt-2">
                               <Badge variant="outline" className="text-xs">
-                                💻 Desktop App
+                                <Monitor className="h-3 w-3 mr-1" />
+                                App
                               </Badge>
                               <div className="text-xs text-muted-foreground">
                                 Focus: {screenshot.focus_percent}%
@@ -502,6 +543,12 @@ export default function AppsViewer() {
                             <span className="text-sm text-muted-foreground">
                               ({Math.round(period.duration / 60)}h {period.duration % 60}m, {period.screenshots.length} screenshots)
                             </span>
+                            {/* Add employee name to activity timeline */}
+                            {period.screenshots.length > 0 && (
+                              <span className="text-sm font-medium text-blue-600">
+                                {users.find(u => u.id === period.screenshots[0].user_id)?.full_name || 'Unknown User'}
+                              </span>
+                            )}
                           </div>
                           <Button
                             variant="ghost"
@@ -520,7 +567,8 @@ export default function AppsViewer() {
                             {period.screenshots.map((screenshot) => (
                               <div
                                 key={screenshot.id}
-                                className="aspect-video bg-gray-100 rounded-md overflow-hidden hover:shadow-md transition-shadow"
+                                className="aspect-video bg-gray-100 rounded-md overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                                onClick={() => handleViewScreenshot(screenshot)}
                               >
                                 <img
                                   src={screenshot.image_url}
@@ -551,6 +599,67 @@ export default function AppsViewer() {
             </Card>
           )}
         </>
+      )}
+
+      {/* Add Screenshot Modal */}
+      {selectedScreenshot && (
+        <Dialog open={isModalOpen} onOpenChange={closeScreenshotModal}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Screenshot Details</span>
+                <Button variant="ghost" size="sm" onClick={closeScreenshotModal}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <img
+                src={selectedScreenshot.image_url}
+                alt={`Screenshot ${selectedScreenshot.id}`}
+                className="w-full h-auto rounded-lg max-h-[60vh] object-contain"
+              />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Captured:</span>
+                  <p className="text-muted-foreground">
+                    {format(new Date(selectedScreenshot.captured_at), 'MMM dd, yyyy HH:mm:ss')}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-medium">User:</span>
+                  <p className="text-muted-foreground">
+                    {users.find(u => u.id === selectedScreenshot.user_id)?.full_name || 'Unknown User'}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-medium">Activity:</span>
+                  <p className="text-muted-foreground">
+                    {selectedScreenshot.activity_percent ? `${selectedScreenshot.activity_percent}%` : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-medium">Focus:</span>
+                  <p className="text-muted-foreground">
+                    {selectedScreenshot.focus_percent ? `${selectedScreenshot.focus_percent}%` : 'N/A'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleDownloadScreenshot(
+                    selectedScreenshot.image_url,
+                    `screenshot-${selectedScreenshot.id}.png`
+                  )}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

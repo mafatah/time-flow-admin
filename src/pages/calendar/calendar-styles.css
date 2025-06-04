@@ -175,22 +175,27 @@
   border-left: 1px solid #e2e8f0 !important;
 }
 
-/* Toolbar styling */
+/* Toolbar styling - Enhanced */
 .rbc-toolbar {
   margin-bottom: 16px !important;
-  padding: 0 !important;
+  padding: 12px !important;
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
   flex-wrap: wrap !important;
-  gap: 8px !important;
+  gap: 12px !important;
   /* Prevent toolbar overflow */
   overflow: visible !important;
   max-width: 100% !important;
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
 }
 
-.rbc-toolbar button {
-  padding: 6px 12px !important;
+/* Enhanced button styling for both default and custom buttons */
+.rbc-toolbar button,
+.rbc-btn {
+  padding: 8px 16px !important;
   margin: 0 2px !important;
   border-radius: 6px !important;
   border: 1px solid #e2e8f0 !important;
@@ -202,19 +207,27 @@
   /* Prevent button overflow */
   white-space: nowrap !important;
   flex-shrink: 0 !important;
+  /* Enhanced styling */
+  color: #374151 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 
-.rbc-toolbar button:hover {
+.rbc-toolbar button:hover,
+.rbc-btn:hover {
   background-color: #f1f5f9 !important;
   border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
 }
 
 .rbc-toolbar button.rbc-active,
-.rbc-toolbar button:focus {
+.rbc-toolbar button:focus,
+.rbc-btn.rbc-active,
+.rbc-btn:focus {
   background-color: #3b82f6 !important;
   color: white !important;
   border-color: #3b82f6 !important;
   outline: none !important;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
 }
 
 .rbc-toolbar .rbc-toolbar-label {
@@ -227,19 +240,54 @@
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
-  max-width: 200px !important;
+  max-width: 250px !important;
+  flex: 1 !important;
 }
 
-/* Today button styling */
+/* Button group styling */
 .rbc-btn-group {
   display: flex !important;
   gap: 4px !important;
   flex-wrap: wrap !important; /* Allow wrapping on small screens */
+  align-items: center !important;
 }
 
 .rbc-btn-group button {
   border-radius: 6px !important;
   font-size: 13px !important;
+}
+
+/* Navigation buttons specific styling */
+.rbc-btn-group:first-child .rbc-btn {
+  background-color: #f3f4f6 !important;
+}
+
+.rbc-btn-group:first-child .rbc-btn:hover {
+  background-color: #e5e7eb !important;
+}
+
+/* View buttons specific styling */
+.rbc-btn-group:last-child .rbc-btn {
+  background-color: white !important;
+  border-color: #d1d5db !important;
+}
+
+.rbc-btn-group:last-child .rbc-btn.rbc-active {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  border-color: #3b82f6 !important;
+}
+
+/* Today button styling */
+.rbc-btn-group .rbc-btn:nth-child(2) {
+  background-color: #10b981 !important;
+  color: white !important;
+  border-color: #10b981 !important;
+}
+
+.rbc-btn-group .rbc-btn:nth-child(2):hover {
+  background-color: #059669 !important;
+  border-color: #059669 !important;
 }
 
 /* Current day highlighting */
@@ -278,18 +326,29 @@
   position: relative !important;
 }
 
-/* Fix for overlapping events in week/day view */
+/* Fix for overlapping events in week/day view - Enhanced */
 .rbc-week-view .rbc-event,
 .rbc-day-view .rbc-event {
   position: relative !important;
   width: calc(100% - 4px) !important;
   left: 2px !important;
+  margin-bottom: 2px !important;
 }
 
-/* Multiple events in same time slot */
+/* Multiple events in same time slot - Enhanced */
 .rbc-week-view .rbc-event + .rbc-event,
 .rbc-day-view .rbc-event + .rbc-event {
   margin-top: 2px !important;
+}
+
+/* Enhanced overlapping prevention */
+.rbc-event-container {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.rbc-event-container + .rbc-event-container {
+  margin-left: 2px !important;
 }
 
 /* Scrolling in time views */
