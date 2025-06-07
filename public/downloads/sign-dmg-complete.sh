@@ -1,3 +1,4 @@
+Apple Developer Program membership ($99/year)
 #!/bin/bash
 
 echo "🔐 TimeFlow DMG - Complete Signing Process"
