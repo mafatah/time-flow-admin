@@ -1,4 +1,4 @@
-# TimeFlow DMG Checksums - Sat Jun  7 14:40:35 +03 2025
+# TimeFlow DMG Checksums - Sat Jun  7 14:47:03 +03 2025
 # Use these to verify download integrity
 
 37092399206c3c8ab5e776d5746aa476d64499e0da68d3a1710380896b5fd36b  TimeFlow.dmg
