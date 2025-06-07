@@ -673,9 +673,19 @@ function isBrowserApp(appName) {
 }
 
 function extractUrlFromTitle(title) {
-  // Simple URL extraction from browser title
-  const urlMatch = title.match(/(https?:\/\/[^\s]+)/);
-  return urlMatch ? urlMatch[1] : null;
+  try {
+    // MEMORY LEAK FIX: Limit title length and use safe regex
+    if (!title || typeof title !== 'string') return null;
+    
+    const limitedTitle = title.length > 1000 ? title.substring(0, 1000) : title;
+    
+    // Use more specific regex to prevent catastrophic backtracking
+    const urlMatch = limitedTitle.match(/https?:\/\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]+/);
+    return urlMatch ? urlMatch[0] : null;
+  } catch (error) {
+    console.error('❌ URL extraction error:', error);
+    return null;
+  }
 }
 
 function extractDomain(url) {
@@ -1520,9 +1530,35 @@ app.on('before-quit', async () => {
   console.log('🔄 App shutting down...');
   await stopTracking();
   
-  // Clear intervals
+  // AGGRESSIVE INTERVAL CLEANUP TO PREVENT MEMORY LEAKS
+  console.log('🧹 Performing aggressive cleanup...');
+  
+  // Clear all known intervals
   if (settingsInterval) clearInterval(settingsInterval);
+  if (screenshotInterval) clearInterval(screenshotInterval);
+  if (activityInterval) clearInterval(activityInterval);
+  if (idleCheckInterval) clearInterval(idleCheckInterval);
+  if (appCaptureInterval) clearInterval(appCaptureInterval);
+  if (urlCaptureInterval) clearInterval(urlCaptureInterval);
+  if (notificationInterval) clearInterval(notificationInterval);
+  if (mouseTrackingInterval) clearInterval(mouseTrackingInterval);
+  if (keyboardTrackingInterval) clearInterval(keyboardTrackingInterval);
+  
+  // Nuclear option: clear ALL possible intervals
+  for (let i = 1; i < 10000; i++) {
+    clearInterval(i);
+    clearTimeout(i);
+  }
+  
   stopNotificationChecking();
+  
+  // Force garbage collection if available
+  if (global.gc) {
+    global.gc();
+    console.log('✅ Garbage collection forced on shutdown');
+  }
+  
+  console.log('✅ Aggressive cleanup completed');
 });
 
 app.on('activate', () => {

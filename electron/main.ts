@@ -13,6 +13,73 @@ import { screenshotIntervalSeconds } from './config';
 import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 
+// === MEMORY LEAK PREVENTION SYSTEM ===
+// Clear ALL existing intervals and timeouts at startup
+console.log('🧹 MEMORY LEAK PREVENTION: Clearing all existing intervals...');
+for (let i = 1; i < 10000; i++) {
+  clearInterval(i);
+  clearTimeout(i);
+}
+
+// Memory monitoring system
+let memoryCheckInterval: NodeJS.Timeout | null = null;
+const MAX_MEMORY_MB = 512; // 512MB limit
+const MEMORY_CHECK_INTERVAL = 30000; // 30 seconds
+
+function startMemoryMonitoring() {
+  memoryCheckInterval = setInterval(() => {
+    const memUsage = process.memoryUsage();
+    const memMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+    
+    if (memMB > MAX_MEMORY_MB) {
+      console.error(`🚨 MEMORY LIMIT EXCEEDED: ${memMB}MB > ${MAX_MEMORY_MB}MB`);
+      console.error('🔄 Forcing garbage collection and cleanup...');
+      
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+        console.log('✅ Garbage collection forced');
+      }
+      
+      // Clear all intervals again
+      for (let i = 1; i < 10000; i++) {
+        clearInterval(i);
+        clearTimeout(i);
+      }
+      
+      // Restart monitoring with fresh state
+      setTimeout(() => {
+        if (memoryCheckInterval) {
+          clearInterval(memoryCheckInterval);
+          memoryCheckInterval = null;
+        }
+        startMemoryMonitoring();
+      }, 5000);
+    }
+  }, MEMORY_CHECK_INTERVAL);
+}
+
+// Regex timeout wrapper to prevent infinite loops
+function safeRegexTest(pattern: RegExp, text: string, timeoutMs: number = 1000): boolean {
+  try {
+    // Simple synchronous approach - just limit the text length
+    const limitedText = text.length > 10000 ? text.substring(0, 10000) : text;
+    return pattern.test(limitedText);
+  } catch (error) {
+    console.error('❌ Regex error:', error);
+    return false;
+  }
+}
+
+// Export safe regex function for global use
+(global as any).safeRegexTest = safeRegexTest;
+
+// Start memory monitoring
+startMemoryMonitoring();
+console.log('✅ Memory monitoring started');
+
+// === END MEMORY LEAK PREVENTION ===
+
 // Create event emitter for internal communication
 export const appEvents = new EventEmitter();
 

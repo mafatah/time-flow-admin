@@ -473,12 +473,32 @@ class AntiCheatDetector {
   cleanupOldData() {
     const cutoff = Date.now() - this.PATTERN_WINDOW;
     
-    this.activityHistory = this.activityHistory.filter(activity => activity.timestamp > cutoff);
-    this.mousePositions = this.mousePositions.filter(pos => pos.timestamp > cutoff);
-    this.keystrokes = this.keystrokes.filter(key => key.timestamp > cutoff);
-    this.suspiciousPatterns = this.suspiciousPatterns.filter(pattern => pattern.timestamp > cutoff);
+    // AGGRESSIVE MEMORY LEAK PREVENTION
+    const MAX_ITEMS = 1000; // Maximum items to keep in memory
     
-    console.log('🧹 Cleaned up old anti-cheat data');
+    this.activityHistory = this.activityHistory
+      .filter(activity => activity.timestamp > cutoff)
+      .slice(-MAX_ITEMS); // Keep only latest items
+      
+    this.mousePositions = this.mousePositions
+      .filter(pos => pos.timestamp > cutoff)
+      .slice(-MAX_ITEMS);
+      
+    this.keystrokes = this.keystrokes
+      .filter(key => key.timestamp > cutoff)
+      .slice(-MAX_ITEMS);
+      
+    this.suspiciousPatterns = this.suspiciousPatterns
+      .filter(pattern => pattern.timestamp > cutoff)
+      .slice(-MAX_ITEMS);
+    
+    // Also limit real-time arrays
+    this.recentMouseMoves = this.recentMouseMoves.slice(-50);
+    this.recentKeyPresses = this.recentKeyPresses.slice(-50);
+    this.mouseClickTimestamps = this.mouseClickTimestamps.slice(-50);
+    this.keyboardTimestamps = this.keyboardTimestamps.slice(-50);
+    
+    console.log('🧹 Aggressive cleanup completed - memory usage reduced');
   }
 
   getDetectionReport() {

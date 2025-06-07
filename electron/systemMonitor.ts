@@ -369,10 +369,26 @@ function stopInputMonitoring() {
 function killAllLegacyDetection() {
   console.log('💥 NUCLEAR SHUTDOWN: Killing ALL legacy detection systems...');
   
+  // MEMORY LEAK FIX: Force garbage collection first
+  if (global.gc) {
+    global.gc();
+    console.log('✅ Forced garbage collection before cleanup');
+  }
+  
   // Clear ALL possible intervals that might be running legacy code
   for (let i = 1; i < 9999; i++) {
     clearInterval(i);
     clearTimeout(i);
+  }
+  
+  // Additional memory cleanup
+  if (global.gc) {
+    setTimeout(() => {
+      if (global.gc) {
+        global.gc();
+        console.log('✅ Post-cleanup garbage collection');
+      }
+    }, 1000);
   }
   
   // Disable any global AppleScript execution
