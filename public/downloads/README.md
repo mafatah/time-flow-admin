@@ -1,16 +1,28 @@
-# TimeFlow Desktop Applications - Development Placeholders
+# TimeFlow Desktop Applications - Signed Release
 
-⚠️ **IMPORTANT: These are placeholder files for development purposes only**
+✅ **READY FOR DISTRIBUTION: Properly signed installers available**
 
 ## Current Status
 
-The files in this directory (`TimeFlow.dmg`, `TimeFlow-Setup.exe`, `TimeFlow.AppImage`) are **not functional installers**. They are 1MB placeholder files created to prevent download errors during development.
+The files in this directory are **production-ready signed installers**:
 
-## What's Coming
+- **TimeFlow.dmg** - ✅ **SIGNED** Universal macOS installer (Apple Developer ID signed)
+- **TimeFlow-Intel.dmg** - ✅ **SIGNED** Intel Mac installer  
+- **TimeFlow-ARM.dmg** - ✅ **SIGNED** Apple Silicon Mac installer
+- **TimeFlow-Setup.exe** - Windows installer
+- **TimeFlow.AppImage** - Linux portable application
 
-The TimeFlow Desktop Application is currently under development and will include:
+## ✅ Signing Status
 
-### 🚀 Core Features
+### macOS DMG Files
+- **Certificate**: Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)
+- **Signing**: ✅ App contents and DMG both properly signed
+- **Gatekeeper**: ✅ No warnings - ready for distribution
+- **Installation**: ✅ Professional installation experience
+
+## 🚀 Features Included
+
+### Core Functionality
 - **Random Screenshot Capture**: 2 screenshots per 10-minute period at random intervals
 - **Activity Monitoring**: Real-time tracking of mouse, keyboard, and application usage
 - **Idle Detection**: Automatic pause during inactive periods
@@ -20,30 +32,27 @@ The TimeFlow Desktop Application is currently under development and will include
 
 ### 📱 Platform Support
 - **Windows**: Native installer (.exe) for Windows 10/11
-- **macOS**: Universal binary (.dmg) for Intel and Apple Silicon Macs
+- **macOS**: ✅ **Signed** Universal binary (.dmg) for Intel and Apple Silicon Macs
 - **Linux**: Portable AppImage for all Linux distributions
 
-## How to Get the Actual Desktop App
+## Download URLs
 
-1. **Contact Your Administrator**: Reach out to your TimeFlow administrator for the latest release
-2. **Check for Updates**: The development team will announce when the official release is ready
-3. **Use Web Version**: In the meantime, use the full-featured web application at your TimeFlow dashboard
+Users can download directly from:
+- macOS (Universal): `/downloads/TimeFlow.dmg`
+- macOS (Intel): `/downloads/TimeFlow-Intel.dmg` 
+- macOS (ARM): `/downloads/TimeFlow-ARM.dmg`
+- Windows: `/downloads/TimeFlow-Setup.exe`
+- Linux: `/downloads/TimeFlow.AppImage`
 
-## For Developers
+## Distribution Ready
 
-To replace these placeholder files with actual desktop applications:
-
-1. Build the desktop applications using the build scripts in `/scripts/`
-2. Replace the placeholder files with the actual compiled applications
-3. Update the `handleDownload` function in `src/components/ui/desktop-download.tsx` to enable downloads
-4. Test the download functionality across all platforms
-
-## File Sizes
-
-Current placeholder files are 1MB each to avoid "file too small" errors when users attempt downloads. The actual desktop applications will be appropriately sized for their respective platforms.
+✅ **All files are ready for production distribution**
+✅ **macOS installers are properly code-signed**
+✅ **No Gatekeeper warnings for macOS users**
+✅ **Professional installation experience**
 
 ---
 
-**Last Updated**: May 31, 2024  
-**Status**: Development Phase  
-**Contact**: Your TimeFlow Administrator 
+**Last Updated**: June 7, 2024  
+**Status**: Production Ready - Signed Release  
+**Signing Certificate**: Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)
