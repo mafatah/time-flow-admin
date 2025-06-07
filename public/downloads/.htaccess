@@ -1,76 +1,25 @@
-# Force download for DMG and EXE files with proper binary handling
-<Files "*.dmg">
-    Header set Content-Type "application/octet-stream"
-    Header set Content-Disposition "attachment"
-    Header set Cache-Control "no-cache, no-store, must-revalidate"
-    Header set Content-Transfer-Encoding "binary"
-    Header set Accept-Ranges "bytes"
-    # Disable compression for binary files to prevent corruption
-    SetEnv no-gzip 1
-    SetEnv dont-vary 1
-    # Prevent any text processing
-    RemoveHandler .dmg
-</Files>
-
-<Files "*.exe">
-    Header set Content-Type "application/octet-stream"
-    Header set Content-Disposition "attachment"
-    Header set Cache-Control "no-cache, no-store, must-revalidate"
-    Header set Content-Transfer-Encoding "binary"
-    Header set Accept-Ranges "bytes"
-    # Disable compression for binary files
-    SetEnv no-gzip 1
-    SetEnv dont-vary 1
-</Files>
-
-<Files "*.AppImage">
-    Header set Content-Type "application/octet-stream"
-    Header set Content-Disposition "attachment"
-    Header set Cache-Control "no-cache, no-store, must-revalidate"
-    Header set Content-Transfer-Encoding "binary"
-    Header set Accept-Ranges "bytes"
-    SetEnv no-gzip 1
-    SetEnv dont-vary 1
-</Files>
-
-# Allow large file downloads
-LimitRequestBody 0
-
-# Prevent timeout for large downloads
-TimeOut 600
-
-# Disable ETags for binary files (can cause corruption)
-<Files "*.dmg">
-    Header unset ETag
-    FileETag None
-</Files>
-
-<Files "*.exe">
-    Header unset ETag
-    FileETag None
-</Files>
-
-<Files "*.AppImage">
-    Header unset ETag
-    FileETag None
-</Files>
-
-# Ensure proper MIME types - use octet-stream for maximum compatibility
+# Simple, compatible DMG handling
 AddType application/octet-stream .dmg
 AddType application/octet-stream .exe
 AddType application/octet-stream .AppImage
 
-# Disable any automatic charset addition
-AddDefaultCharset Off
+# Force download
+<Files "*.dmg">
+    Header set Content-Disposition "attachment"
+    Header set Content-Type "application/octet-stream"
+</Files>
 
-# Prevent any text processing or modification of binary files
+<Files "*.exe">
+    Header set Content-Disposition "attachment"
+    Header set Content-Type "application/octet-stream"
+</Files>
+
+<Files "*.AppImage">
+    Header set Content-Disposition "attachment"
+    Header set Content-Type "application/octet-stream"
+</Files>
+
+# Disable compression for binary files
 <FilesMatch "\.(dmg|exe|AppImage)$">
-    # Disable MultiViews to prevent content negotiation
-    Options -MultiViews
-    # Disable any filters that might modify content
-    SetOutputFilter DEFLATE
-    SetEnvIfNoCase Request_URI \
-        \.(?:dmg|exe|AppImage)$ no-gzip dont-vary
-    SetEnvIfNoCase Request_URI \
-        \.(?:dmg|exe|AppImage)$ no-gzip
+    SetEnv no-gzip 1
 </FilesMatch> 
