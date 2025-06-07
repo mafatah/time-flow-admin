@@ -120,13 +120,13 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Use GitHub releases for reliable downloads
+    // Use GitHub releases for reliable downloads - v1.0.6 with MEMORY LEAK FIXES
     const downloadFiles = {
-      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.5/TimeFlow-Setup.exe`,
-      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.5/TimeFlow-Intel.dmg`,
-      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.5/TimeFlow-ARM.dmg`,
-      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.5/TimeFlow-Intel.dmg`, // Default to Intel for generic mac
-      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.5/TimeFlow.AppImage`
+      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.6/TimeFlow-Setup.exe`,
+      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.6/TimeFlow-Fixed.dmg`, // MEMORY LEAK FIXED
+      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.6/TimeFlow-ARM-Fixed.dmg`, // MEMORY LEAK FIXED  
+      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.6/TimeFlow-Fixed.dmg`, // Default to fixed universal DMG
+      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.6/TimeFlow.AppImage`
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
@@ -279,10 +279,10 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '114MB';
+        return '127MB'; // Updated for TimeFlow-ARM-Fixed.dmg
       case 'mac-intel':
       case 'mac':
-        return '119MB';
+        return '132MB'; // Updated for TimeFlow-Fixed.dmg (universal)
       case 'windows':
         return '85MB';
       case 'linux':
@@ -295,10 +295,10 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 119561630; // Actual ARM DMG size
+        return 127560627; // TimeFlow-ARM-Fixed.dmg size
       case 'mac-intel':
       case 'mac':
-        return 124669402; // Actual Intel DMG size  
+        return 132592031; // TimeFlow-Fixed.dmg size (universal)
       case 'windows':
         return 88816714; // Actual EXE size
       default:
