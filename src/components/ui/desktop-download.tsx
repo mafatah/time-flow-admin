@@ -120,13 +120,13 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Use GitHub releases for reliable downloads - v1.0.7 with APPLE DEVELOPER ID SIGNED
+    // Use GitHub releases for reliable downloads - v1.0.8 with APPLE DEVELOPER ID SIGNED
     const downloadFiles = {
-      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.7/TimeFlow-Setup.exe`,
-      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.7/TimeFlow-Apple-Signed.dmg`, // APPLE DEVELOPER ID SIGNED + MEMORY LEAK FIXED
-      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.7/TimeFlow-ARM-Fixed.dmg`, // MEMORY LEAK FIXED  
-      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.7/TimeFlow-Apple-Signed.dmg`, // Default to Apple signed DMG
-      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.7/TimeFlow.AppImage`
+      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-Setup.exe`,
+      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-Signed-x64.dmg`, // APPLE DEVELOPER ID SIGNED + UNIVERSAL BINARY
+      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-Signed-x64.dmg`, // APPLE DEVELOPER ID SIGNED + UNIVERSAL BINARY
+      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-Signed-x64.dmg`, // Default to Apple signed DMG
+      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow.AppImage`
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
