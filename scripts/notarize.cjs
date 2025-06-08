@@ -12,6 +12,6 @@ module.exports = async function notarizing(context) {
     tool: 'notarytool',
     appBundleId: 'com.ebdaadt.timetracker',
     appPath: `${appOutDir}/${appName}.app`,
-    keychainProfile: 'AC_PASSWORD',
+    keychainProfile: 'notarytool-profile',
   });
 }; 

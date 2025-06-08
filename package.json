@@ -157,7 +157,7 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "identity": "Developer ID Application: Ebdaa Digital Technology",
+      "identity": "Ebdaa Digital Technology",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",

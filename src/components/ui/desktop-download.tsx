@@ -120,12 +120,12 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Use GitHub releases for reliable downloads - v1.0.8 with APPLE DEVELOPER ID SIGNED
+    // Use GitHub releases for reliable downloads - v1.0.9 FULLY NOTARIZED BY APPLE
     const downloadFiles = {
-      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-Setup.exe`,
-      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-v1.0.8-Signed.dmg`, // APPLE DEVELOPER ID SIGNED + UNIVERSAL BINARY
-      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-v1.0.8-Signed.dmg`, // APPLE DEVELOPER ID SIGNED + UNIVERSAL BINARY
-      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-v1.0.8-Signed.dmg`, // Default to Apple signed DMG
+      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.9/TimeFlow-Setup.exe`,
+      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.9/TimeFlow-v1.0.9-Notarized.dmg`, // FULLY NOTARIZED BY APPLE - NO GATEKEEPER WARNINGS
+      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.9/TimeFlow-v1.0.9-Notarized.dmg`, // FULLY NOTARIZED BY APPLE - NO GATEKEEPER WARNINGS
+      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.9/TimeFlow-v1.0.9-Notarized.dmg`, // Default to Apple notarized DMG
       linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow.AppImage`
     };
     
