@@ -180,12 +180,7 @@ export default function CalendarPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Debug Info */}
-            <div className="mb-4 p-3 bg-gray-50 rounded text-sm">
-              <strong>Debug:</strong> {events.length} events loaded, Loading: {loading ? 'Yes' : 'No'}
-              <br />
-              Current {currentView}: {moment(currentDate).format('MMM DD, YYYY')}
-            </div>
+
 
             {loading ? (
               <div className="flex items-center justify-center h-96">
