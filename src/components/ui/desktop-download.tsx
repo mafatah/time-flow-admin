@@ -123,9 +123,9 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     // Use GitHub releases for reliable downloads - v1.0.8 with APPLE DEVELOPER ID SIGNED
     const downloadFiles = {
       windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-Setup.exe`,
-      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-Signed-x64.dmg`, // APPLE DEVELOPER ID SIGNED + UNIVERSAL BINARY
-      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-Signed-x64.dmg`, // APPLE DEVELOPER ID SIGNED + UNIVERSAL BINARY
-      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-Signed-x64.dmg`, // Default to Apple signed DMG
+      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-v1.0.8-Signed.dmg`, // APPLE DEVELOPER ID SIGNED + UNIVERSAL BINARY
+      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-v1.0.8-Signed.dmg`, // APPLE DEVELOPER ID SIGNED + UNIVERSAL BINARY
+      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow-v1.0.8-Signed.dmg`, // Default to Apple signed DMG
       linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow.AppImage`
     };
     
