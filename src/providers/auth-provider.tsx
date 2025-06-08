@@ -130,6 +130,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
+      // Check user pause status with a separate query to avoid type issues
+      try {
+        const { data: statusData, error: statusError } = await supabase
+          .from("users")
+          .select("is_active, pause_reason")
+          .eq("id", validUserId)
+          .single();
+          
+        if (!statusError && statusData && (statusData as any).is_active === false) {
+          console.log('User account is paused:', (statusData as any).pause_reason);
+          setError(`Account suspended: ${(statusData as any).pause_reason || 'Your account has been paused. Please contact your administrator.'}`);
+          
+          // Sign out the user
+          await supabase.auth.signOut();
+          
+          toast({
+            title: "Account Suspended",
+            description: (statusData as any).pause_reason || "Your account has been paused. Please contact your administrator.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } catch (pauseCheckError) {
+        console.warn('Could not check user pause status:', pauseCheckError);
+        // Continue with normal flow if pause check fails
+      }
+      
       console.log('User details fetched:', data);
       setUserDetails(data);
       setError(null);

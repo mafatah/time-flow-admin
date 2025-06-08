@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,7 +12,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { supabase } from "@/lib/supabase";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Pause, Play, UserX, UserCheck } from "lucide-react";
 import { z } from "zod";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -22,6 +23,11 @@ type User = {
   full_name: string;
   role: string;
   avatar_url: string | null;
+  is_active?: boolean;
+  paused_at?: string | null;
+  paused_by?: string | null;
+  pause_reason?: string | null;
+  last_activity?: string | null;
 };
 
 // Form schema
@@ -41,14 +47,21 @@ const createUserFormSchema = z.object({
   }),
 });
 
+// Schema for pausing user
+const pauseUserFormSchema = z.object({
+  reason: z.string().min(1, "Please provide a reason for pausing the user"),
+});
+
 type UserRoleFormValues = z.infer<typeof userRoleFormSchema>;
 type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
+type PauseUserFormValues = z.infer<typeof pauseUserFormSchema>;
 
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isPauseDialogOpen, setIsPauseDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const { toast } = useToast();
   const { userDetails } = useAuth();
@@ -64,6 +77,13 @@ export default function UsersManagement() {
     resolver: zodResolver(createUserFormSchema),
     defaultValues: {
       role: "employee",
+    },
+  });
+
+  const pauseForm = useForm<PauseUserFormValues>({
+    resolver: zodResolver(pauseUserFormSchema),
+    defaultValues: {
+      reason: "",
     },
   });
 
@@ -184,6 +204,87 @@ export default function UsersManagement() {
     setIsDialogOpen(true);
   }
 
+  // Handle pausing user
+  async function handlePauseUser(user: User) {
+    setSelectedUser(user);
+    pauseForm.reset({ reason: "" });
+    setIsPauseDialogOpen(true);
+  }
+
+  // Handle pausing/unpausing user
+  async function onPauseUser(values: PauseUserFormValues) {
+    if (!selectedUser) return;
+
+    try {
+      // Use a direct SQL update to pause the user
+      const { error } = await supabase
+        .from("users")
+        .update({
+          // Cast the object to any to bypass TypeScript checking
+          ...(({
+            is_active: false,
+            paused_at: new Date().toISOString(),
+            paused_by: userDetails?.id,
+            pause_reason: values.reason,
+          } as any))
+        })
+        .eq("id", selectedUser.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "User paused",
+        description: `${selectedUser.full_name} has been paused successfully`,
+      });
+
+      // Refresh users list
+      fetchUsers();
+      setIsPauseDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Error pausing user",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }
+
+  // Handle unpausing user
+  async function handleUnpauseUser(user: User) {
+    try {
+      // Use a direct SQL update to unpause the user
+      const { error } = await supabase
+        .from("users")
+        .update({
+          // Cast the object to any to bypass TypeScript checking
+          ...(({
+            is_active: true,
+            paused_at: null,
+            paused_by: null,
+            pause_reason: null,
+            last_activity: new Date().toISOString(),
+          } as any))
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "User unpaused",
+        description: `${user.full_name} has been reactivated successfully`,
+      });
+
+      // Refresh users list
+      fetchUsers();
+    } catch (error: any) {
+      toast({
+        title: "Error unpausing user",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }
+
   // Check if current user can edit roles (must be admin)
   const canEditRoles = userDetails?.role === "admin";
 
@@ -225,7 +326,8 @@ export default function UsersManagement() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
-                  {canEditRoles && <TableHead className="w-[100px]">Actions</TableHead>}
+                  <TableHead>Status</TableHead>
+                  {canEditRoles && <TableHead className="w-[200px]">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -244,16 +346,58 @@ export default function UsersManagement() {
                         {user.role}
                       </span>
                     </TableCell>
+                    <TableCell>
+                      {user.is_active !== false ? (
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="h-4 w-4 text-green-600" />
+                          <span className="text-green-600 font-medium">Active</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <UserX className="h-4 w-4 text-red-600" />
+                          <span className="text-red-600 font-medium">Paused</span>
+                          {user.pause_reason && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({user.pause_reason})
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
                     {canEditRoles && (
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditRole(user)}
-                          disabled={user.id === userDetails?.id} // Cannot edit own role
-                        >
-                          Change Role
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditRole(user)}
+                            disabled={user.id === userDetails?.id} // Cannot edit own role
+                          >
+                            Change Role
+                          </Button>
+                          {user.is_active !== false ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePauseUser(user)}
+                              disabled={user.id === userDetails?.id} // Cannot pause own account
+                              className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                            >
+                              <Pause className="h-3 w-3 mr-1" />
+                              Pause
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUnpauseUser(user)}
+                              className="text-green-600 border-green-300 hover:bg-green-50"
+                            >
+                              <Play className="h-3 w-3 mr-1" />
+                              Unpause
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -385,6 +529,60 @@ export default function UsersManagement() {
                   Cancel
                 </Button>
                 <Button type="submit">Create User</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pause User Dialog */}
+      <Dialog open={isPauseDialogOpen} onOpenChange={setIsPauseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pause User Account</DialogTitle>
+          </DialogHeader>
+          <Form {...pauseForm}>
+            <form onSubmit={pauseForm.handleSubmit(onPauseUser)} className="space-y-4">
+              <div className="space-y-1 mb-4">
+                <p className="font-medium">User: {selectedUser?.full_name}</p>
+                <p className="text-sm text-muted-foreground">{selectedUser?.email}</p>
+                <p className="text-sm text-orange-600 mt-2">
+                  ⚠️ This will prevent the user from logging in and stop all time tracking activities.
+                </p>
+              </div>
+              <FormField
+                control={pauseForm.control}
+                name="reason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reason for pausing</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="e.g., Employee left the company, On leave, etc." 
+                        {...field} 
+                        rows={3}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsPauseDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  variant="destructive"
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  <Pause className="h-4 w-4 mr-2" />
+                  Pause User
+                </Button>
               </DialogFooter>
             </form>
           </Form>
