@@ -120,13 +120,13 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Use GitHub releases for reliable downloads - v1.0.6 with MEMORY LEAK FIXES
+    // Use GitHub releases for reliable downloads - v1.0.7 with APPLE DEVELOPER ID SIGNED
     const downloadFiles = {
-      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.6/TimeFlow-Setup.exe`,
-      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.6/TimeFlow-Fixed.dmg`, // MEMORY LEAK FIXED
-      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.6/TimeFlow-ARM-Fixed.dmg`, // MEMORY LEAK FIXED  
-      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.6/TimeFlow-Fixed.dmg`, // Default to fixed universal DMG
-      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.6/TimeFlow.AppImage`
+      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.7/TimeFlow-Setup.exe`,
+      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.7/TimeFlow-Apple-Signed.dmg`, // APPLE DEVELOPER ID SIGNED + MEMORY LEAK FIXED
+      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.7/TimeFlow-ARM-Fixed.dmg`, // MEMORY LEAK FIXED  
+      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.7/TimeFlow-Apple-Signed.dmg`, // Default to Apple signed DMG
+      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.7/TimeFlow.AppImage`
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
@@ -279,10 +279,10 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '127MB'; // Updated for TimeFlow-ARM-Fixed.dmg
+        return '122MB'; // Updated for TimeFlow-ARM-Fixed.dmg
       case 'mac-intel':
       case 'mac':
-        return '132MB'; // Updated for TimeFlow-Fixed.dmg (universal)
+        return '391MB'; // Updated for TimeFlow-Apple-Signed.dmg (APPLE DEVELOPER ID SIGNED)
       case 'windows':
         return '85MB';
       case 'linux':
@@ -295,10 +295,10 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 127560627; // TimeFlow-ARM-Fixed.dmg size
+        return 122560627; // TimeFlow-ARM-Fixed.dmg size
       case 'mac-intel':
       case 'mac':
-        return 132592031; // TimeFlow-Fixed.dmg size (universal)
+        return 391000000; // TimeFlow-Apple-Signed.dmg size (APPLE DEVELOPER ID SIGNED)
       case 'windows':
         return 88816714; // Actual EXE size
       default:

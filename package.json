@@ -157,12 +157,14 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "identity": null,
-      "hardenedRuntime": false,
+      "identity": "Developer ID Application: Ebdaa Digital Technology",
+      "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
       "icon": "build/icon.icns",
-      "notarize": null
+      "notarize": true
     },
+    "afterSign": "scripts/notarize.cjs",
     "dmg": {
       "format": "UDZO",
       "icon": "build/icon.icns",
