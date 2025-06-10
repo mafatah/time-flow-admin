@@ -45,12 +45,12 @@ export class PubSubService implements OnModuleDestroy {
     });
   }
 
-  async publish(triggerName: string, payload: any): Promise<void> {
+  async publish(channel: string, message: Record<string, unknown>): Promise<void> {
     try {
-      await this.redisPublisher.publish(triggerName, JSON.stringify(payload));
-      this.logger.debug(`Published to ${triggerName}:`, payload);
+      await this.redisPublisher.publish(channel, JSON.stringify(message));
+      this.logger.debug(`Published to ${channel}:`, message);
     } catch (error) {
-      this.logger.error(`Failed to publish to ${triggerName}:`, error);
+      this.logger.error(`Failed to publish to ${channel}:`, error);
       throw error;
     }
   }
