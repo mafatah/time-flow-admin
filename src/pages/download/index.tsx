@@ -125,6 +125,20 @@ const DownloadPage = () => {
                 <p><strong>Windows:</strong> Run the .exe installer as administrator</p>
                 <p><strong>macOS:</strong> Drag the app to Applications folder</p>
                 <p><strong>Linux:</strong> Make the AppImage executable and run</p>
+                
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Shield className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h5 className="font-medium text-blue-900">Windows Security Notice</h5>
+                      <p className="text-blue-700 text-xs mt-1">
+                        If Windows shows "Windows protected your PC", click <strong>"More info"</strong> then <strong>"Run anyway"</strong>. 
+                        This is normal for new applications. TimeFlow is completely safe to install.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
                 <p className="pt-2 text-muted-foreground">
                   Need help? Contact your administrator or IT support.
                 </p>
@@ -166,6 +180,20 @@ const DownloadPage = () => {
                   <h4 className="font-medium mb-2">Can I work offline?</h4>
                   <p className="text-sm text-muted-foreground">
                     The app will cache data during brief disconnections and sync when reconnected.
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium mb-2">Why does Windows show a security warning?</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Windows SmartScreen protects users by checking app signatures. This is normal for new applications. TimeFlow is completely safe to install.
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium mb-2">How do I install despite the Windows warning?</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Click "More info" in the Windows SmartScreen dialog, then click "Run anyway". The app will install normally.
                   </p>
                 </div>
               </div>
