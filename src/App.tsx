@@ -36,6 +36,67 @@ import SuspiciousActivityPage from '@/pages/suspicious-activity';
 
 console.log('🚀 App.tsx loading...');
 
+// Add global error handlers to catch JavaScript errors
+console.log('🔧 Setting up global error handlers...');
+
+// Catch unhandled JavaScript errors
+window.addEventListener('error', (event) => {
+  console.error('❌ Global JavaScript Error:', {
+    message: event.message,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+    error: event.error,
+    stack: event.error?.stack
+  });
+});
+
+// Catch unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('❌ Unhandled Promise Rejection:', {
+    reason: event.reason,
+    promise: event.promise
+  });
+});
+
+// Add resource loading error detection
+const originalAddEventListener = document.addEventListener;
+document.addEventListener = function(type: string, listener: any, options?: any) {
+  if (type === 'error') {
+    console.log('📡 Error event listener added');
+  }
+  return originalAddEventListener.call(this, type, listener, options);
+};
+
+// Track script loading
+const originalCreateElement = document.createElement;
+document.createElement = function(tagName: string) {
+  const element = originalCreateElement.call(this, tagName);
+  if (tagName.toLowerCase() === 'script') {
+    console.log('📜 Script element created');
+    const scriptElement = element as HTMLScriptElement;
+    scriptElement.addEventListener('load', () => {
+      console.log('✅ Script loaded successfully:', scriptElement.src);
+    });
+    scriptElement.addEventListener('error', (event) => {
+      console.error('❌ Script failed to load:', {
+        src: scriptElement.src,
+        event: event
+      });
+    });
+  }
+  return element;
+};
+
+console.log('🌐 Environment check:', {
+  userAgent: navigator.userAgent,
+  url: window.location.href,
+  origin: window.location.origin,
+  pathname: window.location.pathname,
+  search: window.location.search,
+  hash: window.location.hash
+});
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -56,9 +117,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   
   if (!user) {
+    console.log('🚫 No user found, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
+  console.log('✅ User authenticated, rendering protected content');
   return <>{children}</>;
 }
 
@@ -73,13 +136,16 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   }
   
   if (!userDetails) {
+    console.log('🚫 No user details found, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
   if (userDetails.role !== 'admin') {
+    console.log('🚫 User is not admin, redirecting to employee dashboard');
     return <Navigate to="/employee" replace />;
   }
   
+  console.log('✅ Admin user authenticated, rendering admin content');
   return <>{children}</>;
 }
 
@@ -94,14 +160,17 @@ function EmployeeRoute({ children }: { children: React.ReactNode }) {
   }
   
   if (!userDetails) {
+    console.log('🚫 No user details found, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
   // If admin tries to access employee routes, redirect to admin dashboard
   if (userDetails.role === 'admin') {
+    console.log('🚫 Admin user accessing employee route, redirecting to admin dashboard');
     return <Navigate to="/dashboard" replace />;
   }
   
+  console.log('✅ Employee user authenticated, rendering employee content');
   return <>{children}</>;
 }
 
@@ -120,18 +189,37 @@ function SafeNavigate({ to, replace = false }: { to: string; replace?: boolean }
   const navigate = useNavigate();
   const location = useLocation();
   
+  console.log('🧭 SafeNavigate called:', { to, replace, currentPath: location.pathname });
+  
   React.useEffect(() => {
     // Prevent navigation to the same route
     if (location.pathname !== to) {
+      console.log('🧭 Navigating from', location.pathname, 'to', to);
       const timer = setTimeout(() => {
         navigate(to, { replace });
       }, 10); // Small delay to prevent rapid navigation
       
       return () => clearTimeout(timer);
+    } else {
+      console.log('🧭 Already at destination:', to);
     }
   }, [to, replace, navigate, location.pathname]);
   
   return <div className="flex items-center justify-center min-h-screen">Redirecting...</div>;
+}
+
+// Component to wrap route components with error tracking
+function RouteWrapper({ children, routeName }: { children: React.ReactNode; routeName: string }) {
+  console.log(`🛣️ Rendering route: ${routeName}`);
+  
+  React.useEffect(() => {
+    console.log(`📍 Route mounted: ${routeName}`);
+    return () => {
+      console.log(`📍 Route unmounted: ${routeName}`);
+    };
+  }, [routeName]);
+  
+  return <>{children}</>;
 }
 
 // Main routes component that will be wrapped by AuthProvider
@@ -148,7 +236,11 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public Download Route - No Authentication Required */}
-      <Route path="/download" element={<DownloadPage />} />
+      <Route path="/download" element={
+        <RouteWrapper routeName="download">
+          <DownloadPage />
+        </RouteWrapper>
+      } />
       
       {/* Login route - redirect if already authenticated */}
       <Route 
@@ -156,12 +248,18 @@ function AppRoutes() {
         element={
           user && userDetails ? (
             userDetails.role === 'admin' ? (
-              <SafeNavigate to="/dashboard" replace />
+              <RouteWrapper routeName="login-redirect-admin">
+                <SafeNavigate to="/dashboard" replace />
+              </RouteWrapper>
             ) : (
-              <SafeNavigate to="/employee" replace />
+              <RouteWrapper routeName="login-redirect-employee">
+                <SafeNavigate to="/employee" replace />
+              </RouteWrapper>
             )
           ) : (
-            <LoginPage />
+            <RouteWrapper routeName="login">
+              <LoginPage />
+            </RouteWrapper>
           )
         } 
       />
@@ -172,12 +270,18 @@ function AppRoutes() {
         element={
           user && userDetails ? (
             userDetails.role === 'admin' ? (
-              <SafeNavigate to="/dashboard" replace />
+              <RouteWrapper routeName="root-redirect-admin">
+                <SafeNavigate to="/dashboard" replace />
+              </RouteWrapper>
             ) : (
-              <SafeNavigate to="/employee" replace />
+              <RouteWrapper routeName="root-redirect-employee">
+                <SafeNavigate to="/employee" replace />
+              </RouteWrapper>
             )
           ) : (
-            <SafeNavigate to="/login" replace />
+            <RouteWrapper routeName="root-redirect-login">
+              <SafeNavigate to="/login" replace />
+            </RouteWrapper>
           )
         } 
       />
@@ -187,7 +291,9 @@ function AppRoutes() {
         <ProtectedRoute>
           <AdminRoute>
             <AppLayout>
-              <DashboardPage />
+              <RouteWrapper routeName="dashboard">
+                <DashboardPage />
+              </RouteWrapper>
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>
@@ -197,7 +303,9 @@ function AppRoutes() {
         <ProtectedRoute>
           <AdminRoute>
             <AppLayout>
-              <ReportsPage />
+              <RouteWrapper routeName="reports">
+                <ReportsPage />
+              </RouteWrapper>
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>
@@ -207,7 +315,9 @@ function AppRoutes() {
         <ProtectedRoute>
           <AdminRoute>
             <AppLayout>
-              <TimeReportsPage />
+              <RouteWrapper routeName="time-reports">
+                <TimeReportsPage />
+              </RouteWrapper>
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>

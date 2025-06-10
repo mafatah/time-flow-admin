@@ -12,6 +12,21 @@ import { format, subDays, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { Calendar, Clock, Download, Filter, Search } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+// Add logging for module loading
+console.log('🚀 TimeReports module loaded successfully');
+console.log('📦 Checking dependencies:', {
+  react: !!React,
+  supabase: !!supabase,
+  components: {
+    Card: !!Card,
+    Button: !!Button,
+    Badge: !!Badge,
+    Select: !!Select,
+    Input: !!Input,
+    Table: !!Table
+  }
+});
+
 interface TimeReport {
   id: string;
   user_id: string;
@@ -36,6 +51,8 @@ interface Project {
 }
 
 export default function TimeReports() {
+  console.log('🔧 TimeReports component function called');
+  
   const [reports, setReports] = useState<TimeReport[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -48,30 +65,73 @@ export default function TimeReports() {
     includeIdle: true
   });
 
+  console.log('🎯 Initial state set:', {
+    reportsCount: reports.length,
+    usersCount: users.length,
+    projectsCount: projects.length,
+    loading,
+    filters
+  });
+
   const { user } = useAuth();
   const { toast } = useToast();
 
+  console.log('🔐 Auth context:', { 
+    hasUser: !!user, 
+    userId: user?.id,
+    hasToast: !!toast 
+  });
+
   useEffect(() => {
-    fetchUsers();
-    fetchProjects();
-    fetchReports();
+    console.log('🔄 Initial useEffect triggered - mounting component');
+    console.log('📡 Starting initial data fetch...');
+    
+    const initializeComponent = async () => {
+      try {
+        console.log('👥 Fetching users...');
+        await fetchUsers();
+        
+        console.log('📋 Fetching projects...');
+        await fetchProjects();
+        
+        console.log('📊 Fetching reports...');
+        await fetchReports();
+        
+        console.log('✅ Component initialization complete');
+      } catch (error) {
+        console.error('❌ Error during component initialization:', error);
+      }
+    };
+
+    initializeComponent();
   }, []);
 
   useEffect(() => {
+    console.log('🔄 Filters useEffect triggered - filters changed:', filters);
+    console.log('📊 Re-fetching reports due to filter change...');
     fetchReports();
   }, [filters]);
 
   const fetchUsers = async () => {
+    console.log('👥 Starting fetchUsers');
     try {
+      console.log('📡 Making Supabase query for users...');
       const { data, error } = await supabase
         .from('users')
         .select('id, full_name, email')
         .order('full_name');
 
-      if (error) throw error;
+      console.log('👥 Users query response:', { data: data?.length || 0, error });
+
+      if (error) {
+        console.error('❌ Error in users query:', error);
+        throw error;
+      }
+      
+      console.log('✅ Users fetched successfully:', data?.length || 0);
       setUsers(data || []);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('❌ Error fetching users:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch users',
@@ -81,16 +141,25 @@ export default function TimeReports() {
   };
 
   const fetchProjects = async () => {
+    console.log('📋 Starting fetchProjects');
     try {
+      console.log('📡 Making Supabase query for projects...');
       const { data, error } = await supabase
         .from('projects')
         .select('id, name')
         .order('name');
 
-      if (error) throw error;
+      console.log('📋 Projects query response:', { data: data?.length || 0, error });
+
+      if (error) {
+        console.error('❌ Error in projects query:', error);
+        throw error;
+      }
+      
+      console.log('✅ Projects fetched successfully:', data?.length || 0);
       setProjects(data || []);
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      console.error('❌ Error fetching projects:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch projects',
@@ -100,10 +169,17 @@ export default function TimeReports() {
   };
 
   const fetchReports = async () => {
+    console.log('📊 Starting fetchReports');
     setLoading(true);
     try {
       const startDate = startOfDay(new Date(filters.startDate));
       const endDate = endOfDay(new Date(filters.endDate));
+
+      console.log('📅 Date range for query:', {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        filters
+      });
 
       // Use a direct SQL-like query with joins to get user and project data
       let query = supabase
@@ -116,45 +192,78 @@ export default function TimeReports() {
         .gte('start_time', startDate.toISOString())
         .lte('start_time', endDate.toISOString());
 
+      console.log('🔍 Building query with filters...');
+
       if (filters.userId && filters.userId !== 'all') {
+        console.log('👤 Adding user filter:', filters.userId);
         query = query.eq('user_id', filters.userId);
       }
 
       if (filters.projectId && filters.projectId !== 'all') {
+        console.log('📁 Adding project filter:', filters.projectId);
         query = query.eq('project_id', filters.projectId);
       }
 
       if (!filters.includeIdle) {
+        console.log('⚡ Excluding idle time logs');
         query = query.eq('is_idle', false);
       }
 
+      console.log('📡 Executing time logs query...');
       const { data: timeLogData, error } = await query
         .order('start_time', { ascending: false });
 
-      if (error) throw error;
+      console.log('📊 Time logs query response:', { 
+        dataCount: timeLogData?.length || 0, 
+        error,
+        hasData: !!timeLogData
+      });
+
+      if (error) {
+        console.error('❌ Error in time logs query:', error);
+        throw error;
+      }
 
       if (!timeLogData || timeLogData.length === 0) {
+        console.log('📊 No time log data found');
         setReports([]);
         return;
       }
 
+      console.log('🔄 Processing time log data...');
       // Map the joined data directly
-      const enrichedReports = timeLogData.map(report => ({
-        ...report,
-        user_name: (report as any).users?.full_name || 'Unknown User',
-        user_email: (report as any).users?.email || 'Unknown',
-        project_name: (report as any).projects?.name || 'Unknown Project'
-      }));
+      const enrichedReports = timeLogData.map((report, index) => {
+        const enriched = {
+          ...report,
+          user_name: (report as any).users?.full_name || 'Unknown User',
+          user_email: (report as any).users?.email || 'Unknown',
+          project_name: (report as any).projects?.name || 'Unknown Project'
+        };
+        
+        if (index < 3) { // Log first 3 records for debugging
+          console.log(`📝 Enriched record ${index}:`, {
+            id: enriched.id,
+            user_name: enriched.user_name,
+            project_name: enriched.project_name,
+            start_time: enriched.start_time,
+            is_idle: enriched.is_idle
+          });
+        }
+        
+        return enriched;
+      });
 
+      console.log('✅ Reports processed successfully:', enrichedReports.length);
       setReports(enrichedReports);
     } catch (error) {
-      console.error('Error fetching reports:', error);
+      console.error('❌ Error fetching reports:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch time reports',
         variant: 'destructive',
       });
     } finally {
+      console.log('🏁 fetchReports completed, setting loading to false');
       setLoading(false);
     }
   };
@@ -173,40 +282,52 @@ export default function TimeReports() {
   };
 
   const exportToCSV = () => {
-    const csvData = reports.map((report: TimeReport) => ({
-      'User': report.user_name,
-      'Email': report.user_email,
-      'Project': report.project_name,
-      'Start Time': format(new Date(report.start_time), 'yyyy-MM-dd HH:mm:ss'),
-      'End Time': report.end_time ? format(new Date(report.end_time), 'yyyy-MM-dd HH:mm:ss') : 'Ongoing',
-      'Duration': calculateDuration(report.start_time, report.end_time),
-      'Status': report.is_idle ? 'Idle' : 'Active'
-    }));
+    console.log('📥 Starting CSV export with', reports.length, 'reports');
+    try {
+      const csvData = reports.map((report: TimeReport) => ({
+        'User': report.user_name,
+        'Email': report.user_email,
+        'Project': report.project_name,
+        'Start Time': format(new Date(report.start_time), 'yyyy-MM-dd HH:mm:ss'),
+        'End Time': report.end_time ? format(new Date(report.end_time), 'yyyy-MM-dd HH:mm:ss') : 'Ongoing',
+        'Duration': calculateDuration(report.start_time, report.end_time),
+        'Status': report.is_idle ? 'Idle' : 'Active'
+      }));
 
-    const csvHeaders = Object.keys(csvData[0] || {});
-    const csvRows = csvData.map(row => 
-      csvHeaders.map(header => `"${row[header as keyof typeof row] || ''}"`).join(',')
-    );
-    
-    const csvContent = [
-      csvHeaders.join(','),
-      ...csvRows
-    ].join('\n');
+      const csvHeaders = Object.keys(csvData[0] || {});
+      const csvRows = csvData.map(row => 
+        csvHeaders.map(header => `"${row[header as keyof typeof row] || ''}"`).join(',')
+      );
+      
+      const csvContent = [
+        csvHeaders.join(','),
+        ...csvRows
+      ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `time-reports-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-    
-    toast({
-      title: 'Success',
-      description: 'Report exported successfully',
-    });
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `time-reports-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+      
+      console.log('✅ CSV export successful');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: 'Success',
+        description: 'Report exported successfully',
+      });
+    } catch (error) {
+      console.error('❌ Error exporting to CSV:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to export to CSV',
+        variant: 'destructive',
+      });
+    }
   };
 
   const getTotalHours = (): string => {
