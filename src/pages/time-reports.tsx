@@ -52,18 +52,14 @@ export default function TimeReports() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const loadData = async () => {
-      await Promise.all([fetchUsers(), fetchProjects()]);
-      await fetchReports();
-    };
-    loadData();
+    fetchUsers();
+    fetchProjects();
+    fetchReports();
   }, []);
 
   useEffect(() => {
-    if (users.length > 0 && projects.length > 0) {
-      fetchReports();
-    }
-  }, [filters, users, projects]);
+    fetchReports();
+  }, [filters]);
 
   const fetchUsers = async () => {
     try {
@@ -109,9 +105,14 @@ export default function TimeReports() {
       const startDate = startOfDay(new Date(filters.startDate));
       const endDate = endOfDay(new Date(filters.endDate));
 
+      // Use a direct SQL-like query with joins to get user and project data
       let query = supabase
         .from('time_logs')
-        .select('*')
+        .select(`
+          *,
+          users!time_logs_user_id_fkey(id, full_name, email),
+          projects!time_logs_project_id_fkey(id, name)
+        `)
         .gte('start_time', startDate.toISOString())
         .lte('start_time', endDate.toISOString());
 
@@ -137,18 +138,13 @@ export default function TimeReports() {
         return;
       }
 
-      // Enrich with user and project names
-      const enrichedReports = timeLogData.map(report => {
-        const user = users.find(u => u.id === report.user_id);
-        const project = projects.find(p => p.id === report.project_id);
-        
-        return {
-          ...report,
-          user_name: user?.full_name || 'Unknown User',
-          user_email: user?.email || 'Unknown',
-          project_name: project?.name || 'Unknown Project'
-        };
-      });
+      // Map the joined data directly
+      const enrichedReports = timeLogData.map(report => ({
+        ...report,
+        user_name: (report as any).users?.full_name || 'Unknown User',
+        user_email: (report as any).users?.email || 'Unknown',
+        project_name: (report as any).projects?.name || 'Unknown Project'
+      }));
 
       setReports(enrichedReports);
     } catch (error) {
