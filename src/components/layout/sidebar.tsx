@@ -33,7 +33,8 @@ import {
   MousePointer,
   Keyboard,
   BookOpen,
-  Briefcase
+  Briefcase,
+  Bug
 } from "lucide-react";
 
 const Sidebar = () => {
@@ -217,6 +218,12 @@ const Sidebar = () => {
           href: "/settings",
           icon: Settings,
           description: "Global configuration"
+        },
+        {
+          title: "Debug JS Loading",
+          href: "/debug-js-loading",
+          icon: Bug,
+          description: "JavaScript debugging tools"
         }
       ]
     }
