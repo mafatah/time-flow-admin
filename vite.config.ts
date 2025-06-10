@@ -39,8 +39,17 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_ADMIN_ONLY": JSON.stringify(isAdminOnly ? 'true' : 'false')
     },
     build: {
-      sourcemap: true
+      sourcemap: true,
+      assetsDir: 'assets',
+      rollupOptions: {
+        output: {
+          // Ensure assets are always referenced from root
+          assetFileNames: 'assets/[name]-[hash][extname]',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          entryFileNames: 'assets/[name]-[hash].js'
+        }
+      }
     },
-    base: mode === "production" ? "/" : "./"
+    base: "/"
   };
 });
