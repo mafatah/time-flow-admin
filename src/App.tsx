@@ -17,6 +17,8 @@ import EmployeeTimeTracker from '@/pages/employee/time-tracker';
 import EmployeeReports from '@/pages/employee/reports';
 import ReportsPage from '@/pages/reports';
 import TimeReportsPage from '@/pages/time-reports';
+import AllEmployeeReport from '@/pages/reports/all-employee-report';
+import IndividualEmployeeReport from '@/pages/reports/individual-employee-report';
 import InsightsPage from '@/pages/insights';
 import AppsUrlsIdle from '@/pages/reports/apps-urls-idle';
 import UsersPage from '@/pages/users/users-management';
@@ -206,6 +208,26 @@ function AppRoutes() {
           <AdminRoute>
             <AppLayout>
               <TimeReportsPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/reports/all-employee" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <AllEmployeeReport />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/reports/individual-employee" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <IndividualEmployeeReport />
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>

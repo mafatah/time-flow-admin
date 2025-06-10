@@ -178,6 +178,18 @@ const Sidebar = () => {
           description: "Comprehensive analytics"
         },
         {
+          title: "All Employee Report",
+          href: "/reports/all-employee",
+          icon: FileText,
+          description: "Daily hours breakdown"
+        },
+        {
+          title: "Individual Report",
+          href: "/reports/individual-employee",
+          icon: User,
+          description: "Detailed employee sessions"
+        },
+        {
           title: "Time Reports",
           href: "/reports/time-reports",
           icon: Activity,
