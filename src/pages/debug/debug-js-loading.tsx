@@ -162,8 +162,9 @@ Build Mode: ${(import.meta.env as any).MODE || 'Unknown'}
 
   const testModuleImport = () => {
     try {
-      // Test dynamic import with a non-existent module
-      import('./nonexistent-module.js' as any)
+      // Test dynamic import with a non-existent module (using string to avoid build issues)
+      const modulePath = './nonexistent-module.js';
+      import(/* @vite-ignore */ modulePath)
         .catch(error => console.error('Module import test failed:', error));
     } catch (error: any) {
       console.error('Module import error:', error);
