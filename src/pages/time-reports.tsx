@@ -110,8 +110,8 @@ export default function TimeReports() {
         .from('time_logs')
         .select(`
           *,
-          users!time_logs_user_id_fkey(id, full_name, email),
-          projects!time_logs_project_id_fkey(id, name)
+          users!fk_time_logs_user(id, full_name, email),
+          projects!fk_time_logs_project(id, name)
         `)
         .gte('start_time', startDate.toISOString())
         .lte('start_time', endDate.toISOString());
