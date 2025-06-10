@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeFlow Production Token Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .debug-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .success { color: #22c55e; }
+        .error { color: #ef4444; }
+        .warning { color: #f59e0b; }
+        .info { color: #3b82f6; }
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+        .test-success {
+            background: #f0fdf4;
+            border-color: #22c55e;
+        }
+        .test-error {
+            background: #fef2f2;
+            border-color: #ef4444;
+        }
+        .test-warning {
+            background: #fffbeb;
+            border-color: #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 TimeFlow Production Token Debug</h1>
+    <p class="info">This tool helps diagnose authentication and token issues in production.</p>
+    
+    <div class="debug-section">
+        <h2>📊 Environment Check</h2>
+        <div id="env-check">
+            <p>Checking environment variables...</p>
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h2>🔑 Supabase Connection Test</h2>
+        <button onclick="testSupabaseConnection()">Test Connection</button>
+        <div id="connection-result"></div>
+    </div>
+
+    <div class="debug-section">
+        <h2>👤 Authentication Test</h2>
+        <div>
+            <input type="email" id="test-email" placeholder="Enter your email" style="padding: 8px; margin: 5px;">
+            <input type="password" id="test-password" placeholder="Enter your password" style="padding: 8px; margin: 5px;">
+            <button onclick="testAuthentication()">Test Login</button>
+        </div>
+        <div id="auth-result"></div>
+    </div>
+
+    <div class="debug-section">
+        <h2>🗄️ Storage & Session Test</h2>
+        <button onclick="testStorage()">Test Storage</button>
+        <div id="storage-result"></div>
+    </div>
+
+    <div class="debug-section">
+        <h2>🌐 CORS & Domain Test</h2>
+        <button onclick="testCORS()">Test CORS</button>
+        <div id="cors-result"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Your production Supabase configuration
+        const SUPABASE_URL = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
+
+        let supabase;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            checkEnvironment();
+            initializeSupabase();
+        });
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'success' ? 'test-success' : 
+                            type === 'error' ? 'test-error' : 
+                            type === 'warning' ? 'test-warning' : '';
+            
+            element.innerHTML += `<div class="test-result ${className}">${message}</div>`;
+        }
+
+        function checkEnvironment() {
+            const envElement = document.getElementById('env-check');
+            
+            envElement.innerHTML = `
+                <div class="test-result test-success">
+                    <strong>✅ Current Domain:</strong> ${window.location.origin}
+                </div>
+                <div class="test-result test-success">
+                    <strong>✅ Supabase URL:</strong> ${SUPABASE_URL}
+                </div>
+                <div class="test-result test-success">
+                    <strong>✅ Anon Key:</strong> ${SUPABASE_ANON_KEY.substring(0, 50)}...
+                </div>
+                <div class="test-result test-success">
+                    <strong>✅ User Agent:</strong> ${navigator.userAgent}
+                </div>
+            `;
+        }
+
+        function initializeSupabase() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: {
+                        autoRefreshToken: true,
+                        persistSession: true,
+                        detectSessionInUrl: true
+                    }
+                });
+                log('connection-result', '✅ Supabase client initialized successfully', 'success');
+            } catch (error) {
+                log('connection-result', `❌ Failed to initialize Supabase: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSupabaseConnection() {
+            const resultDiv = document.getElementById('connection-result');
+            resultDiv.innerHTML = '<p>Testing connection...</p>';
+
+            try {
+                // Test basic connection
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('count', { count: 'exact', head: true });
+
+                if (error) {
+                    log('connection-result', `❌ Connection test failed: ${error.message}`, 'error');
+                    return;
+                }
+
+                log('connection-result', '✅ Basic Supabase connection successful', 'success');
+
+                // Test session
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                
+                if (sessionError) {
+                    log('connection-result', `⚠️ Session error: ${sessionError.message}`, 'warning');
+                } else if (session) {
+                    log('connection-result', `✅ Active session found for: ${session.user.email}`, 'success');
+                } else {
+                    log('connection-result', '⚠️ No active session found', 'warning');
+                }
+
+            } catch (error) {
+                log('connection-result', `❌ Connection test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAuthentication() {
+            const email = document.getElementById('test-email').value;
+            const password = document.getElementById('test-password').value;
+            const resultDiv = document.getElementById('auth-result');
+            
+            if (!email || !password) {
+                log('auth-result', '⚠️ Please enter both email and password', 'warning');
+                return;
+            }
+
+            resultDiv.innerHTML = '<p>Testing authentication...</p>';
+
+            try {
+                // Test login
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) {
+                    log('auth-result', `❌ Login failed: ${error.message}`, 'error');
+                    return;
+                }
+
+                log('auth-result', `✅ Login successful for: ${data.user.email}`, 'success');
+
+                // Test user details fetch
+                const { data: userDetails, error: userError } = await supabase
+                    .from('users')
+                    .select('id, email, full_name, role')
+                    .eq('id', data.user.id)
+                    .single();
+
+                if (userError) {
+                    log('auth-result', `❌ Failed to fetch user details: ${userError.message}`, 'error');
+                } else {
+                    log('auth-result', `✅ User details: ${userDetails.full_name} (${userDetails.role})`, 'success');
+                    
+                    if (userDetails.role === 'admin') {
+                        log('auth-result', '✅ Admin role confirmed - Time Reports should be accessible', 'success');
+                    } else {
+                        log('auth-result', `⚠️ User role is "${userDetails.role}" - need admin role for Time Reports`, 'warning');
+                    }
+                }
+
+            } catch (error) {
+                log('auth-result', `❌ Authentication error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testStorage() {
+            const resultDiv = document.getElementById('storage-result');
+            resultDiv.innerHTML = '<p>Testing storage...</p>';
+
+            try {
+                // Test localStorage
+                localStorage.setItem('test-key', 'test-value');
+                const stored = localStorage.getItem('test-key');
+                
+                if (stored === 'test-value') {
+                    log('storage-result', '✅ localStorage working correctly', 'success');
+                    localStorage.removeItem('test-key');
+                } else {
+                    log('storage-result', '❌ localStorage not working', 'error');
+                }
+
+                // Test sessionStorage
+                sessionStorage.setItem('test-session', 'test-value');
+                const sessionStored = sessionStorage.getItem('test-session');
+                
+                if (sessionStored === 'test-value') {
+                    log('storage-result', '✅ sessionStorage working correctly', 'success');
+                    sessionStorage.removeItem('test-session');
+                } else {
+                    log('storage-result', '❌ sessionStorage not working', 'error');
+                }
+
+                // Check for existing Supabase session
+                const supabaseSession = localStorage.getItem('sb-fkpiqcxkmrtaetvfgcli-auth-token');
+                if (supabaseSession) {
+                    log('storage-result', '✅ Supabase session token found in localStorage', 'success');
+                } else {
+                    log('storage-result', '⚠️ No Supabase session token in localStorage', 'warning');
+                }
+
+            } catch (error) {
+                log('storage-result', `❌ Storage test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCORS() {
+            const resultDiv = document.getElementById('cors-result');
+            resultDiv.innerHTML = '<p>Testing CORS...</p>';
+
+            try {
+                log('cors-result', `✅ Current origin: ${window.location.origin}`, 'success');
+                
+                // Test if we can make a request
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+
+                if (response.ok) {
+                    log('cors-result', '✅ CORS configuration working correctly', 'success');
+                } else {
+                    log('cors-result', `⚠️ API response status: ${response.status}`, 'warning');
+                }
+
+            } catch (error) {
+                if (error.message.includes('CORS')) {
+                    log('cors-result', `❌ CORS error: ${error.message}`, 'error');
+                    log('cors-result', '💡 Add your domain to Supabase CORS settings', 'warning');
+                } else {
+                    log('cors-result', `❌ Network error: ${error.message}`, 'error');
+                }
+            }
+        }
+    </script>
+</body>
+</html> 
