@@ -52,13 +52,18 @@ export default function TimeReports() {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchUsers();
-    fetchProjects();
+    const loadData = async () => {
+      await Promise.all([fetchUsers(), fetchProjects()]);
+      await fetchReports();
+    };
+    loadData();
   }, []);
 
   useEffect(() => {
-    fetchReports();
-  }, [filters]);
+    if (users.length > 0 && projects.length > 0) {
+      fetchReports();
+    }
+  }, [filters, users, projects]);
 
   const fetchUsers = async () => {
     try {

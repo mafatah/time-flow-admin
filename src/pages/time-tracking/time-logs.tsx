@@ -8,8 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/providers/auth-provider';
 import { format, differenceInMinutes, startOfDay, endOfDay } from 'date-fns';
-import { Clock, Calendar, Download, Filter, Search, Play, Square, RefreshCw, AlertCircle, Database, Info } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Clock, Calendar, Download, Filter, Search, Play, Square, RefreshCw, Database } from 'lucide-react';
 
 interface TimeLog {
   id: string;
@@ -30,20 +29,7 @@ interface Project {
   name: string;
 }
 
-interface DebugInfo {
-  totalLogsInDb: number | null;
-  todayLogsCount: number | null;
-  todayLogs?: any[];
-  recentLogs?: any[];
-  allLogs?: any[];
-  currentFilter: string;
-  dateRange?: { start: Date; end: Date } | null;
-  filteredLogsCount: number;
-  currentTimezone: string;
-  nowLocal: string;
-  nowUTC: string;
-  error?: string;
-}
+
 
 export default function TimeLogs() {
   const { userDetails } = useAuth();
@@ -55,7 +41,7 @@ export default function TimeLogs() {
   const [userFilter, setUserFilter] = useState('all');
   const [projectFilter, setProjectFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('today');
-  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+
 
   useEffect(() => {
     if (userDetails?.role === 'admin') {
@@ -79,38 +65,6 @@ export default function TimeLogs() {
   const fetchTimeLogs = async () => {
     try {
       setLoading(true);
-      
-      console.log('🔍 Fetching time logs with filter:', dateFilter);
-      
-      // First, check total logs in database
-      const { count: totalCount } = await supabase
-        .from('time_logs')
-        .select('*', { count: 'exact', head: true });
-      
-      // Check today's logs specifically
-      const todayStart = startOfDay(new Date());
-      const todayEnd = endOfDay(new Date());
-      
-      const { data: todayLogs, count: todayCount } = await supabase
-        .from('time_logs')
-        .select('*', { count: 'exact' })
-        .gte('start_time', todayStart.toISOString())
-        .lte('start_time', todayEnd.toISOString());
-      
-      // Check recent logs (last 24 hours)
-      const { data: recentLogs } = await supabase
-        .from('time_logs')
-        .select('*')
-        .gte('start_time', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order('start_time', { ascending: false })
-        .limit(5);
-
-      // Check ALL logs to see what exists
-      const { data: allLogs } = await supabase
-        .from('time_logs')
-        .select('*')
-        .order('start_time', { ascending: false })
-        .limit(10);
 
       let query = supabase
         .from('time_logs')
@@ -121,11 +75,6 @@ export default function TimeLogs() {
       if (dateFilter !== 'all') {
         const range = getDateFilterRange();
         if (range) {
-          console.log('📅 Date range filter:', {
-            start: range.start.toISOString(),
-            end: range.end.toISOString(),
-            filter: dateFilter
-          });
           query = query
             .gte('start_time', range.start.toISOString())
             .lte('start_time', range.end.toISOString());
@@ -136,47 +85,9 @@ export default function TimeLogs() {
 
       if (error) throw error;
       
-      // Set debug information
-      setDebugInfo({
-        totalLogsInDb: totalCount,
-        todayLogsCount: todayCount,
-        todayLogs: todayLogs?.slice(0, 3), // First 3 for preview
-        recentLogs: recentLogs?.slice(0, 3), // First 3 for preview
-        allLogs: allLogs?.slice(0, 5), // First 5 for preview
-        currentFilter: dateFilter,
-        dateRange: dateFilter !== 'all' ? getDateFilterRange() : null,
-        filteredLogsCount: data?.length || 0,
-        currentTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        nowLocal: new Date().toISOString(),
-        nowUTC: new Date().toUTCString()
-      });
-      
-      console.log('📊 Debug info:', {
-        totalLogsInDb: totalCount,
-        todayLogsCount: todayCount,
-        filteredLogsCount: data?.length || 0,
-        dateFilter
-      });
-      
       setLogs(data || []);
     } catch (error) {
       console.error('Error fetching time logs:', error);
-      setDebugInfo((prevDebug: DebugInfo | null) => {
-        const baseDebug: DebugInfo = prevDebug || {
-          totalLogsInDb: null,
-          todayLogsCount: null,
-          currentFilter: dateFilter,
-          filteredLogsCount: 0,
-          currentTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          nowLocal: new Date().toISOString(),
-          nowUTC: new Date().toUTCString()
-        };
-        
-        return {
-          ...baseDebug,
-          error: error instanceof Error ? error.message : 'Unknown error occurred'
-        };
-      });
     } finally {
       setLoading(false);
     }
@@ -295,71 +206,7 @@ export default function TimeLogs() {
         </Button>
       </div>
 
-      {/* Debug Information Card - Show if no logs found for today */}
-      {debugInfo && (debugInfo.filteredLogsCount === 0 || debugInfo.todayLogsCount === 0) && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            <div className="space-y-2">
-              <div className="font-semibold">Debug Information:</div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <strong>Total logs in database:</strong> {debugInfo.totalLogsInDb ?? 'Unknown'}
-                </div>
-                <div>
-                  <strong>Today's logs:</strong> {debugInfo.todayLogsCount ?? 'Unknown'}
-                </div>
-                <div>
-                  <strong>Current filter:</strong> {debugInfo.currentFilter}
-                </div>
-                <div>
-                  <strong>Filtered results:</strong> {debugInfo.filteredLogsCount}
-                </div>
-                <div>
-                  <strong>Timezone:</strong> {debugInfo.currentTimezone}
-                </div>
-                <div>
-                  <strong>Current time:</strong> {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
-                </div>
-              </div>
-              {debugInfo.dateRange && (
-                <div className="mt-2 text-sm">
-                  <strong>Date range:</strong> {format(debugInfo.dateRange.start, 'yyyy-MM-dd HH:mm')} to {format(debugInfo.dateRange.end, 'yyyy-MM-dd HH:mm')}
-                </div>
-              )}
-              {debugInfo.recentLogs && debugInfo.recentLogs.length > 0 && (
-                <div className="mt-2">
-                  <strong>Recent logs (last 24h):</strong>
-                  <ul className="text-xs mt-1">
-                    {debugInfo.recentLogs.map((log: any) => (
-                      <li key={log.id} className="truncate">
-                        {format(new Date(log.start_time), 'MMM dd HH:mm')} - User: {log.user_id?.slice(0, 8)}...
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {debugInfo.allLogs && debugInfo.allLogs.length > 0 && (
-                <div className="mt-2">
-                  <strong>All logs in database:</strong>
-                  <ul className="text-xs mt-1">
-                    {debugInfo.allLogs.map((log: any) => (
-                      <li key={log.id} className="truncate">
-                        {format(new Date(log.start_time), 'MMM dd HH:mm')} - User: {log.user_id?.slice(0, 8)}... - Status: {log.status || 'N/A'} - Project: {log.project_id?.slice(0, 8) || 'None'}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {debugInfo.error && (
-                <div className="mt-2 text-red-600">
-                  <strong>Error:</strong> {debugInfo.error}
-                </div>
-              )}
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
+
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -535,15 +382,9 @@ export default function TimeLogs() {
               <div className="flex flex-col items-center gap-2">
                 <Database className="h-8 w-8 text-muted-foreground/50" />
                 <div>No time logs found matching your filters.</div>
-                {debugInfo && (debugInfo.totalLogsInDb ?? 0) > 0 ? (
-                  <div className="text-sm">
-                    Try changing the date filter - there are {debugInfo.totalLogsInDb} total logs in the database.
-                  </div>
-                ) : (
-                  <div className="text-sm">
-                    No time logs exist in the database yet.
-                  </div>
-                )}
+                <div className="text-sm">
+                  Try changing the date filter or check if employees have been tracking time.
+                </div>
               </div>
             </div>
           ) : (
