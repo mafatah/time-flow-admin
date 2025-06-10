@@ -32,7 +32,7 @@ export default function DebugJSLoading() {
     const originalError = console.error;
     const originalWarn = console.warn;
 
-    // Override console methods
+    // Override console methods to capture ALL output
     console.log = function(...args: any[]) {
       originalLog.apply(console, args);
       addToLog(args.join(' '), 'info');
@@ -40,7 +40,13 @@ export default function DebugJSLoading() {
 
     console.error = function(...args: any[]) {
       originalError.apply(console, args);
-      addToLog('❌ ' + args.join(' '), 'error');
+      const errorMessage = args.join(' ');
+      addToLog('❌ ' + errorMessage, 'error');
+      
+      // Check for specific syntax error
+      if (errorMessage.includes('SyntaxError') || errorMessage.includes('Unexpected token')) {
+        addToLog('🚨 SYNTAX ERROR DETECTED: ' + errorMessage, 'error');
+      }
     };
 
     console.warn = function(...args: any[]) {
@@ -48,17 +54,46 @@ export default function DebugJSLoading() {
       addToLog('⚠️ ' + args.join(' '), 'warning');
     };
 
-    // Add global error handlers
+    // Enhanced global error handlers with more specific detection
     const handleError = (event: ErrorEvent) => {
-      addToLog(`Global Error: ${event.message} at ${event.filename}:${event.lineno}`, 'error');
+      const errorDetails = {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        stack: event.error?.stack
+      };
+      
+      const errorString = `Global Error: ${event.message} at ${event.filename}:${event.lineno}`;
+      addToLog(errorString, 'error');
+      
+      // Specifically look for syntax errors
+      if (event.message.includes('Unexpected token') || event.message.includes('SyntaxError')) {
+        addToLog('🚨 SYNTAX ERROR IN GLOBAL HANDLER: ' + JSON.stringify(errorDetails), 'error');
+      }
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      addToLog(`Unhandled Promise Rejection: ${event.reason}`, 'error');
+      const rejectionDetails = `Unhandled Promise Rejection: ${event.reason}`;
+      addToLog(rejectionDetails, 'error');
+      
+      if (rejectionDetails.includes('Unexpected token') || rejectionDetails.includes('SyntaxError')) {
+        addToLog('🚨 SYNTAX ERROR IN PROMISE REJECTION: ' + rejectionDetails, 'error');
+      }
     };
 
-    window.addEventListener('error', handleError);
+    // Add resource error detection for script tags
+    const handleResourceError = (event: Event) => {
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'SCRIPT') {
+        const scriptElement = target as HTMLScriptElement;
+        addToLog(`🚨 SCRIPT LOADING ERROR: ${scriptElement.src}`, 'error');
+      }
+    };
+
+    window.addEventListener('error', handleError, true); // Use capture phase
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    document.addEventListener('error', handleResourceError, true); // Capture resource loading errors
 
     // Initialize environment info
     initEnvInfo();
@@ -68,8 +103,9 @@ export default function DebugJSLoading() {
       console.log = originalLog;
       console.error = originalError;
       console.warn = originalWarn;
-      window.removeEventListener('error', handleError);
+      window.removeEventListener('error', handleError, true);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      document.removeEventListener('error', handleResourceError, true);
     };
   }, []);
 
@@ -97,6 +133,7 @@ Build Mode: ${(import.meta.env as any).MODE || 'Unknown'}
     const bundlePaths = [
       '/assets/index.js',
       '/assets/index-wvEYJeXC.js',
+      '/assets/index-Dg4k3RGd.js',
       '/dist/assets/index.js',
       './assets/index.js',
       `${window.location.origin}/assets/index.js`
@@ -106,14 +143,33 @@ Build Mode: ${(import.meta.env as any).MODE || 'Unknown'}
     
     for (const path of bundlePaths) {
       try {
-        const response = await fetch(path, { method: 'HEAD' });
+        console.log(`Testing bundle: ${path}`);
+        const response = await fetch(path, { method: 'GET' });
+        const contentType = response.headers.get('content-type') || 'unknown';
+        
         if (response.ok) {
-          results += `✅ ${path} - Status: ${response.status}\n`;
+          const text = await response.text();
+          const preview = text.substring(0, 200);
+          
+          if (text.startsWith('<!DOCTYPE html>') || text.includes('<html')) {
+            results += `❌ ${path} - Status: ${response.status} - RETURNING HTML INSTEAD OF JS!\n`;
+            results += `   Content-Type: ${contentType}\n`;
+            results += `   Preview: ${preview}...\n\n`;
+          } else if (text.includes('SyntaxError') || text.includes('Unexpected token')) {
+            results += `❌ ${path} - Status: ${response.status} - CONTAINS SYNTAX ERROR!\n`;
+            results += `   Content-Type: ${contentType}\n`;
+            results += `   Preview: ${preview}...\n\n`;
+          } else {
+            results += `✅ ${path} - Status: ${response.status} - Valid JS\n`;
+            results += `   Content-Type: ${contentType}\n`;
+            results += `   Size: ${text.length} chars\n\n`;
+          }
         } else {
-          results += `❌ ${path} - Status: ${response.status}\n`;
+          results += `❌ ${path} - Status: ${response.status} - ${response.statusText}\n\n`;
         }
       } catch (error: any) {
-        results += `❌ ${path} - Error: ${error.message}\n`;
+        results += `❌ ${path} - Error: ${error.message}\n\n`;
+        console.error(`Error testing ${path}:`, error);
       }
     }
     
@@ -185,6 +241,83 @@ Build Mode: ${(import.meta.env as any).MODE || 'Unknown'}
     }
   };
 
+  const monitorScriptLoading = () => {
+    console.log('🔍 Starting script loading monitor...');
+    
+    // Override the original script creation to monitor all scripts
+    const originalCreateElement = document.createElement;
+    let scriptCount = 0;
+    
+    document.createElement = function(tagName: string) {
+      const element = originalCreateElement.call(this, tagName);
+      
+      if (tagName.toLowerCase() === 'script') {
+        scriptCount++;
+        const scriptElement = element as HTMLScriptElement;
+        const scriptId = `script-${scriptCount}`;
+        
+        console.log(`📜 Script ${scriptId} created`);
+        
+        scriptElement.addEventListener('load', () => {
+          console.log(`✅ Script ${scriptId} loaded successfully: ${scriptElement.src}`);
+        });
+        
+        scriptElement.addEventListener('error', (event) => {
+          console.error(`❌ Script ${scriptId} failed to load: ${scriptElement.src}`, event);
+        });
+        
+        // Monitor for syntax errors by trying to execute script content
+        if (scriptElement.src) {
+          fetch(scriptElement.src)
+            .then(response => response.text())
+            .then(content => {
+              if (content.startsWith('<!DOCTYPE') || content.includes('<html')) {
+                console.error(`🚨 Script ${scriptId} contains HTML instead of JavaScript: ${scriptElement.src}`);
+              } else if (content.includes('SyntaxError') || content.includes('Unexpected token')) {
+                console.error(`🚨 Script ${scriptId} contains syntax errors: ${scriptElement.src}`);
+              }
+            })
+            .catch(err => {
+              console.error(`❌ Could not fetch script ${scriptId} content: ${scriptElement.src}`, err);
+            });
+        }
+      }
+      
+      return element;
+    };
+    
+    console.log('✅ Script loading monitor active');
+    setNetworkResults('Script loading monitor activated. Check console for real-time script loading events.');
+  };
+
+  const testTimeReportsWithMonitoring = () => {
+    console.log('🎯 Testing Time Reports page with full monitoring...');
+    
+    // Start monitoring before navigation
+    monitorScriptLoading();
+    
+    // Add additional error listeners specifically for this test
+    const errorHandler = (event: ErrorEvent) => {
+      if (event.message.includes('Unexpected token') || event.message.includes('SyntaxError')) {
+        console.error('🚨 CAUGHT SYNTAX ERROR DURING TIME REPORTS TEST:', {
+          message: event.message,
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+          stack: event.error?.stack
+        });
+      }
+    };
+    
+    window.addEventListener('error', errorHandler);
+    
+    // Navigate after a short delay
+    setTimeout(() => {
+      console.log('🚀 Navigating to time reports...');
+      window.location.href = '/reports/time-reports';
+    }, 1000);
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -213,6 +346,7 @@ Build Mode: ${(import.meta.env as any).MODE || 'Unknown'}
             <Button onClick={testJSBundles} variant="outline">Test JS Bundle Loading</Button>
             <Button onClick={testAPIEndpoint} variant="outline">Test API Endpoint</Button>
             <Button onClick={checkConsoleErrors} variant="outline">Check Console Errors</Button>
+            <Button onClick={monitorScriptLoading} variant="outline">Monitor Script Loading</Button>
           </div>
           {networkResults && (
             <pre className="bg-gray-50 p-4 rounded text-sm overflow-x-auto whitespace-pre-wrap">
@@ -254,7 +388,7 @@ Build Mode: ${(import.meta.env as any).MODE || 'Unknown'}
           <div className="flex flex-wrap gap-2">
             <Button onClick={simulateError} variant="outline">Simulate JS Error</Button>
             <Button onClick={testModuleImport} variant="outline">Test Module Import</Button>
-            <Button onClick={testTimeReportsPage} variant="outline">Load Time Reports Page</Button>
+            <Button onClick={testTimeReportsWithMonitoring} variant="outline">Load Time Reports Page</Button>
           </div>
         </CardContent>
       </Card>
