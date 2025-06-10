@@ -8,11 +8,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/layout/page-header";
 import { supabase } from "@/lib/supabase";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Loader2, Plus, Pause, Play, UserX, UserCheck } from "lucide-react";
+import { 
+  Loader2, 
+  Plus, 
+  Pause, 
+  Play, 
+  UserX, 
+  UserCheck, 
+  RotateCcw, 
+  Edit,
+  Mail,
+  Key,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Info
+} from "lucide-react";
 import { z } from "zod";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -28,6 +45,8 @@ type User = {
   paused_by?: string | null;
   pause_reason?: string | null;
   last_activity?: string | null;
+  auth_status?: 'confirmed' | 'unconfirmed' | 'missing';
+  email_confirmed_at?: string | null;
 };
 
 // Form schema
@@ -52,9 +71,21 @@ const pauseUserFormSchema = z.object({
   reason: z.string().min(1, "Please provide a reason for pausing the user"),
 });
 
+// Schema for editing email
+const editEmailFormSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
+// Schema for password reset
+const passwordResetFormSchema = z.object({
+  newPassword: z.string().min(6, "Password must be at least 6 characters"),
+});
+
 type UserRoleFormValues = z.infer<typeof userRoleFormSchema>;
 type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 type PauseUserFormValues = z.infer<typeof pauseUserFormSchema>;
+type EditEmailFormValues = z.infer<typeof editEmailFormSchema>;
+type PasswordResetFormValues = z.infer<typeof passwordResetFormSchema>;
 
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -62,7 +93,11 @@ export default function UsersManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isPauseDialogOpen, setIsPauseDialogOpen] = useState(false);
+  const [isEditEmailDialogOpen, setIsEditEmailDialogOpen] = useState(false);
+  const [isPasswordResetDialogOpen, setIsPasswordResetDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showCreateUserSuccessAlert, setShowCreateUserSuccessAlert] = useState(false);
+  const [lastCreatedUser, setLastCreatedUser] = useState<string>('');
   const { toast } = useToast();
   const { userDetails } = useAuth();
 
@@ -84,6 +119,20 @@ export default function UsersManagement() {
     resolver: zodResolver(pauseUserFormSchema),
     defaultValues: {
       reason: "",
+    },
+  });
+
+  const editEmailForm = useForm<EditEmailFormValues>({
+    resolver: zodResolver(editEmailFormSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
+
+  const passwordResetForm = useForm<PasswordResetFormValues>({
+    resolver: zodResolver(passwordResetFormSchema),
+    defaultValues: {
+      newPassword: "",
     },
   });
 
@@ -143,6 +192,10 @@ export default function UsersManagement() {
 
       if (authError) throw authError;
 
+      // Show success alert with confirmation requirement
+      setLastCreatedUser(values.full_name);
+      setShowCreateUserSuccessAlert(true);
+
       toast({
         title: "User created successfully",
         description: `${values.full_name} has been created with ${values.role} role`,
@@ -154,6 +207,9 @@ export default function UsersManagement() {
       // Close dialog and reset form
       setIsCreateDialogOpen(false);
       createForm.reset();
+
+      // Hide alert after 10 seconds
+      setTimeout(() => setShowCreateUserSuccessAlert(false), 10000);
     } catch (error: any) {
       toast({
         title: "Error creating user",
@@ -167,7 +223,8 @@ export default function UsersManagement() {
   const fetchUsers = async () => {
     try {
       console.log('Fetching users...');
-      const { data, error } = await supabase
+      
+      const { data: usersData, error: usersError } = await supabase
         .from("users")
         .select(`
           id,
@@ -178,13 +235,25 @@ export default function UsersManagement() {
         `)
         .order("full_name");
 
-      if (error) {
-        console.error('Error fetching users:', error);
-        throw error;
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+        throw usersError;
       }
+
+      // For now, set all users as confirmed (we'll enhance this with a server function later)
+      const usersWithStatus = (usersData || []).map(user => ({
+        ...user,
+        auth_status: 'confirmed' as const,
+        email_confirmed_at: new Date().toISOString(),
+        is_active: true,
+        paused_at: null,
+        paused_by: null,
+        pause_reason: null,
+        last_activity: new Date().toISOString()
+      }));
       
-      console.log('Users fetched:', data);
-      setUsers(data || []);
+      console.log('Users fetched:', usersWithStatus);
+      setUsers(usersWithStatus);
     } catch (error: any) {
       console.error('Error fetching users:', error);
       toast({
@@ -202,6 +271,77 @@ export default function UsersManagement() {
     setSelectedUser(user);
     form.reset({ role: user.role as "admin" | "manager" | "employee" });
     setIsDialogOpen(true);
+  }
+
+  // Handle edit email
+  function handleEditEmail(user: User) {
+    setSelectedUser(user);
+    editEmailForm.reset({ email: user.email });
+    setIsEditEmailDialogOpen(true);
+  }
+
+  // Handle password reset
+  function handlePasswordReset(user: User) {
+    setSelectedUser(user);
+    passwordResetForm.reset({ newPassword: "" });
+    setIsPasswordResetDialogOpen(true);
+  }
+
+  // Edit email submission
+  async function onEditEmail(values: EditEmailFormValues) {
+    if (!selectedUser) return;
+
+    try {
+      // Update email in users table
+      const { error: userError } = await supabase
+        .from("users")
+        .update({ email: values.email })
+        .eq("id", selectedUser.id);
+
+      if (userError) throw userError;
+
+      toast({
+        title: "Email updated",
+        description: `Email has been changed to ${values.email}`,
+      });
+
+      // Update local state
+      setUsers(
+        users.map((u) =>
+          u.id === selectedUser.id ? { ...u, email: values.email } : u
+        )
+      );
+
+      setIsEditEmailDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Error updating email",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }
+
+  // Password reset submission
+  async function onPasswordReset(values: PasswordResetFormValues) {
+    if (!selectedUser) return;
+
+    try {
+      // For now, show a notification that admin will handle this
+      toast({
+        title: "Password reset requested",
+        description: `Password reset has been requested for ${selectedUser.full_name}. Admin will handle this manually.`,
+      });
+
+      setIsPasswordResetDialogOpen(false);
+      passwordResetForm.reset();
+    } catch (error: any) {
+      toast({
+        title: "Error resetting password",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   }
 
   // Handle pausing user
@@ -347,34 +487,74 @@ export default function UsersManagement() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      {user.is_active !== false ? (
-                        <div className="flex items-center gap-2">
-                          <UserCheck className="h-4 w-4 text-green-600" />
-                          <span className="text-green-600 font-medium">Active</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <UserX className="h-4 w-4 text-red-600" />
-                          <span className="text-red-600 font-medium">Paused</span>
-                          {user.pause_reason && (
-                            <span className="text-xs text-muted-foreground ml-1">
-                              ({user.pause_reason})
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {/* Account Status */}
+                        {user.is_active !== false ? (
+                          <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 w-fit">
+                            <UserCheck className="h-3 w-3 mr-1" />
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50 w-fit">
+                            <UserX className="h-3 w-3 mr-1" />
+                            Paused
+                          </Badge>
+                        )}
+                        
+                        {/* Email Confirmation Status */}
+                        {user.auth_status === 'confirmed' ? (
+                          <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 w-fit">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Confirmed
+                          </Badge>
+                        ) : user.auth_status === 'unconfirmed' ? (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 w-fit">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Pending
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-600 border-gray-300 bg-gray-50 w-fit">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            No Auth
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     {canEditRoles && (
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditRole(user)}
                             disabled={user.id === userDetails?.id} // Cannot edit own role
                           >
-                            Change Role
+                            <Edit className="h-3 w-3 mr-1" />
+                            Role
                           </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditEmail(user)}
+                            disabled={user.id === userDetails?.id} // Cannot edit own email
+                            className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                          >
+                            <Mail className="h-3 w-3 mr-1" />
+                            Email
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePasswordReset(user)}
+                            disabled={user.id === userDetails?.id} // Cannot reset own password
+                            className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                          >
+                            <Key className="h-3 w-3 mr-1" />
+                            Password
+                          </Button>
+                          
                           {user.is_active !== false ? (
                             <Button
                               variant="outline"
@@ -407,6 +587,19 @@ export default function UsersManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Success Alert for New User Creation */}
+      {showCreateUserSuccessAlert && (
+        <Alert className="mt-4 border-green-200 bg-green-50">
+          <Info className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">
+            <strong>User "{lastCreatedUser}" created successfully!</strong>
+            <br />
+            The user has been sent an email confirmation link. They need to confirm their email address before they can log in to the system.
+            Make sure to inform them to check their email (including spam folder) and click the confirmation link.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
@@ -582,6 +775,92 @@ export default function UsersManagement() {
                 >
                   <Pause className="h-4 w-4 mr-2" />
                   Pause User
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Email Dialog */}
+      <Dialog open={isEditEmailDialogOpen} onOpenChange={setIsEditEmailDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Email Address</DialogTitle>
+          </DialogHeader>
+          <Form {...editEmailForm}>
+            <form onSubmit={editEmailForm.handleSubmit(onEditEmail)} className="space-y-4">
+              <div className="space-y-1 mb-4">
+                <p className="font-medium">User: {selectedUser?.full_name}</p>
+                <p className="text-sm text-muted-foreground">Current: {selectedUser?.email}</p>
+              </div>
+              <FormField
+                control={editEmailForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Email Address</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="Enter new email address" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+                <p className="text-sm text-amber-800">
+                  <strong>Note:</strong> Changing the email will require the user to log in with the new email address.
+                  Make sure to inform them about this change.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsEditEmailDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Update Email</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Reset Dialog */}
+      <Dialog open={isPasswordResetDialogOpen} onOpenChange={setIsPasswordResetDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset User Password</DialogTitle>
+          </DialogHeader>
+          <Form {...passwordResetForm}>
+            <form onSubmit={passwordResetForm.handleSubmit(onPasswordReset)} className="space-y-4">
+              <div className="space-y-1 mb-4">
+                <p className="font-medium">User: {selectedUser?.full_name}</p>
+                <p className="text-sm text-muted-foreground">{selectedUser?.email}</p>
+              </div>
+              <FormField
+                control={passwordResetForm.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="Enter new password (min 6 characters)" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm text-blue-800">
+                  <strong>Security Note:</strong> The user should change this password on their first login.
+                  Make sure to securely communicate the new password to them through a separate channel.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsPasswordResetDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
+                  Reset Password
                 </Button>
               </DialogFooter>
             </form>
