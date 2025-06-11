@@ -76,17 +76,27 @@ export default function WarningsDeductions({ selectedMonth }: WarningsDeductions
 
   useEffect(() => {
     if (userDetails?.role === 'admin') {
-      fetchData();
+      fetchEmployees();
     }
   }, [userDetails, selectedMonth]);
 
+  useEffect(() => {
+    if (employees.length > 0) {
+      calculateEmployeeSummary();
+    } else {
+      setLoading(false);
+    }
+  }, [employees, selectedMonth]);
+
   const fetchData = async () => {
     setLoading(true);
-    await Promise.all([
-      fetchEmployees(),
-      calculateEmployeeSummary()
-    ]);
-    setLoading(false);
+    try {
+      // First fetch employees
+      await fetchEmployees();
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setLoading(false);
+    }
   };
 
   const fetchEmployees = async () => {
@@ -108,6 +118,13 @@ export default function WarningsDeductions({ selectedMonth }: WarningsDeductions
 
   const calculateEmployeeSummary = async () => {
     try {
+      // Check if employees are loaded
+      if (!employees || employees.length === 0) {
+        console.log('No employees loaded yet, skipping calculation');
+        setLoading(false);
+        return;
+      }
+
       // Calculate actual work hours for each employee
       const startDate = new Date(selectedMonth + '-01');
       const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
@@ -186,6 +203,7 @@ export default function WarningsDeductions({ selectedMonth }: WarningsDeductions
       const summaryResults = await Promise.all(workHoursPromises);
       const validSummaries = summaryResults.filter(result => result !== null) as EmployeeSummary[];
       setEmployeeSummary(validSummaries);
+      setLoading(false);
 
     } catch (error) {
       console.error('Error calculating employee summary:', error);
@@ -207,6 +225,7 @@ export default function WarningsDeductions({ selectedMonth }: WarningsDeductions
         unreviewed_warnings: 1
       }));
       setEmployeeSummary(fallbackData);
+      setLoading(false);
     }
   };
 
@@ -338,12 +357,12 @@ export default function WarningsDeductions({ selectedMonth }: WarningsDeductions
           <div className="flex gap-4 mb-6">
             <div className="flex-1">
               <Label htmlFor="employee-filter">Filter by Employee</Label>
-              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+              <Select value={selectedEmployee || "all_employees"} onValueChange={(value) => setSelectedEmployee(value === "all_employees" ? "" : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="All employees" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All employees</SelectItem>
+                  <SelectItem value="all_employees">All employees</SelectItem>
                   {employees.map((employee) => (
                     <SelectItem key={employee.id} value={employee.id}>
                       {employee.full_name}
@@ -355,7 +374,7 @@ export default function WarningsDeductions({ selectedMonth }: WarningsDeductions
 
             <div className="flex-1">
               <Label htmlFor="status-filter">Filter by Status</Label>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <Select value={filterStatus || "all"} onValueChange={setFilterStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
@@ -370,7 +389,7 @@ export default function WarningsDeductions({ selectedMonth }: WarningsDeductions
 
             <div className="flex-1">
               <Label htmlFor="role-filter">Filter by Type</Label>
-              <Select value={filterRole} onValueChange={setFilterRole}>
+              <Select value={filterRole || "all"} onValueChange={setFilterRole}>
                 <SelectTrigger>
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
