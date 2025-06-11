@@ -122,10 +122,10 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     // Use GitHub releases for reliable downloads - v1.0.10 with Windows and macOS builds
     const downloadFiles = {
-      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.10/TimeFlow-Setup-v1.0.9.exe`,
-      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.10/TimeFlow-Apple-Signed.dmg`, // FULLY SIGNED BY APPLE DEVELOPER ID
-      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.10/TimeFlow-Apple-Signed.dmg`, // FULLY SIGNED BY APPLE DEVELOPER ID
-      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.10/TimeFlow-Apple-Signed.dmg`, // Default to Apple signed DMG
+      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.10/TimeFlow-v1.0.10-Setup.exe`,
+      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.10/TimeFlow-v1.0.10-Intel-Signed.dmg`, // FULLY SIGNED BY APPLE DEVELOPER ID
+      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.10/TimeFlow-v1.0.10-ARM64-Signed.dmg`, // FULLY SIGNED BY APPLE DEVELOPER ID  
+      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.10/TimeFlow-v1.0.10-ARM64-Signed.dmg`, // Default to ARM64 for modern Macs
       linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow.AppImage`
     };
     
@@ -279,12 +279,12 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '391MB'; // TimeFlow-Apple-Signed.dmg (APPLE DEVELOPER ID SIGNED)
+        return '133MB'; // TimeFlow-v1.0.10-ARM64-Signed.dmg (APPLE DEVELOPER ID SIGNED)
       case 'mac-intel':
       case 'mac':
-        return '391MB'; // TimeFlow-Apple-Signed.dmg (APPLE DEVELOPER ID SIGNED)
+        return '139MB'; // TimeFlow-v1.0.10-Intel-Signed.dmg (APPLE DEVELOPER ID SIGNED)
       case 'windows':
-        return '95MB'; // TimeFlow-Setup-v1.0.9.exe
+        return '103MB'; // TimeFlow-v1.0.10-Setup.exe
       case 'linux':
         return '120MB';
       default:
@@ -295,12 +295,12 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 410000000; // TimeFlow-Apple-Signed.dmg size (APPLE DEVELOPER ID SIGNED)
+        return 133253043; // TimeFlow-v1.0.10-ARM64-Signed.dmg size (APPLE DEVELOPER ID SIGNED)
       case 'mac-intel':
       case 'mac':
-        return 410000000; // TimeFlow-Apple-Signed.dmg size (APPLE DEVELOPER ID SIGNED)
+        return 139714546; // TimeFlow-v1.0.10-Intel-Signed.dmg size (APPLE DEVELOPER ID SIGNED)
       case 'windows':
-        return 95090436; // TimeFlow-Setup-v1.0.9.exe size
+        return 103053712; // TimeFlow-v1.0.10-Setup.exe size
       default:
         return 0;
     }
