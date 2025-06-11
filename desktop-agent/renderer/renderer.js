@@ -46,6 +46,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             lucide.createIcons();
         }
         
+        // Load remembered login data
+        loadRememberedLoginData();
+        
+        // Update section moved to tray menu for cleaner interface
+        
         console.log('✅ Desktop agent initialized successfully');
         
     } catch (error) {
@@ -74,8 +79,7 @@ async function initializeApp() {
             await handleUserLogin(savedSession.user);
         }
         
-        // Add test buttons after dashboard is loaded
-        addTestButtons();
+        // Test buttons removed for cleaner interface
         
         // Add Mac permission check
         checkMacPermissions();
@@ -155,31 +159,7 @@ function setupEventListeners() {
         dashboardProjectSelect.addEventListener('change', handleDashboardProjectSelection);
     }
     
-    // === DEBUG ACTIVITY TESTING EVENTS ===
-    const downloadActivityLogs = document.getElementById('downloadActivityLogs');
-    if (downloadActivityLogs) {
-        downloadActivityLogs.addEventListener('click', downloadActivityLogsFile);
-    }
-    
-    const downloadSystemLogs = document.getElementById('downloadSystemLogs');
-    if (downloadSystemLogs) {
-        downloadSystemLogs.addEventListener('click', downloadSystemLogsFile);
-    }
-    
-    const downloadScreenshotLogs = document.getElementById('downloadScreenshotLogs');
-    if (downloadScreenshotLogs) {
-        downloadScreenshotLogs.addEventListener('click', downloadScreenshotLogsFile);
-    }
 
-    const refreshMetrics = document.getElementById('refreshMetrics');
-    if (refreshMetrics) {
-        refreshMetrics.addEventListener('click', updateActivityMetricsDisplay);
-    }
-    
-    const exportCompatibilityReport = document.getElementById('exportCompatibilityReport');
-    if (exportCompatibilityReport) {
-        exportCompatibilityReport.addEventListener('click', exportCompatibilityReportFile);
-    }
     
     // === LOGOUT EVENT ===
     const logoutBtn = document.getElementById('logoutBtn');
@@ -222,12 +202,32 @@ function setupIpcListeners() {
     console.log('✅ IPC listeners set up successfully');
 }
 
+// === REMEMBER ME FUNCTIONALITY ===
+function loadRememberedLoginData() {
+    const rememberedEmail = localStorage.getItem('timeflow_remember_email');
+    const rememberMeChecked = localStorage.getItem('timeflow_remember_me') === 'true';
+    
+    const emailInput = document.getElementById('loginEmail');
+    const rememberMeCheckbox = document.getElementById('rememberMe');
+    
+    if (emailInput && rememberedEmail && rememberMeChecked) {
+        emailInput.value = rememberedEmail;
+        console.log('📧 Auto-filled email from localStorage:', rememberedEmail);
+    }
+    
+    if (rememberMeCheckbox && rememberMeChecked) {
+        rememberMeCheckbox.checked = true;
+        console.log('✅ Remember me checkbox restored');
+    }
+}
+
 // === LOGIN FUNCTIONALITY ===
 async function handleLogin(e) {
     e.preventDefault();
     
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
+    const rememberMe = document.getElementById('rememberMe').checked;
     const loginBtn = document.getElementById('loginBtn');
     const loginBtnText = document.getElementById('loginBtnText');
     const loginLoader = document.getElementById('loginLoader');
@@ -282,6 +282,15 @@ async function handleLogin(e) {
 
         // Save user to localStorage
         localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
+
+        // Handle remember me functionality
+        if (rememberMe) {
+            localStorage.setItem('timeflow_remember_email', email);
+            localStorage.setItem('timeflow_remember_me', 'true');
+        } else {
+            localStorage.removeItem('timeflow_remember_email');
+            localStorage.removeItem('timeflow_remember_me');
+        }
 
         // Notify main process about user login
         await ipcRenderer.invoke('user-logged-in', currentUser);
@@ -1121,39 +1130,7 @@ async function triggerManualScreenshot() {
     }
 }
 
-function addTestButtons() {
-    // Add test buttons to the dashboard for debugging
-    const dashboard = document.getElementById('dashboard');
-    if (dashboard && currentUser) {
-        const testButtonsHTML = `
-            <div class="test-buttons" style="margin-top: 20px; padding: 15px; border: 2px dashed #4f46e5; border-radius: 8px; background: rgba(79, 70, 229, 0.05);">
-                <h4 style="margin: 0 0 10px 0; color: #4f46e5; font-size: 14px;">🧪 Debug Tools</h4>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button id="testScreenshotBtn" class="btn-secondary" style="font-size: 12px; padding: 6px 12px;">
-                        🖼️ Test Screenshot
-                    </button>
-                    <button id="manualScreenshotBtn" class="btn-secondary" style="font-size: 12px; padding: 6px 12px;">
-                        📸 Manual Screenshot
-                    </button>
-                    <button id="refreshGalleryBtn" class="btn-secondary" style="font-size: 12px; padding: 6px 12px;">
-                        🔄 Refresh Gallery
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        // Insert test buttons before screenshot gallery
-        const screenshotSection = dashboard.querySelector('.screenshot-section');
-        if (screenshotSection) {
-            screenshotSection.insertAdjacentHTML('beforebegin', testButtonsHTML);
-            
-            // Add event listeners
-            document.getElementById('testScreenshotBtn')?.addEventListener('click', testScreenshotCapture);
-            document.getElementById('manualScreenshotBtn')?.addEventListener('click', triggerManualScreenshot);
-            document.getElementById('refreshGalleryBtn')?.addEventListener('click', updateScreenshotGallery);
-        }
-    }
-}
+// Test buttons functionality removed for cleaner interface
 
 // Add this function after setupIpcListeners
 function checkMacPermissions() {
@@ -1414,137 +1391,7 @@ async function handleDashboardProjectSelection() {
     }
 }
 
-// === DEBUG ACTIVITY TESTING FUNCTIONS ===
-async function updateActivityMetricsDisplay() {
-    try {
-        const result = await ipcRenderer.invoke('get-activity-metrics');
-        const metricsDisplay = document.getElementById('activityMetrics');
-        
-        if (!metricsDisplay) return;
-        
-        if (result.success && result.metrics) {
-            const metrics = result.metrics;
-            metricsDisplay.innerHTML = `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px;">
-                    <div>🖱️ Mouse Clicks: <strong>${metrics.mouse_clicks}</strong></div>
-                    <div>⌨️ Keystrokes: <strong>${metrics.keystrokes}</strong></div>
-                    <div>↔️ Mouse Moves: <strong>${metrics.mouse_movements}</strong></div>
-                    <div>📊 Activity Score: <strong>${metrics.activity_score}%</strong></div>
-                    <div>🕐 Last Activity: <strong>${metrics.time_since_last_activity_seconds}s ago</strong></div>
-                    <div>🔍 Monitoring: <strong>${metrics.is_monitoring ? 'Active' : 'Stopped'}</strong></div>
-                </div>
-                <div style="margin-top: 8px; font-size: 11px; color: #6b7280;">
-                    Updated: ${new Date().toLocaleTimeString()}
-                </div>
-            `;
-        } else {
-            metricsDisplay.innerHTML = `
-                <div style="color: #dc2626;">
-                    ❌ Failed to get metrics: ${result.error || 'Unknown error'}
-                </div>
-            `;
-        }
-    } catch (error) {
-        console.error('❌ Error updating activity metrics:', error);
-        const metricsDisplay = document.getElementById('activityMetrics');
-        if (metricsDisplay) {
-            metricsDisplay.innerHTML = `
-                <div style="color: #dc2626;">
-                    ❌ Error: ${error.message}
-                </div>
-            `;
-        }
-    }
-}
-
-// Auto-update activity metrics when on dashboard
-setInterval(() => {
-    const dashboardPage = document.getElementById('dashboardPage');
-    if (dashboardPage && dashboardPage.classList.contains('active')) {
-        updateActivityMetricsDisplay();
-    }
-}, 3000); // Update every 3 seconds
-
-// === LOG DOWNLOAD FUNCTIONS ===
-async function downloadActivityLogsFile() {
-    try {
-        showNotification('Generating activity logs...', 'info');
-        
-        const result = await ipcRenderer.invoke('get-activity-logs');
-        if (result.success) {
-            downloadFile('activity-logs.json', JSON.stringify(result.data, null, 2), 'application/json');
-            showNotification('✅ Activity logs downloaded successfully!', 'success');
-        } else {
-            showNotification(`❌ Failed to get activity logs: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        console.error('❌ Error downloading activity logs:', error);
-        showNotification(`❌ Error: ${error.message}`, 'error');
-    }
-}
-
-async function downloadSystemLogsFile() {
-    try {
-        showNotification('Generating system logs...', 'info');
-        
-        const result = await ipcRenderer.invoke('get-system-logs');
-        if (result.success) {
-            downloadFile('system-logs.txt', result.data, 'text/plain');
-            showNotification('✅ System logs downloaded successfully!', 'success');
-        } else {
-            showNotification(`❌ Failed to get system logs: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        console.error('❌ Error downloading system logs:', error);
-        showNotification(`❌ Error: ${error.message}`, 'error');
-    }
-}
-
-async function downloadScreenshotLogsFile() {
-    try {
-        showNotification('Generating screenshot logs...', 'info');
-        
-        const result = await ipcRenderer.invoke('get-screenshot-logs');
-        if (result.success) {
-            downloadFile('screenshot-logs.json', JSON.stringify(result.data, null, 2), 'application/json');
-            showNotification('✅ Screenshot logs downloaded successfully!', 'success');
-        } else {
-            showNotification(`❌ Failed to get screenshot logs: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        console.error('❌ Error downloading screenshot logs:', error);
-        showNotification(`❌ Error: ${error.message}`, 'error');
-    }
-}
-
-async function exportCompatibilityReportFile() {
-    try {
-        showNotification('Generating compatibility report...', 'info');
-        
-        const result = await ipcRenderer.invoke('get-compatibility-report');
-        if (result.success) {
-            downloadFile('compatibility-report.json', JSON.stringify(result.data, null, 2), 'application/json');
-            showNotification('✅ Compatibility report downloaded successfully!', 'success');
-        } else {
-            showNotification(`❌ Failed to generate compatibility report: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        console.error('❌ Error generating compatibility report:', error);
-        showNotification(`❌ Error: ${error.message}`, 'error');
-    }
-}
-
-function downloadFile(filename, content, contentType) {
-    const blob = new Blob([content], { type: contentType });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-}
+// Debug functions removed - cleaner interface
 
 // === REPORTS FUNCTIONALITY ===
 async function loadEmployeeReports() {
@@ -1844,3 +1691,5 @@ function generateProductivityInsight(focusScore, clicks, keystrokes) {
         return "Low activity detected. Ensure you're actively using your computer during work sessions.";
     }
 }
+
+// Update functionality moved to system tray menu for cleaner interface

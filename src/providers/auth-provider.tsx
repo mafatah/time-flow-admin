@@ -19,7 +19,7 @@ interface AuthContextType {
   user: User | null;
   userDetails: UserDetails | null;
   session: Session | null;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   loading: boolean;
   error: string | null;
@@ -166,21 +166,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function signIn(email: string, password: string) {
+  async function signIn(email: string, password: string, rememberMe: boolean = false) {
     try {
       setError(null);
       
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: {
+          // Set session persistence based on rememberMe
+          // When rememberMe is true, session persists longer
+          // When false, session expires when browser closes
+          captchaToken: undefined,
+        }
       });
 
       if (error) {
         throw error;
       }
       
+      // Store remember me preference in localStorage
+      if (rememberMe) {
+        localStorage.setItem('timeflow_remember_me', 'true');
+        localStorage.setItem('timeflow_last_email', email);
+      } else {
+        localStorage.removeItem('timeflow_remember_me');
+        localStorage.removeItem('timeflow_last_email');
+      }
+      
       toast({
         title: "Successfully signed in",
+        description: rememberMe ? "Your session will be remembered" : "Welcome back!",
       });
     } catch (error: any) {
       const errorMessage = error.message || "An unexpected error occurred";

@@ -1,0 +1,14 @@
+{
+  "version": "999.0.0",
+  "releaseDate": "2025-06-11T09:41:50.721Z",
+  "files": [
+    {
+      "url": "http://localhost:3001/TimeFlow-v999.0.0.dmg",
+      "sha512": "mock-sha512-hash",
+      "size": 123456789
+    }
+  ],
+  "path": "TimeFlow-v999.0.0.dmg",
+  "sha512": "mock-sha512-hash",
+  "releaseNotes": "Test release for auto-updater functionality testing."
+}

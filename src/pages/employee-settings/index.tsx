@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/providers/auth-provider';
 import { toast } from 'sonner';
-import { Settings, DollarSign, Camera, User, Save, Trash2, Plus, Edit } from 'lucide-react';
+import { Settings, DollarSign, Camera, User, Save, Trash2, Plus, Edit, FolderOpen, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -32,12 +32,28 @@ interface SalarySettings {
   notes: string;
 }
 
+interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+interface ProjectAssignment {
+  id: string;
+  user_id: string;
+  project_id: string;
+  projects: Project | null;
+}
+
 export default function EmployeeSettingsPage() {
   const { userDetails } = useAuth();
   const [employees, setEmployees] = useState<User[]>([]);
   const [salarySettings, setSalarySettings] = useState<SalarySettings[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingEmployee, setEditingEmployee] = useState<string | null>(null);
+  const [managingProjects, setManagingProjects] = useState<string | null>(null);
   const [currentSettings, setCurrentSettings] = useState<SalarySettings>({
     user_id: '',
     salary_type: 'monthly',
@@ -54,6 +70,8 @@ export default function EmployeeSettingsPage() {
     if (userDetails?.role === 'admin') {
       fetchEmployees();
       fetchSalarySettings();
+      fetchProjects();
+      fetchProjectAssignments();
     }
   }, [userDetails]);
 
@@ -87,6 +105,44 @@ export default function EmployeeSettingsPage() {
       toast.error('Failed to fetch salary settings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, description')
+        .order('name');
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      toast.error('Failed to fetch projects');
+    }
+  };
+
+  const fetchProjectAssignments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('employee_project_assignments')
+        .select(`
+          id,
+          user_id,
+          project_id,
+          projects (
+            id,
+            name,
+            description
+          )
+        `);
+
+      if (error) throw error;
+      setProjectAssignments(data || []);
+    } catch (error) {
+      console.error('Error fetching project assignments:', error);
+      toast.error('Failed to fetch project assignments');
     }
   };
 
@@ -199,6 +255,51 @@ export default function EmployeeSettingsPage() {
     return `${minutes}m ${remainingSeconds}s`;
   };
 
+  const assignProjectToEmployee = async (userId: string, projectId: string) => {
+    try {
+      const { error } = await supabase
+        .from('employee_project_assignments')
+        .insert({
+          user_id: userId,
+          project_id: projectId
+        });
+
+      if (error) throw error;
+      
+      toast.success('Project assigned successfully');
+      fetchProjectAssignments();
+    } catch (error) {
+      console.error('Error assigning project:', error);
+      toast.error('Failed to assign project');
+    }
+  };
+
+  const removeProjectFromEmployee = async (assignmentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('employee_project_assignments')
+        .delete()
+        .eq('id', assignmentId);
+
+      if (error) throw error;
+      
+      toast.success('Project removed successfully');
+      fetchProjectAssignments();
+    } catch (error) {
+      console.error('Error removing project:', error);
+      toast.error('Failed to remove project');
+    }
+  };
+
+  const getEmployeeProjects = (userId: string): ProjectAssignment[] => {
+    return projectAssignments.filter(assignment => assignment.user_id === userId);
+  };
+
+  const getAvailableProjects = (userId: string): Project[] => {
+    const assignedProjectIds = getEmployeeProjects(userId).map(assignment => assignment.project_id);
+    return projects.filter(project => !assignedProjectIds.includes(project.id));
+  };
+
   if (userDetails?.role !== 'admin') {
     return (
       <div className="flex items-center justify-center h-64">
@@ -216,12 +317,12 @@ export default function EmployeeSettingsPage() {
             <Settings className="h-8 w-8" />
             Employee Settings
           </h1>
-          <p className="text-muted-foreground">Manage screenshot frequency and salary settings for employees</p>
+          <p className="text-muted-foreground">Manage project assignments, screenshot frequency, and salary settings for employees</p>
         </div>
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
@@ -234,8 +335,8 @@ export default function EmployeeSettingsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{salarySettings.length}</div>
-              <div className="text-sm text-muted-foreground">Configured Settings</div>
+              <div className="text-2xl font-bold text-green-600">{projects.length}</div>
+              <div className="text-sm text-muted-foreground">Total Projects</div>
             </div>
           </CardContent>
         </Card>
@@ -243,10 +344,17 @@ export default function EmployeeSettingsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">
-                {employees.filter(e => e.custom_screenshot_interval_seconds !== null).length}
-              </div>
-              <div className="text-sm text-muted-foreground">Custom Screenshot Intervals</div>
+              <div className="text-2xl font-bold text-purple-600">{projectAssignments.length}</div>
+              <div className="text-sm text-muted-foreground">Project Assignments</div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600">{salarySettings.length}</div>
+              <div className="text-sm text-muted-foreground">Configured Settings</div>
             </div>
           </CardContent>
         </Card>
@@ -260,7 +368,7 @@ export default function EmployeeSettingsPage() {
             Employee Configuration
           </CardTitle>
           <CardDescription>
-            Configure salary and screenshot monitoring settings for each employee
+            Configure project assignments, salary and screenshot monitoring settings for each employee
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -463,6 +571,85 @@ export default function EmployeeSettingsPage() {
                           </DialogContent>
                         </Dialog>
                         
+                        <Dialog open={managingProjects === employee.id} onOpenChange={(open) => !open && setManagingProjects(null)}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setManagingProjects(employee.id)}
+                            >
+                              <FolderOpen className="h-4 w-4 mr-2" />
+                              Projects
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>Manage Projects - {employee.full_name}</DialogTitle>
+                              <DialogDescription>
+                                Assign and remove projects for this employee
+                              </DialogDescription>
+                            </DialogHeader>
+                            
+                            <div className="space-y-6">
+                              {/* Current Projects */}
+                              <div>
+                                <h4 className="font-medium mb-3">Assigned Projects</h4>
+                                <div className="space-y-2">
+                                  {getEmployeeProjects(employee.id).length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No projects assigned</p>
+                                  ) : (
+                                    getEmployeeProjects(employee.id).map((assignment) => (
+                                      <div key={assignment.id} className="flex items-center justify-between p-3 border rounded">
+                                        <div>
+                                          <span className="font-medium">{assignment.projects?.name}</span>
+                                          {assignment.projects?.description && (
+                                            <p className="text-sm text-muted-foreground">{assignment.projects.description}</p>
+                                          )}
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => removeProjectFromEmployee(assignment.id)}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Available Projects */}
+                              <div>
+                                <h4 className="font-medium mb-3">Available Projects</h4>
+                                <div className="space-y-2">
+                                  {getAvailableProjects(employee.id).length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">All projects are already assigned</p>
+                                  ) : (
+                                    getAvailableProjects(employee.id).map((project) => (
+                                      <div key={project.id} className="flex items-center justify-between p-3 border rounded">
+                                        <div>
+                                          <span className="font-medium">{project.name}</span>
+                                          {project.description && (
+                                            <p className="text-sm text-muted-foreground">{project.description}</p>
+                                          )}
+                                        </div>
+                                        <Button
+                                          variant="default"
+                                          size="sm"
+                                          onClick={() => assignProjectToEmployee(employee.id, project.id)}
+                                        >
+                                          <Plus className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+
                         {settings && (
                           <Button 
                             variant="outline" 
@@ -475,7 +662,7 @@ export default function EmployeeSettingsPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <span className="font-medium">Screenshot Frequency:</span>
                         <br />
@@ -505,6 +692,30 @@ export default function EmployeeSettingsPage() {
                         <Badge variant="outline">
                           {settings ? `${settings.minimum_hours_monthly}h` : 'Not set'}
                         </Badge>
+                      </div>
+
+                      <div>
+                        <span className="font-medium">Assigned Projects:</span>
+                        <br />
+                        {(() => {
+                          const assignedProjects = getEmployeeProjects(employee.id);
+                          return assignedProjects.length === 0 ? (
+                            <Badge variant="outline">No projects</Badge>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {assignedProjects.slice(0, 2).map((assignment) => (
+                                <Badge key={assignment.id} variant="default" className="text-xs">
+                                  {assignment.projects?.name}
+                                </Badge>
+                              ))}
+                              {assignedProjects.length > 2 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{assignedProjects.length - 2} more
+                                </Badge>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 

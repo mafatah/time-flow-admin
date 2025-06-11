@@ -33,7 +33,7 @@ import TimeLogsPage from '@/pages/time-logs';
 import EmployeeSettingsPage from '@/pages/employee-settings';
 import FinancePage from '@/pages/finance';
 import SuspiciousActivityPage from '@/pages/suspicious-activity';
-import DebugJSLoading from '@/pages/debug/debug-js-loading';
+
 
 console.log('🚀 App.tsx loading...');
 
@@ -485,15 +485,6 @@ function AppRoutes() {
       } />
 
       {/* Debug Route - Available to both admin and employee */}
-      <Route path="/debug-js-loading" element={
-        <ProtectedRoute>
-          <AppLayout>
-            <RouteWrapper routeName="debug-js-loading">
-              <DebugJSLoading />
-            </RouteWrapper>
-          </AppLayout>
-        </ProtectedRoute>
-      } />
       
       {/* Employee Routes */}
       <Route path="/employee" element={

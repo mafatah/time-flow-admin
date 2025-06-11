@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ProjectSelector } from '@/components/tracking/project-selector';
 import { useToast } from '@/components/ui/use-toast';
 import { format, differenceInMinutes, differenceInHours } from 'date-fns';
-import { Clock, Play, Square, Calendar } from 'lucide-react';
+import { Clock, Play, Square, Calendar, RefreshCw } from 'lucide-react';
 
 interface TimeLog {
   id: string;
@@ -134,14 +134,24 @@ export default function EmployeeTimeTracker() {
   };
 
   const fetchProjects = async () => {
+    if (!userDetails?.id) {
+      return;
+    }
+
     try {
       const { data, error } = await supabase
-        .from('projects')
-        .select('id, name')
-        .order('name');
+        .from('employee_project_assignments')
+        .select(`
+          project_id,
+          projects (
+            id,
+            name
+          )
+        `)
+        .eq('user_id', userDetails.id);
 
       if (error) {
-        console.error('Error fetching projects:', error);
+        console.error('Error fetching assigned projects:', error);
         toast({
           title: 'Error fetching projects',
           description: error.message,
@@ -150,25 +160,58 @@ export default function EmployeeTimeTracker() {
         return;
       }
 
-      setProjects(data || []);
+      // Extract projects from the assignment data
+      const assignedProjects = (data || [])
+        .map((assignment: any) => assignment.projects)
+        .filter(Boolean)
+        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+      setProjects(assignedProjects);
     } catch (error) {
       console.error('Error fetching projects:', error);
       toast({
         title: 'Error fetching projects',
-        description: 'Failed to fetch projects',
+        description: 'Failed to fetch assigned projects',
         variant: 'destructive',
       });
     }
+  };
+
+  const refreshData = async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchActiveSessions(),
+      fetchRecentSessions(),
+      fetchProjects()
+    ]);
+    setLoading(false);
+    toast({
+      title: 'Data refreshed',
+      description: 'Projects and sessions have been updated',
+    });
   };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Time Tracking</CardTitle>
-          <CardDescription>
-            Track your work sessions and manage your time effectively.
-          </CardDescription>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Time Tracking</CardTitle>
+              <CardDescription>
+                Track your work sessions and manage your time effectively.
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshData}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <ProjectSelector />

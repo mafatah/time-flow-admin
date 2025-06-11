@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
@@ -16,6 +17,7 @@ import { Loader2 } from "lucide-react";
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  rememberMe: z.boolean().default(false),
 });
 
 export default function LoginPage() {
@@ -24,18 +26,23 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
+  // Check if user previously chose "Remember me"
+  const rememberedEmail = localStorage.getItem('timeflow_last_email') || "";
+  const wasRemembered = localStorage.getItem('timeflow_remember_me') === 'true';
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "",
+      email: rememberedEmail,
       password: "",
+      rememberMe: wasRemembered,
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      await signIn(values.email, values.password);
+      await signIn(values.email, values.password, values.rememberMe);
       navigate("/");
     } catch (error: any) {
       toast({
@@ -89,6 +96,29 @@ export default function LoginPage() {
                             <Input type="password" placeholder="••••••••" {...field} />
                           </FormControl>
                           <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="rememberMe"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm font-normal">
+                              Remember me
+                            </FormLabel>
+                            <p className="text-xs text-muted-foreground">
+                              Keep me signed in on this device
+                            </p>
+                          </div>
                         </FormItem>
                       )}
                     />

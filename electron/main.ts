@@ -12,6 +12,47 @@ import { ensureScreenRecordingPermission, testScreenCapture } from './permission
 import { screenshotIntervalSeconds } from './config';
 import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
+import { checkForUpdates, enableAutoUpdates, setupUpdaterIPC, getUpdateStatus } from './autoUpdater';
+
+// Safe console logging to prevent EPIPE errors
+function safeLog(...args: any[]) {
+  try {
+    console.log(...args);
+  } catch (error) {
+    // Silently ignore EPIPE errors when stdout is broken
+    if ((error as any).code !== 'EPIPE') {
+      // For non-EPIPE errors, try to log to stderr
+      try {
+        console.error('Console error:', error);
+      } catch (e) {
+        // If even stderr fails, just ignore
+      }
+    }
+  }
+}
+
+// Global error handling to prevent crashes
+process.on('uncaughtException', (error) => {
+  // Handle EPIPE errors silently (broken stdout/stderr pipe)
+  if ((error as any).code === 'EPIPE') {
+    return; // Ignore EPIPE errors silently
+  }
+  
+  // For other critical errors, log and continue
+  try {
+    console.error('Uncaught Exception:', error);
+  } catch (e) {
+    // If logging fails, just continue
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  try {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  } catch (e) {
+    // If logging fails, just continue
+  }
+});
 
 // === MEMORY LEAK PREVENTION SYSTEM ===
 // Clear ALL existing intervals and timeouts at startup
@@ -197,11 +238,16 @@ appEvents.on('auto-stop-tracking', (data) => {
 });
 
 async function createWindow() {
+  // Determine the correct icon path
+  const iconPath = path.join(__dirname, '../assets/icon.png');
+  const iconExists = fs.existsSync(iconPath);
+  
   // Create the employee desktop app window
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     show: true, // Show the window for employee interaction
+    icon: iconExists ? iconPath : undefined, // Use icon only if it exists
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -284,6 +330,10 @@ app.whenReady().then(async () => {
   setupAutoLaunch().catch(err => console.error(err));
   initSystemMonitor();
   startSyncLoop();
+  
+  // Setup auto-updater
+  setupUpdaterIPC();
+  enableAutoUpdates();
 
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) await createWindow();
@@ -441,6 +491,11 @@ ipcMain.on('logout', () => {
   console.log('🚪 User logged out - session cleared and tracking stopped');
 });
 
+// Update-related IPC handlers are now managed by setupUpdaterIPC() in autoUpdater.ts
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
 // Add back the missing sync handlers
 ipcMain.on('sync-offline-data', () => void syncOfflineData());
 ipcMain.handle('load-session', () => loadSession());
@@ -544,48 +599,80 @@ ipcMain.handle('manual-screenshot', async () => {
 
 // Create tray icon
 function createTray() {
-  // Use the assets from the electron directory
-  const iconPath = process.platform === 'darwin' 
-    ? path.join(__dirname, '../assets/tray-icon.png')  // macOS uses regular PNG
-    : path.join(__dirname, '../assets/tray-icon.png');
-  
-  console.log('🔍 Loading tray icon from:', iconPath);
-  
-  // Create fallback icon if file doesn't exist
-  if (!fs.existsSync(iconPath)) {
-    console.log('⚠️ Tray icon not found, creating fallback');
-    // Create a simple 16x16 icon programmatically
-    const icon = nativeImage.createFromBuffer(
-      Buffer.from(createSimpleIcon(), 'base64')
-    );
-    tray = new Tray(icon);
-  } else {
-    console.log('✅ Loading tray icon from file');
-    const icon = nativeImage.createFromPath(iconPath);
-    // Resize for tray (16x16 on macOS, 16x16 on Windows)
-    const resizedIcon = icon.resize({ width: 16, height: 16 });
-    tray = new Tray(resizedIcon);
-  }
-
-  // Set initial tooltip
-  tray.setToolTip('Ebdaa Time - Not tracking');
-  
-  // Create context menu
-  updateTrayMenu();
-  
-  // Handle click events
-  tray.on('click', () => {
-    if (mainWindow) {
-      if (mainWindow.isVisible()) {
-        mainWindow.hide();
-      } else {
-        mainWindow.show();
-        mainWindow.focus();
-      }
+  try {
+    // Use the assets from the electron directory
+    const iconPath = process.platform === 'darwin' 
+      ? path.join(__dirname, '../assets/tray-icon.png')  // macOS uses regular PNG
+      : path.join(__dirname, '../assets/tray-icon.png');
+    
+    console.log('🔍 Loading tray icon from:', iconPath);
+    console.log('🔍 Icon path exists:', fs.existsSync(iconPath));
+    console.log('🔍 Platform:', process.platform);
+    
+    // Create fallback icon if file doesn't exist
+    if (!fs.existsSync(iconPath)) {
+      console.log('⚠️ Tray icon not found, creating fallback');
+      // Create a simple 16x16 icon programmatically
+      const icon = nativeImage.createFromBuffer(
+        Buffer.from(createSimpleIcon(), 'base64')
+      );
+      tray = new Tray(icon);
+    } else {
+      console.log('✅ Loading tray icon from file');
+      const icon = nativeImage.createFromPath(iconPath);
+      // Resize for tray (16x16 on macOS, 16x16 on Windows)
+      const resizedIcon = icon.resize({ width: 16, height: 16 });
+      tray = new Tray(resizedIcon);
     }
-  });
 
-  return tray;
+    // Set initial tooltip
+    tray.setToolTip('TimeFlow - Not tracking');
+    
+    console.log('✅ Tray created successfully');
+    console.log('🔍 Tray is destroyed?', tray.isDestroyed());
+    
+    // Create context menu
+    updateTrayMenu();
+    
+    // Handle click events
+    tray.on('click', () => {
+      console.log('🖱️ Tray icon clicked');
+      if (mainWindow) {
+        if (mainWindow.isVisible()) {
+          mainWindow.hide();
+        } else {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    });
+
+    // Handle right-click events
+    tray.on('right-click', () => {
+      console.log('🖱️ Tray icon right-clicked');
+      if (tray) {
+        tray.popUpContextMenu();
+      }
+    });
+
+    console.log('✅ Tray event handlers set up');
+    
+    // Show notification that tray is ready
+    setTimeout(() => {
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'TimeFlow is ready',
+          body: 'Look for the TimeFlow icon in your system tray (menu bar)',
+          silent: true,
+        }).show();
+      }
+    }, 2000);
+
+    return tray;
+  } catch (error) {
+    console.error('❌ Failed to create tray:', error);
+    return null;
+  }
 }
 
 // Create a simple icon as base64 (16x16 green circle)
@@ -596,6 +683,13 @@ function createSimpleIcon(): string {
 
 // Update tray menu
 function updateTrayMenu() {
+  const updateStatus = getUpdateStatus();
+  const updateLabel = updateStatus.updateAvailable 
+    ? '⬇️ Download Update' 
+    : updateStatus.updateCheckInProgress 
+      ? '🔍 Checking...' 
+      : '🔄 Check for Updates';
+
   const contextMenu = Menu.buildFromTemplate([
     { 
       label: isTracking ? '⏸ Stop Tracking' : '▶️ Start Tracking', 
@@ -615,12 +709,23 @@ function updateTrayMenu() {
         shell.openExternal('https://time-flow-admin.vercel.app');
       }
     },
+    { type: 'separator' },
     { 
-      label: '📸 Take Screenshot', 
+      label: updateLabel, 
       click: () => {
-        triggerActivityCapture();
-        showScreenshotNotification();
+        if (updateStatus.updateAvailable) {
+          // Import downloadUpdate dynamically to avoid circular imports
+          import('./autoUpdater').then(({ downloadUpdate }) => {
+            downloadUpdate();
+          });
+        } else {
+          checkForUpdates(true);
+        }
       }
+    },
+    { 
+      label: `ℹ️ Version ${app.getVersion()}`, 
+      enabled: false
     },
     { type: 'separator' },
     { 

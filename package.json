@@ -11,7 +11,7 @@
   "main": "build/electron/electron/main.cjs",
   "scripts": {
     "start": "SCREENSHOT_INTERVAL_SECONDS=20 concurrently \"npm:dev\" \"npm:electron\"",
-    "start:desktop": "npm run build:all && npx electron build/electron/main.cjs",
+    "start:desktop": "npm run build:all && npx electron build/electron/electron/main.cjs",
     "electron": "SCREENSHOT_INTERVAL_SECONDS=20 npm run build:electron && SCREENSHOT_INTERVAL_SECONDS=20 npx electron build/electron/electron/main.cjs",
     "dev:electron": "ts-node-esm --project tsconfig.electron.json electron/main.ts",
     "dev": "vite",
@@ -22,7 +22,7 @@
     "electron:build": "electron-builder",
     "electron:build-unsigned": "electron-builder --config.mac.identity=null --config.mac.notarize=null",
     "build:web": "tsc -p tsconfig.app.json",
-    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\; && node fix-imports.cjs && mkdir -p build/desktop-agent && cp -r desktop-agent/renderer desktop-agent/config.json desktop-agent/assets build/desktop-agent/",
+    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\; && node fix-imports.cjs && mkdir -p build/desktop-agent && cp -r desktop-agent/renderer desktop-agent/config.json desktop-agent/assets build/desktop-agent/ && mkdir -p build/electron/assets && cp -r electron/assets/* build/electron/assets/",
     "build:all": "npm run build:dev && npm run build:electron && mkdir -p build/dist && cp -r dist/* build/dist/",
     "test:windows": "node test-windows-compatibility.js",
     "test:cross-platform": "node test-windows-compatibility.js"
@@ -66,6 +66,7 @@
     "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
     "electron-auto-launch": "^5.0.1",
+    "electron-updater": "^6.6.2",
     "embla-carousel-react": "^8.3.0",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.462.0",
@@ -123,9 +124,15 @@
   "build": {
     "appId": "com.ebdaadt.timetracker",
     "productName": "Ebdaa Work Time",
+    "icon": "electron/assets/icon.png",
     "directories": {
       "output": "dist",
       "buildResources": "build"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "your-github-username",
+      "repo": "time-flow-admin"
     },
     "files": [
       "build/electron/**/*",
@@ -161,13 +168,13 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "icon": "build/icon.icns",
+      "icon": "electron/assets/icon.png",
       "notarize": true
     },
     "afterSign": "scripts/notarize.cjs",
     "dmg": {
       "format": "UDZO",
-      "icon": "build/icon.icns",
+      "icon": "electron/assets/icon.png",
       "iconSize": 80,
       "title": "Install Ebdaa Work Time",
       "window": {
@@ -194,7 +201,8 @@
         "arch": [
           "x64"
         ]
-      }
+      },
+      "icon": "electron/assets/icon.png"
     },
     "linux": {
       "target": {
@@ -203,7 +211,8 @@
           "x64"
         ]
       },
-      "category": "Office"
+      "category": "Office",
+      "icon": "electron/assets/icon.png"
     },
     "nsis": {
       "oneClick": false,

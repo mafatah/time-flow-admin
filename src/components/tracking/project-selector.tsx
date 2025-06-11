@@ -20,27 +20,45 @@ export function ProjectSelector() {
   const { toast } = useToast();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(currentProjectId);
 
-  // Fetch projects
-  const { data: projects, isLoading: projectsLoading } = useQuery({
-    queryKey: ['projects'],
+  // Fetch assigned projects for employee
+  const { data: projects, isLoading: projectsLoading, refetch: refetchProjects } = useQuery({
+    queryKey: ['employee-assigned-projects', user?.id],
     queryFn: async () => {
+      if (!user?.id) return [];
+      
       const { data, error } = await supabase
-        .from('projects')
-        .select('id, name, description')
-        .order('name');
+        .from('employee_project_assignments')
+        .select(`
+          project_id,
+          projects (
+            id,
+            name,
+            description
+          )
+        `)
+        .eq('user_id', user.id);
         
       if (error) {
         toast({
-          title: 'Error fetching projects',
+          title: 'Error fetching assigned projects',
           description: error.message,
           variant: 'destructive',
         });
         return [];
       }
       
-      return data as Project[];
+      // Extract projects from assignment data and sort by name
+      const assignedProjects = (data || [])
+        .map((assignment: any) => assignment.projects)
+        .filter(Boolean)
+        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+      
+      return assignedProjects as Project[];
     },
-    enabled: !!user,
+    enabled: !!user?.id,
+    staleTime: 30000, // Consider data stale after 30 seconds
+    refetchInterval: 60000, // Refetch every minute
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
   
   // Update selected project when currentProjectId changes
@@ -113,7 +131,7 @@ export function ProjectSelector() {
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="no-projects" disabled>No projects available</SelectItem>
+                  <SelectItem value="no-projects" disabled>No projects assigned to you</SelectItem>
                 )}
               </SelectContent>
             </Select>

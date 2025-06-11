@@ -44,11 +44,42 @@ export default function TimeTrackerPage() {
   }, [userDetails]);
 
   const fetchProjects = async () => {
+    if (!userDetails?.id) return;
+
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, name')
-        .order('name');
+      let data, error;
+      
+      // Admin users can see all projects, employees only see assigned projects
+      if (userDetails.role === 'admin') {
+        const response = await supabase
+          .from('projects')
+          .select('id, name')
+          .order('name');
+        data = response.data;
+        error = response.error;
+      } else {
+        // Employee: fetch only assigned projects
+        const response = await supabase
+          .from('employee_project_assignments')
+          .select(`
+            project_id,
+            projects (
+              id,
+              name
+            )
+          `)
+          .eq('user_id', userDetails.id);
+        
+        if (response.error) {
+          error = response.error;
+        } else {
+          // Extract projects from assignment data
+          data = (response.data || [])
+            .map((assignment: any) => assignment.projects)
+            .filter(Boolean)
+            .sort((a: any, b: any) => a.name.localeCompare(b.name));
+        }
+      }
 
       if (error) {
         console.error('Error fetching projects:', error);

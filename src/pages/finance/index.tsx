@@ -12,6 +12,8 @@ import { DollarSign, Calculator, TrendingDown, TrendingUp, Users, Clock, AlertTr
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import WarningsDeductions from '@/components/finance/warnings-deductions';
 
 interface Employee {
   id: string;
@@ -394,18 +396,25 @@ export default function FinancePage() {
         </Card>
       </div>
 
-      {/* Payroll Records */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Payroll for {format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
-          </CardTitle>
-          <CardDescription>
-            Employee salary calculations based on hours worked and settings
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      {/* Tabs for different sections */}
+      <Tabs defaultValue="payroll" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="payroll">Payroll Calculations</TabsTrigger>
+          <TabsTrigger value="warnings">Warnings & Deductions</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="payroll">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Payroll for {format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
+              </CardTitle>
+              <CardDescription>
+                Employee salary calculations based on hours worked and settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
           {loading ? (
             <div className="text-center py-8">Loading payroll data...</div>
           ) : payrollRecords.length === 0 ? (
@@ -531,8 +540,14 @@ export default function FinancePage() {
               })}
             </div>
           )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="warnings">
+          <WarningsDeductions selectedMonth={selectedMonth} />
+        </TabsContent>
+      </Tabs>
 
       {/* Edit Payroll Dialog */}
       {editingPayroll && (

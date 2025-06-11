@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,21 +41,56 @@ const TimeTracker = () => {
   const fetchProjects = async () => {
     setIsLoading(true);
     try {
+      // Fetch only projects assigned to the current user
       const { data, error } = await supabase
-        .from('projects')
-        .select('id, name');
+        .from('employee_project_assignments')
+        .select(`
+          project_id,
+          projects (
+            id,
+            name
+          )
+        `)
+        .eq('user_id', user?.id || '');
 
       if (error) {
+        console.error('Error fetching assigned projects:', error);
         toast({
           title: 'Error fetching projects',
           description: error.message,
           variant: 'destructive',
         });
+        setProjects([]);
+        return;
       }
 
       if (data) {
-        setProjects(data);
+        // Transform the data to match the Project interface
+        const assignedProjects = data
+          .filter(assignment => assignment.projects) // Ensure project exists
+          .map(assignment => ({
+            id: assignment.projects!.id,
+            name: assignment.projects!.name,
+          }));
+        
+        setProjects(assignedProjects);
+        
+        if (assignedProjects.length === 0) {
+          toast({
+            title: 'No projects assigned',
+            description: 'Please contact your administrator to assign projects to your account.',
+            variant: 'default',
+          });
+        }
       }
+    } catch (error: any) {
+      console.error('Unexpected error fetching projects:', error);
+      toast({
+        title: 'Error fetching projects',
+        description: 'An unexpected error occurred while loading projects.',
+        variant: 'destructive',
+      });
+      setProjects([]);
     } finally {
       setIsLoading(false);
     }
@@ -220,16 +254,27 @@ const TimeTracker = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Select onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select project" />
+            <label htmlFor="project-select" className="text-sm font-medium">
+              Select Project <span className="text-red-500">*</span>
+            </label>
+            <Select onValueChange={setSelectedProjectId} disabled={projects.length === 0}>
+              <SelectTrigger className="w-full">
+                <SelectValue 
+                  placeholder={projects.length === 0 ? "✓ Choose a project to track time..." : "Choose a project to track time..."} 
+                />
               </SelectTrigger>
               <SelectContent>
-                {projects.map((project: any) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
+                {projects.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    No projects assigned
+                  </div>
+                ) : (
+                  projects.map((project: Project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <Button onClick={startSession} disabled={!selectedProjectId || activeSessions.length > 0}>

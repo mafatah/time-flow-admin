@@ -318,8 +318,6 @@ function detectMouseMovement() {
       const movementCount = Math.floor(totalMovement / 10); // 1 movement per 10 pixels
       recordRealActivity('mouse_movement', movementCount);
       
-      console.log(`🖱️ Real mouse movement detected: ${totalMovement}px, recorded ${movementCount} movements`);
-      
       // Update last position
       lastMousePosition.x = currentX;
       lastMousePosition.y = currentY;

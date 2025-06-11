@@ -1372,22 +1372,7 @@ export function recordRealActivity(type: 'mouse_click' | 'keystroke' | 'mouse_mo
       user_status: 'GENUINELY_ACTIVE_TYPING'
     });
   } else if (type === 'mouse_movement') {
-    // Keep existing mouse movement logging but enhance it slightly
-    console.log(`🖱️ Real mouse movement detected: ${count} movement${count > 1 ? 's' : ''}, total movements: ${activityMetrics.mouse_movements}`);
-    console.log(`🖱️ MOUSE MOVEMENT DETAILS:`, {
-      timestamp: timestamp,
-      movement_count: count,
-      total_session_movements: activityMetrics.mouse_movements,
-      activity_score_before: previousScore,
-      activity_score_after: activityMetrics.activity_score,
-      score_increase: scoreIncrease,
-      session_totals: {
-        mouse_clicks: activityMetrics.mouse_clicks,
-        keystrokes: activityMetrics.keystrokes,
-        mouse_movements: activityMetrics.mouse_movements
-      },
-      user_status: 'GENUINELY_ACTIVE_MOVING'
-    });
+    // Mouse movement recorded silently to avoid log spam
   }
   
   // Overall activity summary (shown occasionally to avoid spam)

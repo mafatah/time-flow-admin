@@ -643,6 +643,14 @@
                     <label class="form-label" for="loginPassword">Password</label>
                     <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" required>
                 </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="checkbox-container" style="display: flex; align-items: center; font-size: 14px; cursor: pointer;">
+                        <input type="checkbox" id="rememberMe" style="margin-right: 8px; transform: scale(1.2);">
+                        <span style="color: #374151;">Remember me</span>
+                    </label>
+                    <p style="font-size: 12px; color: #64748b; margin-top: 4px; margin-left: 20px;">Keep me signed in on this device</p>
+                </div>
                 
                 <button type="submit" id="loginBtn" class="login-btn">
                     <span id="loginBtnText">Sign In</span>
@@ -800,63 +808,9 @@
                     </div>
                 </div>
 
-                <!-- DEBUG SECTION (FOR TESTING) -->
-                <div class="control-section" style="margin-top: 40px; border: 2px dashed #e2e8f0; border-radius: 12px; padding: 24px;">
-                    <div class="control-header">
-                        <div class="control-title" style="color: #f59e0b;">🧪 Activity Detection Debug</div>
-                        <div class="control-subtitle">Cross-platform input detection testing and log export</div>
-                    </div>
-                    
-                    <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-                        <h4 style="color: #92400e; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Current Activity Metrics:</h4>
-                        <div id="activityMetrics" style="font-family: monospace; font-size: 13px; color: #78350f;">
-                            Loading metrics...
-                        </div>
-                    </div>
 
-                    <div style="background: #dbeafe; border: 1px solid #3b82f6; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-                        <h4 style="color: #1e40af; font-size: 14px; font-weight: 600; margin-bottom: 8px;">📋 Cross-Platform Testing Instructions:</h4>
-                        <div style="font-size: 13px; color: #1e40af; line-height: 1.5;">
-                            <strong>For Windows Testing:</strong><br>
-                            1. Download logs using the buttons below<br>
-                            2. Send logs to Windows user<br>
-                            3. Have them test: mouse clicks, keyboard input, mouse movement<br>
-                            4. Compare their results with expected behavior
-                        </div>
-                    </div>
-                    
-                    <div class="button-group" style="flex-wrap: wrap; gap: 12px;">
-                        <button id="downloadActivityLogs" class="btn" style="background: #059669; color: white; padding: 12px 16px; font-size: 14px;">
-                            <i data-lucide="download" style="width: 16px; height: 16px;"></i>
-                            <span>Download Activity Logs</span>
-                        </button>
-                        
-                        <button id="downloadSystemLogs" class="btn" style="background: #7c3aed; color: white; padding: 12px 16px; font-size: 14px;">
-                            <i data-lucide="file-text" style="width: 16px; height: 16px;"></i>
-                            <span>Download System Logs</span>
-                        </button>
-                        
-                        <button id="downloadScreenshotLogs" class="btn" style="background: #dc2626; color: white; padding: 12px 16px; font-size: 14px;">
-                            <i data-lucide="camera" style="width: 16px; height: 16px;"></i>
-                            <span>Download Screenshot Logs</span>
-                        </button>
-                        
-                        <button id="refreshMetrics" class="btn" style="background: #64748b; color: white; padding: 12px 16px; font-size: 14px;">
-                            <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i>
-                            <span>Refresh Metrics</span>
-                        </button>
-                        
-                        <button id="exportCompatibilityReport" class="btn" style="background: #ea580c; color: white; padding: 12px 16px; font-size: 14px;">
-                            <i data-lucide="file-down" style="width: 16px; height: 16px;"></i>
-                            <span>Export Compatibility Report</span>
-                        </button>
-                    </div>
-                    
-                    <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 12px; color: #0c4a6e;">
-                        <strong>Instructions:</strong> Use these buttons to manually test activity recording. Click the buttons and check if the activity metrics update correctly.
-                        Real trackpad/keyboard input should also be detected automatically.
-                    </div>
-                </div>
+
+
             </div>
 
             <!-- TIME TRACKER PAGE -->
