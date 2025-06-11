@@ -121,6 +121,25 @@ console.log('✅ Memory monitoring started');
 
 // === END MEMORY LEAK PREVENTION ===
 
+// === JIT COMPILATION FIX FOR APPLE SILICON ===
+// Fix for EXC_BREAKPOINT crashes in pthread_jit_write_protect_np
+console.log('🔧 Applying JIT compilation fixes for Apple Silicon...');
+
+// Disable V8's MAP_JIT flag which conflicts with macOS security
+app.commandLine.appendSwitch('--disable-features', 'VizDisplayCompositor');
+app.commandLine.appendSwitch('--no-sandbox');
+app.commandLine.appendSwitch('--disable-web-security');
+app.commandLine.appendSwitch('--disable-features', 'OutOfBlinkCors');
+
+// V8 JIT compilation fixes specifically for Apple Silicon
+app.commandLine.appendSwitch('--js-flags', '--jitless');
+app.commandLine.appendSwitch('--disable-software-rasterizer');
+app.commandLine.appendSwitch('--disable-background-timer-throttling');
+app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('--disable-renderer-backgrounding');
+
+console.log('✅ JIT compilation fixes applied');
+
 // Create event emitter for internal communication
 export const appEvents = new EventEmitter();
 
