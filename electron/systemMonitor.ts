@@ -124,37 +124,11 @@ export function initSystemMonitor() {
     
     const session = loadSession();
     if (session) {
-      if (suspendDuration < 5 * 60 * 1000) {
-        console.log('🔄 Auto-resuming tracking (short suspend)');
-        startTracking();
-        if (session.user_id) {
-          startActivityMonitoring(session.user_id);
-        }
-      } else {
-        try {
-          const result = dialog.showMessageBoxSync({
-            type: 'question',
-            message: `System was suspended for ${suspendMinutes} minutes. Resume tracking?`,
-            detail: 'Choose "Resume" to continue tracking from where you left off, or "Stop" to end the current session.',
-            buttons: ['Resume', 'Stop'],
-            defaultId: 0,
-            cancelId: 1
-          });
-          
-          if (result === 0) {
-            console.log('👤 User chose to resume tracking');
-            startTracking();
-            if (session.user_id) {
-              startActivityMonitoring(session.user_id);
-            }
-          } else {
-            console.log('👤 User chose to stop tracking');
-            stopTracking();
-          }
-        } catch (error) {
-          console.log('⚠️ Could not show resume dialog, auto-stopping:', error);
-          stopTracking();
-        }
+      // Always auto-resume regardless of suspend duration - don't ask employee
+      console.log('🔄 Auto-resuming tracking after system suspend');
+      startTracking();
+      if (session.user_id) {
+        startActivityMonitoring(session.user_id);
       }
     }
   });

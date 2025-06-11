@@ -382,16 +382,10 @@ function startIdleMonitoring() {
       
       idleStart = null;
       
-      // ITEM 3: Auto-resume tracking with confirmation for long idle periods
+      // ITEM 3: Auto-resume tracking without asking employee
       if (isPaused && currentSession) {
-        if (idleDurationSeconds > 300) { // More than 5 minutes
-          // Ask user if they want to resume
-          mainWindow?.webContents.send('confirm-resume-after-idle', {
-            idleDurationSeconds: idleDurationSeconds
-          });
-        } else {
-          resumeTracking();
-        }
+        // Always auto-resume regardless of idle duration - don't interrupt employee
+        resumeTracking();
       }
       
       // Update UI
@@ -1604,16 +1598,11 @@ powerMonitor.on('resume', () => {
   
   // Auto-resume with user confirmation for long sleep periods
   if (isPaused && currentSession) {
-    setTimeout(() => {
-      if (sleepMinutes > 60) { // More than 1 hour
-        mainWindow?.webContents.send('confirm-resume-after-sleep', {
-          sleepMinutes: sleepMinutes
-        });
-      } else {
-        resumeTracking();
-        showTrayNotification(`Tracking resumed after ${sleepMinutes}m sleep`, 'success');
-      }
-    }, 5000); // Wait 5 seconds after resume
+            setTimeout(() => {
+          // Always auto-resume tracking without asking - employee doesn't need to be interrupted
+          resumeTracking();
+          showTrayNotification(`Tracking resumed after ${sleepMinutes}m sleep`, 'success');
+        }, 5000); // Wait 5 seconds after resume
   }
   
   systemSleepStart = null;
