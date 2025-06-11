@@ -24,8 +24,8 @@
     "build:web": "tsc -p tsconfig.app.json",
     "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\; && node fix-imports.cjs && mkdir -p build/desktop-agent && cp -r desktop-agent/renderer desktop-agent/config.json desktop-agent/assets build/desktop-agent/ && mkdir -p build/electron/assets && cp -r electron/assets/* build/electron/assets/ && cp public/app-update.yml build/electron/",
     "build:all": "npm run build:dev && npm run build:electron && mkdir -p build/dist && cp -r dist/* build/dist/",
-    "test:windows": "node test-windows-compatibility.js",
-    "test:cross-platform": "node test-windows-compatibility.js"
+    "test:windows": "node test-windows-compatibility.cjs",
+    "test:cross-platform": "node test-windows-compatibility.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

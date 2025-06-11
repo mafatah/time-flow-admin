@@ -1,11 +1,13 @@
-version: 1.0.10
+version: 1.0.11
 files:
-  - url: TimeFlow-v1.0.10-ARM64-Signed.dmg
-    sha512: c0024af3ce0fc4afd7595ea35b66feb074f2a3f4de6e26565cb563de67356d564002d767a4fc8a4b34ac386b95b24fb1114fb051a9cf0514ae3abd5816988764
-    size: 133253043
-  - url: TimeFlow-v1.0.10-Intel-Signed.dmg
-    sha512: e47783d0c99598e9506c5d2c5d872784514e33d834aefd6d33000efde1b864cc1d3e4d18b37c31aa82cb969752c3643d322ca278cec7758da74592ee547e3f2e
-    size: 139714546
-path: TimeFlow-v1.0.10-ARM64-Signed.dmg
-sha512: c0024af3ce0fc4afd7595ea35b66feb074f2a3f4de6e26565cb563de67356d564002d767a4fc8a4b34ac386b95b24fb1114fb051a9cf0514ae3abd5816988764
-releaseDate: '2025-06-11T14:30:00.000Z' 
+  - url: TimeFlow-v1.0.11-ARM64-Signed.dmg
+    sha512: 064489932a54f9cf4ad470d6d6f37be740f5e349bc08d6af1fcfc0de9eb5f4b14e41fd56e6d6dc980fd1357cd3040ba5493579ab85e4c3a3510e2406fa91dc18
+    size: 135124313
+    blockMapSize: 144076
+  - url: TimeFlow-v1.0.11-Intel-Signed.dmg  
+    sha512: a74c1a8ab1be26f4080e17da11fb1e45f6416b93e569a818cbfb2e600ebfde0f07d9e58ebd08f0ff42eb1826e3622c543142b9855fc7cde5e822d18e9134a598
+    size: 141612066
+    blockMapSize: 150889
+path: TimeFlow-v1.0.11-ARM64-Signed.dmg
+sha512: 064489932a54f9cf4ad470d6d6f37be740f5e349bc08d6af1fcfc0de9eb5f4b14e41fd56e6d6dc980fd1357cd3040ba5493579ab85e4c3a3510e2406fa91dc18
+releaseDate: '2025-06-11T13:36:00.000Z' 
