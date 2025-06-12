@@ -1,13 +1,13 @@
-version: 1.0.11
+version: 1.0.14
 files:
-  - url: TimeFlow-v1.0.11-ARM64-Signed.dmg
-    sha512: 064489932a54f9cf4ad470d6d6f37be740f5e349bc08d6af1fcfc0de9eb5f4b14e41fd56e6d6dc980fd1357cd3040ba5493579ab85e4c3a3510e2406fa91dc18
-    size: 135124313
-    blockMapSize: 144076
-  - url: TimeFlow-v1.0.11-Intel-Signed.dmg  
-    sha512: a74c1a8ab1be26f4080e17da11fb1e45f6416b93e569a818cbfb2e600ebfde0f07d9e58ebd08f0ff42eb1826e3622c543142b9855fc7cde5e822d18e9134a598
-    size: 141612066
-    blockMapSize: 150889
-path: TimeFlow-v1.0.11-ARM64-Signed.dmg
-sha512: 064489932a54f9cf4ad470d6d6f37be740f5e349bc08d6af1fcfc0de9eb5f4b14e41fd56e6d6dc980fd1357cd3040ba5493579ab85e4c3a3510e2406fa91dc18
-releaseDate: '2025-06-11T13:36:00.000Z' 
+  - url: Ebdaa Work Time-1.0.14-arm64.dmg
+    sha512: placeholder_hash_will_be_updated_after_build
+    size: 120000000
+    blockMapSize: 150000
+  - url: Ebdaa Work Time-1.0.14.dmg  
+    sha512: placeholder_hash_will_be_updated_after_build
+    size: 125000000
+    blockMapSize: 155000
+path: Ebdaa Work Time-1.0.14-arm64.dmg
+sha512: placeholder_hash_will_be_updated_after_build
+releaseDate: '2025-06-12T12:45:00.000Z' 
