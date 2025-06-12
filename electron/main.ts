@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as http from 'http';
 import * as fs from 'fs';
 import { setUserId, getUserId, setProjectId, startTracking, stopTracking, syncOfflineData, loadSession, clearSavedSession } from './tracker';
+import { saveUserSession, loadUserSession, clearUserSession, isSessionValid, UserSession } from './userSessionManager';
 import { setupAutoLaunch } from './autoLaunch';
 import { initSystemMonitor } from './systemMonitor';
 import { startSyncLoop } from './unsyncedManager';
@@ -374,10 +375,26 @@ app.on('before-quit', () => {
 });
 
 // Handle user login from desktop-agent UI - FIX: Use handle instead of on for invoke calls
-ipcMain.handle('user-logged-in', (event, user) => {
-  console.log('👤 User logged in from UI:', user.email);
-  setUserId(user.id);
-  console.log('Set user ID:', user.id);
+ipcMain.handle('user-logged-in', (event, userData) => {
+  console.log('👤 User logged in from UI:', userData.email);
+  setUserId(userData.id);
+  
+  // Save user session if remember_me is true
+  if (userData.session && userData.remember_me) {
+    const userSession: UserSession = {
+      id: userData.id,
+      email: userData.email,
+      access_token: userData.session.access_token,
+      refresh_token: userData.session.refresh_token,
+      expires_at: userData.session.expires_at * 1000, // Convert to milliseconds
+      user_metadata: userData.session.user || {},
+      remember_me: userData.remember_me
+    };
+    saveUserSession(userSession);
+    console.log('✅ User session saved for future logins');
+  }
+  
+  console.log('Set user ID:', userData.id);
   console.log('✅ User ID set, ready for manual tracking start');
   return { success: true, message: 'User logged in successfully' };
 });
@@ -385,11 +402,12 @@ ipcMain.handle('user-logged-in', (event, user) => {
 // Handle user logout from desktop-agent UI
 ipcMain.handle('user-logged-out', () => {
   console.log('🚪 User logout requested from UI');
-  // Clear session and stop tracking
+  // Clear user session and tracking session
+  clearUserSession();
   clearSavedSession();
   stopTrackingTimer();
   stopActivityMonitoring();
-  console.log('✅ User logged out - session cleared and tracking stopped');
+  console.log('✅ User logged out - all sessions cleared and tracking stopped');
   return { success: true, message: 'User logged out successfully' };
 });
 
@@ -518,6 +536,16 @@ ipcMain.handle('get-app-version', () => {
 // Add back the missing sync handlers
 ipcMain.on('sync-offline-data', () => void syncOfflineData());
 ipcMain.handle('load-session', () => loadSession());
+ipcMain.handle('load-user-session', () => {
+  const userSession = loadUserSession();
+  if (userSession && isSessionValid(userSession)) {
+    console.log('✅ Valid user session found for:', userSession.email);
+    return userSession;
+  } else {
+    console.log('⚠️ No valid user session found');
+    return null;
+  }
+});
 ipcMain.on('clear-session', () => clearSavedSession());
 
 // Add missing get-config handler if not already present

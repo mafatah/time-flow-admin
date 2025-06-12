@@ -72,11 +72,41 @@ async function initializeApp() {
         supabaseClient = supabase.createClient(config.supabase_url, config.supabase_key);
         console.log('✅ Supabase client initialized');
         
-        // Try to load saved session
-        const savedSession = await ipcRenderer.invoke('load-session');
-        if (savedSession && savedSession.user) {
-            console.log('📂 Found saved session, auto-logging in...');
-            await handleUserLogin(savedSession.user);
+        // Try to load saved user session first
+        const savedUserSession = await ipcRenderer.invoke('load-user-session');
+        if (savedUserSession) {
+            console.log('📂 Found saved user session, auto-logging in...');
+            
+            // Restore Supabase session
+            const { data: sessionData, error: sessionError } = await supabaseClient.auth.setSession({
+                access_token: savedUserSession.access_token,
+                refresh_token: savedUserSession.refresh_token
+            });
+            
+            if (!sessionError && sessionData.session) {
+                // Set current user from saved session
+                currentUser = {
+                    id: savedUserSession.id,
+                    email: savedUserSession.email,
+                    name: savedUserSession.user_metadata.full_name || savedUserSession.email.split('@')[0],
+                    role: 'employee'
+                };
+                
+                console.log('👤 User restored from saved session:', currentUser);
+                showMainApp();
+                showNotification('Welcome back! Automatically signed in.', 'success');
+            } else {
+                console.log('⚠️ Failed to restore session:', sessionError);
+                // Clear invalid session
+                await ipcRenderer.invoke('user-logged-out');
+            }
+        } else {
+            // Try to load old session format (tracking session)
+            const savedSession = await ipcRenderer.invoke('load-session');
+            if (savedSession && savedSession.user) {
+                console.log('📂 Found saved tracking session, auto-logging in...');
+                await handleUserLogin(savedSession.user);
+            }
         }
         
         // Test buttons removed for cleaner interface
@@ -292,8 +322,12 @@ async function handleLogin(e) {
             localStorage.removeItem('timeflow_remember_me');
         }
 
-        // Notify main process about user login
-        await ipcRenderer.invoke('user-logged-in', currentUser);
+        // Notify main process about user login with session data
+        await ipcRenderer.invoke('user-logged-in', {
+            ...currentUser,
+            session: authData.session,
+            remember_me: rememberMe
+        });
 
         // Show main app
         showMainApp();

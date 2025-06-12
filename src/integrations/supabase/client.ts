@@ -15,7 +15,10 @@ const supabaseClient: SupabaseClient<Database> = createClient<Database>(supabase
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    storageKey: 'sb-fkpiqcxkmrtaetvfgcli-auth-token',
+    flowType: 'pkce'
   }
 });
 

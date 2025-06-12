@@ -64,6 +64,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (sessionError) {
           console.error("Error getting session:", sessionError);
+          
+          // Try to restore from extended session if remember me was used
+          const extendedSessionStr = localStorage.getItem('timeflow_extended_session');
+          if (extendedSessionStr) {
+            try {
+              const extendedSession = JSON.parse(extendedSessionStr);
+              if (extendedSession.expires_at > Date.now()) {
+                console.log('🔄 Attempting to restore extended session...');
+                const { data: restoredData, error: restoreError } = await supabase.auth.setSession(extendedSession);
+                
+                if (!restoreError && restoredData.session) {
+                  console.log('✅ Extended session restored successfully');
+                  setSession(restoredData.session);
+                  if (restoredData.session.user) {
+                    setUser(restoredData.session.user);
+                    await fetchUserDetails(restoredData.session.user.id);
+                  }
+                  return; // Skip error handling below
+                } else {
+                  console.log('⚠️ Failed to restore extended session:', restoreError);
+                  localStorage.removeItem('timeflow_extended_session');
+                }
+              } else {
+                console.log('⚠️ Extended session expired, removing...');
+                localStorage.removeItem('timeflow_extended_session');
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse extended session:', parseError);
+              localStorage.removeItem('timeflow_extended_session');
+            }
+          }
+          
           setError(`Authentication error: ${sessionError.message}`);
           toast({
             title: "Authentication error",
@@ -170,7 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setError(null);
       
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
         options: {
@@ -189,9 +221,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rememberMe) {
         localStorage.setItem('timeflow_remember_me', 'true');
         localStorage.setItem('timeflow_last_email', email);
+        
+        // Explicitly save session in localStorage with extended expiry
+        if (data.session) {
+          const extendedSession = {
+            ...data.session,
+            expires_at: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
+          };
+          localStorage.setItem('timeflow_extended_session', JSON.stringify(extendedSession));
+        }
       } else {
         localStorage.removeItem('timeflow_remember_me');
         localStorage.removeItem('timeflow_last_email');
+        localStorage.removeItem('timeflow_extended_session');
+      }
+      
+      // Force session persistence in Supabase storage
+      if (data.session && rememberMe) {
+        try {
+          // Manually save session to ensure persistence
+          await supabase.auth.setSession(data.session);
+        } catch (sessionError) {
+          console.warn('Failed to explicitly set session:', sessionError);
+        }
       }
       
       toast({
@@ -214,6 +266,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setError(null);
       await supabase.auth.signOut();
+      
+      // Clear all session-related localStorage items
+      localStorage.removeItem('timeflow_remember_me');
+      localStorage.removeItem('timeflow_last_email');
+      localStorage.removeItem('timeflow_extended_session');
+      
+      // Clear Supabase session storage explicitly
+      const storageKey = 'sb-fkpiqcxkmrtaetvfgcli-auth-token';
+      localStorage.removeItem(storageKey);
       
       // If running in Electron, also clear the Electron session
       if (typeof window !== 'undefined' && (window as any).electron) {
