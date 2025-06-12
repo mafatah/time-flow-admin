@@ -19,7 +19,7 @@ exports.default = async function notarizeMacOS(context) {
       appBundleId: 'com.ebdaadt.timetracker',
       appPath: `${appOutDir}/${appName}.app`,
       appleId: process.env.APPLE_ID || 'alshqawe66@gmail.com',
-      appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD || 'aejg-aqwt-ryfs-ntuf',
+      appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
       teamId: process.env.APPLE_TEAM_ID || '6GW49LK9V9',
     });
 

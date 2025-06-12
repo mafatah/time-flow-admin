@@ -1,0 +1,37 @@
+{
+  "timestamp": "2025-06-12T09:17:44.048Z",
+  "tables": {
+    "users": {
+      "error": "Invalid API key",
+      "data": []
+    },
+    "projects": {
+      "error": "Invalid API key",
+      "data": []
+    },
+    "time_logs": {
+      "error": "Invalid API key",
+      "data": []
+    },
+    "screenshots": {
+      "error": "Invalid API key",
+      "data": []
+    },
+    "idle_logs": {
+      "error": "Invalid API key",
+      "data": []
+    },
+    "activities": {
+      "error": "Invalid API key",
+      "data": []
+    },
+    "suspicious_activities": {
+      "error": "Invalid API key",
+      "data": []
+    },
+    "user_profiles": {
+      "error": "Invalid API key",
+      "data": []
+    }
+  }
+}

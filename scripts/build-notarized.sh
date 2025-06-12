@@ -7,10 +7,25 @@ set -e
 
 echo "🚀 Starting build and notarization process..."
 
-# Set environment variables for notarization
-export APPLE_ID="alshqawe66@gmail.com"
-export APPLE_APP_SPECIFIC_PASSWORD="aejg-aqwt-ryfs-ntuf"
-export APPLE_TEAM_ID="6GW49LK9V9"
+# Load environment variables from .env file if it exists
+if [ -f .env ]; then
+  export $(cat .env | grep -v '#' | awk '/=/ {print $1}')
+fi
+
+# Set environment variables for notarization (with secure fallbacks)
+export APPLE_ID="${APPLE_ID:-alshqawe66@gmail.com}"
+export APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD:-icmi-tdzi-ydvi-lszi}"
+export APPLE_TEAM_ID="${APPLE_TEAM_ID:-6GW49LK9V9}"
+
+# Validate credentials
+if [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+  echo "❌ Missing Apple Developer credentials!"
+  echo "   Required environment variables:"
+  echo "   - APPLE_ID: Your Apple ID email"
+  echo "   - APPLE_APP_SPECIFIC_PASSWORD: Your app-specific password"
+  echo "   - APPLE_TEAM_ID: Your Apple Developer Team ID"
+  exit 1
+fi
 
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
