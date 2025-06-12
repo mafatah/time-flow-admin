@@ -11,7 +11,7 @@ let downloadProgress = 0;
 let updateInfo: any = null;
 
 // Configure auto-updater
-autoUpdater.autoDownload = false; // Don't auto-download, ask user first
+autoUpdater.autoDownload = true; // Auto-download updates for better UX
 autoUpdater.allowPrerelease = false; // Only stable releases
 
 // DEVELOPMENT MODE: Force updates in development for testing
@@ -53,8 +53,20 @@ autoUpdater.on('update-available', (info) => {
   if (Notification.isSupported()) {
     const notification = new Notification({
       title: '🔄 Update Available - TimeFlow',
-      body: `Version ${info.version} is available. Check the tray menu to download.`,
+      body: `Version ${info.version} is downloading automatically. Click for details.`,
       icon: path.join(__dirname, '../assets/icon.png'),
+    });
+    
+    // Make notification clickable to show download status
+    notification.on('click', () => {
+      // Show download progress dialog
+      dialog.showMessageBox({
+        type: 'info',
+        title: 'Downloading Update - TimeFlow',
+        message: `Version ${info.version} is downloading in the background`,
+        detail: 'You will be notified when the update is ready to install.',
+        buttons: ['OK']
+      });
     });
     
     notification.show();
@@ -107,12 +119,14 @@ autoUpdater.on('update-downloaded', (info) => {
   if (Notification.isSupported()) {
     const notification = new Notification({
       title: '🔄 Update Ready - TimeFlow',
-      body: `Version ${info.version} is ready to install. Restart the app to complete the update.`,
+      body: `Version ${info.version} is ready! Click to install and restart now.`,
       icon: path.join(__dirname, '../assets/icon.png'),
     });
     
     notification.on('click', () => {
-      installUpdate();
+      // Auto-install without confirmation for better UX
+      console.log('🔄 Auto-installing update and restarting...');
+      autoUpdater.quitAndInstall();
     });
     
     notification.show();
@@ -316,5 +330,5 @@ export function setupUpdaterIPC(): void {
 
 // Utility function to open releases page
 export function openReleasesPage(): void {
-  shell.openExternal('https://github.com/your-repo/releases'); // Update with your repo
+  shell.openExternal('https://github.com/mafatah/time-flow-admin/releases');
 } 
