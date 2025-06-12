@@ -725,8 +725,8 @@ function startUrlCapture() {
     try {
       const activeWindow = await activeWin();
       if (activeWindow && isBrowserApp(activeWindow.owner.name)) {
-        // Extract URL from browser window title (simplified)
-        const url = extractUrlFromTitle(activeWindow.title);
+        // Use proper browser URL extraction instead of window title
+        const url = await extractBrowserUrl(activeWindow.owner.name);
         if (url) {
           const urlLog = {
             user_id: config.user_id,
@@ -756,8 +756,60 @@ function stopUrlCapture() {
 }
 
 function isBrowserApp(appName) {
-  const browsers = ['chrome', 'firefox', 'safari', 'edge', 'opera', 'brave'];
+  const browsers = ['chrome', 'firefox', 'safari', 'edge', 'opera', 'brave', 'google chrome'];
   return browsers.some(browser => appName.toLowerCase().includes(browser));
+}
+
+// NEW: Proper browser URL extraction using AppleScript
+async function extractBrowserUrl(browserName) {
+  if (process.platform !== 'darwin') {
+    // Fallback to title extraction for non-macOS
+    return extractUrlFromTitle();
+  }
+
+  try {
+    const { execSync } = require('child_process');
+    let script = '';
+    
+    const lowerBrowser = browserName.toLowerCase();
+    
+    if (lowerBrowser.includes('safari')) {
+      script = `
+        tell application "Safari"
+          if (count of windows) > 0 then
+            get URL of current tab of front window
+          end if
+        end tell
+      `;
+    } else if (lowerBrowser.includes('chrome')) {
+      script = `
+        tell application "Google Chrome"
+          if (count of windows) > 0 then
+            get URL of active tab of front window
+          end if
+        end tell
+      `;
+    } else {
+      // For other browsers, try the generic approach
+      return extractUrlFromTitle();
+    }
+
+    const result = execSync(`osascript -e '${script}'`, { 
+      encoding: 'utf8',
+      timeout: 5000 // 5 second timeout
+    }).trim();
+    
+    if (result && result.startsWith('http')) {
+      console.log(`✅ Extracted URL via AppleScript: ${result}`);
+      return result;
+    }
+    
+    return null;
+  } catch (error) {
+    console.log(`⚠️ AppleScript URL extraction failed for ${browserName}:`, error.message);
+    // Fallback to title extraction
+    return extractUrlFromTitle();
+  }
 }
 
 function extractUrlFromTitle(title) {
@@ -1729,7 +1781,8 @@ async function captureActiveUrl() {
     const activeWindow = await activeWin();
     if (!activeWindow || !isBrowserApp(activeWindow.name)) return null;
 
-    const url = extractUrlFromTitle(activeWindow.title);
+    // Use proper browser URL extraction instead of window title
+    const url = await extractBrowserUrl(activeWindow.name);
     if (!url) return null;
 
     const urlData = {
