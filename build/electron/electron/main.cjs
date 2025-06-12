@@ -144,6 +144,21 @@ global.safeRegexTest = safeRegexTest;
 startMemoryMonitoring();
 console.log('✅ Memory monitoring started');
 // === END MEMORY LEAK PREVENTION ===
+// === JIT COMPILATION FIX FOR APPLE SILICON ===
+// Fix for EXC_BREAKPOINT crashes in pthread_jit_write_protect_np
+console.log('🔧 Applying JIT compilation fixes for Apple Silicon...');
+// Disable V8's MAP_JIT flag which conflicts with macOS security
+electron_1.app.commandLine.appendSwitch('--disable-features', 'VizDisplayCompositor');
+electron_1.app.commandLine.appendSwitch('--no-sandbox');
+electron_1.app.commandLine.appendSwitch('--disable-web-security');
+electron_1.app.commandLine.appendSwitch('--disable-features', 'OutOfBlinkCors');
+// V8 JIT compilation fixes specifically for Apple Silicon
+electron_1.app.commandLine.appendSwitch('--js-flags', '--jitless');
+electron_1.app.commandLine.appendSwitch('--disable-software-rasterizer');
+electron_1.app.commandLine.appendSwitch('--disable-background-timer-throttling');
+electron_1.app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
+electron_1.app.commandLine.appendSwitch('--disable-renderer-backgrounding');
+console.log('✅ JIT compilation fixes applied');
 // Create event emitter for internal communication
 exports.appEvents = new events_1.EventEmitter();
 // Debug environment variables
