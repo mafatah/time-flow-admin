@@ -207,7 +207,11 @@
           "x64"
         ]
       },
-      "icon": "electron/assets/icon.png"
+      "icon": "electron/assets/icon.png",
+      "certificateFile": "build/code-signing-cert.p12",
+      "certificatePassword": "${CSC_KEY_PASSWORD}",
+      "signingHashAlgorithms": ["sha256"],
+      "publisherName": "Ebdaa Digital Technology"
     },
     "linux": {
       "target": {

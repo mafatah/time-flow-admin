@@ -71,7 +71,8 @@ let appSettings = {
   suspicious_activity_threshold: 10,
   pattern_detection_window_minutes: 15,
   minimum_mouse_distance: 50,
-  keyboard_diversity_threshold: 5
+  keyboard_diversity_threshold: 5,
+  max_laptop_closed_hours: 1
 };
 
 // === ACTIVITY STATS ===
@@ -196,21 +197,115 @@ function createTray() {
   const iconPath = path.join(__dirname, '../assets/tray-icon.png');
   tray = new Tray(iconPath);
   
+  updateTrayMenu();
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+
+  const isCurrentlyTracking = isTracking && !isPaused;
+  const isPausing = isTracking && isPaused;
+
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show Ebdaa Time',
-      click: () => {
-        mainWindow.show();
-        mainWindow.focus();
+      label: `TimeFlow Desktop Agent`,
+      enabled: false
+    },
+    { type: 'separator' },
+    {
+      label: `Status: ${isCurrentlyTracking ? '🟢 Tracking' : isPausing ? '⏸️ Paused' : '⭕ Stopped'}`,
+      enabled: false
+    },
+    {
+      label: currentSession ? `Project: ${currentSession.project_id || 'Unknown'}` : 'No active project',
+      enabled: false
+    },
+    { type: 'separator' },
+    {
+      label: '▶️ Start Tracking',
+      enabled: !isTracking,
+      click: async () => {
+        try {
+          // Check if project is selected
+          if (!config.project_id) {
+            // Show project selection requirement
+            if (mainWindow) {
+              mainWindow.focus();
+              mainWindow.webContents.send('show-project-selection-required');
+            }
+            
+            new Notification({
+              title: 'Project Selection Required',
+              body: 'Please open the TimeFlow app and select a project before starting tracking from the menu bar.'
+            }).show();
+            
+            return;
+          }
+          
+          await startTracking(config.project_id);
+          console.log('✅ [TRAY] Tracking started from menu bar');
+        } catch (error) {
+          console.error('❌ [TRAY] Failed to start tracking:', error.message);
+          new Notification({
+            title: 'Failed to Start Tracking',
+            body: error.message
+          }).show();
+        }
       }
     },
     {
-      label: isTracking ? 'Stop Tracking' : 'Start Tracking',
+      label: '⏸️ Pause Tracking',
+      enabled: isCurrentlyTracking,
+      click: async () => {
+        try {
+          await pauseTracking('manual');
+          console.log('✅ [TRAY] Tracking paused from menu bar');
+        } catch (error) {
+          console.error('❌ [TRAY] Failed to pause tracking:', error);
+        }
+      }
+    },
+    {
+      label: '▶️ Resume Tracking',
+      enabled: isPausing,
+      click: async () => {
+        try {
+          await resumeTracking();
+          console.log('✅ [TRAY] Tracking resumed from menu bar');
+        } catch (error) {
+          console.error('❌ [TRAY] Failed to resume tracking:', error);
+        }
+      }
+    },
+    {
+      label: '⏹️ Stop Tracking',
+      enabled: isTracking,
+      click: async () => {
+        try {
+          await stopTracking();
+          console.log('✅ [TRAY] Tracking stopped from menu bar');
+        } catch (error) {
+          console.error('❌ [TRAY] Failed to stop tracking:', error);
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: '📊 Open Dashboard',
       click: () => {
-        if (isTracking) {
-          stopTracking();
-        } else {
-          startTracking();
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    },
+    {
+      label: '📋 Select Project',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+          mainWindow.webContents.send('navigate-to-time-tracker');
         }
       }
     },
@@ -218,19 +313,17 @@ function createTray() {
     {
       label: 'Quit',
       click: () => {
-        stopTracking();
         app.quit();
       }
     }
   ]);
-  
+
   tray.setContextMenu(contextMenu);
-  tray.setToolTip('Ebdaa Time Agent');
   
-  tray.on('click', () => {
-    mainWindow.show();
-    mainWindow.focus();
-  });
+  // Update tray tooltip with current status
+  const tooltipStatus = isCurrentlyTracking ? 'Tracking' : isPausing ? 'Paused' : 'Stopped';
+  const projectInfo = currentSession ? ` - ${currentSession.project_id}` : '';
+  tray.setToolTip(`TimeFlow: ${tooltipStatus}${projectInfo}`);
 }
 
 // === ITEM 6: SETTINGS PULL ===
@@ -262,7 +355,8 @@ async function fetchSettings() {
         suspicious_activity_threshold: settings.suspicious_activity_threshold || 10,
         pattern_detection_window_minutes: settings.pattern_detection_window_minutes || 15,
         minimum_mouse_distance: settings.minimum_mouse_distance || 50,
-        keyboard_diversity_threshold: settings.keyboard_diversity_threshold || 5
+        keyboard_diversity_threshold: settings.keyboard_diversity_threshold || 5,
+        max_laptop_closed_hours: settings.max_laptop_closed_hours || 1
       };
       console.log('✅ Settings loaded from server');
     } else {
@@ -724,7 +818,13 @@ async function checkMacScreenPermissions() {
   return true; // Not macOS, assume OK
 }
 
-// === ENHANCED SCREENSHOT CAPTURE WITH ANTI-CHEAT ===
+// === ENHANCED SCREENSHOT CAPTURE WITH MANDATORY REQUIREMENT ===
+let consecutiveScreenshotFailures = 0;
+let lastSuccessfulScreenshotTime = 0;
+let screenshotFailureStart = null;
+const MAX_SCREENSHOT_FAILURES = 3; // Stop after 3 consecutive failures
+const MANDATORY_SCREENSHOT_INTERVAL = 15 * 60 * 1000; // 15 minutes mandatory screenshot interval (reduced from 30)
+
 async function captureScreenshot() {
   try {
     console.log('📸 Capturing screenshot...');
@@ -803,6 +903,12 @@ async function captureScreenshot() {
     
     console.log(`📦 Screenshot queued (${offlineQueue.screenshots.length} pending)`);
     
+    // SUCCESS: Reset failure tracking
+    consecutiveScreenshotFailures = 0;
+    lastSuccessfulScreenshotTime = Date.now();
+    screenshotFailureStart = null;
+    console.log('✅ Screenshot captured successfully - mandatory requirement satisfied');
+    
     // Send screenshot event to UI
     if (mainWindow) {
       mainWindow.webContents.send('screenshot-captured', {
@@ -822,46 +928,122 @@ async function captureScreenshot() {
     
     // Anti-cheat analysis
     let suspiciousActivity = { suspicious: false, confidence: 0 };
+    
     if (antiCheatDetector) {
-      suspiciousActivity = antiCheatDetector.analyzeScreenshotTiming();
-      if (suspiciousActivity.suspicious) {
-        console.log('🚨 Suspicious screenshot_evasion detected:', suspiciousActivity);
-        
-        // Queue fraud alert
-        offlineQueue.fraudAlerts.push({
-          type: 'screenshot_evasion',
-          severity: 'HIGH',
-          details: suspiciousActivity,
-          timestamp: Date.now()
+      try {
+        suspiciousActivity = await antiCheatDetector.analyzeScreenshot(img, {
+          activityPercent,
+          focusPercent,
+          mouseClicks: activityStats.mouseClicks,
+          keystrokes: activityStats.keystrokes
         });
+        
+        if (suspiciousActivity.suspicious) {
+          console.log(`🚨 Suspicious activity detected (confidence: ${suspiciousActivity.confidence})`);
+          activityStats.suspiciousEvents++;
+        }
+      } catch (detectionError) {
+        console.log('⚠️ Anti-cheat detection failed:', detectionError.message);
       }
     }
     
-    console.log(`✅ Screenshot captured - Activity: ${activityPercent}%, Focus: ${focusPercent}%, Risk: ${suspiciousActivity?.confidence || 0}`);
+    return true; // Success
     
-    // Reset short-term activity counters
-    resetActivityStats();
-      
   } catch (error) {
-    console.error('❌ Screenshot capture failed:', error);
+    // FAILURE: Track consecutive failures
+    consecutiveScreenshotFailures++;
+    console.error(`💥 Screenshot failed (attempt ${consecutiveScreenshotFailures}/${MAX_SCREENSHOT_FAILURES}):`, error.message);
     
-    // Try app capture if screenshot fails
-    try {
-      await captureActiveApplication();
-    } catch (appError) {
-      console.error('❌ App capture failed:', appError);
+    // Track when failures started
+    if (!screenshotFailureStart) {
+      screenshotFailureStart = Date.now();
+      console.log('⚠️ Screenshot failures started, beginning mandatory screenshot enforcement');
     }
     
-    // Try URL capture if app capture fails  
-    try {
-      await captureActiveUrl();
-    } catch (urlError) {
-      console.error('❌ URL capture failed:', urlError);
+    // Check if we should stop tracking due to screenshot requirement failure
+    const shouldStopTracking = checkScreenshotStopConditions();
+    
+    if (shouldStopTracking) {
+      const { reason, message } = getScreenshotStopReason();
+      console.log(`🛑 Stopping tracking due to screenshot requirement: ${reason}`);
+      
+      // Stop tracking
+      if (isTracking) {
+        await stopTracking();
+        showTrayNotification(message, 'error');
+        
+        // Show detailed notification
+        try {
+          new Notification({
+            title: 'TimeFlow - Screenshot Requirement Failed',
+            body: message
+          }).show();
+        } catch (e) {
+          console.log('⚠️ Could not show screenshot failure notification:', e);
+        }
+      }
+      
+      // Update tray to reflect stopped state
+      updateTrayMenu();
     }
     
-    console.log('⚠️ Screenshot upload failed, queuing for later');
-    console.log(`📦 Screenshot queued (${offlineQueue.screenshots.length} pending)`);
+    return false; // Failure
   }
+}
+
+// Check if tracking should stop due to screenshot failures
+function checkScreenshotStopConditions() {
+  const now = Date.now();
+  
+  // Stop if too many consecutive failures
+  if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
+    return true;
+  }
+  
+  // Stop if mandatory screenshot interval exceeded (30 minutes without successful screenshot)
+  if (lastSuccessfulScreenshotTime > 0 && (now - lastSuccessfulScreenshotTime) > MANDATORY_SCREENSHOT_INTERVAL) {
+    return true;
+  }
+  
+  // Stop if we're tracking but haven't had any successful screenshots for the mandatory interval
+  if (isTracking && screenshotFailureStart && (now - screenshotFailureStart) > MANDATORY_SCREENSHOT_INTERVAL) {
+    return true;
+  }
+  
+  return false;
+}
+
+// Get stop reason for screenshot failures
+function getScreenshotStopReason() {
+  const now = Date.now();
+  
+  if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
+    return {
+      reason: 'consecutive_failures',
+      message: `Screenshots are mandatory for time tracking. ${consecutiveScreenshotFailures} consecutive failures detected. Please ensure your laptop is open and screen recording permissions are granted.`
+    };
+  }
+  
+  if (lastSuccessfulScreenshotTime > 0) {
+    const minutesWithoutScreenshot = Math.floor((now - lastSuccessfulScreenshotTime) / (60 * 1000));
+    return {
+      reason: 'mandatory_timeout',
+      message: `Screenshots are required every 15 minutes for time tracking verification. ${minutesWithoutScreenshot} minutes have passed without a successful screenshot.`
+    };
+  }
+  
+  if (screenshotFailureStart) {
+    const minutesSinceFirstFailure = Math.floor((now - screenshotFailureStart) / (60 * 1000));
+    return {
+      reason: 'extended_failure',
+      message: `Screenshot capture has been failing for ${minutesSinceFirstFailure} minutes. Screenshots are mandatory for continued time tracking.`
+    };
+  }
+  
+  return {
+    reason: 'unknown',
+    message: 'Screenshot requirement not met. Please restart tracking and ensure proper permissions.'
+  };
 }
 
 function calculateActivityPercent() {
@@ -988,88 +1170,103 @@ function showTrayNotification(message, type = 'info') {
 
 // === TRACKING CONTROL ===
 async function startTracking(projectId = null) {
-  console.log('🚀 [MAIN] startTracking() function called with projectId:', projectId);
-  console.log('🔍 [MAIN] Current tracking state - isTracking:', isTracking, 'isPaused:', isPaused);
-  
   if (isTracking) {
-    console.log('⚠️ [MAIN] Already tracking, returning early');
+    console.log('⚠️ [MAIN] Tracking already active');
     return;
   }
 
   console.log('🚀 [MAIN] Starting time tracking...');
   
-  isTracking = true;
-  isPaused = false;
+  // === PROJECT VALIDATION ===
+  let actualProjectId = projectId || config.project_id;
   
-  // Use project_id from config if not provided
-  const actualProjectId = projectId || config.project_id || '00000000-0000-0000-0000-000000000001';
-  
-  console.log('📋 [MAIN] Project ID resolution:', {
-    provided: projectId,
-    fromConfig: config.project_id,
-    fallback: '00000000-0000-0000-0000-000000000001',
-    final: actualProjectId
-  });
-  
-  // Create time log entry
-  try {
-    console.log('📝 [MAIN] Creating time log entry with project_id:', actualProjectId);
-    console.log('📝 [MAIN] Using user_id:', config.user_id);
-    console.log('📝 [MAIN] Database URL:', config.supabase_url);
+  // If no project ID provided, show project selection dialog
+  if (!actualProjectId) {
+    console.log('❌ [MAIN] No project ID available - project selection required');
     
-    const timeLogData = {
-      user_id: config.user_id,
-      project_id: actualProjectId,
-      start_time: new Date().toISOString(),
-      status: 'active',
-      is_idle: false
-    };
+    // Show project selection notification
+    showTrayNotification('Please select a project before starting tracking', 'warning');
     
-    console.log('📊 [MAIN] Time log data to insert:', timeLogData);
-    
-    const { data, error } = await supabase
-      .from('time_logs')
-      .insert(timeLogData)
-      .select('id')
-      .single();
-
-    console.log('📊 [MAIN] Database response - data:', data, 'error:', error);
-
-    if (error) {
-      console.error('❌ [MAIN] Database error details:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
-      throw error;
+    // Try to focus the main window to show project selection
+    if (mainWindow) {
+      mainWindow.focus();
+      mainWindow.webContents.send('show-project-selection');
     }
     
-    currentTimeLogId = data.id;
-    console.log('✅ [MAIN] Time log created successfully with ID:', currentTimeLogId);
-    
-  } catch (error) {
-    console.error('❌ [MAIN] Failed to create time log, detailed error:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    
-    currentTimeLogId = `offline_${Date.now()}`;
-    console.log('💾 [MAIN] Created offline time log ID:', currentTimeLogId);
-    
-    // Queue for offline sync
-    if (!offlineQueue.timeLogs) offlineQueue.timeLogs = [];
-    offlineQueue.timeLogs.push({
+    throw new Error('Project selection is required to start tracking. Please select a project from the Time Tracker page.');
+  }
+  
+  // Validate project ID format (should be UUID or valid identifier)
+  if (actualProjectId.length < 10) {
+    console.log('❌ [MAIN] Invalid project ID format');
+    throw new Error('Invalid project ID. Please select a valid project.');
+  }
+
+  console.log('📋 [MAIN] Project ID validated:', actualProjectId);
+  
+  // === MANDATORY REQUIREMENTS CHECK ===
+  console.log('🔍 [MAIN] Checking mandatory requirements for time tracking...');
+  
+  // 1. Check screenshot capabilities
+  const hasScreenshotPermissions = await checkMacScreenPermissions();
+  if (!hasScreenshotPermissions) {
+    console.log('❌ [MAIN] Screenshot permissions required for time tracking');
+    throw new Error('Screen recording permissions are required for time tracking. Please grant permissions and restart.');
+  }
+  
+  // 2. Test screenshot capture before starting
+  console.log('📸 [MAIN] Testing screenshot capability...');
+  const testScreenshotResult = await captureScreenshot();
+  if (!testScreenshotResult) {
+    console.log('❌ [MAIN] Screenshot test failed - cannot start tracking');
+    throw new Error('Screenshot capture failed. Screenshots are mandatory for time tracking.');
+  }
+  
+  console.log('✅ [MAIN] Mandatory requirements satisfied - proceeding with tracking');
+
+  // Set tracking state
+  isTracking = true;
+  isPaused = false;
+
+  // Generate time log ID
+  currentTimeLogId = `time_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  console.log('📝 [MAIN] Generated time log ID:', currentTimeLogId);
+
+  // Create time log
+  try {
+    const timeLogData = {
+      id: currentTimeLogId,
       user_id: config.user_id,
       project_id: actualProjectId,
       start_time: new Date().toISOString(),
       status: 'active',
-      is_idle: false,
-      offline_id: currentTimeLogId
+      created_at: new Date().toISOString()
+    };
+
+    console.log('💾 [MAIN] Creating time log with data:', timeLogData);
+
+    const { error } = await supabase
+      .from('time_logs')
+      .insert(timeLogData);
+
+    if (error) {
+      console.log('⚠️ [MAIN] Failed to create time log in database:', error);
+      console.log('📋 [MAIN] Queuing time log for later sync');
+      offlineQueue.timeLogs.push(timeLogData);
+    } else {
+      console.log('✅ [MAIN] Time log created in database');
+    }
+  } catch (dbError) {
+    console.log('❌ [MAIN] Database error creating time log:', dbError.message);
+    console.log('📋 [MAIN] Queuing time log for offline sync');
+    offlineQueue.timeLogs.push({
+      id: currentTimeLogId,
+      user_id: config.user_id,
+      project_id: actualProjectId,
+      start_time: new Date().toISOString(),
+      status: 'active'
     });
-    
-    console.log('📦 [MAIN] Queued for offline sync, queue length:', offlineQueue.timeLogs.length);
   }
 
   currentSession = {
@@ -1087,6 +1284,7 @@ async function startTracking(projectId = null) {
   startIdleMonitoring();
   startAppCapture();
   startUrlCapture();
+  startMandatoryScreenshotMonitoring(); // NEW: Monitor mandatory screenshot requirement
 
   // Update tray
   updateTrayMenu();
@@ -1094,7 +1292,66 @@ async function startTracking(projectId = null) {
   // Update UI
   mainWindow?.webContents.send('tracking-started', currentSession);
   
-  console.log('✅ [MAIN] Time tracking started successfully');
+  // Notify user of successful start with project info
+  showTrayNotification(`Tracking started for project: ${actualProjectId}`, 'success');
+  
+  console.log('✅ [MAIN] Time tracking started successfully with mandatory screenshot enforcement');
+}
+
+// === MANDATORY SCREENSHOT MONITORING ===
+let mandatoryScreenshotInterval = null;
+
+function startMandatoryScreenshotMonitoring() {
+  // Check every 3 minutes if mandatory screenshot requirement is being met
+  mandatoryScreenshotInterval = setInterval(() => {
+    if (!isTracking) return;
+    
+    const now = Date.now();
+    const timeSinceLastSuccess = now - lastSuccessfulScreenshotTime;
+    const minutesSinceLastSuccess = Math.floor(timeSinceLastSuccess / (60 * 1000));
+    
+    // Warn at 12 minutes (3 minutes before mandatory stop at 15 minutes)
+    if (timeSinceLastSuccess > (12 * 60 * 1000) && timeSinceLastSuccess < (15 * 60 * 1000)) {
+      console.log(`⚠️ [MANDATORY] Warning: ${minutesSinceLastSuccess} minutes since last screenshot`);
+      showTrayNotification(
+        `Warning: ${minutesSinceLastSuccess} minutes since last screenshot. Screenshots are required every 15 minutes.`,
+        'warning'
+      );
+    }
+    
+    // Check if mandatory interval exceeded (15 minutes)
+    if (timeSinceLastSuccess > MANDATORY_SCREENSHOT_INTERVAL) {
+      console.log(`🛑 [MANDATORY] Stopping tracking: ${minutesSinceLastSuccess} minutes without screenshot`);
+      
+      // Force stop tracking
+      stopTracking();
+      
+      showTrayNotification(
+        `Tracking stopped: Screenshots are required every 15 minutes. ${minutesSinceLastSuccess} minutes have passed without a successful screenshot.`,
+        'error'
+      );
+      
+      // Show detailed notification
+      try {
+        new Notification({
+          title: 'TimeFlow - Mandatory Screenshot Requirement',
+          body: `Time tracking has been stopped because ${minutesSinceLastSuccess} minutes have passed without a successful screenshot. Screenshots are required every 15 minutes for time tracking verification. Please restart tracking and ensure proper permissions.`
+        }).show();
+      } catch (e) {
+        console.log('⚠️ Could not show mandatory screenshot notification:', e);
+      }
+    }
+  }, 3 * 60 * 1000); // Check every 3 minutes (more frequent for 15-minute interval)
+  
+  console.log('✅ [MANDATORY] Mandatory screenshot monitoring started (checking every 3 minutes)');
+}
+
+function stopMandatoryScreenshotMonitoring() {
+  if (mandatoryScreenshotInterval) {
+    clearInterval(mandatoryScreenshotInterval);
+    mandatoryScreenshotInterval = null;
+    console.log('🛑 [MANDATORY] Mandatory screenshot monitoring stopped');
+  }
 }
 
 async function stopTracking() {
@@ -1110,19 +1367,60 @@ async function stopTracking() {
   stopIdleMonitoring();
   stopAppCapture();
   stopUrlCapture();
+  stopMandatoryScreenshotMonitoring(); // NEW: Stop mandatory screenshot monitoring
 
-  // End time log
+  // Reset screenshot failure tracking
+  consecutiveScreenshotFailures = 0;
+  lastSuccessfulScreenshotTime = 0;
+  screenshotFailureStart = null;
+  console.log('🔄 Screenshot failure tracking reset');
+
+  // End current time log and cleanup any stale sessions
   if (currentTimeLogId) {
     try {
-      await supabase
+      // End the current session
+      const { error } = await supabase
         .from('time_logs')
         .update({
           end_time: new Date().toISOString(),
           status: 'completed'
         })
         .eq('id', currentTimeLogId);
+      
+      if (error) {
+        console.error('❌ Failed to end current time log:', error);
+      } else {
+        console.log('✅ Current time log ended successfully');
+      }
+      
+      // CLEANUP: End any other active sessions for this user that might be stale
+      const cleanupResult = await supabase
+        .from('time_logs')
+        .update({
+          end_time: new Date().toISOString(),
+          status: 'completed'
+        })
+        .eq('user_id', config.user_id)
+        .is('end_time', null)
+        .neq('id', currentTimeLogId); // Don't update the current one again
+      
+      if (cleanupResult.error) {
+        console.log('⚠️ Failed to cleanup stale sessions:', cleanupResult.error);
+      } else {
+        console.log('🧹 Cleaned up any stale active sessions');
+      }
+      
     } catch (error) {
       console.error('❌ Failed to end time log:', error);
+      
+      // Queue for offline sync
+      offlineQueue.timeLogs.push({
+        id: currentTimeLogId,
+        user_id: config.user_id,
+        end_time: new Date().toISOString(),
+        status: 'completed',
+        action: 'update'
+      });
     }
   }
 
@@ -1132,9 +1430,12 @@ async function stopTracking() {
   // Update UI
   mainWindow?.webContents.send('tracking-stopped');
   
+  // Notify user of successful stop
+  showTrayNotification('Time tracking stopped', 'info');
+  
   currentSession = null;
   currentTimeLogId = null;
-  console.log('✅ Time tracking stopped');
+  console.log('✅ Time tracking stopped with mandatory requirements enforced');
 }
 
 async function pauseTracking(reason = 'manual') {
@@ -1177,43 +1478,6 @@ async function resumeTracking() {
 
   // Update UI
   mainWindow?.webContents.send('tracking-resumed');
-}
-
-function updateTrayMenu() {
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Show Ebdaa Time',
-      click: () => {
-        mainWindow.show();
-        mainWindow.focus();
-      }
-    },
-    {
-      label: isTracking ? 'Stop Tracking' : 'Start Tracking',
-      click: () => {
-        if (isTracking) {
-          stopTracking();
-        } else {
-          startTracking();
-        }
-      }
-    },
-    { type: 'separator' },
-    {
-      label: `Status: ${isTracking ? (isPaused ? 'Paused' : 'Active') : 'Stopped'}`,
-      enabled: false
-    },
-    { type: 'separator' },
-    {
-      label: 'Quit',
-      click: () => {
-        stopTracking();
-        app.quit();
-      }
-    }
-  ]);
-  
-  tray.setContextMenu(contextMenu);
 }
 
 // === ENHANCED IPC HANDLERS ===
@@ -1580,12 +1844,46 @@ powerMonitor.on('suspend', () => {
 powerMonitor.on('resume', () => {
   const sleepDuration = systemSleepStart ? Date.now() - systemSleepStart : 0;
   const sleepMinutes = Math.floor(sleepDuration / 60000);
+  const sleepHours = Math.floor(sleepDuration / (60 * 60 * 1000));
   
-  console.log(`⚡ System resumed after ${sleepMinutes} minutes`);
+  console.log(`⚡ System resumed after ${sleepHours}h ${sleepMinutes % 60}m`);
   
   // Log the sleep period as idle time
   if (systemSleepStart && currentTimeLogId) {
     logIdlePeriod(systemSleepStart, Date.now(), Math.floor(sleepDuration / 1000));
+  }
+  
+  // Check if laptop was closed for more than 1 hour (configurable)
+  const maxLaptopClosedHours = appSettings.max_laptop_closed_hours || 1;
+  const maxLaptopClosedTime = maxLaptopClosedHours * 60 * 60 * 1000; // Convert to milliseconds
+  
+  if (sleepDuration > maxLaptopClosedTime) {
+    console.log(`🛑 Laptop was closed for ${sleepHours} hours (max: ${maxLaptopClosedHours}h) - stopping tracking`);
+    
+    // Stop tracking due to extended closure
+    if (isTracking) {
+      stopTracking();
+      showTrayNotification(
+        `Tracking stopped: Laptop was closed for ${sleepHours} hours. Please restart tracking when you resume work.`, 
+        'warning'
+      );
+    }
+    
+    // Update tray to reflect stopped state
+    updateTrayMenu();
+    
+    // Show detailed notification
+    try {
+      new Notification({
+        title: 'TimeFlow - Extended Absence Detected',
+        body: `Time tracking has been stopped because your laptop was closed for ${sleepHours} hours (maximum allowed: ${maxLaptopClosedHours} hour). This ensures accurate time tracking. Please start tracking again when you resume work.`
+      }).show();
+    } catch (e) {
+      console.log('⚠️ Could not show extended absence notification:', e);
+    }
+    
+    systemSleepStart = null;
+    return; // Don't auto-resume
   }
   
   // Restart anti-cheat monitoring
@@ -1596,13 +1894,13 @@ powerMonitor.on('resume', () => {
     antiCheatDetector.startMonitoring();
   }
   
-  // Auto-resume with user confirmation for long sleep periods
+  // Auto-resume for shorter sleep periods (under 1 hour)
   if (isPaused && currentSession) {
-            setTimeout(() => {
-          // Always auto-resume tracking without asking - employee doesn't need to be interrupted
-          resumeTracking();
-          showTrayNotification(`Tracking resumed after ${sleepMinutes}m sleep`, 'success');
-        }, 5000); // Wait 5 seconds after resume
+    setTimeout(() => {
+      // Always auto-resume tracking without asking - employee doesn't need to be interrupted
+      resumeTracking();
+      showTrayNotification(`Tracking resumed after ${sleepHours}h ${sleepMinutes % 60}m sleep`, 'success');
+    }, 5000); // Wait 5 seconds after resume
   }
   
   systemSleepStart = null;

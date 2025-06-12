@@ -54,13 +54,17 @@ interface AppSettings {
   blur_screenshots: boolean;
   screenshot_interval_seconds: number;
   idle_threshold_seconds: number;
+  max_laptop_closed_hours: number;
+  mandatory_screenshot_interval_minutes: number;
 }
 
 // === SETTINGS ===
 let appSettings: AppSettings = {
   blur_screenshots: false,
   screenshot_interval_seconds: 60,
-  idle_threshold_seconds: 300 // 5 minutes default
+  idle_threshold_seconds: 300, // 5 minutes default
+  max_laptop_closed_hours: 1, // Stop tracking after 1 hour of laptop being closed (reduced from 15)
+  mandatory_screenshot_interval_minutes: 15 // Screenshots are mandatory every 15 minutes (reduced from 30)
 };
 
 // === ACTIVITY METRICS ===
@@ -89,9 +93,13 @@ let currentApp: AppActivity | null = null;
 let consecutiveScreenshotFailures = 0;
 let lastSuccessfulScreenshot = 0;
 let systemUnavailableStart: number | null = null;
+let laptopClosedStart: number | null = null; // Track when laptop was closed
+let lastMandatoryScreenshotTime = 0; // Track mandatory screenshots
 const MAX_SCREENSHOT_FAILURES = 3; // Stop after 3 consecutive failures
 const MAX_SYSTEM_UNAVAILABLE_TIME = 2 * 60 * 1000; // 2 minutes
-const SCREENSHOT_TIMEOUT_MS = 10000; // 10 seconds timeout for screenshot capture
+const SCREENSHOT_TIMEOUT_MS = 10000;
+const MAX_LAPTOP_CLOSED_TIME = 1 * 60 * 60 * 1000; // 1 hour in milliseconds (reduced from 15)
+const MANDATORY_SCREENSHOT_INTERVAL = 15 * 60 * 1000; // 15 minutes in milliseconds (reduced from 30)
 
 // Always-on activity monitoring - starts when app launches
 export async function startActivityMonitoring(userId: string) {
@@ -326,7 +334,9 @@ export async function fetchSettings() {
       appSettings = {
         blur_screenshots: config.blur_screenshots || false,
         screenshot_interval_seconds: config.screenshot_interval_seconds || 60,
-        idle_threshold_seconds: config.idle_threshold_seconds || 300
+        idle_threshold_seconds: config.idle_threshold_seconds || 300,
+        max_laptop_closed_hours: config.max_laptop_closed_hours || 1,
+        mandatory_screenshot_interval_minutes: config.mandatory_screenshot_interval_minutes || 15
       };
       console.log('✅ Settings loaded from config:', appSettings);
       return;
@@ -347,7 +357,9 @@ export async function fetchSettings() {
       appSettings = {
         blur_screenshots: data.blur_screenshots || false,
         screenshot_interval_seconds: data.screenshot_interval_seconds || 60,
-        idle_threshold_seconds: data.idle_threshold_seconds || 300
+        idle_threshold_seconds: data.idle_threshold_seconds || 300,
+        max_laptop_closed_hours: data.max_laptop_closed_hours || 1,
+        mandatory_screenshot_interval_minutes: data.mandatory_screenshot_interval_minutes || 15
       };
       console.log('✅ Settings loaded from database:', appSettings);
     }
@@ -448,13 +460,20 @@ async function captureActivityScreenshot() {
     // Reset failure count on success
     consecutiveScreenshotFailures = 0;
     lastSuccessfulScreenshot = Date.now();
+    lastMandatoryScreenshotTime = Date.now(); // Track mandatory screenshots
     
     // Reset system unavailable tracking
     if (systemUnavailableStart) {
       console.log('✅ System available again after being unavailable');
       systemUnavailableStart = null;
     }
-
+    
+    // Reset laptop closed tracking on successful screenshot
+    if (laptopClosedStart) {
+      console.log('✅ Laptop appears to be open again - successful screenshot captured');
+      laptopClosedStart = null;
+    }
+    
     // Skip event emission to avoid circular dependency issues with main.ts
     console.log('📸 Screenshot capture and upload completed successfully!');
     console.log(`📊 Total screenshots this session: ${currentActivitySession?.total_screenshots || 0}`);
@@ -481,13 +500,19 @@ async function captureActivityScreenshot() {
       console.log('⚠️ System appears to be unavailable, starting timer');
     }
     
-    // Check if we should stop tracking due to consecutive failures or timeout
-    const shouldStopTracking = consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES || 
-                              (systemUnavailableStart && (Date.now() - systemUnavailableStart) > MAX_SYSTEM_UNAVAILABLE_TIME);
+    // Check if laptop might be closed (multiple screenshot failures)
+    if (consecutiveScreenshotFailures >= 2 && !laptopClosedStart) {
+      laptopClosedStart = Date.now();
+      console.log('💤 Laptop appears to be closed, starting laptop closure timer');
+    }
+    
+    // Check various stop conditions
+    const shouldStopTracking = checkStopConditions();
     
     if (shouldStopTracking) {
-      console.log('🛑 Stopping tracking due to system unavailability or screenshot failures');
-      console.log(`📊 Failure stats: ${consecutiveScreenshotFailures} failures, ${systemUnavailableStart ? Date.now() - systemUnavailableStart : 0}ms unavailable`);
+      const { reason, details } = getStopReason();
+      console.log(`🛑 Stopping tracking due to: ${reason}`);
+      console.log(`📊 Details: ${details}`);
       
       // Stop all monitoring
       stopActivityMonitoring();
@@ -499,9 +524,11 @@ async function captureActivityScreenshot() {
         }
         if (appEvents) {
           appEvents.emit('auto-stop-tracking', {
-            reason: consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES ? 'screenshot_failures' : 'system_unavailable',
+            reason: reason,
             failures: consecutiveScreenshotFailures,
-            unavailableTime: systemUnavailableStart ? Date.now() - systemUnavailableStart : 0
+            unavailableTime: systemUnavailableStart ? Date.now() - systemUnavailableStart : 0,
+            laptopClosedTime: laptopClosedStart ? Date.now() - laptopClosedStart : 0,
+            details: details
           });
         }
       } catch (e) {
@@ -512,14 +539,108 @@ async function captureActivityScreenshot() {
       try {
         new Notification({
           title: 'TimeFlow - Tracking Stopped',
-          body: consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES 
-            ? 'Tracking stopped due to screenshot capture issues (laptop closed?)'
-            : 'Tracking stopped due to system inactivity'
+          body: getNotificationMessage(reason, details)
         }).show();
       } catch (e) {
         // Silent fail for notifications
       }
     }
+  }
+}
+
+// Enhanced stop condition checking
+function checkStopConditions(): boolean {
+  const now = Date.now();
+  
+  // Check consecutive screenshot failures
+  if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
+    return true;
+  }
+  
+  // Check system unavailable time (2 minutes)
+  if (systemUnavailableStart && (now - systemUnavailableStart) > MAX_SYSTEM_UNAVAILABLE_TIME) {
+    return true;
+  }
+  
+  // Check laptop closed time (1 hour)
+  if (laptopClosedStart && (now - laptopClosedStart) > MAX_LAPTOP_CLOSED_TIME) {
+    return true;
+  }
+  
+  // Check mandatory screenshot requirement (15 minutes without successful screenshot)
+  if (lastSuccessfulScreenshot > 0 && (now - lastSuccessfulScreenshot) > MANDATORY_SCREENSHOT_INTERVAL) {
+    return true;
+  }
+  
+  // Check if we haven't had ANY successful screenshot for too long during active tracking
+  if (currentActivitySession && lastMandatoryScreenshotTime > 0) {
+    const timeSinceLastMandatory = now - lastMandatoryScreenshotTime;
+    if (timeSinceLastMandatory > MANDATORY_SCREENSHOT_INTERVAL) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// Get stop reason details
+function getStopReason(): { reason: string, details: string } {
+  const now = Date.now();
+  
+  if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
+    return {
+      reason: 'screenshot_failures',
+      details: `${consecutiveScreenshotFailures} consecutive screenshot failures - system may be sleeping or locked`
+    };
+  }
+  
+  if (laptopClosedStart && (now - laptopClosedStart) > MAX_LAPTOP_CLOSED_TIME) {
+    const closedHours = Math.floor((now - laptopClosedStart) / (60 * 60 * 1000));
+    return {
+      reason: 'laptop_closed_extended',
+      details: `Laptop appears closed for ${closedHours} hours (max: ${appSettings.max_laptop_closed_hours} hours)`
+    };
+  }
+  
+  if (lastSuccessfulScreenshot > 0 && (now - lastSuccessfulScreenshot) > MANDATORY_SCREENSHOT_INTERVAL) {
+    const minutesWithoutScreenshot = Math.floor((now - lastSuccessfulScreenshot) / (60 * 1000));
+    return {
+      reason: 'mandatory_screenshot_timeout',
+      details: `${minutesWithoutScreenshot} minutes without successful screenshot (mandatory every ${appSettings.mandatory_screenshot_interval_minutes} minutes)`
+    };
+  }
+  
+  if (systemUnavailableStart && (now - systemUnavailableStart) > MAX_SYSTEM_UNAVAILABLE_TIME) {
+    const unavailableMinutes = Math.floor((now - systemUnavailableStart) / (60 * 1000));
+    return {
+      reason: 'system_unavailable',
+      details: `System unavailable for ${unavailableMinutes} minutes`
+    };
+  }
+  
+  return {
+    reason: 'unknown',
+    details: 'Unknown stop condition triggered'
+  };
+}
+
+// Get notification message based on stop reason
+function getNotificationMessage(reason: string, details: string): string {
+  switch (reason) {
+    case 'screenshot_failures':
+      return 'Tracking stopped: Screenshots are mandatory for time tracking. Please ensure your laptop is open and permissions are granted.';
+    
+    case 'laptop_closed_extended':
+      return `Tracking stopped: Laptop has been closed for over ${appSettings.max_laptop_closed_hours} hours. Time tracking cannot continue without active monitoring.`;
+    
+    case 'mandatory_screenshot_timeout':
+      return `Tracking stopped: Screenshots are required every ${appSettings.mandatory_screenshot_interval_minutes} minutes for time tracking verification.`;
+    
+    case 'system_unavailable':
+      return 'Tracking stopped: System appears to be unavailable or sleeping. Please restart tracking when you resume work.';
+    
+    default:
+      return `Tracking stopped: ${details}`;
   }
 }
 
@@ -1256,7 +1377,7 @@ function showNotification(notification: any) {
     if (Notification.isSupported()) {
       const notif = new Notification({
         title: 'Time Flow',
-        body: getNotificationMessage(notification),
+        body: getOriginalNotificationMessage(notification),
         icon: path.join(__dirname, '../assets/icon.png'), // Add app icon
         silent: false
       });
@@ -1275,7 +1396,7 @@ function showNotification(notification: any) {
   }
 }
 
-function getNotificationMessage(notification: any): string {
+function getOriginalNotificationMessage(notification: any): string {
   switch (notification.type) {
     case 'low_activity':
       return 'Low activity detected. Please check your productivity.';
