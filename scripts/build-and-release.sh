@@ -12,10 +12,15 @@ if [ -f .env ]; then
   export $(cat .env | grep -v '#' | awk '/=/ {print $1}')
 fi
 
-# Set environment variables for notarization (with secure fallbacks)
-export APPLE_ID="${APPLE_ID:-alshqawe66@gmail.com}"
-export APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD:-icmi-tdzi-ydvi-lszi}"
-export APPLE_TEAM_ID="${APPLE_TEAM_ID:-6GW49LK9V9}"
+# Ensure required Apple notarization environment variables are present
+if [[ -z "$APPLE_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+  echo "❌ APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, and APPLE_TEAM_ID must be set in the environment." >&2
+  echo "   Export them in your shell or add them to the .env file (not committed)." >&2
+  exit 1
+fi
+export APPLE_ID
+export APPLE_APP_SPECIFIC_PASSWORD
+export APPLE_TEAM_ID
 
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
