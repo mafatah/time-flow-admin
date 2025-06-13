@@ -1,3 +1,24 @@
+#!/bin/bash
+
+# Update Download Links Script
+# Updates download links in the web application after a new release
+
+set -e
+
+VERSION=${1:-$(node -p "require('./package.json').version")}
+
+echo "🔗 Updating download links for version $VERSION"
+echo "=============================================="
+
+# GitHub repository info
+REPO_OWNER="mafatah"
+REPO_NAME="time-flow-admin"
+BASE_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/v$VERSION"
+
+echo "📋 Base URL: $BASE_URL"
+
+# Update download page component
+cat > src/pages/download/index.tsx << EOF
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +33,7 @@ import {
 } from "lucide-react";
 
 const DownloadPage = () => {
-  const version = "1.0.17";
+  const version = "$VERSION";
   const releaseDate = new Date().toLocaleDateString();
   
   const downloads = [
@@ -20,8 +41,8 @@ const DownloadPage = () => {
       platform: "macOS (Apple Silicon)",
       icon: <Apple className="h-6 w-6" />,
       description: "For M1, M2, M3 Macs",
-      filename: "Ebdaa-Work-Time-${version}-arm64.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-1.0.17-arm64.dmg",
+      filename: "Ebdaa-Work-Time-\${version}-arm64.dmg",
+      url: "$BASE_URL/Ebdaa-Work-Time-$VERSION-arm64.dmg",
       size: "~112 MB",
       requirements: "macOS 11.0+",
       verified: true
@@ -30,8 +51,8 @@ const DownloadPage = () => {
       platform: "macOS (Intel)",
       icon: <Apple className="h-6 w-6" />,
       description: "For Intel-based Macs",
-      filename: "Ebdaa-Work-Time-${version}.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-1.0.17.dmg",
+      filename: "Ebdaa-Work-Time-\${version}.dmg",
+      url: "$BASE_URL/Ebdaa-Work-Time-$VERSION.dmg",
       size: "~118 MB",
       requirements: "macOS 10.14+",
       verified: true
@@ -40,8 +61,8 @@ const DownloadPage = () => {
       platform: "Windows",
       icon: <Monitor className="h-6 w-6" />,
       description: "For Windows 10/11",
-      filename: "Ebdaa-Work-Time-Setup-${version}.exe",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-Setup-1.0.17.exe",
+      filename: "Ebdaa-Work-Time-Setup-\${version}.exe",
+      url: "$BASE_URL/Ebdaa-Work-Time-Setup-$VERSION.exe",
       size: "~85 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true
@@ -50,8 +71,8 @@ const DownloadPage = () => {
       platform: "Linux",
       icon: <Smartphone className="h-6 w-6" />,
       description: "AppImage for Linux",
-      filename: "Ebdaa-Work-Time-${version}.AppImage",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-1.0.17.AppImage",
+      filename: "Ebdaa-Work-Time-\${version}.AppImage",
+      url: "$BASE_URL/Ebdaa-Work-Time-$VERSION.AppImage",
       size: "~120 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: true
@@ -60,7 +81,7 @@ const DownloadPage = () => {
 
   const handleDownload = (url: string, filename: string) => {
     // Track download analytics if needed
-    console.log(`Download started: ${filename}`);
+    console.log(\`Download started: \${filename}\`);
     window.open(url, '_blank');
   };
 
@@ -181,7 +202,7 @@ const DownloadPage = () => {
         <div className="text-center text-gray-600 space-y-4">
           <div className="flex justify-center gap-6 text-sm">
             <a 
-              href="https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.17"
+              href="https://github.com/mafatah/time-flow-admin/releases/tag/v$VERSION"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-blue-600"
@@ -202,7 +223,7 @@ const DownloadPage = () => {
             All downloads are code-signed and verified for security
           </p>
           <p className="text-xs text-gray-500">
-            © 2025 Ebdaa Digital Technology. All rights reserved.
+            © $(date +%Y) Ebdaa Digital Technology. All rights reserved.
           </p>
         </div>
       </div>
@@ -211,3 +232,61 @@ const DownloadPage = () => {
 };
 
 export default DownloadPage;
+EOF
+
+echo "✅ Updated download page component"
+
+# Update latest.yml files with correct URLs
+cat > public/latest-mac.yml << EOF
+version: $VERSION
+files:
+  - url: Ebdaa-Work-Time-$VERSION-arm64.dmg
+    sha512: placeholder_hash_will_be_updated_after_build
+    size: 120000000
+    blockMapSize: 150000
+  - url: Ebdaa-Work-Time-$VERSION.dmg  
+    sha512: placeholder_hash_will_be_updated_after_build
+    size: 125000000
+    blockMapSize: 155000
+path: Ebdaa-Work-Time-$VERSION-arm64.dmg
+sha512: placeholder_hash_will_be_updated_after_build
+releaseDate: '$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")'
+EOF
+
+cat > public/latest.yml << EOF
+version: $VERSION
+files:
+  - url: Ebdaa-Work-Time-Setup-$VERSION.exe
+    sha512: placeholder_hash_will_be_updated_after_build
+    size: 90000000
+path: Ebdaa-Work-Time-Setup-$VERSION.exe
+sha512: placeholder_hash_will_be_updated_after_build
+releaseDate: '$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")'
+EOF
+
+echo "✅ Updated auto-updater configuration files"
+
+# Update README with new download links
+sed -i '' "s/download\/v[0-9.]*\//download\/v$VERSION\//g" README.md 2>/dev/null || true
+
+echo "✅ Updated README download links"
+
+# Commit changes if git is available
+if command -v git &> /dev/null; then
+    git add .
+    git commit -m "🔗 Update download links for v$VERSION" || true
+    echo "✅ Committed download link updates"
+fi
+
+echo ""
+echo "🎉 Download links updated successfully!"
+echo "=================================="
+echo "📦 Version: $VERSION"
+echo "🔗 Download page: /download"
+echo "🌐 GitHub release: https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/v$VERSION"
+echo ""
+echo "📋 Direct download links:"
+echo "  🍎 macOS ARM64: $BASE_URL/Ebdaa-Work-Time-$VERSION-arm64.dmg"
+echo "  🍎 macOS Intel: $BASE_URL/Ebdaa-Work-Time-$VERSION.dmg"
+echo "  🪟 Windows: $BASE_URL/Ebdaa-Work-Time-Setup-$VERSION.exe"
+echo "  🐧 Linux: $BASE_URL/Ebdaa-Work-Time-$VERSION.AppImage" 

@@ -1,8 +1,8 @@
 {
   "user_id": "employee@timeflow.com",
   "project_id": null,
-  "supabase_url": "https://cmlkfcqepqmytndqsmbx.supabase.co",
-  "supabase_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtbGtmY3FlcHFteXRuZHFzbWJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMzMTY3NzAsImV4cCI6MjA0ODg5Mjc3MH0.NLFGAM-1tnhAFdhS3XAhgKk0iDGNfEqInxgCe2Nwdis",
+  "supabase_url": "https://fkpiqcxkmrtaetvfgcli.supabase.co",
+  "supabase_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4",
   "auto_start_tracking": false,
   "screenshot_interval_seconds": 300,
   "idle_threshold_seconds": 300,

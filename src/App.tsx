@@ -33,6 +33,7 @@ import TimeLogsPage from '@/pages/time-logs';
 import EmployeeSettingsPage from '@/pages/employee-settings';
 import FinancePage from '@/pages/finance';
 import SuspiciousActivityPage from '@/pages/suspicious-activity';
+import DebugUrlTracking from '@/components/debug/debug-url-tracking';
 
 
 console.log('🚀 App.tsx loading...');
@@ -409,6 +410,16 @@ function AppRoutes() {
           <AdminRoute>
             <AppLayout>
               <UrlsViewer />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/debug-url-tracking" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <DebugUrlTracking />
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>

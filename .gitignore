@@ -34,3 +34,64 @@ public/downloads/*.dmg
 public/downloads/*.exe
 public/downloads/*.AppImage
 dist/
+
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# testing
+coverage
+
+# production
+build
+dist
+
+# misc
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Electron
+/out/
+/dist_electron/
+
+# Temporary folders
+tmp/
+temp/
+
+# Code signing and certificates (SENSITIVE - DO NOT COMMIT)
+.env.signing
+build/code-signing-cert.p12
+build/AuthKey.p8
+build/*.p12
+build/*.p8
+*.p12
+*.p8
+AuthKey_*.p8
+
+# Apple Developer certificates
+*.cer
+*.certSigningRequest
+*.mobileprovision
+
+# Windows code signing
+*.pfx
+
+# Notarization logs
+*notarization*.log
+notarization-*.log
+
+# Local test files
+test-*
+debug-*
+check-*

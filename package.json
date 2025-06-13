@@ -1,7 +1,7 @@
 {
   "name": "vite_react_shadcn_ts",
   "private": true,
-  "version": "1.0.16",
+  "version": "1.0.17",
   "type": "module",
   "author": "Ebdaa Digital Technology",
   "description": "Ebdaa Work Time - Employee time tracking and productivity monitoring application",
@@ -26,6 +26,9 @@
     "build:all": "npm run build:dev && npm run build:electron && mkdir -p build/dist && cp -r dist/* build/dist/",
     "build:notarized": "scripts/build-notarized.sh",
     "build:release": "scripts/build-and-release.sh",
+    "build:signed": "bash scripts/build-and-release.sh",
+    "setup:signing": "bash scripts/setup-code-signing.sh",
+    "update:links": "bash scripts/update-download-links.sh",
     "test:windows": "node test-windows-compatibility.cjs",
     "test:cross-platform": "node test-windows-compatibility.cjs"
   },
