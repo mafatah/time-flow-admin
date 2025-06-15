@@ -75,7 +75,10 @@ async function initializeApp() {
         // Try to load saved user session first
         const savedUserSession = await ipcRenderer.invoke('load-user-session');
         if (savedUserSession) {
-            console.log('📂 Found saved user session, auto-logging in...');
+            console.log('📂 Found saved user session, auto-logging in...', {
+                email: savedUserSession.email,
+                remember_me: savedUserSession.remember_me
+            });
             
             // Restore Supabase session
             const { data: sessionData, error: sessionError } = await supabaseClient.auth.setSession({
@@ -95,12 +98,18 @@ async function initializeApp() {
                 console.log('👤 User restored from saved session:', currentUser);
                 showMainApp();
                 showNotification('Welcome back! Automatically signed in.', 'success');
+                
+                // Also save to localStorage for UI consistency
+                localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
+                localStorage.setItem('timeflow_remember_email', savedUserSession.email);
+                localStorage.setItem('timeflow_remember_me', 'true');
             } else {
                 console.log('⚠️ Failed to restore session:', sessionError);
                 // Clear invalid session
                 await ipcRenderer.invoke('user-logged-out');
             }
         } else {
+            console.log('ℹ️ No saved user session found, showing login form');
             // Try to load old session format (tracking session)
             const savedSession = await ipcRenderer.invoke('load-session');
             if (savedSession && savedSession.user) {
@@ -197,6 +206,20 @@ function setupEventListeners() {
         logoutBtn.addEventListener('click', logout);
     }
     
+    // === DEBUG: Add session test button (development only) ===
+    if (process.env.NODE_ENV === 'development') {
+        const debugBtn = document.createElement('button');
+        debugBtn.textContent = '🔍 Test Session';
+        debugBtn.className = 'px-3 py-1 bg-gray-500 text-white rounded text-xs';
+        debugBtn.onclick = testSessionPersistence;
+        
+        // Add to login form if it exists
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.appendChild(debugBtn);
+        }
+    }
+    
     console.log('✅ Event listeners set up successfully');
 }
 
@@ -263,7 +286,7 @@ async function handleLogin(e) {
     const loginLoader = document.getElementById('loginLoader');
     const errorDiv = document.getElementById('loginError');
 
-    console.log('🔐 Attempting login for:', email);
+    console.log('🔐 Attempting login for:', email, 'Remember me:', rememberMe);
 
     // Reset error state
     if (errorDiv) {
@@ -313,21 +336,38 @@ async function handleLogin(e) {
         // Save user to localStorage
         localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
 
-        // Handle remember me functionality
+        // Handle remember me functionality - save to localStorage for UI
         if (rememberMe) {
             localStorage.setItem('timeflow_remember_email', email);
             localStorage.setItem('timeflow_remember_me', 'true');
+            console.log('💾 Login credentials remembered in localStorage');
         } else {
             localStorage.removeItem('timeflow_remember_email');
             localStorage.removeItem('timeflow_remember_me');
+            console.log('🗑️ Login credentials cleared from localStorage');
         }
 
-        // Notify main process about user login with session data
-        await ipcRenderer.invoke('user-logged-in', {
+        // Prepare session data with complete user information
+        const sessionData = {
             ...currentUser,
-            session: authData.session,
+            session: {
+                access_token: authData.session.access_token,
+                refresh_token: authData.session.refresh_token,
+                expires_at: authData.session.expires_at,
+                user: authData.user
+            },
             remember_me: rememberMe
+        };
+
+        console.log('📤 Sending user login data to main process:', {
+            email: sessionData.email,
+            remember_me: sessionData.remember_me,
+            has_session: !!sessionData.session
         });
+
+        // Notify main process about user login with session data
+        const result = await ipcRenderer.invoke('user-logged-in', sessionData);
+        console.log('✅ User login result:', result);
 
         // Show main app
         showMainApp();
@@ -364,6 +404,7 @@ async function handleLogin(e) {
 async function handleQuickLogin() {
     const emailInput = document.getElementById('loginEmail');
     const passwordInput = document.getElementById('loginPassword');
+    const rememberMeCheckbox = document.getElementById('rememberMe');
     const quickLoginBtn = document.getElementById('quickLoginBtn');
     const errorDiv = document.getElementById('loginError');
 
@@ -375,9 +416,12 @@ async function handleQuickLogin() {
         errorDiv.textContent = '';
     }
 
-    // Set demo credentials (already pre-filled, but ensure they're correct)
+    // Set demo credentials and enable remember me by default for quick login
     emailInput.value = 'employee@timeflow.com';
     passwordInput.value = 'employee123456';
+    if (rememberMeCheckbox) {
+        rememberMeCheckbox.checked = true;
+    }
 
     // Show loading state
     quickLoginBtn.disabled = true;
@@ -417,8 +461,27 @@ async function handleQuickLogin() {
         // Save user to localStorage
         localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
 
+        // Save remember me for quick login
+        localStorage.setItem('timeflow_remember_email', 'employee@timeflow.com');
+        localStorage.setItem('timeflow_remember_me', 'true');
+
+        // Prepare session data for quick login with remember me enabled
+        const sessionData = {
+            ...currentUser,
+            session: {
+                access_token: authData.session.access_token,
+                refresh_token: authData.session.refresh_token,
+                expires_at: authData.session.expires_at,
+                user: authData.user
+            },
+            remember_me: true // Quick login always remembers
+        };
+
+        console.log('📤 Sending quick login data to main process');
+
         // Notify main process
-        await ipcRenderer.invoke('user-logged-in', currentUser);
+        const result = await ipcRenderer.invoke('user-logged-in', sessionData);
+        console.log('✅ Quick login result:', result);
 
         // Show main app
         showMainApp();
@@ -1727,3 +1790,41 @@ function generateProductivityInsight(focusScore, clicks, keystrokes) {
 }
 
 // Update functionality moved to system tray menu for cleaner interface
+
+// === DEBUG FUNCTIONS ===
+async function testSessionPersistence() {
+    console.log('🔍 Testing session persistence...');
+    
+    try {
+        // Check current session state
+        const savedSession = await ipcRenderer.invoke('load-user-session');
+        console.log('💾 Current saved session:', savedSession ? {
+            email: savedSession.email,
+            remember_me: savedSession.remember_me,
+            expires_at: new Date(savedSession.expires_at)
+        } : 'None');
+        
+        // Check localStorage
+        const localUser = localStorage.getItem('timeflow_user');
+        const localRemember = localStorage.getItem('timeflow_remember_me');
+        const localEmail = localStorage.getItem('timeflow_remember_email');
+        
+        console.log('🏪 localStorage state:', {
+            user: localUser ? JSON.parse(localUser) : 'None',
+            remember_me: localRemember,
+            email: localEmail
+        });
+        
+        // Show in UI
+        showNotification(
+            `Session: ${savedSession ? 'Found' : 'None'}, ` +
+            `LocalStorage: ${localUser ? 'Found' : 'None'}, ` +
+            `Remember: ${localRemember || 'false'}`,
+            'info'
+        );
+        
+    } catch (error) {
+        console.error('❌ Error testing session:', error);
+        showNotification('Session test failed: ' + error.message, 'error');
+    }
+}

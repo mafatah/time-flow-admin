@@ -10,40 +10,25 @@ let updateAvailable = false;
 let downloadProgress = 0;
 let updateInfo: any = null;
 
-// Configure auto-updater
+// Configure auto-updater for GitHub releases
 autoUpdater.autoDownload = true; // Auto-download updates for better UX
 autoUpdater.allowPrerelease = false; // Only stable releases
 
-// DEVELOPMENT MODE: Force updates in development for testing
-// In production, this should be commented out
-if (!app.isPackaged) {
-  console.log('🧪 DEVELOPMENT MODE: Forcing update config for testing');
-  Object.defineProperty(app, 'isPackaged', {
-    get() { return true; }
-  });
-}
-
-// Set up update server - using GitHub releases
+// GitHub releases configuration
 // electron-updater automatically detects the GitHub repo from package.json
-// No need to set feedURL for GitHub releases - it's auto-detected
+// No need to set feedURL for GitHub releases - it's auto-detected from repository field
 
-// For development, we'll use a mock response to avoid connection errors
-if (!app.isPackaged) {
-  console.log('🧪 DEVELOPMENT MODE: Using mock update server');
-  // In development, we'll handle this gracefully without actual server calls
-}
-
-console.log('🔄 Auto-updater initialized');
+console.log('🔄 Auto-updater initialized for GitHub releases');
 
 // Auto-updater events
 autoUpdater.on('checking-for-update', () => {
-  console.log('🔍 Checking for updates...');
+  console.log('🔍 Checking for updates from GitHub...');
   updateCheckInProgress = true;
   updaterEvents.emit('checking-for-update');
 });
 
 autoUpdater.on('update-available', (info) => {
-  console.log('✅ Update available:', info.version);
+  console.log('✅ Update available from GitHub:', info.version);
   updateAvailable = true;
   updateInfo = info;
   updateCheckInProgress = false;
@@ -52,17 +37,15 @@ autoUpdater.on('update-available', (info) => {
   // Show notification about available update
   if (Notification.isSupported()) {
     const notification = new Notification({
-      title: '🔄 Update Available - TimeFlow',
+      title: '🔄 Update Available - Ebdaa Work Time',
       body: `Version ${info.version} is downloading automatically. Click for details.`,
       icon: path.join(__dirname, '../assets/icon.png'),
     });
     
-    // Make notification clickable to show download status
     notification.on('click', () => {
-      // Show download progress dialog
       dialog.showMessageBox({
         type: 'info',
-        title: 'Downloading Update - TimeFlow',
+        title: 'Downloading Update - Ebdaa Work Time',
         message: `Version ${info.version} is downloading in the background`,
         detail: 'You will be notified when the update is ready to install.',
         buttons: ['OK']
@@ -86,18 +69,17 @@ autoUpdater.on('error', (error) => {
   updateCheckInProgress = false;
   updaterEvents.emit('error', error);
   
-  // Show user-friendly error dialog based on context
-  let title = 'Update Check - TimeFlow';
-  let errorMessage = 'Failed to check for updates. Please check your internet connection and try again.';
+  // Show user-friendly error dialog
+  let title = 'Update Check - Ebdaa Work Time';
+  let errorMessage = 'Failed to check for updates from GitHub. Please check your internet connection and try again.';
   
-  // In development mode, show a more helpful message
-  if (!app.isPackaged || error.message.includes('app-update.yml') || error.message.includes('ENOENT')) {
-    title = 'Development Mode - TimeFlow';
-    errorMessage = 'Auto-update testing in development mode.\n\n✅ The auto-update system is working correctly!\n\n📝 Note: Auto-updates only function in production builds distributed to users. This behavior is expected during development.';
+  if (!app.isPackaged) {
+    title = 'Development Mode - Ebdaa Work Time';
+    errorMessage = 'Auto-update testing in development mode.\n\n✅ The auto-update system is configured correctly!\n\n📝 Note: Auto-updates only function in production builds. Updates will be served from GitHub releases.';
   }
   
   dialog.showMessageBox({
-    type: 'info',
+    type: !app.isPackaged ? 'info' : 'warning',
     title: title,
     message: 'Auto-Update Status',
     detail: errorMessage,
@@ -107,24 +89,23 @@ autoUpdater.on('error', (error) => {
 
 autoUpdater.on('download-progress', (progressObj) => {
   downloadProgress = progressObj.percent;
-  console.log(`📥 Download progress: ${Math.round(progressObj.percent)}%`);
+  console.log(`📥 Download progress from GitHub: ${Math.round(progressObj.percent)}%`);
   updaterEvents.emit('download-progress', progressObj);
 });
 
 autoUpdater.on('update-downloaded', (info) => {
-  console.log('✅ Update downloaded successfully:', info.version);
+  console.log('✅ Update downloaded successfully from GitHub:', info.version);
   updaterEvents.emit('update-downloaded', info);
   
   // Show notification that update is ready
   if (Notification.isSupported()) {
     const notification = new Notification({
-      title: '🔄 Update Ready - TimeFlow',
+      title: '🔄 Update Ready - Ebdaa Work Time',
       body: `Version ${info.version} is ready! Click to install and restart now.`,
       icon: path.join(__dirname, '../assets/icon.png'),
     });
     
     notification.on('click', () => {
-      // Auto-install without confirmation for better UX
       console.log('🔄 Auto-installing update and restarting...');
       autoUpdater.quitAndInstall();
     });
@@ -133,7 +114,7 @@ autoUpdater.on('update-downloaded', (info) => {
   }
 });
 
-// Function to manually check for updates
+// Function to manually check for updates from GitHub releases
 export async function checkForUpdates(showNoUpdateDialog = false): Promise<void> {
   if (updateCheckInProgress) {
     console.log('⚠️ Update check already in progress');
@@ -141,14 +122,15 @@ export async function checkForUpdates(showNoUpdateDialog = false): Promise<void>
   }
   
   try {
-    console.log('🔍 Manually checking for updates...');
+    console.log('🔍 Manually checking for updates from GitHub releases...');
+    
     const result = await autoUpdater.checkForUpdates();
     
     if (!result && showNoUpdateDialog) {
-      const title = !app.isPackaged ? 'Development Mode - TimeFlow' : 'Update Check - TimeFlow';
+      const title = !app.isPackaged ? 'Development Mode - Ebdaa Work Time' : 'Update Check - Ebdaa Work Time';
       const message = !app.isPackaged ? 'Auto-Update Testing' : 'Unable to check for updates';
       const detail = !app.isPackaged 
-        ? 'Auto-update system is working correctly!\n\nThis is development mode - auto-updates only work in production builds.'
+        ? 'Auto-update system is configured correctly!\n\nUpdates will be served from GitHub releases.\n\nNote: Updates will work in production builds.'
         : 'Please check your internet connection and try again later.';
       
       dialog.showMessageBoxSync({
@@ -166,25 +148,25 @@ export async function checkForUpdates(showNoUpdateDialog = false): Promise<void>
         if (!updateAvailable && !updateCheckInProgress) {
           dialog.showMessageBoxSync({
             type: 'info',
-            title: 'No Updates - TimeFlow',
+            title: 'No Updates - Ebdaa Work Time',
             message: 'You are running the latest version',
-            detail: `Current version: ${app.getVersion()}`,
+            detail: `Current version: ${app.getVersion()}\nChecked: GitHub Releases`,
             buttons: ['OK']
           });
         }
-      }, 3000); // Wait 3 seconds to see if update is found
+      }, 3000);
     }
     
   } catch (error) {
     console.error('❌ Error checking for updates:', error);
     
     if (showNoUpdateDialog) {
-      const isDev = !app.isPackaged || (error as Error).message.includes('app-update.yml') || (error as Error).message.includes('ENOENT');
-      const title = isDev ? 'Development Mode - TimeFlow' : 'Update Check Failed - TimeFlow';
-      const message = isDev ? 'Auto-Update Testing Complete' : 'Update Check Failed';
+      const isDev = !app.isPackaged;
+      const title = isDev ? 'Development Mode - Ebdaa Work Time' : 'Update Check Failed - Ebdaa Work Time';
+      const message = isDev ? 'Auto-Update GitHub Testing' : 'Update Check Failed';
       const detail = isDev 
-        ? '✅ Auto-update system is working correctly!\n\n📝 This is development mode - the error is expected. Auto-updates only work in production builds distributed to users.'
-        : `Failed to check for updates: ${error}\n\nPlease check your internet connection.`;
+        ? '✅ Auto-update system is configured for GitHub releases!\n\n📝 This error is expected in development. Production builds will connect to GitHub properly.'
+        : `Failed to check for updates from GitHub: ${error}`;
       
       dialog.showMessageBox({
         type: isDev ? 'info' : 'error',

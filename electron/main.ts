@@ -377,21 +377,46 @@ app.on('before-quit', () => {
 // Handle user login from desktop-agent UI - FIX: Use handle instead of on for invoke calls
 ipcMain.handle('user-logged-in', (event, userData) => {
   console.log('👤 User logged in from UI:', userData.email);
+  console.log('🔍 Login data received:', {
+    email: userData.email,
+    has_session: !!userData.session,
+    remember_me: userData.remember_me,
+    session_keys: userData.session ? Object.keys(userData.session) : []
+  });
+  
   setUserId(userData.id);
   
   // Save user session if remember_me is true
   if (userData.session && userData.remember_me) {
-    const userSession: UserSession = {
-      id: userData.id,
-      email: userData.email,
-      access_token: userData.session.access_token,
-      refresh_token: userData.session.refresh_token,
-      expires_at: userData.session.expires_at * 1000, // Convert to milliseconds
-      user_metadata: userData.session.user || {},
-      remember_me: userData.remember_me
-    };
-    saveUserSession(userSession);
-    console.log('✅ User session saved for future logins');
+    try {
+      const userSession: UserSession = {
+        id: userData.id,
+        email: userData.email,
+        access_token: userData.session.access_token,
+        refresh_token: userData.session.refresh_token,
+        expires_at: userData.session.expires_at * 1000, // Convert to milliseconds
+        user_metadata: userData.session.user || {},
+        remember_me: userData.remember_me
+      };
+      
+      console.log('💾 Attempting to save user session:', {
+        email: userSession.email,
+        remember_me: userSession.remember_me,
+        expires_at: new Date(userSession.expires_at)
+      });
+      
+      saveUserSession(userSession);
+      console.log('✅ User session saved successfully for future logins');
+    } catch (error) {
+      console.error('❌ Failed to save user session:', error);
+    }
+  } else {
+    if (!userData.session) {
+      console.log('⚠️ No session data provided - cannot save session');
+    }
+    if (!userData.remember_me) {
+      console.log('ℹ️ Remember me is false - not saving session');
+    }
   }
   
   console.log('Set user ID:', userData.id);
@@ -537,12 +562,32 @@ ipcMain.handle('get-app-version', () => {
 ipcMain.on('sync-offline-data', () => void syncOfflineData());
 ipcMain.handle('load-session', () => loadSession());
 ipcMain.handle('load-user-session', () => {
-  const userSession = loadUserSession();
-  if (userSession && isSessionValid(userSession)) {
-    console.log('✅ Valid user session found for:', userSession.email);
-    return userSession;
-  } else {
-    console.log('⚠️ No valid user session found');
+  try {
+    console.log('🔍 Attempting to load user session...');
+    const userSession = loadUserSession();
+    
+    if (userSession) {
+      console.log('📂 User session found:', {
+        email: userSession.email,
+        remember_me: userSession.remember_me,
+        expires_at: new Date(userSession.expires_at)
+      });
+      
+      if (isSessionValid(userSession)) {
+        console.log('✅ Valid user session found for:', userSession.email);
+        return userSession;
+      } else {
+        console.log('⚠️ User session found but expired or invalid');
+        // Clear the invalid session
+        clearUserSession();
+        return null;
+      }
+    } else {
+      console.log('ℹ️ No saved user session found');
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Error loading user session:', error);
     return null;
   }
 });

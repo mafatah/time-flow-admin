@@ -39,6 +39,7 @@ const electron_1 = require("electron");
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const tracker_1 = require("./tracker.cjs");
+const userSessionManager_1 = require("./userSessionManager.cjs");
 const autoLaunch_1 = require("./autoLaunch.cjs");
 const systemMonitor_1 = require("./systemMonitor.cjs");
 const unsyncedManager_1 = require("./unsyncedManager.cjs");
@@ -354,21 +355,60 @@ electron_1.app.on('before-quit', () => {
     }
 });
 // Handle user login from desktop-agent UI - FIX: Use handle instead of on for invoke calls
-electron_1.ipcMain.handle('user-logged-in', (event, user) => {
-    console.log('👤 User logged in from UI:', user.email);
-    (0, tracker_1.setUserId)(user.id);
-    console.log('Set user ID:', user.id);
+electron_1.ipcMain.handle('user-logged-in', (event, userData) => {
+    console.log('👤 User logged in from UI:', userData.email);
+    console.log('🔍 Login data received:', {
+        email: userData.email,
+        has_session: !!userData.session,
+        remember_me: userData.remember_me,
+        session_keys: userData.session ? Object.keys(userData.session) : []
+    });
+    (0, tracker_1.setUserId)(userData.id);
+    // Save user session if remember_me is true
+    if (userData.session && userData.remember_me) {
+        try {
+            const userSession = {
+                id: userData.id,
+                email: userData.email,
+                access_token: userData.session.access_token,
+                refresh_token: userData.session.refresh_token,
+                expires_at: userData.session.expires_at * 1000, // Convert to milliseconds
+                user_metadata: userData.session.user || {},
+                remember_me: userData.remember_me
+            };
+            console.log('💾 Attempting to save user session:', {
+                email: userSession.email,
+                remember_me: userSession.remember_me,
+                expires_at: new Date(userSession.expires_at)
+            });
+            (0, userSessionManager_1.saveUserSession)(userSession);
+            console.log('✅ User session saved successfully for future logins');
+        }
+        catch (error) {
+            console.error('❌ Failed to save user session:', error);
+        }
+    }
+    else {
+        if (!userData.session) {
+            console.log('⚠️ No session data provided - cannot save session');
+        }
+        if (!userData.remember_me) {
+            console.log('ℹ️ Remember me is false - not saving session');
+        }
+    }
+    console.log('Set user ID:', userData.id);
     console.log('✅ User ID set, ready for manual tracking start');
     return { success: true, message: 'User logged in successfully' };
 });
 // Handle user logout from desktop-agent UI
 electron_1.ipcMain.handle('user-logged-out', () => {
     console.log('🚪 User logout requested from UI');
-    // Clear session and stop tracking
+    // Clear user session and tracking session
+    (0, userSessionManager_1.clearUserSession)();
     (0, tracker_1.clearSavedSession)();
     stopTrackingTimer();
     (0, activityMonitor_1.stopActivityMonitoring)();
-    console.log('✅ User logged out - session cleared and tracking stopped');
+    console.log('✅ User logged out - all sessions cleared and tracking stopped');
     return { success: true, message: 'User logged out successfully' };
 });
 // Handle tracking start with better response
@@ -485,6 +525,37 @@ electron_1.ipcMain.handle('get-app-version', () => {
 // Add back the missing sync handlers
 electron_1.ipcMain.on('sync-offline-data', () => void (0, tracker_1.syncOfflineData)());
 electron_1.ipcMain.handle('load-session', () => (0, tracker_1.loadSession)());
+electron_1.ipcMain.handle('load-user-session', () => {
+    try {
+        console.log('🔍 Attempting to load user session...');
+        const userSession = (0, userSessionManager_1.loadUserSession)();
+        if (userSession) {
+            console.log('📂 User session found:', {
+                email: userSession.email,
+                remember_me: userSession.remember_me,
+                expires_at: new Date(userSession.expires_at)
+            });
+            if ((0, userSessionManager_1.isSessionValid)(userSession)) {
+                console.log('✅ Valid user session found for:', userSession.email);
+                return userSession;
+            }
+            else {
+                console.log('⚠️ User session found but expired or invalid');
+                // Clear the invalid session
+                (0, userSessionManager_1.clearUserSession)();
+                return null;
+            }
+        }
+        else {
+            console.log('ℹ️ No saved user session found');
+            return null;
+        }
+    }
+    catch (error) {
+        console.error('❌ Error loading user session:', error);
+        return null;
+    }
+});
 electron_1.ipcMain.on('clear-session', () => (0, tracker_1.clearSavedSession)());
 // Add missing get-config handler if not already present
 electron_1.ipcMain.handle('get-config', () => {

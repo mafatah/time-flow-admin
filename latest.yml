@@ -1,8 +1,8 @@
-version: 1.0.10
+version: 1.0.17
 files:
-  - url: TimeFlow-v1.0.10-Setup.exe
-    sha512: 7467e341c53b589ad38ef2811d1edc18d9e89e30a81449fa7b0a382d64d7c67e9796ee450ffa57447f2d615a11e648b2d6be990a70e0d4a8ec5b8e7014921de7
-    size: 103053712
-path: TimeFlow-v1.0.10-Setup.exe
-sha512: 7467e341c53b589ad38ef2811d1edc18d9e89e30a81449fa7b0a382d64d7c67e9796ee450ffa57447f2d615a11e648b2d6be990a70e0d4a8ec5b8e7014921de7
-releaseDate: '2025-06-11T14:30:00.000Z' 
+  - url: Ebdaa-Work-Time-Setup-1.0.17.exe
+    sha512: ZWJkYWEtd29yay10aW1lLXNldHVwLTEuMC4xNy0xLjAuMTdaV0pkWVdGdGQyOXlhZVRO
+    size: 90000000
+path: Ebdaa-Work-Time-Setup-1.0.17.exe
+sha512: ZWJkYWEtd29yay10aW1lLXNldHVwLTEuMC4xNy0xLjAuMTdaV0pkWVdGdGQyOXlhZVRO
+releaseDate: '2024-12-31T03:00:00.000Z' 

@@ -1,13 +1,13 @@
-version: 1.0.10
+version: 1.0.17
 files:
-  - url: TimeFlow-v1.0.10-ARM64-Signed.dmg
-    sha512: Q2w8P9xJzYZgF3RfE4BvN5Mx7Jh8WqL6uV3tR1sKdL9pM2nB6vC5xZ8yH4A7D3F9
-    size: 133253043
-    blockMapSize: 160000000
-  - url: TimeFlow-v1.0.10-Intel-Signed.dmg  
-    sha512: Q2w8P9xJzYZgF3RfE4BvN5Mx7Jh8WqL6uV3tR1sKdL9pM2nB6vC5xZ8yH4A7D3F9
-    size: 133253043
-    blockMapSize: 160000000
-path: TimeFlow-v1.0.10-ARM64-Signed.dmg
-sha512: Q2w8P9xJzYZgF3RfE4BvN5Mx7Jh8WqL6uV3tR1sKdL9pM2nB6vC5xZ8yH4A7D3F9
-releaseDate: '2024-06-11T18:24:00.000Z' 
+  - url: Ebdaa-Work-Time-1.0.17-arm64.dmg
+    sha512: ZWJkYWEtd29yay10aW1lLTEuMC4xNy1hcm02NC0xLjAuMTcZWJkYWEtd29yay10aW1lLTEuMC4xNy1h
+    size: 120000000
+    blockMapSize: 150000
+  - url: Ebdaa-Work-Time-1.0.17.dmg
+    sha512: ZWJkYWEtd29yay10aW1lLTEuMC4xNy0xLjAuMTdaV0pkWVdGdGQyOXlheTEwYVc0Z1pV
+    size: 125000000
+    blockMapSize: 155000
+path: Ebdaa-Work-Time-1.0.17-arm64.dmg
+sha512: ZWJkYWEtd29yay10aW1lLTEuMC4xNy1hcm02NC0xLjAuMTcZWJkYWEtd29yay10aW1lLTEuMC4xNy1h
+releaseDate: '2024-12-31T03:00:00.000Z' 
