@@ -122,11 +122,11 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     
     // Use GitHub releases for reliable downloads - v1.0.16 with improved auto-update
     const downloadFiles = {
-      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.15/TimeFlow-1.0.15-Setup.exe`, // Using v1.0.15 Windows version
-      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.16/TimeFlow-1.0.16-Intel.dmg`, // FULLY SIGNED AND NOTARIZED BY APPLE
-      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.16/TimeFlow-1.0.16-ARM64.dmg`, // FULLY SIGNED AND NOTARIZED BY APPLE
-      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.16/TimeFlow-1.0.16-ARM64.dmg`, // Default to ARM64 for modern Macs
-      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.8/TimeFlow.AppImage`
+          windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-Setup-1.0.17.exe`, // Windows version coming soon
+    'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-1.0.17.dmg`, // FULLY SIGNED AND NOTARIZED BY APPLE
+    'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-1.0.17-arm64.dmg`, // FULLY SIGNED AND NOTARIZED BY APPLE
+    'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-1.0.17-arm64.dmg`, // Default to ARM64 for modern Macs
+    linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-1.0.17.AppImage`
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
