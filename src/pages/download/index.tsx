@@ -24,7 +24,7 @@ interface DownloadItem {
 }
 
 const DownloadPage = () => {
-  const version = "1.0.16";
+  const version = "1.0.17";
   const releaseDate = new Date().toLocaleDateString();
   
   const downloads = [
@@ -32,8 +32,8 @@ const DownloadPage = () => {
       platform: "macOS (Apple Silicon)",
       icon: <Apple className="h-6 w-6" />,
       description: "For M1, M2, M3 Macs",
-      filename: "TimeFlow-1.0.16-ARM64.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.16/TimeFlow-1.0.16-ARM64.dmg",
+      filename: "Ebdaa-Work-Time-1.0.17-arm64.dmg",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-1.0.17-arm64.dmg",
       size: "~112 MB",
       requirements: "macOS 11.0+",
       verified: true
@@ -42,8 +42,8 @@ const DownloadPage = () => {
       platform: "macOS (Intel)",
       icon: <Apple className="h-6 w-6" />,
       description: "For Intel-based Macs",
-      filename: "TimeFlow-1.0.16-Intel.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.16/TimeFlow-1.0.16-Intel.dmg",
+      filename: "Ebdaa-Work-Time-1.0.17.dmg",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-1.0.17.dmg",
       size: "~118 MB",
       requirements: "macOS 10.14+",
       verified: true
@@ -52,8 +52,8 @@ const DownloadPage = () => {
       platform: "Windows",
       icon: <Monitor className="h-6 w-6" />,
       description: "For Windows 10/11",
-      filename: "TimeFlow-Setup-1.0.16.exe",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.16/TimeFlow-Setup-1.0.16.exe",
+      filename: "Ebdaa-Work-Time-Setup-1.0.17.exe",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-Setup-1.0.17.exe",
       size: "~85 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: false,
@@ -63,8 +63,8 @@ const DownloadPage = () => {
       platform: "Linux",
       icon: <Smartphone className="h-6 w-6" />,
       description: "AppImage for Linux",
-      filename: "TimeFlow-1.0.16.AppImage",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.16/TimeFlow-1.0.16.AppImage",
+      filename: "Ebdaa-Work-Time-1.0.17.AppImage",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.17/Ebdaa-Work-Time-1.0.17.AppImage",
       size: "~120 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: false,
@@ -199,7 +199,7 @@ const DownloadPage = () => {
         <div className="text-center text-gray-600 space-y-4">
           <div className="flex justify-center gap-6 text-sm">
             <a 
-              href="https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.16"
+              href="https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.17"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-blue-600"
