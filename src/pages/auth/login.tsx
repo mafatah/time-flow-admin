@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/providers/auth-provider";
@@ -26,16 +27,12 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check if user previously chose "Remember me"
-  const rememberedEmail = localStorage.getItem('timeflow_last_email') || "";
-  const wasRemembered = localStorage.getItem('timeflow_remember_me') === 'true';
-
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: rememberedEmail,
+      email: "",
       password: "",
-      rememberMe: wasRemembered,
+      rememberMe: false,
     },
   });
 
