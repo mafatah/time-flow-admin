@@ -33,6 +33,10 @@ import TimeLogsPage from '@/pages/time-logs';
 import EmployeeSettingsPage from '@/pages/employee-settings';
 import FinancePage from '@/pages/finance';
 import SuspiciousActivityPage from '@/pages/suspicious-activity';
+import EmailReportsPage from '@/pages/admin/email-reports';
+import AdminScreenshotsPage from '@/pages/admin/screenshots';
+import AdminIdleLogsPage from '@/pages/admin/idle-logs';
+import AdminDashboard from '@/pages/admin';
 // import DebugUrlTracking from '@/components/debug/debug-url-tracking';
 
 
@@ -492,6 +496,46 @@ function AppRoutes() {
           <AdminRoute>
             <AppLayout>
               <SuspiciousActivityPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <AdminDashboard />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin/email-reports" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <EmailReportsPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin/screenshots" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <AdminScreenshotsPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin/idle-logs" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <AdminIdleLogsPage />
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>

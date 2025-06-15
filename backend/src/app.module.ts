@@ -6,11 +6,11 @@ import { BullModule } from '@nestjs/bull';
 import { join } from 'path';
 
 import { AuthModule } from './auth/auth.module';
-import { LogsModule } from './logs/logs.module';
 import { ScreenshotsModule } from './screenshots/screenshots.module';
 import { InsightsModule } from './insights/insights.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WorkersModule } from './workers/workers.module';
+import { ReportsModule } from './reports/reports.module';
 import { CommonModule } from './common/common.module';
 
 @Module({
@@ -49,11 +49,11 @@ import { CommonModule } from './common/common.module';
     // Feature modules
     CommonModule,
     AuthModule,
-    LogsModule,
     ScreenshotsModule,
     InsightsModule,
     NotificationsModule,
     WorkersModule,
+    ReportsModule,
   ],
 })
 export class AppModule {} 

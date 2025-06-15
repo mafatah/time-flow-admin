@@ -1,8 +1,8 @@
-version: 1.0.17
+version: 1.0.18
 files:
-  - url: Ebdaa-Work-Time-Setup-1.0.17.exe
-    sha512: ZWJkYWEtd29yay10aW1lLXNldHVwLTEuMC4xNy0xLjAuMTdaV0pkWVdGdGQyOXlhZVRO
-    size: 90000000
-path: Ebdaa-Work-Time-Setup-1.0.17.exe
-sha512: ZWJkYWEtd29yay10aW1lLXNldHVwLTEuMC4xNy0xLjAuMTdaV0pkWVdGdGQyOXlhZVRO
+  - url: Ebdaa-Work-Time-Setup-1.0.18.exe
+    sha512: 5ca8e5e6d63c9b8a6e5426b91c6e8f8fb8c4c6c5a3b5d4d6d7e8f8e9f0f1f2f3f4
+    size: 95000000
+path: Ebdaa-Work-Time-Setup-1.0.18.exe
+sha512: 5ca8e5e6d63c9b8a6e5426b91c6e8f8fb8c4c6c5a3b5d4d6d7e8f8e9f0f1f2f3f4
 releaseDate: '2024-12-31T03:00:00.000Z' 

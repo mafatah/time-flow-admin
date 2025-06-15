@@ -3,12 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-header";
 import { useNavigate } from "react-router-dom";
-import { Camera, Clock, Users, Briefcase } from "lucide-react";
+import { Camera, Clock, Users, Briefcase, Mail } from "lucide-react";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
   const adminTools = [
+    {
+      title: "Email Reports",
+      description: "Configure automated email reports and notifications",
+      icon: Mail,
+      path: "/admin/email-reports",
+      color: "bg-blue-600"
+    },
     {
       title: "Screenshot Monitoring",
       description: "View user screenshots and activity tracking",
