@@ -33,7 +33,7 @@ import TimeLogsPage from '@/pages/time-logs';
 import EmployeeSettingsPage from '@/pages/employee-settings';
 import FinancePage from '@/pages/finance';
 import SuspiciousActivityPage from '@/pages/suspicious-activity';
-import DebugUrlTracking from '@/components/debug/debug-url-tracking';
+// import DebugUrlTracking from '@/components/debug/debug-url-tracking';
 
 
 console.log('🚀 App.tsx loading...');
@@ -415,6 +415,7 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
+      {/* Debug route temporarily disabled for production build
       <Route path="/debug-url-tracking" element={
         <ProtectedRoute>
           <AdminRoute>
@@ -424,6 +425,7 @@ function AppRoutes() {
           </AdminRoute>
         </ProtectedRoute>
       } />
+      */}
       
       <Route path="/settings" element={
         <ProtectedRoute>
