@@ -26,6 +26,7 @@ interface EmployeeData {
   id: string;
   name: string;
   email: string;
+  role: string;
   dailyHours: DailyHours;
   totalHours: number;
   activeHours: number;
@@ -104,16 +105,16 @@ export default function AllEmployeeReport() {
       const labels = days.map(day => format(day, 'EEE\nM/d'));
       setDateLabels(labels);
 
-      // First get all employees with better error handling
+      // First get all users (employees, admins, managers) with better error handling
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('id, full_name, email')
-        .eq('role', 'employee')
+        .select('id, full_name, email, role')
+        .in('role', ['employee', 'admin', 'manager'])
         .order('full_name');
 
       if (usersError) {
         console.error('Error fetching users:', usersError);
-        throw new Error(`Failed to fetch employees: ${usersError.message}`);
+        throw new Error(`Failed to fetch users: ${usersError.message}`);
       }
 
       if (!usersData || usersData.length === 0) {
@@ -156,6 +157,7 @@ export default function AllEmployeeReport() {
           id: user.id,
           name: user.full_name || 'Unknown',
           email: user.email,
+          role: user.role,
           dailyHours,
           totalHours: 0,
           activeHours: 0,
@@ -390,7 +392,7 @@ export default function AllEmployeeReport() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Employee Hours Summary ({employees.length} employees)
+            Employee Hours Summary ({employees.length} users)
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -402,8 +404,8 @@ export default function AllEmployeeReport() {
           ) : employees.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <div>No employee data found for the selected period.</div>
-              <div className="text-sm mt-2">Try selecting a different date range or ensure employees have logged time.</div>
+              <div>No user data found for the selected period.</div>
+              <div className="text-sm mt-2">Try selecting a different date range or ensure users have logged time.</div>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -427,7 +429,12 @@ export default function AllEmployeeReport() {
                     <tr key={employee.id} className={empIndex % 2 === 0 ? 'bg-muted/10' : ''}>
                       <td className="p-3 font-medium">
                         <div>
-                          <div className="font-medium">{employee.name}</div>
+                          <div className="font-medium flex items-center gap-2">
+                            {employee.name}
+                            <Badge variant="outline" className="text-xs capitalize">
+                              {employee.role}
+                            </Badge>
+                          </div>
                           <div className="text-xs text-muted-foreground">{employee.email}</div>
                           <div className="text-xs text-muted-foreground mt-1">
                             Active: {formatHours(employee.activeHours)} | Idle: {formatHours(employee.idleHours)}
