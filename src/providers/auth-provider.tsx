@@ -36,14 +36,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
+    let mounted = true;
+
     async function initializeAuth() {
       try {
+        if (!mounted) return;
+        
         setLoading(true);
         setError(null);
         
         // Set up auth state listener FIRST
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event: AuthChangeEvent, session: Session | null) => {
+            if (!mounted) return;
+            
             console.log('Auth state change:', event, session?.user?.email);
             setSession(session);
             setUser(session?.user ?? null);
@@ -51,7 +57,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (session?.user) {
               // Use setTimeout to avoid blocking the auth callback
               setTimeout(() => {
-                fetchUserDetails(session.user.id);
+                if (mounted) {
+                  fetchUserDetails(session.user.id);
+                }
               }, 0);
             } else {
               setUserDetails(null);
@@ -62,46 +70,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // THEN check for existing session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
+        if (!mounted) return;
+        
         if (sessionError) {
           console.error("Error getting session:", sessionError);
-          
-          // Try to restore from extended session if remember me was used
-          const extendedSessionStr = localStorage.getItem('timeflow_extended_session');
-          if (extendedSessionStr) {
-            try {
-              const extendedSession = JSON.parse(extendedSessionStr);
-              if (extendedSession.expires_at > Date.now()) {
-                console.log('🔄 Attempting to restore extended session...');
-                const { data: restoredData, error: restoreError } = await supabase.auth.setSession(extendedSession);
-                
-                if (!restoreError && restoredData.session) {
-                  console.log('✅ Extended session restored successfully');
-                  setSession(restoredData.session);
-                  if (restoredData.session.user) {
-                    setUser(restoredData.session.user);
-                    await fetchUserDetails(restoredData.session.user.id);
-                  }
-                  return; // Skip error handling below
-                } else {
-                  console.log('⚠️ Failed to restore extended session:', restoreError);
-                  localStorage.removeItem('timeflow_extended_session');
-                }
-              } else {
-                console.log('⚠️ Extended session expired, removing...');
-                localStorage.removeItem('timeflow_extended_session');
-              }
-            } catch (parseError) {
-              console.warn('Failed to parse extended session:', parseError);
-              localStorage.removeItem('timeflow_extended_session');
-            }
-          }
-          
           setError(`Authentication error: ${sessionError.message}`);
-          toast({
-            title: "Authentication error",
-            description: "There was a problem with your session. Please try logging in again.",
-            variant: "destructive",
-          });
+          if (toast) {
+            toast({
+              title: "Authentication error",
+              description: "There was a problem with your session. Please try logging in again.",
+              variant: "destructive",
+            });
+          }
         } else {
           setSession(session);
 
@@ -112,22 +92,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         return () => {
+          mounted = false;
           subscription.unsubscribe();
         };
       } catch (err) {
+        if (!mounted) return;
+        
         console.error("Auth initialization error:", err);
         setError("Failed to initialize authentication");
-        toast({
-          title: "System Error",
-          description: "Failed to initialize authentication system. Please refresh the page.",
-          variant: "destructive",
-        });
+        if (toast) {
+          toast({
+            title: "System Error",
+            description: "Failed to initialize authentication system. Please refresh the page.",
+            variant: "destructive",
+          });
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
     initializeAuth();
+
+    return () => {
+      mounted = false;
+    };
   }, [toast]);
 
   async function fetchUserDetails(userId: string) {
@@ -162,33 +153,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
-      // Check user pause status with a separate query to avoid type issues
-      try {
-        const { data: statusData, error: statusError } = await supabase
-          .from("users")
-          .select("is_active, pause_reason")
-          .eq("id", validUserId)
-          .single();
-          
-        if (!statusError && statusData && (statusData as any).is_active === false) {
-          console.log('User account is paused:', (statusData as any).pause_reason);
-          setError(`Account suspended: ${(statusData as any).pause_reason || 'Your account has been paused. Please contact your administrator.'}`);
-          
-          // Sign out the user
-          await supabase.auth.signOut();
-          
-          toast({
-            title: "Account Suspended",
-            description: (statusData as any).pause_reason || "Your account has been paused. Please contact your administrator.",
-            variant: "destructive",
-          });
-          return;
-        }
-      } catch (pauseCheckError) {
-        console.warn('Could not check user pause status:', pauseCheckError);
-        // Continue with normal flow if pause check fails
-      }
-      
       console.log('User details fetched:', data);
       setUserDetails(data);
       setError(null);
@@ -205,59 +169,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          // Set session persistence based on rememberMe
-          // When rememberMe is true, session persists longer
-          // When false, session expires when browser closes
-          captchaToken: undefined,
-        }
       });
 
       if (error) {
         throw error;
       }
       
-      // Store remember me preference in localStorage
-      if (rememberMe) {
-        localStorage.setItem('timeflow_remember_me', 'true');
-        localStorage.setItem('timeflow_last_email', email);
-        
-        // Explicitly save session in localStorage with extended expiry
-        if (data.session) {
-          const extendedSession = {
-            ...data.session,
-            expires_at: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
-          };
-          localStorage.setItem('timeflow_extended_session', JSON.stringify(extendedSession));
-        }
-      } else {
-        localStorage.removeItem('timeflow_remember_me');
-        localStorage.removeItem('timeflow_last_email');
-        localStorage.removeItem('timeflow_extended_session');
+      if (toast) {
+        toast({
+          title: "Successfully signed in",
+          description: "Welcome back!",
+        });
       }
-      
-      // Force session persistence in Supabase storage
-      if (data.session && rememberMe) {
-        try {
-          // Manually save session to ensure persistence
-          await supabase.auth.setSession(data.session);
-        } catch (sessionError) {
-          console.warn('Failed to explicitly set session:', sessionError);
-        }
-      }
-      
-      toast({
-        title: "Successfully signed in",
-        description: rememberMe ? "Your session will be remembered" : "Welcome back!",
-      });
     } catch (error: any) {
       const errorMessage = error.message || "An unexpected error occurred";
       setError(errorMessage);
-      toast({
-        title: "Error signing in",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      if (toast) {
+        toast({
+          title: "Error signing in",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
       throw error;
     }
   }
@@ -267,31 +200,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       await supabase.auth.signOut();
       
-      // Clear all session-related localStorage items
-      localStorage.removeItem('timeflow_remember_me');
-      localStorage.removeItem('timeflow_last_email');
-      localStorage.removeItem('timeflow_extended_session');
-      
-      // Clear Supabase session storage explicitly
-      const storageKey = 'sb-fkpiqcxkmrtaetvfgcli-auth-token';
-      localStorage.removeItem(storageKey);
-      
-      // If running in Electron, also clear the Electron session
-      if (typeof window !== 'undefined' && (window as any).electron) {
-        (window as any).electron.logout();
+      if (toast) {
+        toast({
+          title: "Successfully signed out",
+        });
       }
-      
-      toast({
-        title: "Successfully signed out",
-      });
     } catch (error: any) {
       const errorMessage = error.message || "Error signing out";
       setError(errorMessage);
-      toast({
-        title: "Error signing out",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      if (toast) {
+        toast({
+          title: "Error signing out",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     }
   }
 

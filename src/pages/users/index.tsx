@@ -85,7 +85,12 @@ const UsersPage: React.FC = () => {
         throw error;
       }
 
-      const users = data || [];
+      // Convert the data to match our User interface, handling null is_active values
+      const users = (data || []).map(user => ({
+        ...user,
+        is_active: user.is_active ?? true // Default to true if null
+      }));
+      
       setActiveUsers(users.filter(u => u.is_active));
       setInactiveUsers(users.filter(u => !u.is_active));
     } catch (error: any) {

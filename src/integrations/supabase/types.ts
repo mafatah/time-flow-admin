@@ -134,6 +134,143 @@ export type Database = {
           },
         ]
       }
+      employee_deductions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string
+          deduction_type: string
+          id: string
+          is_active: boolean | null
+          month_year: string
+          reason: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          created_by: string
+          deduction_type: string
+          id?: string
+          is_active?: boolean | null
+          month_year: string
+          reason: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string
+          deduction_type?: string
+          id?: string
+          is_active?: boolean | null
+          month_year?: string
+          reason?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_deductions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_deductions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_deductions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_deductions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_payroll: {
+        Row: {
+          base_salary: number | null
+          created_at: string | null
+          deductions: number | null
+          final_salary: number | null
+          id: string
+          is_paid: boolean | null
+          month_year: string
+          notes: string | null
+          overtime_hours: number | null
+          overtime_pay: number | null
+          paid_at: string | null
+          regular_hours: number | null
+          total_hours_worked: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          base_salary?: number | null
+          created_at?: string | null
+          deductions?: number | null
+          final_salary?: number | null
+          id?: string
+          is_paid?: boolean | null
+          month_year: string
+          notes?: string | null
+          overtime_hours?: number | null
+          overtime_pay?: number | null
+          paid_at?: string | null
+          regular_hours?: number | null
+          total_hours_worked?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          base_salary?: number | null
+          created_at?: string | null
+          deductions?: number | null
+          final_salary?: number | null
+          id?: string
+          is_paid?: boolean | null
+          month_year?: string
+          notes?: string | null
+          overtime_hours?: number | null
+          overtime_pay?: number | null
+          paid_at?: string | null
+          regular_hours?: number | null
+          total_hours_worked?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_payroll_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_payroll_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_project_assignments: {
         Row: {
           created_at: string
@@ -159,6 +296,275 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_salary_settings: {
+        Row: {
+          created_at: string | null
+          effective_from: string | null
+          hourly_rate: number | null
+          id: string
+          minimum_hours_monthly: number | null
+          monthly_salary: number | null
+          notes: string | null
+          overtime_rate: number | null
+          salary_type: string
+          screenshot_frequency_seconds: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          effective_from?: string | null
+          hourly_rate?: number | null
+          id?: string
+          minimum_hours_monthly?: number | null
+          monthly_salary?: number | null
+          notes?: string | null
+          overtime_rate?: number | null
+          salary_type?: string
+          screenshot_frequency_seconds?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          effective_from?: string | null
+          hourly_rate?: number | null
+          id?: string
+          minimum_hours_monthly?: number | null
+          monthly_salary?: number | null
+          notes?: string | null
+          overtime_rate?: number | null
+          salary_type?: string
+          screenshot_frequency_seconds?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_salary_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_salary_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_suspicious_activity: {
+        Row: {
+          analysis_date: string
+          created_at: string | null
+          entertainment_apps: number | null
+          flags: string[] | null
+          id: string
+          idle_time_hours: number | null
+          low_focus_periods: number | null
+          news_consumption: number | null
+          productivity_metrics: Json | null
+          raw_data: Json | null
+          risk_score: number | null
+          screenshot_analysis: Json | null
+          social_media_usage: number | null
+          unproductive_websites: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis_date?: string
+          created_at?: string | null
+          entertainment_apps?: number | null
+          flags?: string[] | null
+          id?: string
+          idle_time_hours?: number | null
+          low_focus_periods?: number | null
+          news_consumption?: number | null
+          productivity_metrics?: Json | null
+          raw_data?: Json | null
+          risk_score?: number | null
+          screenshot_analysis?: Json | null
+          social_media_usage?: number | null
+          unproductive_websites?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis_date?: string
+          created_at?: string | null
+          entertainment_apps?: number | null
+          flags?: string[] | null
+          id?: string
+          idle_time_hours?: number | null
+          low_focus_periods?: number | null
+          news_consumption?: number | null
+          productivity_metrics?: Json | null
+          raw_data?: Json | null
+          risk_score?: number | null
+          screenshot_analysis?: Json | null
+          social_media_usage?: number | null
+          unproductive_websites?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_suspicious_activity_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_suspicious_activity_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_warnings: {
+        Row: {
+          actual_value: number | null
+          created_at: string | null
+          gap_percentage: number | null
+          id: string
+          is_reviewed: boolean | null
+          message: string
+          month_year: string
+          required_value: number | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          severity: string | null
+          updated_at: string | null
+          user_id: string
+          warning_type: string
+        }
+        Insert: {
+          actual_value?: number | null
+          created_at?: string | null
+          gap_percentage?: number | null
+          id?: string
+          is_reviewed?: boolean | null
+          message: string
+          month_year: string
+          required_value?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: string | null
+          updated_at?: string | null
+          user_id: string
+          warning_type: string
+        }
+        Update: {
+          actual_value?: number | null
+          created_at?: string | null
+          gap_percentage?: number | null
+          id?: string
+          is_reviewed?: boolean | null
+          message?: string
+          month_year?: string
+          required_value?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: string | null
+          updated_at?: string | null
+          user_id?: string
+          warning_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_warnings_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_warnings_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_warnings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_warnings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_working_standards: {
+        Row: {
+          created_at: string | null
+          employment_type: string
+          id: string
+          is_active: boolean | null
+          minimum_hours_daily: number | null
+          overtime_threshold: number | null
+          required_days_monthly: number | null
+          required_hours_monthly: number | null
+          updated_at: string | null
+          user_id: string
+          warning_threshold_percentage: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          employment_type: string
+          id?: string
+          is_active?: boolean | null
+          minimum_hours_daily?: number | null
+          overtime_threshold?: number | null
+          required_days_monthly?: number | null
+          required_hours_monthly?: number | null
+          updated_at?: string | null
+          user_id: string
+          warning_threshold_percentage?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          employment_type?: string
+          id?: string
+          is_active?: boolean | null
+          minimum_hours_daily?: number | null
+          overtime_threshold?: number | null
+          required_days_monthly?: number | null
+          required_hours_monthly?: number | null
+          updated_at?: string | null
+          user_id?: string
+          warning_threshold_percentage?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_working_standards_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_working_standards_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "v_dashboard"
             referencedColumns: ["id"]
           },
         ]
@@ -430,6 +836,75 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      suspicious_activity_detection: {
+        Row: {
+          activity_score: number | null
+          created_at: string | null
+          detection_date: string
+          entertainment_time_minutes: number | null
+          flags: Json | null
+          focus_score: number | null
+          id: string
+          idle_time_minutes: number | null
+          news_time_minutes: number | null
+          notes: string | null
+          productivity_score: number | null
+          risk_level: string | null
+          social_media_time_minutes: number | null
+          total_work_time_minutes: number | null
+          user_id: string
+        }
+        Insert: {
+          activity_score?: number | null
+          created_at?: string | null
+          detection_date: string
+          entertainment_time_minutes?: number | null
+          flags?: Json | null
+          focus_score?: number | null
+          id?: string
+          idle_time_minutes?: number | null
+          news_time_minutes?: number | null
+          notes?: string | null
+          productivity_score?: number | null
+          risk_level?: string | null
+          social_media_time_minutes?: number | null
+          total_work_time_minutes?: number | null
+          user_id: string
+        }
+        Update: {
+          activity_score?: number | null
+          created_at?: string | null
+          detection_date?: string
+          entertainment_time_minutes?: number | null
+          flags?: Json | null
+          focus_score?: number | null
+          id?: string
+          idle_time_minutes?: number | null
+          news_time_minutes?: number | null
+          notes?: string | null
+          productivity_score?: number | null
+          risk_level?: string | null
+          social_media_time_minutes?: number | null
+          total_work_time_minutes?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suspicious_activity_detection_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suspicious_activity_detection_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tasks: {
         Row: {
@@ -738,9 +1213,18 @@ export type Database = {
           full_name: string
           id: string
           idle_timeout_minutes: number | null
+          is_active: boolean | null
+          last_activity: string | null
+          minimum_hours_monthly: number | null
           offline_tracking_enabled: boolean | null
           pause_allowed: boolean | null
+          pause_reason: string | null
+          paused_at: string | null
+          paused_by: string | null
           role: string
+          salary_amount: number | null
+          salary_type: string | null
+          screenshot_frequency_seconds: number | null
         }
         Insert: {
           avatar_url?: string | null
@@ -749,9 +1233,18 @@ export type Database = {
           full_name: string
           id: string
           idle_timeout_minutes?: number | null
+          is_active?: boolean | null
+          last_activity?: string | null
+          minimum_hours_monthly?: number | null
           offline_tracking_enabled?: boolean | null
           pause_allowed?: boolean | null
+          pause_reason?: string | null
+          paused_at?: string | null
+          paused_by?: string | null
           role?: string
+          salary_amount?: number | null
+          salary_type?: string | null
+          screenshot_frequency_seconds?: number | null
         }
         Update: {
           avatar_url?: string | null
@@ -760,11 +1253,35 @@ export type Database = {
           full_name?: string
           id?: string
           idle_timeout_minutes?: number | null
+          is_active?: boolean | null
+          last_activity?: string | null
+          minimum_hours_monthly?: number | null
           offline_tracking_enabled?: boolean | null
           pause_allowed?: boolean | null
+          pause_reason?: string | null
+          paused_at?: string | null
+          paused_by?: string | null
           role?: string
+          salary_amount?: number | null
+          salary_type?: string | null
+          screenshot_frequency_seconds?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_paused_by_fkey"
+            columns: ["paused_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "users_paused_by_fkey"
+            columns: ["paused_by"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -800,6 +1317,14 @@ export type Database = {
           new_data?: Json
         }
         Returns: undefined
+      }
+      pause_user: {
+        Args: { target_user_id: string; admin_user_id: string; reason?: string }
+        Returns: boolean
+      }
+      unpause_user: {
+        Args: { target_user_id: string; admin_user_id: string }
+        Returns: boolean
       }
     }
     Enums: {
