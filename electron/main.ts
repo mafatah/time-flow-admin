@@ -777,7 +777,7 @@ function createSimpleIcon(): string {
 function updateTrayMenu() {
   const updateStatus = getUpdateStatus();
   const updateLabel = updateStatus.updateAvailable 
-    ? '⬇️ Download Update' 
+    ? `⬇️ Download v${updateStatus.updateInfo?.version}` 
     : updateStatus.updateCheckInProgress 
       ? '🔍 Checking...' 
       : '🔄 Check for Updates';

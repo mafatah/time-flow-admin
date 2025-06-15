@@ -11,7 +11,7 @@ let downloadProgress = 0;
 let updateInfo: any = null;
 
 // Configure auto-updater for GitHub releases
-autoUpdater.autoDownload = true; // Auto-download updates for better UX
+autoUpdater.autoDownload = false; // Manual download for user control
 autoUpdater.allowPrerelease = false; // Only stable releases
 
 // GitHub releases configuration

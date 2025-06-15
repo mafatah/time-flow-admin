@@ -180,9 +180,8 @@
       "notarize": {
         "teamId": "6GW49LK9V9"
       }
-    },
-    "afterSign": "scripts/notarize.cjs",
-    "dmg": {
+          },
+      "dmg": {
       "format": "UDZO",
       "icon": "electron/assets/icon.png",
       "iconSize": 80,
@@ -213,8 +212,7 @@
         ]
       },
       "icon": "electron/assets/icon.png",
-      "certificateFile": "build/code-signing-cert.p12",
-      "certificatePassword": "${CSC_KEY_PASSWORD}",
+
       "signingHashAlgorithms": [
         "sha256"
       ],
