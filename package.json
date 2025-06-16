@@ -1,7 +1,7 @@
 {
   "name": "vite_react_shadcn_ts",
   "private": true,
-  "version": "1.0.23",
+  "version": "1.0.24",
   "type": "module",
   "author": "Ebdaa Digital Technology",
   "description": "Ebdaa Work Time - Employee time tracking and productivity monitoring application",
@@ -22,7 +22,7 @@
     "electron:build": "electron-builder",
     "electron:build-unsigned": "electron-builder --config.mac.identity=null --config.mac.notarize=null",
     "build:web": "tsc -p tsconfig.app.json",
-    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\; && node fix-imports.cjs && mkdir -p build/desktop-agent && cp -r desktop-agent/renderer desktop-agent/config.json desktop-agent/assets desktop-agent/debug-window.html build/desktop-agent/ && mkdir -p build/electron/assets && cp -r electron/assets/* build/electron/assets/ && cp public/app-update.yml build/electron/",
+    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\; && node fix-imports.cjs && mkdir -p build/desktop-agent && cp -r desktop-agent/renderer desktop-agent/config.json desktop-agent/assets desktop-agent/debug-window.html build/desktop-agent/ && mkdir -p build/electron/assets && cp -r electron/assets/* build/electron/assets/ && cp public/app-update.yml build/electron/ && cp build/electron/electron/env-config.js build/electron/electron/ 2>/dev/null || echo 'env-config.js will be created during build'",
     "build:all": "npm run build:dev && npm run build:electron && mkdir -p build/dist && cp -r dist/* build/dist/",
     "build:notarized": "scripts/build-notarized.sh",
     "build:release": "scripts/build-and-release.sh",

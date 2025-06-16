@@ -120,13 +120,13 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Use GitHub releases for reliable downloads - v1.0.23 FULLY SIGNED & NOTARIZED
+    // Use GitHub releases for reliable downloads - v1.0.24 HOTFIX - CONFIGURATION FIXED!
     const downloadFiles = {
-      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.23/Ebdaa.Work.Time.Setup.1.0.23.exe`,
-      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.23/Ebdaa.Work.Time-1.0.23.dmg`, // SIGNED & NOTARIZED
-      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.23/Ebdaa.Work.Time-1.0.23-arm64.dmg`, // SIGNED & NOTARIZED
-      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.23/Ebdaa.Work.Time-1.0.23-arm64.dmg`, // Default to ARM64 for modern Macs
-      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.23/Ebdaa.Work.Time-1.0.23.AppImage`
+      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.24/Ebdaa.Work.Time.Setup.1.0.24.exe`,
+      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.24/Ebdaa.Work.Time-1.0.24.dmg`, // SIGNED & NOTARIZED
+      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.24/Ebdaa.Work.Time-1.0.24-arm64.dmg`, // SIGNED & NOTARIZED
+      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.24/Ebdaa.Work.Time-1.0.24-arm64.dmg`, // Default to ARM64 for modern Macs
+      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.24/Ebdaa.Work.Time-1.0.24.AppImage`
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
