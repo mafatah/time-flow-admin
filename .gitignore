@@ -95,3 +95,4 @@ notarization-*.log
 test-*
 debug-*
 check-*
+.vercel
