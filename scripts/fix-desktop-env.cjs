@@ -4,114 +4,156 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-console.log('🔧 Fixing desktop app environment variables...');
+console.log('🔧 Fixing desktop agent environment variables...');
 
-// Read current .env file
-const envPath = path.join(process.cwd(), '.env');
-if (!fs.existsSync(envPath)) {
-    console.error('❌ .env file not found in project root');
-    process.exit(1);
-}
+// Supabase credentials from main project
+const supabaseUrl = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
 
-// Extract required environment variables
-const requiredEnvVars = {
-    VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
-    VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-};
+const desktopAgentDir = path.join(__dirname, '..', 'desktop-agent');
 
-// Validate required variables
-if (!requiredEnvVars.VITE_SUPABASE_URL || !requiredEnvVars.VITE_SUPABASE_ANON_KEY) {
-    console.error('❌ Missing required Supabase environment variables');
-    console.error('   VITE_SUPABASE_URL:', requiredEnvVars.VITE_SUPABASE_URL ? '✓' : '❌');
-    console.error('   VITE_SUPABASE_ANON_KEY:', requiredEnvVars.VITE_SUPABASE_ANON_KEY ? '✓' : '❌');
-    process.exit(1);
-}
-
-// Create embedded config file for desktop app
-const desktopEnvPath = path.join(process.cwd(), 'desktop-agent', '.env');
-const envContent = `# Generated environment file for desktop app
-VITE_SUPABASE_URL=${requiredEnvVars.VITE_SUPABASE_URL}
-VITE_SUPABASE_ANON_KEY=${requiredEnvVars.VITE_SUPABASE_ANON_KEY}
-SUPABASE_SERVICE_ROLE_KEY=${requiredEnvVars.SUPABASE_SERVICE_ROLE_KEY}
-NODE_ENV=production
+// 1. Create desktop-agent/.env file
+const envPath = path.join(desktopAgentDir, '.env');
+const envContent = `VITE_SUPABASE_URL=${supabaseUrl}
+VITE_SUPABASE_ANON_KEY=${supabaseAnonKey}
+SUPABASE_URL=${supabaseUrl}
+SUPABASE_ANON_KEY=${supabaseAnonKey}
 `;
 
-fs.writeFileSync(desktopEnvPath, envContent);
+fs.writeFileSync(envPath, envContent);
 console.log('✅ Created desktop-agent/.env file');
 
-// Also create a config.js file that can be bundled
-const configPath = path.join(process.cwd(), 'desktop-agent', 'env-config.js');
-const configContent = `// Generated configuration file for desktop app
+// 2. Create a JavaScript config file that gets bundled with the app
+const envConfigPath = path.join(desktopAgentDir, 'env-config.js');
+const envConfigContent = `// Embedded environment configuration for packaged app
 module.exports = {
-    SUPABASE_URL: "${requiredEnvVars.VITE_SUPABASE_URL}",
-    SUPABASE_ANON_KEY: "${requiredEnvVars.VITE_SUPABASE_ANON_KEY}",
-    SUPABASE_SERVICE_KEY: "${requiredEnvVars.SUPABASE_SERVICE_ROLE_KEY}",
-    NODE_ENV: "production"
+  VITE_SUPABASE_URL: '${supabaseUrl}',
+  VITE_SUPABASE_ANON_KEY: '${supabaseAnonKey}',
+  SUPABASE_URL: '${supabaseUrl}',
+  SUPABASE_ANON_KEY: '${supabaseAnonKey}'
 };
 `;
 
-fs.writeFileSync(configPath, configContent);
+fs.writeFileSync(envConfigPath, envConfigContent);
 console.log('✅ Created desktop-agent/env-config.js file');
 
-// Update the main.js to use embedded config as fallback
-const mainJsPath = path.join(process.cwd(), 'desktop-agent', 'src', 'main.js');
-if (fs.existsSync(mainJsPath)) {
-    let mainContent = fs.readFileSync(mainJsPath, 'utf8');
-    
-    // Add fallback config loading at the top
-    const fallbackConfig = `
-// Fallback configuration for packaged app
+// 3. Update config.json to include Supabase credentials as fallback
+const configPath = path.join(desktopAgentDir, 'config.json');
+let config = {};
+
+if (fs.existsSync(configPath)) {
+  config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+}
+
+config.supabase_url = supabaseUrl;
+config.supabase_key = supabaseAnonKey;
+
+fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+console.log('✅ Updated desktop-agent/config.json with Supabase credentials');
+
+// 4. Update load-config.js to use embedded config as fallback
+const loadConfigPath = path.join(desktopAgentDir, 'load-config.js');
+const loadConfigContent = `const fs = require('fs');
+const path = require('path');
+
+// Try to load embedded config for packaged apps
 let embeddedConfig = {};
 try {
-    embeddedConfig = require('../env-config.js');
-} catch (e) {
-    console.log('📄 No embedded config found, using environment variables');
+  embeddedConfig = require('./env-config');
+} catch (error) {
+  // Embedded config not available in development
 }
 
-// Set environment variables from embedded config if available
-if (embeddedConfig.SUPABASE_URL && !process.env.VITE_SUPABASE_URL) {
-    process.env.VITE_SUPABASE_URL = embeddedConfig.SUPABASE_URL;
-    process.env.VITE_SUPABASE_ANON_KEY = embeddedConfig.SUPABASE_ANON_KEY;
-    process.env.SUPABASE_SERVICE_ROLE_KEY = embeddedConfig.SUPABASE_SERVICE_KEY;
-    console.log('✅ Using embedded configuration for Supabase');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+function loadConfig() {
+  console.log('🔧 Loading desktop agent configuration...');
+  
+  // Load from .env file if it exists
+  const envPath = path.join(__dirname, '.env');
+  let envConfig = {};
+  
+  if (fs.existsSync(envPath)) {
+    console.log('📄 Found .env file, loading credentials...');
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    
+    envContent.split('\n').forEach(line => {
+      const trimmedLine = line.trim();
+      if (trimmedLine && !trimmedLine.startsWith('#')) {
+        const [key, ...valueParts] = trimmedLine.split('=');
+        if (key && valueParts.length > 0) {
+          const value = valueParts.join('=').trim();
+          envConfig[key.trim()] = value;
+        }
+      }
+    });
+  }
+  
+  // Load from config.json for other settings
+  const configPath = path.join(__dirname, 'config.json');
+  let jsonConfig = {};
+  
+  if (fs.existsSync(configPath)) {
+    jsonConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  }
+  
+  // Merge configurations with priority: process.env > .env > embedded > config.json
+  const config = {
+    ...jsonConfig,
+    supabase_url: process.env.VITE_SUPABASE_URL || 
+                  process.env.SUPABASE_URL || 
+                  envConfig.SUPABASE_URL || 
+                  embeddedConfig.SUPABASE_URL || 
+                  jsonConfig.supabase_url || '',
+    supabase_key: process.env.VITE_SUPABASE_ANON_KEY || 
+                  process.env.SUPABASE_ANON_KEY || 
+                  envConfig.SUPABASE_ANON_KEY || 
+                  embeddedConfig.SUPABASE_ANON_KEY || 
+                  jsonConfig.supabase_key || '',
+    supabase_service_key: process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                          envConfig.SUPABASE_SERVICE_ROLE_KEY || 
+                          ''
+  };
+  
+  // Validate required credentials
+  if (!config.supabase_url || !config.supabase_key) {
+    console.error('❌ Missing Supabase credentials!');
+    console.error('   Please ensure either:');
+    console.error('   1. .env file contains VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+    console.error('   2. OR environment variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set');
+    console.error('   3. OR config.json contains supabase_url and supabase_key');
+    console.error('   4. OR embedded config is available (for packaged apps)');
+    throw new Error('Missing required Supabase environment variables');
+  }
+  
+  console.log('✅ Configuration loaded successfully');
+  console.log(\`   Using Supabase URL: \${config.supabase_url}\`);
+  console.log(\`   Using credentials from: \${envConfig.SUPABASE_URL ? '.env file' : embeddedConfig.SUPABASE_URL ? 'embedded config' : 'config.json'}\`);
+  console.log(\`   Service role key available: \${!!config.supabase_service_key}\`);
+  console.log(\`   Service role key length: \${config.supabase_service_key ? config.supabase_service_key.length : 0}\`);
+  
+  return config;
 }
+
+module.exports = { loadConfig }; 
 `;
 
-    // Insert fallback config after the initial requires
-    if (!mainContent.includes('embeddedConfig')) {
-        const insertPos = mainContent.indexOf("require('dotenv').config();");
-        if (insertPos !== -1) {
-            const afterDotenv = mainContent.indexOf('\n', insertPos) + 1;
-            mainContent = mainContent.slice(0, afterDotenv) + fallbackConfig + mainContent.slice(afterDotenv);
-            fs.writeFileSync(mainJsPath, mainContent);
-            console.log('✅ Updated main.js with embedded config fallback');
-        }
-    }
-}
-
-// Update build script to include env files
-const buildPath = path.join(process.cwd(), 'build', 'desktop-agent');
-if (fs.existsSync(buildPath)) {
-    // Copy env files to build directory
-    const buildEnvPath = path.join(buildPath, '.env');
-    const buildConfigPath = path.join(buildPath, 'env-config.js');
-    
-    fs.copyFileSync(desktopEnvPath, buildEnvPath);
-    fs.copyFileSync(configPath, buildConfigPath);
-    
-    console.log('✅ Copied env files to build directory');
-}
+fs.writeFileSync(loadConfigPath, loadConfigContent);
+console.log('✅ Updated desktop-agent/load-config.js with embedded config support');
 
 console.log('');
-console.log('🎉 Desktop app environment fix complete!');
-console.log('📋 Changes made:');
-console.log('   • Created desktop-agent/.env with Supabase credentials');
-console.log('   • Created desktop-agent/env-config.js for bundling');
-console.log('   • Updated main.js with embedded config fallback');
-console.log('   • Copied files to build directory');
+console.log('🎉 Desktop agent environment fix completed!');
 console.log('');
-console.log('💡 Next steps:');
-console.log('   1. Rebuild the desktop app: npm run build:electron');
-console.log('   2. Test locally: cd desktop-agent && npm start');
-console.log('   3. Build new DMG: npm run electron:build'); 
+console.log('The following changes were made:');
+console.log('1. ✅ Created desktop-agent/.env file with Supabase credentials');
+console.log('2. ✅ Created desktop-agent/env-config.js for packaged apps');
+console.log('3. ✅ Updated desktop-agent/config.json with fallback credentials');
+console.log('4. ✅ Enhanced desktop-agent/load-config.js with multiple fallbacks');
+console.log('');
+console.log('Now the desktop agent will work in all scenarios:');
+console.log('- ✅ Development (uses .env file)');
+console.log('- ✅ Packaged app (uses embedded env-config.js)');
+console.log('- ✅ Fallback (uses config.json)');
+console.log('');
+console.log('🧪 Test the fix by running:');
+console.log('   cd desktop-agent && node test-deployment-scenario.js'); 

@@ -60,7 +60,26 @@ try {
 
 // Load configuration using our new environment variable loader
 const { loadConfig } = require('../load-config');
-const config = loadConfig();
+let config;
+try {
+  config = loadConfig();
+} catch (error) {
+  console.error('❌ Failed to load configuration:', error);
+  
+  // Show error dialog and exit
+  const { dialog } = require('electron');
+  if (app) {
+    app.whenReady().then(() => {
+      dialog.showErrorBox(
+        'Configuration Error',
+        `Failed to load Supabase configuration:\n\n${error.message}\n\nPlease ensure the app has proper environment variables or contact support.`
+      );
+      app.quit();
+    });
+  }
+  
+  process.exit(1);
+}
 
 // Initialize Supabase client - prioritize service key for admin operations
 const supabase = config.supabase_service_key ? 

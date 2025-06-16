@@ -1,5 +1,14 @@
 const fs = require('fs');
 const path = require('path');
+
+// Try to load embedded config for packaged apps
+let embeddedConfig = {};
+try {
+  embeddedConfig = require('./env-config');
+} catch (error) {
+  // Embedded config not available in development
+}
+
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 function loadConfig() {
@@ -13,7 +22,8 @@ function loadConfig() {
     console.log('📄 Found .env file, loading credentials...');
     const envContent = fs.readFileSync(envPath, 'utf8');
     
-    envContent.split('\n').forEach(line => {
+    envContent.split('
+').forEach(line => {
       const trimmedLine = line.trim();
       if (trimmedLine && !trimmedLine.startsWith('#')) {
         const [key, ...valueParts] = trimmedLine.split('=');
@@ -33,12 +43,22 @@ function loadConfig() {
     jsonConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   }
   
-  // Merge configurations - environment variables take priority for credentials
+  // Merge configurations with priority: process.env > .env > embedded > config.json
   const config = {
     ...jsonConfig,
-    supabase_url: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || envConfig.SUPABASE_URL || jsonConfig.supabase_url || '',
-    supabase_key: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || envConfig.SUPABASE_ANON_KEY || jsonConfig.supabase_key || '',
-    supabase_service_key: process.env.SUPABASE_SERVICE_ROLE_KEY || envConfig.SUPABASE_SERVICE_ROLE_KEY || ''
+    supabase_url: process.env.VITE_SUPABASE_URL || 
+                  process.env.SUPABASE_URL || 
+                  envConfig.SUPABASE_URL || 
+                  embeddedConfig.SUPABASE_URL || 
+                  jsonConfig.supabase_url || '',
+    supabase_key: process.env.VITE_SUPABASE_ANON_KEY || 
+                  process.env.SUPABASE_ANON_KEY || 
+                  envConfig.SUPABASE_ANON_KEY || 
+                  embeddedConfig.SUPABASE_ANON_KEY || 
+                  jsonConfig.supabase_key || '',
+    supabase_service_key: process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                          envConfig.SUPABASE_SERVICE_ROLE_KEY || 
+                          ''
   };
   
   // Validate required credentials
@@ -48,12 +68,13 @@ function loadConfig() {
     console.error('   1. .env file contains VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
     console.error('   2. OR environment variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set');
     console.error('   3. OR config.json contains supabase_url and supabase_key');
-    throw new Error('Missing required Supabase configuration');
+    console.error('   4. OR embedded config is available (for packaged apps)');
+    throw new Error('Missing required Supabase environment variables');
   }
   
   console.log('✅ Configuration loaded successfully');
   console.log(`   Using Supabase URL: ${config.supabase_url}`);
-  console.log(`   Using credentials from: ${envConfig.SUPABASE_URL ? '.env file' : 'config.json'}`);
+  console.log(`   Using credentials from: ${envConfig.SUPABASE_URL ? '.env file' : embeddedConfig.SUPABASE_URL ? 'embedded config' : 'config.json'}`);
   console.log(`   Service role key available: ${!!config.supabase_service_key}`);
   console.log(`   Service role key length: ${config.supabase_service_key ? config.supabase_service_key.length : 0}`);
   
