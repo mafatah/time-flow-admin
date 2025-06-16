@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 const DownloadPage = () => {
-  const version = "v1.0.19";
+  const version = "v1.0.16";
   const releaseDate = new Date().toLocaleDateString();
   
   const downloads = [
@@ -20,8 +20,8 @@ const DownloadPage = () => {
       platform: "macOS (Apple Silicon)",
       icon: <Apple className="h-6 w-6" />,
       description: "For M1, M2, M3 Macs",
-      filename: "Ebdaa-Work-Time-${version}-arm64.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/vv1.0.19/Ebdaa-Work-Time-v1.0.19-arm64.dmg",
+      filename: `TimeFlow-${version}-ARM64.dmg`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-ARM64.dmg`,
       size: "~112 MB",
       requirements: "macOS 11.0+",
       verified: true
@@ -30,8 +30,8 @@ const DownloadPage = () => {
       platform: "macOS (Intel)",
       icon: <Apple className="h-6 w-6" />,
       description: "For Intel-based Macs",
-      filename: "Ebdaa-Work-Time-${version}.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/vv1.0.19/Ebdaa-Work-Time-v1.0.19.dmg",
+      filename: `TimeFlow-${version}-Intel.dmg`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Intel.dmg`,
       size: "~118 MB",
       requirements: "macOS 10.14+",
       verified: true
@@ -40,8 +40,8 @@ const DownloadPage = () => {
       platform: "Windows",
       icon: <Monitor className="h-6 w-6" />,
       description: "For Windows 10/11",
-      filename: "Ebdaa-Work-Time-Setup-${version}.exe",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/vv1.0.19/Ebdaa-Work-Time-Setup-v1.0.19.exe",
+      filename: `TimeFlow-${version}-Setup.exe`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Setup.exe`,
       size: "~85 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true
@@ -50,8 +50,8 @@ const DownloadPage = () => {
       platform: "Linux",
       icon: <Smartphone className="h-6 w-6" />,
       description: "AppImage for Linux",
-      filename: "Ebdaa-Work-Time-${version}.AppImage",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/vv1.0.19/Ebdaa-Work-Time-v1.0.19.AppImage",
+      filename: `TimeFlow-${version}.AppImage`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}.AppImage`,
       size: "~120 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: true
@@ -181,7 +181,7 @@ const DownloadPage = () => {
         <div className="text-center text-gray-600 space-y-4">
           <div className="flex justify-center gap-6 text-sm">
             <a 
-              href="https://github.com/mafatah/time-flow-admin/releases/tag/vv1.0.19"
+              href={`https://github.com/mafatah/time-flow-admin/releases/tag/${version}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-blue-600"

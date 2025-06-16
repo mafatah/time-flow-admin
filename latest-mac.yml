@@ -1,11 +1,11 @@
-version: 1.0.19
+version: 1.0.16
 files:
-  - url: Ebdaa-Work-Time-1.0.19.dmg
+  - url: TimeFlow-v1.0.16-Intel.dmg
     sha512: hqUNggCgCVjbj2H2H3KIFduw7z3yst1FtLKUcEVw+SkK+AK4nByMPTkKv7t0g3fRh4aL6cQady+I2JD8+dkVug==
     size: 122924207
-  - url: Ebdaa-Work-Time-1.0.19-arm64.dmg
+  - url: TimeFlow-v1.0.16-ARM64.dmg
     sha512: 7/HXuT+FRP0ZPsfas08/VHhBQCuAzAUGLIprAd1dj8mk+LNXXlA+WV70sNIeterHL1C/Nk6Cf0D80Idl6P48IQ==
     size: 116412551
-path: Ebdaa-Work-Time-1.0.19.dmg
+path: TimeFlow-v1.0.16-Intel.dmg
 sha512: hqUNggCgCVjbj2H2H3KIFduw7z3yst1FtLKUcEVw+SkK+AK4nByMPTkKv7t0g3fRh4aL6cQady+I2JD8+dkVug==
-releaseDate: '2025-06-16T11:05:29.624Z'
+releaseDate: '2025-06-13T18:04:06.000Z'
