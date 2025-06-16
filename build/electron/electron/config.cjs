@@ -6,25 +6,62 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isProduction = exports.isDevelopment = exports.trackApplications = exports.trackUrls = exports.enableScreenshots = exports.enableIdleDetection = exports.enableActivityTracking = exports.enableAntiCheat = exports.enableScreenshotBlur = exports.keyboardDiversityThreshold = exports.minimumMouseDistance = exports.patternDetectionWindowMinutes = exports.suspiciousActivityThreshold = exports.notificationFrequencySeconds = exports.screenshotFailureWarningMinutes = exports.maxConsecutiveScreenshotFailures = exports.mandatoryScreenshotIntervalMinutes = exports.maxLaptopClosedHours = exports.screenshotIntervalSeconds = exports.idleTimeoutMinutes = exports.SUPABASE_PUBLISHABLE_KEY = exports.SUPABASE_SERVICE_KEY = exports.SUPABASE_URL = void 0;
 // In Node.js environment, we can safely use dotenv
 const dotenv_1 = __importDefault(require("dotenv"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 // Load environment variables first
 dotenv_1.default.config();
 // Enhanced configuration with environment variables only - no hardcoded fallbacks
-// Get configuration from environment variables only
+// Attempt to load embedded configuration (generated during packaging)
+let embeddedConfig = {};
+try {
+    // env-config.js will be placed in the same folder as the compiled config file
+    /* eslint-disable @typescript-eslint/no-var-requires */
+    embeddedConfig = require('./env-config');
+    /* eslint-enable @typescript-eslint/no-var-requires */
+    console.log('📦 Loaded embedded Supabase configuration');
+}
+catch {
+    // No embedded config available (likely development mode)
+}
+// Attempt to load desktop-agent fallback configuration (packaged alongside the app)
+let desktopConfig = {};
+try {
+    // In the compiled output this resolves to build/desktop-agent/config.json
+    const desktopConfigPath = path_1.default.join(__dirname, '../../desktop-agent/config.json');
+    if (fs_1.default.existsSync(desktopConfigPath)) {
+        desktopConfig = JSON.parse(fs_1.default.readFileSync(desktopConfigPath, 'utf8'));
+        console.log('🖥️ Loaded Supabase configuration from desktop-agent/config.json');
+    }
+}
+catch (error) {
+    console.log('⚠️ Could not load desktop-agent/config.json:', error);
+}
+// Get configuration from environment variables first, then fallbacks
 exports.SUPABASE_URL = process.env.VITE_SUPABASE_URL ||
-    process.env.SUPABASE_URL;
-exports.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SUPABASE_URL ||
+    embeddedConfig.VITE_SUPABASE_URL ||
+    embeddedConfig.SUPABASE_URL ||
+    desktopConfig.supabase_url;
+exports.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    embeddedConfig.SUPABASE_SERVICE_ROLE_KEY ||
+    desktopConfig.supabase_service_key;
 exports.SUPABASE_PUBLISHABLE_KEY = process.env.VITE_SUPABASE_ANON_KEY ||
-    process.env.SUPABASE_PUBLISHABLE_KEY;
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    embeddedConfig.VITE_SUPABASE_ANON_KEY ||
+    embeddedConfig.SUPABASE_ANON_KEY ||
+    desktopConfig.supabase_key;
 // Strict validation with helpful error messages
 if (!exports.SUPABASE_URL || !exports.SUPABASE_PUBLISHABLE_KEY) {
     console.error('❌ CRITICAL: Missing Supabase configuration!');
-    console.error('   Please ensure your .env file contains:');
-    console.error('   - VITE_SUPABASE_URL: Your Supabase project URL');
-    console.error('   - VITE_SUPABASE_ANON_KEY: Your Supabase anonymous key');
+    console.error('   Checked sources in the following priority:');
+    console.error('   1. Environment variables');
+    console.error('   2. Embedded env-config.js');
+    console.error('   3. desktop-agent/config.json');
+    console.error('   Please ensure one of these sources provides VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
     throw new Error('Missing required Supabase environment variables');
 }
 else {
-    console.log('✅ Supabase configuration loaded successfully from environment variables');
+    console.log('✅ Supabase configuration loaded successfully');
 }
 // Enhanced configuration with anti-cheat settings
 exports.idleTimeoutMinutes = Number(process.env.IDLE_TIMEOUT_MINUTES ?? 1);

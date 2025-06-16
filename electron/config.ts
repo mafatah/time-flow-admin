@@ -1,29 +1,69 @@
 // In Node.js environment, we can safely use dotenv
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 // Load environment variables first
 dotenv.config();
 
 // Enhanced configuration with environment variables only - no hardcoded fallbacks
 
-// Get configuration from environment variables only
-export const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 
-  process.env.SUPABASE_URL;
+// Attempt to load embedded configuration (generated during packaging)
+let embeddedConfig: Record<string, string> = {};
+try {
+  // env-config.js will be placed in the same folder as the compiled config file
+  /* eslint-disable @typescript-eslint/no-var-requires */
+  embeddedConfig = require('./env-config');
+  /* eslint-enable @typescript-eslint/no-var-requires */
+  console.log('📦 Loaded embedded Supabase configuration');
+} catch {
+  // No embedded config available (likely development mode)
+}
 
-export const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Attempt to load desktop-agent fallback configuration (packaged alongside the app)
+let desktopConfig: Record<string, string> = {};
+try {
+  // In the compiled output this resolves to build/desktop-agent/config.json
+  const desktopConfigPath = path.join(__dirname, '../../desktop-agent/config.json');
+  if (fs.existsSync(desktopConfigPath)) {
+    desktopConfig = JSON.parse(fs.readFileSync(desktopConfigPath, 'utf8'));
+    console.log('🖥️ Loaded Supabase configuration from desktop-agent/config.json');
+  }
+} catch (error) {
+  console.log('⚠️ Could not load desktop-agent/config.json:', error);
+}
 
-export const SUPABASE_PUBLISHABLE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 
-  process.env.SUPABASE_PUBLISHABLE_KEY;
+// Get configuration from environment variables first, then fallbacks
+export const SUPABASE_URL =
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  embeddedConfig.VITE_SUPABASE_URL ||
+  embeddedConfig.SUPABASE_URL ||
+  (desktopConfig as any).supabase_url;
+
+export const SUPABASE_SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  embeddedConfig.SUPABASE_SERVICE_ROLE_KEY ||
+  (desktopConfig as any).supabase_service_key;
+
+export const SUPABASE_PUBLISHABLE_KEY =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  embeddedConfig.VITE_SUPABASE_ANON_KEY ||
+  embeddedConfig.SUPABASE_ANON_KEY ||
+  (desktopConfig as any).supabase_key;
 
 // Strict validation with helpful error messages
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   console.error('❌ CRITICAL: Missing Supabase configuration!');
-  console.error('   Please ensure your .env file contains:');
-  console.error('   - VITE_SUPABASE_URL: Your Supabase project URL');
-  console.error('   - VITE_SUPABASE_ANON_KEY: Your Supabase anonymous key');
+  console.error('   Checked sources in the following priority:');
+  console.error('   1. Environment variables');
+  console.error('   2. Embedded env-config.js');
+  console.error('   3. desktop-agent/config.json');
+  console.error('   Please ensure one of these sources provides VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
   throw new Error('Missing required Supabase environment variables');
 } else {
-  console.log('✅ Supabase configuration loaded successfully from environment variables');
+  console.log('✅ Supabase configuration loaded successfully');
 }
 
 // Enhanced configuration with anti-cheat settings
