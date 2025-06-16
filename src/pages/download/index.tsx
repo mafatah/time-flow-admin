@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 const DownloadPage = () => {
-  const version = "v1.0.20";
+  const version = "v1.0.21";
   const releaseDate = new Date().toLocaleDateString();
   
   const downloads = [
@@ -20,8 +20,8 @@ const DownloadPage = () => {
       platform: "macOS (Apple Silicon)",
       icon: <Apple className="h-6 w-6" />,
       description: "For M1, M2, M3 Macs",
-      filename: "TimeFlow-v1.0.20-ARM64-Signed.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.20/TimeFlow-v1.0.20-ARM64-Signed.dmg",
+      filename: "TimeFlow-v1.0.21-ARM64-Signed.dmg",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.21/TimeFlow-v1.0.21-ARM64-Signed.dmg",
       size: "~112 MB",
       requirements: "macOS 11.0+",
       verified: true
@@ -30,8 +30,8 @@ const DownloadPage = () => {
       platform: "macOS (Intel)",
       icon: <Apple className="h-6 w-6" />,
       description: "For Intel-based Macs",
-      filename: "TimeFlow-v1.0.20-Intel-Signed.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.20/TimeFlow-v1.0.20-Intel-Signed.dmg",
+      filename: "TimeFlow-v1.0.21-Intel-Signed.dmg",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.21/TimeFlow-v1.0.21-Intel-Signed.dmg",
       size: "~118 MB",
       requirements: "macOS 10.14+",
       verified: true
@@ -40,8 +40,8 @@ const DownloadPage = () => {
       platform: "Windows",
       icon: <Monitor className="h-6 w-6" />,
       description: "For Windows 10/11",
-      filename: "TimeFlow-Setup-v1.0.20-Windows-x64.exe",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.20/TimeFlow-Setup-v1.0.20-Windows-x64.exe",
+      filename: "TimeFlow-Setup-v1.0.21-Windows-x64.exe",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.21/TimeFlow-Setup-v1.0.21-Windows-x64.exe",
       size: "~85 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true
@@ -50,9 +50,9 @@ const DownloadPage = () => {
       platform: "Linux",
       icon: <Smartphone className="h-6 w-6" />,
       description: "AppImage for Linux",
-      filename: "TimeFlow-v1.0.20-Linux-x64.AppImage",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.20/TimeFlow-v1.0.20-Linux-x64.AppImage",
-      size: "~120 MB", 
+      filename: "TimeFlow-v1.0.21-Linux-x64.AppImage",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.21/TimeFlow-v1.0.21-Linux-x64.AppImage",
+      size: "~121 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: true
     }
@@ -181,7 +181,7 @@ const DownloadPage = () => {
         <div className="text-center text-gray-600 space-y-4">
           <div className="flex justify-center gap-6 text-sm">
             <a 
-              href="https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.20"
+              href="https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.21"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-blue-600"

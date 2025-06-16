@@ -120,13 +120,13 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Use GitHub releases for reliable downloads - v1.0.20 with signed and notarized files
+    // Use GitHub releases for reliable downloads - v1.0.21 with FIXED environment variables
     const downloadFiles = {
-      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.20/TimeFlow-Setup-v1.0.20-Windows-x64.exe`,
-      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.20/TimeFlow-v1.0.20-Intel-Signed.dmg`, // FULLY SIGNED AND NOTARIZED BY APPLE
-      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.20/TimeFlow-v1.0.20-ARM64-Signed.dmg`, // FULLY SIGNED AND NOTARIZED BY APPLE
-      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.20/TimeFlow-v1.0.20-ARM64-Signed.dmg`, // Default to ARM64 for modern Macs
-      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.20/TimeFlow-v1.0.20-Linux-x64.AppImage`
+      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.21/TimeFlow-Setup-v1.0.21-Windows-x64.exe`,
+      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.21/TimeFlow-v1.0.21-Intel-Signed.dmg`, // FULLY SIGNED AND NOTARIZED BY APPLE
+      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.21/TimeFlow-v1.0.21-ARM64-Signed.dmg`, // FULLY SIGNED AND NOTARIZED BY APPLE
+      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.21/TimeFlow-v1.0.21-ARM64-Signed.dmg`, // Default to ARM64 for modern Macs
+      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.21/TimeFlow-v1.0.21-Linux-x64.AppImage`
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
@@ -279,14 +279,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '112MB'; // TimeFlow-v1.0.20-ARM64-Signed.dmg (FULLY SIGNED AND NOTARIZED)
+        return '112MB'; // TimeFlow-v1.0.21-ARM64-Signed.dmg (FULLY SIGNED AND NOTARIZED)
       case 'mac-intel':
       case 'mac':
-        return '118MB'; // TimeFlow-v1.0.20-Intel-Signed.dmg (FULLY SIGNED AND NOTARIZED)
+        return '118MB'; // TimeFlow-v1.0.21-Intel-Signed.dmg (FULLY SIGNED AND NOTARIZED)
       case 'windows':
-        return '2.3MB'; // TimeFlow-Setup-v1.0.20-Windows-x64.exe
+        return '85MB'; // TimeFlow-Setup-v1.0.21-Windows-x64.exe
       case 'linux':
-        return '120MB'; // TimeFlow-v1.0.20-Linux-x64.AppImage
+        return '121MB'; // TimeFlow-v1.0.21-Linux-x64.AppImage
       default:
         return '';
     }
