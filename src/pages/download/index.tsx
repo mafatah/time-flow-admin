@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 const DownloadPage = () => {
-  const version = "v1.0.24"; // Updated automatically by release pipeline
+  const version = "v1.0.25"; // Updated automatically by release pipeline
   const releaseDate = new Date().toLocaleDateString();
   
   const downloads = [
@@ -181,7 +181,7 @@ const DownloadPage = () => {
         <div className="text-center text-gray-600 space-y-4">
           <div className="flex justify-center gap-6 text-sm">
             <a 
-              href="https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.24"
+              href="https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.25"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-blue-600"
