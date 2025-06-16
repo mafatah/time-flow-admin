@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-VERSION="1.0.21"
+VERSION="1.0.22"
 CERT_NAME="Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)"
 TEAM_ID="6GW49LK9V9"
 APPLE_ID="alshqawe66@gmail.com"

@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-VERSION="1.0.21"
+VERSION="1.0.22"
 GITHUB_REPO="mafatah/time-flow-admin"
 BASE_URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}"
 
