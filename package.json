@@ -34,7 +34,8 @@
     "test:windows": "node test-windows-compatibility.cjs",
     "test:cross-platform": "node test-windows-compatibility.cjs",
     "release": "./scripts/automated-release.sh",
-    "release:quick": "./scripts/quick-release.sh"
+    "release:quick": "./scripts/quick-release.sh",
+    "deploy:web": "./scripts/deploy-web-updates.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

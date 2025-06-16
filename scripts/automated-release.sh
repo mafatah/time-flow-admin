@@ -305,6 +305,32 @@ upload_release_assets() {
     log "${GREEN}✅ Release assets uploaded${NC}"
 }
 
+# Function to update download links in web components
+update_web_download_links() {
+    local version=$1
+    log "${BLUE}🌐 Updating web download links...${NC}"
+    
+    # Update desktop download component
+    if [[ -f "src/components/ui/desktop-download.tsx" ]]; then
+        sed -i '' "s/const currentVersion = \".*\";/const currentVersion = \"$version\";/" src/components/ui/desktop-download.tsx
+        log "${GREEN}✅ Updated desktop-download.tsx${NC}"
+    fi
+    
+    # Update download page component  
+    if [[ -f "src/pages/download/index.tsx" ]]; then
+        sed -i '' "s/const version = \"v.*\";/const version = \"v$version\";/" src/pages/download/index.tsx
+        log "${GREEN}✅ Updated download page${NC}"
+    fi
+    
+    # Update any README files with download links
+    if [[ -f "public/README.md" ]]; then
+        sed -i '' "s|releases/download/v[0-9]\+\.[0-9]\+\.[0-9]\+/|releases/download/v$version/|g" public/README.md
+        log "${GREEN}✅ Updated public README${NC}"
+    fi
+    
+    log "${GREEN}✅ Web download links updated${NC}"
+}
+
 # Function to update auto-updater links
 update_auto_updater_links() {
     local version=$1
@@ -399,6 +425,7 @@ main() {
     build_signed_releases
     notarize_dmg
     create_github_release "$new_version"
+    update_web_download_links "$new_version"
     update_auto_updater_links "$new_version"
     commit_and_push "$new_version"
     

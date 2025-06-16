@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 const DownloadPage = () => {
-  const version = "v1.0.24";
+  const version = "v1.0.24"; // Updated automatically by release pipeline
   const releaseDate = new Date().toLocaleDateString();
   
   const downloads = [
@@ -20,8 +20,8 @@ const DownloadPage = () => {
       platform: "macOS (Apple Silicon)",
       icon: <Apple className="h-6 w-6" />,
       description: "For M1, M2, M3 Macs",
-      filename: "TimeFlow-v1.0.21-ARM64-Signed.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.24/Ebdaa.Work.Time-1.0.24-arm64.dmg",
+      filename: `TimeFlow-${version}-ARM64.dmg`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-ARM64.dmg`,
       size: "~111 MB",
       requirements: "macOS 11.0+",
       verified: true
@@ -30,8 +30,8 @@ const DownloadPage = () => {
       platform: "macOS (Intel)",
       icon: <Apple className="h-6 w-6" />,
       description: "For Intel-based Macs",
-      filename: "TimeFlow-v1.0.21-Intel-Signed.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.24/Ebdaa.Work.Time-1.0.24.dmg",
+      filename: `TimeFlow-${version}-Intel.dmg`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Intel.dmg`,
       size: "~118 MB",
       requirements: "macOS 10.14+",
       verified: true
@@ -40,8 +40,8 @@ const DownloadPage = () => {
       platform: "Windows",
       icon: <Monitor className="h-6 w-6" />,
       description: "For Windows 10/11",
-      filename: "TimeFlow-Setup-v1.0.21-Windows-x64.exe",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.24/Ebdaa.Work.Time.Setup.1.0.24.exe",
+      filename: `TimeFlow-${version}-Setup.exe`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Setup.exe`,
       size: "~85 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true
@@ -50,8 +50,8 @@ const DownloadPage = () => {
       platform: "Linux",
       icon: <Smartphone className="h-6 w-6" />,
       description: "AppImage for Linux",
-      filename: "TimeFlow-v1.0.21-Linux-x64.AppImage",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.24/Ebdaa.Work.Time-1.0.24.AppImage",
+      filename: `TimeFlow-${version}-Linux.AppImage`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Linux.AppImage`,
       size: "~121 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: true

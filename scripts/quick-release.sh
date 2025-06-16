@@ -31,6 +31,15 @@ export APPLE_TEAM_ID="6GW49LK9V9"
 
 npx electron-builder --mac --win --publish=never
 
+# Update web download links
+echo "🌐 Updating web download links..."
+if [[ -f "src/components/ui/desktop-download.tsx" ]]; then
+    sed -i '' "s/const currentVersion = \".*\";/const currentVersion = \"$NEW_VERSION\";/" src/components/ui/desktop-download.tsx
+fi
+if [[ -f "src/pages/download/index.tsx" ]]; then
+    sed -i '' "s/const version = \"v.*\";/const version = \"v$NEW_VERSION\";/" src/pages/download/index.tsx
+fi
+
 # Copy to root for easy access
 echo "📁 Copying files to root..."
 cp dist/*.dmg "./TimeFlow-v$NEW_VERSION-Test.dmg" 2>/dev/null || true
