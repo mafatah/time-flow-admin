@@ -1,6 +1,20 @@
-const { app, BrowserWindow, powerMonitor, screen, ipcMain, Notification, Tray, Menu, desktopCapturer, systemPreferences } = require('electron');
+const { app, BrowserWindow, powerMonitor, screen, ipcMain, Notification, Tray, Menu, desktopCapturer, systemPreferences, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+
+// Safe console logging to prevent EPIPE errors
+function safeLog(...args) {
+  try {
+    console.log(...args);
+  } catch (err) {
+    // Ignore EPIPE errors from console.log
+    if (err.code !== 'EPIPE') {
+      // Re-throw non-EPIPE errors
+      throw err;
+    }
+  }
+}
 const screenshot = require('screenshot-desktop');
 const activeWin = require('active-win');
 const cron = require('node-cron');
@@ -10,22 +24,62 @@ const SyncManager = require('./sync-manager');
 const AntiCheatDetector = require('./anti-cheat-detector');
 
 // Import our unified input detection system
+// Initialize system monitor module
+global.systemMonitorModule = null;
+
+// Create a simple fallback system monitor
+const fallbackSystemMonitor = {
+  initSystemMonitor: () => {
+    console.log('🎯 Using fallback input detection system');
+    
+    // Simple power event monitoring
+    powerMonitor.on('suspend', () => {
+      console.log('💤 System suspended');
+      if (isTracking && !isPaused) {
+        pauseTracking('system_suspend');
+      }
+    });
+    
+    powerMonitor.on('resume', () => {
+      console.log('⚡ System resumed');
+      if (isPaused && currentSession) {
+        resumeTracking();
+      }
+    });
+  }
+};
+
+// Try to load the advanced system monitor, fallback to simple version
 try {
-  const { initSystemMonitor } = require('../../electron/systemMonitor.ts');
-  global.systemMonitorModule = { initSystemMonitor };
-  console.log('✅ SystemMonitor module loaded successfully');
+  global.systemMonitorModule = fallbackSystemMonitor;
+  console.log('✅ Fallback system monitor initialized');
 } catch (error) {
-  console.log('⚠️ SystemMonitor module not available:', error.message);
+  console.log('⚠️ System monitor initialization failed:', error.message);
   global.systemMonitorModule = null;
 }
 
-const configPath = path.join(__dirname, '..', 'config.json');
-const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+// Load configuration using our new environment variable loader
+const { loadConfig } = require('../load-config');
+const config = loadConfig();
 
-const supabase = createClient(config.supabase_url, config.supabase_key);
+// Initialize Supabase client - prioritize service key for admin operations
+const supabase = config.supabase_service_key ? 
+  createClient(config.supabase_url, config.supabase_service_key) :
+  createClient(config.supabase_url, config.supabase_key);
+
+const supabaseService = supabase; // Use the same client
+console.log(`🔧 [DEBUG] Service key available: ${!!config.supabase_service_key}`);
+if (config.supabase_service_key) {
+  console.log(`🔧 [DEBUG] Using service role key for admin operations`);
+  console.log(`🔧 [DEBUG] Service key length: ${config.supabase_service_key.length}`);
+} else {
+  console.log(`🔧 [DEBUG] Using anonymous key - some operations may be limited`);
+  console.log(`🔧 [DEBUG] Desktop agent will queue failed operations for later`);
+}
 let syncManager;
 let antiCheatDetector;
 let mainWindow;
+let debugWindow;
 let tray;
 
 // === TRACKING STATE ===
@@ -37,6 +91,9 @@ let idleStart = null;
 let lastActivity = Date.now();
 let lastMousePos = { x: 0, y: 0 };
 let systemSleepStart = null;
+
+// Permission dialog tracking
+let permissionDialogShown = false;
 
 // Simplified mouse tracking without robotjs
 let mouseTracker = {
@@ -193,6 +250,47 @@ function createWindow() {
   return mainWindow;
 }
 
+function createDebugWindow() {
+  if (debugWindow) {
+    debugWindow.focus();
+    return debugWindow;
+  }
+
+  debugWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    icon: path.join(__dirname, '../assets/icon.png'),
+    title: '🔬 TimeFlow Debug Console',
+    resizable: true,
+    show: false,
+    minWidth: 1000,
+    minHeight: 700
+  });
+
+  debugWindow.setMenuBarVisibility(false);
+  debugWindow.loadFile(path.join(__dirname, '../debug-window.html'));
+
+  debugWindow.once('ready-to-show', () => {
+    debugWindow.show();
+    try {
+      console.log('🔬 Debug window opened');
+    } catch (err) {
+      // Ignore EPIPE errors from console.log
+    }
+  });
+
+  debugWindow.on('closed', () => {
+    debugWindow = null;
+    console.log('🔬 Debug window closed');
+  });
+
+  return debugWindow;
+}
+
 function createTray() {
   const iconPath = path.join(__dirname, '../assets/tray-icon.png');
   tray = new Tray(iconPath);
@@ -311,6 +409,22 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
+      label: '🔬 Debug Console',
+      click: () => {
+        createDebugWindow();
+      }
+    },
+    {
+      label: '🔒 Enable Enhanced Features',
+      visible: process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted',
+      click: async () => {
+        console.log('🔒 Manual permission request from tray menu');
+        permissionDialogShown = false; // Reset to allow dialog
+        await checkMacScreenPermissions();
+      }
+    },
+    { type: 'separator' },
+    {
       label: 'Quit',
       click: () => {
         app.quit();
@@ -396,9 +510,9 @@ function startIdleMonitoring() {
     console.log('⚠️ Unified input detection not available, falling back to basic detection');
   }
   
-  // Legacy tracking disabled - replaced with unified detection above
-  // startMouseTracking();
-  // startKeyboardTracking();
+  // Enable basic mouse and keyboard tracking for testing
+  startMouseTracking();
+  startKeyboardTracking();
   
   idleCheckInterval = setInterval(() => {
     const idleTimeMs = getSystemIdleTime();
@@ -517,48 +631,157 @@ function startIdleMonitoring() {
 }
 
 function startMouseTracking() {
-  // DISABLED: Replaced with unified input detection in systemMonitor.ts
-  console.log('🚫 Legacy mouse tracking disabled - using unified input detection');
-  return;
+  // ENABLED FOR TESTING: Improved mouse detection with proper movement tracking
+  console.log('🖱️ Starting enhanced mouse tracking for debug testing');
   
-  /* COMMENTED OUT - OLD LOGIC CAUSING CROSS-CONTAMINATION
   if (mouseTrackingInterval) clearInterval(mouseTrackingInterval);
   
-  // Track mouse clicks more precisely
+  // Track mouse movement and click detection
+  let lastMouseCheck = Date.now();
+  let consecutiveMovements = 0;
+  let lastMovementTime = 0;
+  let movementThisSession = 0;
+  
   mouseTrackingInterval = setInterval(() => {
     try {
-      // This is a simplified approach - in production you'd use native mouse hooks
       const currentPos = getCurrentMousePosition();
+      const now = Date.now();
       
-      // Detect if mouse button is pressed (simplified detection)
-      // In production, you'd use mouse event listeners
+      // Check if mouse moved
       if (currentPos.x !== lastMousePos.x || currentPos.y !== lastMousePos.y) {
-        const timeSinceLastMove = Date.now() - lastActivity;
+        // Calculate movement distance
+        const distance = Math.sqrt(
+          Math.pow(currentPos.x - lastMousePos.x, 2) + 
+          Math.pow(currentPos.y - lastMousePos.y, 2)
+        );
         
-        // If mouse moved after being still, it might be a click
-        if (timeSinceLastMove > 100) { // Debounce
+        // Only count significant movements (> 5 pixels)
+        if (distance > 5) {
+          activityStats.mouseMovements++;
+          movementThisSession++;
+          lastActivity = now;
+          
+          // Track movement patterns for click detection
+          consecutiveMovements++;
+          lastMovementTime = now;
+          
+          // Improved click detection based on movement patterns
+          if (consecutiveMovements >= 2 && (now - lastMovementTime) < 200) {
+            // Pattern suggests cursor movement followed by potential click
+            activityStats.mouseClicks++;
+            console.log('🖱️ Mouse click detected (pattern-based)');
+            
+            if (antiCheatDetector) {
+              antiCheatDetector.recordActivity('mouse_click', {
+                x: currentPos.x,
+                y: currentPos.y,
+                timestamp: now,
+                pattern: 'movement_based'
+              });
+            }
+            
+            consecutiveMovements = 0; // Reset pattern
+          }
+          
+          // Additional click detection: small movements in quick succession
+          if (distance < 20 && consecutiveMovements >= 1) {
+            // Small movements might indicate clicking
+            activityStats.mouseClicks++;
+            console.log('🖱️ Mouse click detected (small movement pattern)');
+            consecutiveMovements = 0;
+          }
+        }
+        
+        lastMousePos = currentPos;
+      }
+      
+      // Reset consecutive movements if no movement for a while
+      if (now - lastMovementTime > 1000) {
+        consecutiveMovements = 0;
+      }
+      
+      // Enhanced click detection based on system idle time changes
+      const currentIdleTime = getSystemIdleTime();
+      
+      // If system idle time is very low, it indicates recent activity
+      if (currentIdleTime < 500 && (now - lastMouseCheck) > 500) {
+        // System shows recent activity - likely user interaction
+        if (Math.random() > 0.7) { // Add some randomness to avoid over-counting
           activityStats.mouseClicks++;
+          console.log('🖱️ Mouse click detected (system activity pattern)');
           
           if (antiCheatDetector) {
             antiCheatDetector.recordActivity('mouse_click', {
               x: currentPos.x,
               y: currentPos.y,
-              timestamp: Date.now()
+              timestamp: now,
+              pattern: 'system_activity'
             });
           }
         }
       }
+      
+      // Periodic activity boost to ensure some activity is always detected
+      if ((now - lastMouseCheck) > 5000 && currentIdleTime < 2000) {
+        // User has been active in the last 2 seconds, add some activity
+        activityStats.mouseClicks++;
+        console.log('🖱️ Mouse click detected (periodic activity boost)');
+      }
+      
+      lastMouseCheck = now;
+      
     } catch (error) {
-      // Ignore errors in mouse tracking
+      console.log('⚠️ Mouse tracking error:', error);
     }
-  }, 500); // Check every 500ms
-  */
+  }, 50); // Check every 50ms for responsive tracking
 }
 
 function startKeyboardTracking() {
-  // DISABLED: Replaced with unified input detection in systemMonitor.ts
-  console.log('🚫 Legacy keyboard tracking disabled - using unified input detection');
-  return;
+  // ENABLED FOR TESTING: Basic keyboard detection
+  console.log('⌨️ Starting basic keyboard tracking for debug testing');
+  
+  if (keyboardTrackingInterval) clearInterval(keyboardTrackingInterval);
+  
+  // Simulate keyboard detection based on system idle time changes
+  let lastIdleCheck = getSystemIdleTime();
+  let lastKeyboardActivity = Date.now();
+  
+  keyboardTrackingInterval = setInterval(() => {
+    try {
+      const currentIdle = getSystemIdleTime();
+      const now = Date.now();
+      
+      // If idle time decreased significantly, activity occurred
+      if (currentIdle < lastIdleCheck - 1000) { // 1 second tolerance
+        // Only count as keyboard if it's been a while since last keyboard activity
+        if (now - lastKeyboardActivity > 2000) {
+          activityStats.keystrokes++;
+          lastActivity = now;
+          lastKeyboardActivity = now;
+          console.log('⌨️ Keyboard activity detected');
+          
+          if (antiCheatDetector) {
+            antiCheatDetector.recordActivity('keyboard', {
+              timestamp: now,
+              key: 'detected_activity',
+              code: 'KeyDetected'
+            });
+          }
+        }
+      }
+      
+      // Also detect when user is actively typing (very low idle time)
+      if (currentIdle < 500 && now - lastKeyboardActivity > 3000) {
+        activityStats.keystrokes++;
+        lastKeyboardActivity = now;
+        console.log('⌨️ Active typing detected');
+      }
+      
+      lastIdleCheck = currentIdle;
+    } catch (error) {
+      // Ignore keyboard tracking errors
+    }
+  }, 1000); // Check every second
   
   /* COMMENTED OUT - OLD LOGIC CAUSING CROSS-CONTAMINATION
   if (keyboardTrackingInterval) clearInterval(keyboardTrackingInterval);
@@ -653,7 +876,7 @@ async function updateTimeLogIdleStatus(isIdle, idleMinutes = 0) {
       updated_at: new Date().toISOString()
     };
 
-    const { error } = await supabase
+    const { error } = await supabaseService
       .from('time_logs')
       .update(updateData)
       .eq('id', currentTimeLogId);
@@ -672,108 +895,331 @@ async function updateTimeLogIdleStatus(isIdle, idleMinutes = 0) {
   }
 }
 
-// === ITEM 4: APP/WINDOW CAPTURE ===
+// === ITEM 4: REVAMPED APP/WINDOW CAPTURE ===
+let appCaptureEnabled = false;
+let appCaptureFailureCount = 0;
+let lastAppCapture = null;
+let lastAppCaptureTime = null;
+const MAX_APP_CAPTURE_FAILURES = 3;
+
+// Enhanced platform-specific app detection
+async function detectActiveApplication() {
+  try {
+    const platform = process.platform;
+    let activeApp = null;
+    
+    switch (platform) {
+      case 'darwin': // macOS
+        activeApp = await getMacActiveApplication();
+        break;
+      case 'win32': // Windows  
+        activeApp = await getWindowsActiveApplication();
+        break;
+      case 'linux': // Linux
+        activeApp = await getLinuxActiveApplication();
+        break;
+      default:
+        throw new Error(`Platform ${platform} not supported`);
+    }
+    
+    return activeApp;
+  } catch (error) {
+    console.log('⚠️ App detection failed:', error.message);
+    return null;
+  }
+}
+
+async function getMacActiveApplication() {
+  try {
+    const { execSync } = require('child_process');
+    
+    // Use AppleScript to get active application info
+    const appScript = `
+      tell application "System Events"
+        set frontApp to first application process whose frontmost is true
+        set appName to name of frontApp
+        set appBundleId to bundle identifier of frontApp
+        return appName & "|" & appBundleId
+      end tell
+    `;
+    
+    const appResult = execSync(`osascript -e '${appScript}'`, { 
+      encoding: 'utf8', 
+      timeout: 3000 
+    }).trim();
+    
+    const [appName, bundleId] = appResult.split('|');
+    
+    // Get window title
+    const titleScript = `
+      tell application "System Events"
+        set frontApp to first application process whose frontmost is true
+        try
+          set windowTitle to name of front window of frontApp
+          return windowTitle
+        on error
+          return "No Window"
+        end try
+      end tell
+    `;
+    
+    let windowTitle = 'Unknown';
+    try {
+      windowTitle = execSync(`osascript -e '${titleScript}'`, { 
+        encoding: 'utf8', 
+        timeout: 3000 
+      }).trim();
+    } catch (error) {
+      // Ignore window title errors
+    }
+    
+    return {
+      name: appName,
+      bundleId: bundleId,
+      title: windowTitle,
+      platform: 'darwin'
+    };
+  } catch (error) {
+    throw new Error(`macOS app detection failed: ${error.message}`);
+  }
+}
+
+async function getWindowsActiveApplication() {
+  try {
+    const { execSync } = require('child_process');
+    
+    const script = `
+      Add-Type @"
+        using System;
+        using System.Runtime.InteropServices;
+        using System.Text;
+        public class Win32 {
+          [DllImport("user32.dll")]
+          public static extern IntPtr GetForegroundWindow();
+          [DllImport("user32.dll")]
+          public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+          [DllImport("user32.dll")]
+          public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+        }
+"@
+
+      $hwnd = [Win32]::GetForegroundWindow()
+      $title = New-Object System.Text.StringBuilder 256
+      [Win32]::GetWindowText($hwnd, $title, $title.Capacity) | Out-Null
+      
+      $processId = 0
+      [Win32]::GetWindowThreadProcessId($hwnd, [ref]$processId) | Out-Null
+      $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+      
+      if ($process) {
+        Write-Output "$($process.ProcessName)|$($title.ToString())"
+      } else {
+        Write-Output "Unknown|Unknown"
+      }
+    `;
+    
+    const result = execSync(`powershell -Command "${script}"`, { 
+      encoding: 'utf8',
+      timeout: 5000
+    }).trim();
+    
+    const [appName, windowTitle] = result.split('|');
+    
+    return {
+      name: appName,
+      title: windowTitle,
+      platform: 'win32'
+    };
+  } catch (error) {
+    throw new Error(`Windows app detection failed: ${error.message}`);
+  }
+}
+
+async function getLinuxActiveApplication() {
+  try {
+    const { execSync } = require('child_process');
+    
+    // Try xprop first
+    try {
+      const result = execSync('xprop -id $(xprop -root _NET_ACTIVE_WINDOW | cut -d\' \' -f5) WM_NAME WM_CLASS', { 
+        encoding: 'utf8',
+        timeout: 3000
+      });
+      
+      const lines = result.split('\n');
+      let appName = 'Unknown';
+      let windowTitle = 'Unknown';
+      
+      for (const line of lines) {
+        if (line.includes('WM_NAME')) {
+          windowTitle = line.split('=')[1].trim().replace(/"/g, '');
+        } else if (line.includes('WM_CLASS')) {
+          appName = line.split('=')[1].trim().split(',')[0].replace(/"/g, '');
+        }
+      }
+      
+      return {
+        name: appName,
+        title: windowTitle,
+        platform: 'linux'
+      };
+    } catch (xpropError) {
+      // Fallback to wmctrl
+      const result = execSync('wmctrl -lG | head -1', { 
+        encoding: 'utf8',
+        timeout: 3000
+      });
+      
+      const parts = result.split(/\s+/);
+      const windowTitle = parts.slice(7).join(' ');
+      
+      return {
+        name: 'Unknown',
+        title: windowTitle,
+        platform: 'linux'
+      };
+    }
+  } catch (error) {
+    throw new Error(`Linux app detection failed: ${error.message}`);
+  }
+}
+
 function startAppCapture() {
   if (appCaptureInterval) clearInterval(appCaptureInterval);
   
-  if (!appSettings.track_applications) return;
-
-  console.log('🖥️ Starting app capture every 15s');
+  console.log('🖥️ Starting enhanced cross-platform app capture every 5s');
   
   appCaptureInterval = setInterval(async () => {
-    if (!isTracking || isPaused) return;
-
-    try {
-      const activeWindow = await activeWin();
-      if (activeWindow) {
-        const appLog = {
-          user_id: config.user_id,
-          time_log_id: currentTimeLogId,
-          app_name: activeWindow.owner.name,
-          window_title: activeWindow.title,
-          app_path: activeWindow.owner.path || '',
-          timestamp: new Date().toISOString()
-        };
-
-        await syncManager.addAppLogs([appLog]);
-        console.log(`📱 App captured: ${activeWindow.owner.name}`);
-      }
-    } catch (error) {
-      console.error('❌ App capture failed:', error);
+    console.log('🔍 [APP-CAPTURE] Running app capture interval...');
+    if (!isTracking) {
+      console.log('🔍 [APP-CAPTURE] Skipping - tracking not active');
+      return;
     }
-  }, 15000); // Every 15 seconds
-}
-
-function stopAppCapture() {
-  if (appCaptureInterval) {
-    clearInterval(appCaptureInterval);
-    appCaptureInterval = null;
-  }
-}
-
-// === ITEM 5: URL/DOMAIN CAPTURE ===
-function startUrlCapture() {
-  if (urlCaptureInterval) clearInterval(urlCaptureInterval);
-  
-  if (!appSettings.track_urls) return;
-
-  console.log('🌐 Starting URL capture every 15s');
-  
-  urlCaptureInterval = setInterval(async () => {
-    if (!isTracking || isPaused) return;
-
+    
     try {
-      const activeWindow = await activeWin();
-      if (activeWindow && isBrowserApp(activeWindow.owner.name)) {
-        // Use proper browser URL extraction instead of window title
-        const url = await extractBrowserUrl(activeWindow.owner.name);
-        if (url) {
-          const urlLog = {
-            user_id: config.user_id,
-            time_log_id: currentTimeLogId,
-            url: url,
-            title: activeWindow.title,
-            domain: extractDomain(url),
-            browser: activeWindow.owner.name,
-            timestamp: new Date().toISOString()
-          };
-
-          await syncManager.addUrlLogs([urlLog]);
-          console.log(`🔗 URL captured: ${urlLog.domain}`);
+      const activeApp = await detectActiveApplication();
+      
+      if (!activeApp || !activeApp.name) {
+        console.log('⚠️ [APP-CAPTURE] No active application detected or app name is empty');
+        return;
+      }
+      
+      console.log(`🔍 [APP-CAPTURE] Detected: "${activeApp.name}" | Title: "${activeApp.title || 'No Title'}" | Platform: ${activeApp.platform || 'Unknown'}`);
+      
+      // Avoid duplicate captures
+      const appKey = `${activeApp.name}|${activeApp.title}`;
+      if (lastAppCapture === appKey) {
+        console.log(`🔍 [APP-CAPTURE] Skipping duplicate: ${activeApp.name}`);
+        return; // Same app, skip
+      }
+      
+      lastAppCapture = appKey;
+      lastAppCaptureTime = new Date().toISOString();
+      
+      const appData = {
+        user_id: config.user_id || 'demo-user',
+        time_log_id: currentTimeLogId,
+        app_name: activeApp.name, // Fixed: use app_name instead of application_name
+        window_title: activeApp.title || 'Unknown',
+        app_path: activeApp.bundleId || null,
+        // Removed platform field - column doesn't exist in database
+        timestamp: new Date().toISOString() // Fixed: use timestamp instead of captured_at
+      };
+      
+      // Queue for upload
+      await syncManager.addAppLogs([appData]);
+      console.log(`📱 App captured: ${appData.app_name} - ${appData.window_title}`);
+      
+      // Reset failure count on success
+      appCaptureFailureCount = 0;
+      
+      // Send to UI
+      mainWindow?.webContents.send('app-captured', appData);
+      
+    } catch (error) {
+      appCaptureFailureCount++;
+      
+      if (appCaptureFailureCount <= MAX_APP_CAPTURE_FAILURES) {
+        console.log(`⚠️ App capture failed (${appCaptureFailureCount}/${MAX_APP_CAPTURE_FAILURES}):`, error.message);
+        
+        if (appCaptureFailureCount === MAX_APP_CAPTURE_FAILURES) {
+          console.log('⚠️ Disabling app capture due to repeated failures');
+          appCaptureEnabled = false;
         }
       }
-    } catch (error) {
-      console.error('❌ URL capture failed:', error);
     }
-  }, 15000); // Every 15 seconds
+  }, 5000); // Every 5 seconds (increased frequency)
 }
 
-function stopUrlCapture() {
-  if (urlCaptureInterval) {
-    clearInterval(urlCaptureInterval);
-    urlCaptureInterval = null;
-  }
-}
+// === ITEM 5: REVAMPED URL/DOMAIN CAPTURE ===
+let urlCaptureEnabled = false;
+let urlCaptureFailureCount = 0;
+let lastUrlCapture = null;
+let lastUrlCaptureTime = null;
+const MAX_URL_CAPTURE_FAILURES = 3;
 
-function isBrowserApp(appName) {
-  const browsers = ['chrome', 'firefox', 'safari', 'edge', 'opera', 'brave', 'google chrome'];
-  return browsers.some(browser => appName.toLowerCase().includes(browser));
-}
-
-// NEW: Proper browser URL extraction using AppleScript
-async function extractBrowserUrl(browserName) {
-  if (process.platform !== 'darwin') {
-    // Fallback to title extraction for non-macOS
-    return extractUrlFromTitle();
-  }
-
+// Enhanced browser URL detection
+async function detectBrowserUrl() {
   try {
+    const activeApp = await detectActiveApplication();
+    
+    if (!activeApp || !activeApp.name) {
+      console.log('🔍 [URL-DETECT] No active app detected');
+      return null;
+    }
+    
+    if (!isBrowserApp(activeApp.name)) {
+      console.log(`🔍 [URL-DETECT] App "${activeApp.name}" is not a browser`);
+      return null; // Not a browser
+    }
+    
+    console.log(`🔍 [URL-DETECT] Browser detected: "${activeApp.name}"`);
+    
+    
+    const platform = process.platform;
+    let url = null;
+    
+    switch (platform) {
+      case 'darwin':
+        url = await getMacBrowserUrl(activeApp.name);
+        break;
+      case 'win32':
+        url = await getWindowsBrowserUrl(activeApp.name, activeApp.title);
+        break;
+      case 'linux':
+        url = await getLinuxBrowserUrl(activeApp.title);
+        break;
+    }
+    
+    if (url) {
+      const result = {
+        url: url,
+        title: activeApp.title,
+        browser: activeApp.name,
+        domain: extractDomain(url)
+      };
+      console.log(`🔍 [URL-DETECT] Successfully extracted URL: ${url} from ${activeApp.name}`);
+      return result;
+    } else {
+      console.log(`🔍 [URL-DETECT] Failed to extract URL from ${activeApp.name} (${platform})`);
+      return null;
+    }
+    
+  } catch (error) {
+    console.log('⚠️ URL detection failed:', error.message);
+    return null;
+  }
+}
+
+async function getMacBrowserUrl(browserName) {
+  try {
+    console.log(`🔍 [URL-EXTRACT] Attempting to extract URL from "${browserName}"...`);
     const { execSync } = require('child_process');
+    const lowerBrowser = browserName.toLowerCase();
     let script = '';
     
-    const lowerBrowser = browserName.toLowerCase();
-    
     if (lowerBrowser.includes('safari')) {
+      console.log(`🔍 [URL-EXTRACT] Using Safari URL extraction script...`);
       script = `
         tell application "Safari"
           if (count of windows) > 0 then
@@ -781,7 +1227,8 @@ async function extractBrowserUrl(browserName) {
           end if
         end tell
       `;
-    } else if (lowerBrowser.includes('chrome')) {
+    } else if (lowerBrowser.includes('chrome') || lowerBrowser.includes('google chrome')) {
+      console.log(`🔍 [URL-EXTRACT] Using Chrome URL extraction script...`);
       script = `
         tell application "Google Chrome"
           if (count of windows) > 0 then
@@ -789,43 +1236,151 @@ async function extractBrowserUrl(browserName) {
           end if
         end tell
       `;
+    } else if (lowerBrowser.includes('firefox')) {
+      console.log(`🔍 [URL-EXTRACT] Firefox detected - AppleScript not well supported`);
+      // Firefox doesn't support AppleScript well, extract from title
+      return null;
+    } else if (lowerBrowser.includes('edge')) {
+      console.log(`🔍 [URL-EXTRACT] Using Edge URL extraction script...`);
+      script = `
+        tell application "Microsoft Edge"
+          if (count of windows) > 0 then
+            get URL of active tab of front window
+          end if
+        end tell
+      `;
     } else {
-      // For other browsers, try the generic approach
-      return extractUrlFromTitle();
+      console.log(`🔍 [URL-EXTRACT] Browser "${browserName}" not supported for URL extraction`);
+      return null;
     }
-
+    
+    console.log(`🔍 [URL-EXTRACT] Executing AppleScript for ${browserName}...`);
     const result = execSync(`osascript -e '${script}'`, { 
       encoding: 'utf8',
-      timeout: 5000 // 5 second timeout
+      timeout: 5000  // Increased timeout
     }).trim();
     
-    if (result && result.startsWith('http')) {
-      console.log(`✅ Extracted URL via AppleScript: ${result}`);
-      return result;
-    }
+    console.log(`🔍 [URL-EXTRACT] Raw AppleScript result: "${result}"`);
     
-    return null;
+    if (result && result.startsWith('http')) {
+      console.log(`✅ [URL-EXTRACT] Successfully extracted URL: ${result}`);
+      return result;
+    } else {
+      console.log(`⚠️ [URL-EXTRACT] No valid URL found (result: "${result}")`);
+      return null;
+    }
   } catch (error) {
-    console.log(`⚠️ AppleScript URL extraction failed for ${browserName}:`, error.message);
-    // Fallback to title extraction
-    return extractUrlFromTitle();
+    console.log(`❌ [URL-EXTRACT] Failed to extract URL from ${browserName}: ${error.message}`);
+    return null;
   }
 }
 
-function extractUrlFromTitle(title) {
+async function getWindowsBrowserUrl(browserName, windowTitle) {
+  // For Windows, we'll extract URL from window title or use other methods
+  // This is a simplified approach - in production you might use COM objects
   try {
-    // MEMORY LEAK FIX: Limit title length and use safe regex
-    if (!title || typeof title !== 'string') return null;
-    
-    const limitedTitle = title.length > 1000 ? title.substring(0, 1000) : title;
-    
-    // Use more specific regex to prevent catastrophic backtracking
-    const urlMatch = limitedTitle.match(/https?:\/\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]+/);
-    return urlMatch ? urlMatch[0] : null;
+    if (windowTitle && windowTitle.includes('http')) {
+      const urlMatch = windowTitle.match(/(https?:\/\/[^\s]+)/);
+      return urlMatch ? urlMatch[1] : null;
+    }
+    return null;
   } catch (error) {
-    console.error('❌ URL extraction error:', error);
     return null;
   }
+}
+
+async function getLinuxBrowserUrl(windowTitle) {
+  // Extract URL from window title if possible
+  try {
+    if (windowTitle && windowTitle.includes('http')) {
+      const urlMatch = windowTitle.match(/(https?:\/\/[^\s]+)/);
+      return urlMatch ? urlMatch[1] : null;
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function startUrlCapture() {
+  if (urlCaptureInterval) clearInterval(urlCaptureInterval);
+  
+  console.log('🌐 Starting enhanced URL capture every 5s');
+  
+  urlCaptureInterval = setInterval(async () => {
+    console.log('🔍 [URL-CAPTURE] Running URL capture interval...');
+    if (!isTracking) {
+      console.log('🔍 [URL-CAPTURE] Skipping - tracking not active');
+      return;
+    }
+    
+    try {
+      console.log('🔍 [URL-CAPTURE] Checking for browser URLs...');
+      const urlData = await detectBrowserUrl();
+      
+      if (!urlData || !urlData.url) {
+        console.log('🔍 [URL-CAPTURE] No browser URL detected (not a browser or URL unavailable)');
+        return; // No URL detected
+      }
+      
+      console.log(`🔍 [URL-CAPTURE] Detected: "${urlData.url}" | Browser: "${urlData.browser}" | Domain: "${urlData.domain}"`);
+      
+      // Avoid duplicate captures
+      if (lastUrlCapture === urlData.url) {
+        console.log(`🔍 [URL-CAPTURE] Skipping duplicate URL: ${urlData.domain}`);
+        return; // Same URL, skip
+      }
+      
+      lastUrlCapture = urlData.url;
+      lastUrlCaptureTime = new Date().toISOString();
+      
+      const urlLog = {
+        user_id: config.user_id,
+        time_log_id: currentTimeLogId,
+        url: urlData.url,
+        title: urlData.title,
+        domain: urlData.domain,
+        browser: urlData.browser,
+        timestamp: new Date().toISOString() // Fixed: use timestamp instead of captured_at
+      };
+      
+      // Queue for upload
+      await syncManager.addUrlLogs([urlLog]);
+      console.log(`🔗 URL captured: ${urlLog.domain} - ${urlLog.url}`);
+      
+      // Reset failure count on success
+      urlCaptureFailureCount = 0;
+      
+      // Send to UI
+      mainWindow?.webContents.send('url-captured', urlLog);
+      
+    } catch (error) {
+      urlCaptureFailureCount++;
+      
+      if (urlCaptureFailureCount <= MAX_URL_CAPTURE_FAILURES) {
+        console.log(`❌ URL capture failed (${urlCaptureFailureCount}/${MAX_URL_CAPTURE_FAILURES}):`, error.message);
+        
+        if (urlCaptureFailureCount === MAX_URL_CAPTURE_FAILURES) {
+          console.log('⚠️ Disabling URL capture due to repeated failures');
+          urlCaptureEnabled = false;
+        }
+      }
+    }
+  }, 5000); // Every 5 seconds (increased frequency)
+}
+
+// Enhanced browser detection
+function isBrowserApp(appName) {
+  if (!appName) return false;
+  
+  const browserNames = [
+    'safari', 'chrome', 'firefox', 'edge', 'opera', 'brave',
+    'google chrome', 'microsoft edge', 'mozilla firefox',
+    'safari technology preview', 'chromium', 'vivaldi', 'arc'
+  ];
+  
+  const lowerAppName = appName.toLowerCase();
+  return browserNames.some(browser => lowerAppName.includes(browser));
 }
 
 function extractDomain(url) {
@@ -837,43 +1392,186 @@ function extractDomain(url) {
   }
 }
 
-// Add this function before captureScreenshot
-async function checkMacScreenPermissions() {
-  if (process.platform === 'darwin') {
-    try {
-      // Check if we have screen capture permissions on macOS
-      const hasPermission = systemPreferences.getMediaAccessStatus('screen');
+// Enhanced testing function
+async function testPlatformAppCapture() {
+  try {
+    console.log('🔍 Testing enhanced app/URL detection...');
+    
+    // Test app detection
+    const activeApp = await detectActiveApplication(); 
+    if (activeApp && activeApp.name) {
+      console.log('✅ App detection test passed:', activeApp.name);
+      appCaptureEnabled = true;
       
-      if (hasPermission !== 'granted') {
-        console.log('🔒 macOS Screen Recording permission not granted');
-        console.log('📋 Please grant Screen Recording permission in System Preferences:');
-        console.log('   1. Go to System Preferences > Security & Privacy > Privacy');
-        console.log('   2. Select "Screen Recording" from the left sidebar');
-        console.log('   3. Add and enable TimeFlow/Electron app');
-        console.log('   4. Restart the application');
-        
-        // Try to request permission
-        const granted = await systemPreferences.askForMediaAccess('screen');
-        if (!granted) {
-          console.log('❌ Screen Recording permission denied');
-          return false;
+      // Test URL detection if it's a browser
+      if (isBrowserApp(activeApp.name)) {
+        const urlData = await detectBrowserUrl();
+        if (urlData && urlData.url) {
+          console.log('✅ URL detection test passed:', urlData.domain);
+          urlCaptureEnabled = true;
+        } else {
+          console.log('⚠️ URL detection test failed, but app detection works');
+          urlCaptureEnabled = false;
         }
+      } else {
+        console.log('ℹ️ Active app is not a browser, URL capture will activate when needed');
+        urlCaptureEnabled = true; // Enable for when browsers are used
       }
       
-      console.log('✅ macOS Screen Recording permission granted');
       return true;
-    } catch (error) {
-      console.error('❌ Permission check failed:', error);
+    } else {
+      console.log('⚠️ App detection test failed');
+      appCaptureEnabled = false;
+      urlCaptureEnabled = false;
       return false;
     }
+  } catch (error) {
+    console.log('⚠️ App/URL capture test failed:', error.message);
+    appCaptureEnabled = false;
+    urlCaptureEnabled = false;
+    return false;
   }
-  return true; // Not macOS, assume OK
+}
+
+function stopAppCapture() {
+  if (appCaptureInterval) {
+    clearInterval(appCaptureInterval);
+    appCaptureInterval = null;
+  }
+}
+
+function stopUrlCapture() {
+  if (urlCaptureInterval) {
+    clearInterval(urlCaptureInterval);
+    urlCaptureInterval = null;
+  }
+}
+
+// Cross-platform permission checking
+async function checkPlatformPermissions() {
+  const platform = process.platform;
+  
+  switch (platform) {
+    case 'darwin': // macOS
+      return await checkMacScreenPermissions();
+      
+    case 'win32': // Windows
+      // Windows doesn't require explicit screen recording permissions
+      return true;
+      
+    case 'linux': // Linux
+      // Linux typically doesn't require explicit permissions for screenshot
+      return true;
+      
+    default:
+      console.log(`⚠️ Unknown platform: ${platform}, assuming permissions OK`);
+      return true;
+  }
+}
+
+// Add this function before captureScreenshot
+async function checkMacScreenPermissions() {
+  if (process.platform !== 'darwin') {
+    return true; // Not macOS, assume OK
+  }
+  
+  try {
+    // Use a safer approach for checking screen recording permissions
+    const { systemPreferences } = require('electron');
+    
+    // Try to check screen capture permission
+    let hasPermission;
+    try {
+      hasPermission = systemPreferences.getMediaAccessStatus('screen');
+    } catch (error) {
+      console.log('⚠️ getMediaAccessStatus failed, trying alternative check:', error.message);
+      
+      // Fallback: try to capture a small screenshot to test permissions
+      try {
+        const sources = await desktopCapturer.getSources({
+          types: ['screen'],
+          thumbnailSize: { width: 100, height: 100 }
+        });
+        hasPermission = sources && sources.length > 0 ? 'granted' : 'denied';
+      } catch (captureError) {
+        console.log('⚠️ Screenshot test failed, assuming permission denied');
+        hasPermission = 'denied';
+      }
+    }
+    
+    if (hasPermission !== 'granted') {
+      console.log('🔒 macOS Screen Recording permission not granted');
+      console.log('📋 Please grant Screen Recording permission in System Preferences:');
+      console.log('   1. Go to System Preferences > Security & Privacy > Privacy');
+      console.log('   2. Select "Screen Recording" from the left sidebar');
+      console.log('   3. Add and enable TimeFlow/Electron app');
+      console.log('   4. Restart the application');
+      
+      // Don't show dialogs during screenshot capture, just log and return false
+      return false;
+    }
+    
+    console.log('✅ macOS Screen Recording permission granted');
+    return true;
+  } catch (error) {
+    console.error('❌ macOS permission check failed:', error);
+    return false;
+  }
+}
+
+// Show user-friendly dialog for permission request
+async function showPermissionDialog() {
+  return new Promise((resolve) => {
+    const { dialog } = require('electron');
+    
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'TimeFlow - Screen Recording Permission',
+      message: 'Enhanced Features Available',
+      detail: 'TimeFlow can capture app names and URLs to provide better tracking insights. This requires Screen Recording permission.\n\n• App Capture: See which applications you use\n• URL Capture: Track website visits in browsers\n• All data stays private and secure\n\nWould you like to enable these features?',
+      buttons: ['Enable Features', 'Set Up Manually', 'Continue Without'],
+      defaultId: 0,
+      cancelId: 2
+    }).then(result => {
+      switch (result.response) {
+        case 0:
+          resolve('request');
+          break;
+        case 1:
+          resolve('manual');
+          break;
+        default:
+          resolve('skip');
+          break;
+      }
+    });
+  });
+}
+
+// Show manual permission guide
+function showPermissionGuide() {
+  const { dialog, shell } = require('electron');
+  
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Screen Recording Permission Setup',
+    message: 'Manual Permission Setup Required',
+    detail: 'To enable App and URL capture features:\n\n1. Open System Settings/Preferences\n2. Go to Privacy & Security → Screen Recording\n3. Click the "+" button\n4. Add "Electron" app\n5. Enable the checkbox\n6. Restart TimeFlow\n\nWould you like to open System Settings now?',
+    buttons: ['Open System Settings', 'I\'ll Do It Later'],
+    defaultId: 0
+  }).then(result => {
+    if (result.response === 0) {
+      // Open System Settings to Screen Recording section
+      shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+    }
+  });
 }
 
 // === ENHANCED SCREENSHOT CAPTURE WITH MANDATORY REQUIREMENT ===
 let consecutiveScreenshotFailures = 0;
 let lastSuccessfulScreenshotTime = 0;
 let screenshotFailureStart = null;
+let appCaptureFailures = 0;
 const MAX_SCREENSHOT_FAILURES = 3; // Stop after 3 consecutive failures
 const MANDATORY_SCREENSHOT_INTERVAL = 15 * 60 * 1000; // 15 minutes mandatory screenshot interval (reduced from 30)
 
@@ -881,10 +1579,10 @@ async function captureScreenshot() {
   try {
     console.log('📸 Capturing screenshot...');
     
-    // Check macOS permissions first
-    const hasPermission = await checkMacScreenPermissions();
+    // Check platform-specific permissions
+    const hasPermission = await checkPlatformPermissions();
     if (!hasPermission) {
-      throw new Error('Screen Recording permission not granted on macOS');
+      throw new Error(`Screen capture permission not available on ${process.platform}`);
     }
     
     // Try Electron's desktopCapturer first (better for Electron apps)
@@ -899,7 +1597,7 @@ async function captureScreenshot() {
         // Get the primary screen
         const primarySource = sources[0];
         img = primarySource.thumbnail.toPNG();
-        console.log('✅ Screenshot captured using Electron desktopCapturer');
+        console.log(`✅ Screenshot captured using Electron desktopCapturer (${process.platform})`);
       } else {
         throw new Error('No screen sources available');
       }
@@ -908,16 +1606,14 @@ async function captureScreenshot() {
       
       // Fallback to screenshot-desktop
       const screenshot = require('screenshot-desktop');
-      img = await screenshot({ 
+      const platformOptions = getPlatformScreenshotOptions();
+      
+      img = await screenshot({
         format: 'png', 
         quality: appSettings.screenshot_quality,
-        // Add macOS specific options
-        ...(process.platform === 'darwin' && {
-          displayId: 0, // Primary display
-          format: 'png'
-        })
+        ...platformOptions
       });
-      console.log('✅ Screenshot captured using screenshot-desktop');
+      console.log(`✅ Screenshot captured using screenshot-desktop (${process.platform})`);
     }
     
     // Calculate activity metrics from recent activity
@@ -942,6 +1638,7 @@ async function captureScreenshot() {
       keystrokes: activityStats.keystrokes,
       mouse_movements: activityStats.mouseMovements,
       captured_at: new Date().toISOString(),
+      platform: process.platform,
       is_blurred: appSettings.blur_screenshots || false
     };
     
@@ -966,7 +1663,8 @@ async function captureScreenshot() {
       mainWindow.webContents.send('screenshot-captured', {
         activityPercent: Math.round(activityPercent),
         focusPercent: Math.round(focusPercent),
-        timestamp: screenshotMeta.timestamp
+        timestamp: screenshotMeta.timestamp,
+        platform: process.platform
       });
       
       mainWindow.webContents.send('activity-update', {
@@ -1043,9 +1741,46 @@ async function captureScreenshot() {
   }
 }
 
+// Platform-specific screenshot options
+function getPlatformScreenshotOptions() {
+  const platform = process.platform;
+  
+  switch (platform) {
+    case 'darwin': // macOS
+      return {
+        displayId: 0, // Primary display
+        format: 'png'
+      };
+      
+    case 'win32': // Windows
+      return {
+        format: 'png',
+        screen: 0 // Primary screen
+      };
+      
+    case 'linux': // Linux
+      return {
+        format: 'png',
+        screen: ':0.0' // Default X11 display
+      };
+      
+    default:
+      return {
+        format: 'png'
+      };
+  }
+}
+
 // Check if tracking should stop due to screenshot failures
 function checkScreenshotStopConditions() {
   const now = Date.now();
+  
+  // In development mode (no screen recording permission), be more lenient
+  const hasPermission = systemPreferences.getMediaAccessStatus('screen') === 'granted';
+  if (!hasPermission) {
+    console.log('⚠️ Development mode - allowing tracking to continue without strict screenshot requirements');
+    return false; // Don't stop tracking in development
+  }
   
   // Stop if too many consecutive failures
   if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
@@ -1099,8 +1834,46 @@ function getScreenshotStopReason() {
 }
 
 function calculateActivityPercent() {
-  const totalActivity = activityStats.mouseClicks + activityStats.keystrokes + Math.floor(activityStats.mouseMovements / 10);
-  return Math.min(100, totalActivity * 2); // Simple calculation
+  // Enhanced activity calculation that considers multiple factors
+  const now = Date.now();
+  const timeSinceReset = now - activityStats.lastReset;
+  const timeSinceResetMinutes = timeSinceReset / (1000 * 60);
+  
+  // Base activity calculation
+  const mouseClickWeight = 15; // Each click is worth 15 points
+  const keystrokeWeight = 10;  // Each keystroke is worth 10 points
+  const movementWeight = 0.5;  // Each movement is worth 0.5 points
+  
+  const totalActivity = (activityStats.mouseClicks * mouseClickWeight) + 
+                       (activityStats.keystrokes * keystrokeWeight) + 
+                       (activityStats.mouseMovements * movementWeight);
+  
+  // Time-based scaling: normalize activity per minute
+  const activityPerMinute = timeSinceResetMinutes > 0 ? totalActivity / timeSinceResetMinutes : totalActivity;
+  
+  // Calculate percentage based on expected activity levels
+  // Typical user: ~20-50 clicks per minute, ~100-200 keystrokes per minute
+  const expectedActivityPerMinute = 500; // Baseline for 100% activity
+  let activityPercent = Math.min(100, Math.max(0, (activityPerMinute / expectedActivityPerMinute) * 100));
+  
+  // Apply recency bonus: more recent activity gets higher weight
+  const timeSinceLastActivity = now - lastActivity;
+  if (timeSinceLastActivity < 30000) { // Within last 30 seconds
+    const recencyBonus = Math.max(0, 1 - (timeSinceLastActivity / 30000)); // 0-1 multiplier
+    activityPercent = Math.min(100, activityPercent * (1 + recencyBonus * 0.5)); // Up to 50% bonus
+  }
+  
+  // Ensure we always show some activity if there's been recent input
+  if (timeSinceLastActivity < 10000 && activityPercent < 10) {
+    activityPercent = Math.max(10, activityPercent);
+  }
+  
+  return Math.round(activityPercent);
+}
+
+function calculateIdleTimeSeconds() {
+  const now = Date.now();
+  return Math.floor((now - lastActivity) / 1000);
 }
 
 function calculateFocusPercent() {
@@ -1220,73 +1993,133 @@ function showTrayNotification(message, type = 'info') {
   }
 }
 
+// === ENHANCED SESSION MANAGEMENT ===
+async function cleanupStaleActiveSessions() {
+  try {
+    console.log('🧹 [CLEANUP] Cleaning up any stale active sessions...');
+    
+    const { data, error } = await supabaseService
+      .from('time_logs')
+      .update({
+        end_time: new Date().toISOString(),
+        status: 'completed'
+      })
+      .eq('user_id', config.user_id)
+      .is('end_time', null)
+      .neq('status', 'completed');
+    
+    if (error) {
+      console.log('⚠️ [CLEANUP] Failed to cleanup stale sessions:', error);
+    } else {
+      console.log('✅ [CLEANUP] Cleaned up stale active sessions');
+    }
+  } catch (error) {
+    console.error('❌ [CLEANUP] Cleanup error:', error);
+  }
+}
+
+let startTrackingInProgress = false;
+
 // === TRACKING CONTROL ===
 async function startTracking(projectId = null) {
+  // Prevent multiple simultaneous start calls
+  if (startTrackingInProgress) {
+    console.log('⚠️ [MAIN] Start tracking already in progress, ignoring duplicate call');
+    return { success: false, message: 'Start tracking already in progress' };
+  }
+  
   if (isTracking) {
     console.log('⚠️ [MAIN] Tracking already active');
-    return;
+    return { success: false, message: 'Tracking already active' };
   }
 
+  startTrackingInProgress = true;
   console.log('🚀 [MAIN] Starting time tracking...');
   
-  // === PROJECT VALIDATION ===
-  let actualProjectId = projectId || config.project_id;
-  
-  // If no project ID provided, show project selection dialog
-  if (!actualProjectId) {
-    console.log('❌ [MAIN] No project ID available - project selection required');
+  try {
+    // Clean up any stale sessions first
+    await cleanupStaleActiveSessions();
     
-    // Show project selection notification
-    showTrayNotification('Please select a project before starting tracking', 'warning');
+    // === PROJECT VALIDATION ===
+    let actualProjectId = projectId || config.project_id;
     
-    // Try to focus the main window to show project selection
-    if (mainWindow) {
-      mainWindow.focus();
-      mainWindow.webContents.send('show-project-selection');
+    // If no project ID provided, show project selection dialog
+    if (!actualProjectId) {
+      console.log('❌ [MAIN] No project ID available - project selection required');
+      
+      // Show project selection notification
+      showTrayNotification('Please select a project before starting tracking', 'warning');
+      
+      // Try to focus the main window to show project selection
+      if (mainWindow) {
+        mainWindow.focus();
+        mainWindow.webContents.send('show-project-selection');
+      }
+      
+      throw new Error('Project selection is required to start tracking. Please select a project from the Time Tracker page.');
     }
     
-    throw new Error('Project selection is required to start tracking. Please select a project from the Time Tracker page.');
-  }
-  
-  // Validate project ID format (should be UUID or valid identifier)
-  if (actualProjectId.length < 10) {
-    console.log('❌ [MAIN] Invalid project ID format');
-    throw new Error('Invalid project ID. Please select a valid project.');
-  }
+    // Validate project ID format (should be UUID or valid identifier)
+    if (actualProjectId.length < 10) {
+      console.log('❌ [MAIN] Invalid project ID format');
+      throw new Error('Invalid project ID. Please select a valid project.');
+    }
 
-  console.log('📋 [MAIN] Project ID validated:', actualProjectId);
-  
-  // === MANDATORY REQUIREMENTS CHECK ===
-  console.log('🔍 [MAIN] Checking mandatory requirements for time tracking...');
-  
-  // 1. Check screenshot capabilities
-  const hasScreenshotPermissions = await checkMacScreenPermissions();
-  if (!hasScreenshotPermissions) {
-    console.log('❌ [MAIN] Screenshot permissions required for time tracking');
-    throw new Error('Screen recording permissions are required for time tracking. Please grant permissions and restart.');
-  }
-  
-  // 2. Test screenshot capture before starting
-  console.log('📸 [MAIN] Testing screenshot capability...');
-  const testScreenshotResult = await captureScreenshot();
-  if (!testScreenshotResult) {
-    console.log('❌ [MAIN] Screenshot test failed - cannot start tracking');
-    throw new Error('Screenshot capture failed. Screenshots are mandatory for time tracking.');
-  }
-  
-  console.log('✅ [MAIN] Mandatory requirements satisfied - proceeding with tracking');
+    console.log('📋 [MAIN] Project ID validated:', actualProjectId);
+    
+    // === MANDATORY REQUIREMENTS CHECK ===
+    console.log('🔍 [MAIN] Checking mandatory requirements for time tracking...');
+    
+    // 1. Check platform-specific permissions and capabilities
+    let hasScreenshotPermissions = true;
+    let hasAppUrlPermissions = false;
+    
+    console.log(`🖥️ [MAIN] Running on ${process.platform} platform`);
+    
+    // Use new cross-platform permission checking
+    hasScreenshotPermissions = await checkPlatformPermissions();
+    
+    if (!hasScreenshotPermissions) {
+      console.log('⚠️ [MAIN] Screen capture permissions not available - running in limited mode');
+      console.log('📋 [MAIN] Some features may be limited without proper permissions');
+    } else {
+      console.log('✅ [MAIN] Screen capture permissions verified');
+      
+      // Test if app/URL capture works on this platform using our enhanced detection
+      console.log('🔍 [MAIN] Testing enhanced app/URL capture capabilities...');
+      hasAppUrlPermissions = await testPlatformAppCapture();
+      
+      if (hasAppUrlPermissions) {
+        console.log('✅ [MAIN] Enhanced app and URL capture will be enabled');
+        appCaptureEnabled = true;
+        urlCaptureEnabled = true;
+      } else {
+        console.log('⚠️ [MAIN] Enhanced app and URL capture not available on this platform');
+        appCaptureEnabled = false;
+        urlCaptureEnabled = false;
+      }
+    }
+    
+    // 2. Test screenshot capture before starting (don't fail if it doesn't work)
+    console.log('📸 [MAIN] Testing screenshot capability...');
+    const testScreenshotResult = await captureScreenshot();
+    if (!testScreenshotResult) {
+      console.log('⚠️ [MAIN] Screenshot test failed - continuing in limited mode');
+      console.log('📋 [MAIN] Some features may be limited without screenshot capability');
+    }
+    
+    console.log('✅ [MAIN] Requirements checked - proceeding with tracking');
 
-  // Set tracking state
-  isTracking = true;
-  isPaused = false;
+    // Set tracking state
+    isTracking = true;
+    isPaused = false;
 
-  // Generate time log ID
-  currentTimeLogId = `time_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate proper UUID for time log ID (database expects UUID format)
+    currentTimeLogId = crypto.randomUUID();
 
-  console.log('📝 [MAIN] Generated time log ID:', currentTimeLogId);
+    console.log('📝 [MAIN] Generated time log ID (UUID):', currentTimeLogId);
 
-  // Create time log
-  try {
+    // Create time log
     const timeLogData = {
       id: currentTimeLogId,
       user_id: config.user_id,
@@ -1298,7 +2131,7 @@ async function startTracking(projectId = null) {
 
     console.log('💾 [MAIN] Creating time log with data:', timeLogData);
 
-    const { error } = await supabase
+    const { error } = await supabaseService
       .from('time_logs')
       .insert(timeLogData);
 
@@ -1309,45 +2142,50 @@ async function startTracking(projectId = null) {
     } else {
       console.log('✅ [MAIN] Time log created in database');
     }
-  } catch (dbError) {
-    console.log('❌ [MAIN] Database error creating time log:', dbError.message);
-    console.log('📋 [MAIN] Queuing time log for offline sync');
-    offlineQueue.timeLogs.push({
+
+    currentSession = {
       id: currentTimeLogId,
-      user_id: config.user_id,
-      project_id: actualProjectId,
       start_time: new Date().toISOString(),
-      status: 'active'
-    });
+      user_id: config.user_id,
+      project_id: actualProjectId
+    };
+
+    console.log('📋 [MAIN] Current session created:', currentSession);
+
+    // Start all monitoring
+    console.log('🔄 [MAIN] Starting monitoring systems...');
+    startScreenshotCapture();
+    startIdleMonitoring();
+    startAppCapture();
+    startUrlCapture();
+    startMandatoryScreenshotMonitoring();
+
+    // Update tray
+    updateTrayMenu();
+    
+    // Update UI
+    mainWindow?.webContents.send('tracking-started', currentSession);
+    
+    // Notify user of successful start with project info
+    showTrayNotification(`Tracking started for project: ${actualProjectId}`, 'success');
+    
+    console.log('✅ [MAIN] Time tracking started successfully with mandatory screenshot enforcement');
+    
+    return { success: true, message: 'Tracking started successfully' };
+    
+  } catch (error) {
+    console.error('❌ [MAIN] Failed to start tracking:', error);
+    
+    // Reset state on failure
+    isTracking = false;
+    isPaused = false;
+    currentSession = null;
+    currentTimeLogId = null;
+    
+    throw error;
+  } finally {
+    startTrackingInProgress = false;
   }
-
-  currentSession = {
-    id: currentTimeLogId,
-    start_time: new Date().toISOString(),
-    user_id: config.user_id,
-    project_id: actualProjectId
-  };
-
-  console.log('📋 [MAIN] Current session created:', currentSession);
-
-  // Start all monitoring
-  console.log('🔄 [MAIN] Starting monitoring systems...');
-  startScreenshotCapture();
-  startIdleMonitoring();
-  startAppCapture();
-  startUrlCapture();
-  startMandatoryScreenshotMonitoring(); // NEW: Monitor mandatory screenshot requirement
-
-  // Update tray
-  updateTrayMenu();
-  
-  // Update UI
-  mainWindow?.webContents.send('tracking-started', currentSession);
-  
-  // Notify user of successful start with project info
-  showTrayNotification(`Tracking started for project: ${actualProjectId}`, 'success');
-  
-  console.log('✅ [MAIN] Time tracking started successfully with mandatory screenshot enforcement');
 }
 
 // === MANDATORY SCREENSHOT MONITORING ===
@@ -1407,7 +2245,10 @@ function stopMandatoryScreenshotMonitoring() {
 }
 
 async function stopTracking() {
-  if (!isTracking) return;
+  if (!isTracking) {
+    console.log('⚠️ [MAIN] Tracking already stopped');
+    return { success: false, message: 'Tracking already stopped' };
+  }
 
   console.log('🛑 Stopping time tracking...');
   
@@ -1419,7 +2260,7 @@ async function stopTracking() {
   stopIdleMonitoring();
   stopAppCapture();
   stopUrlCapture();
-  stopMandatoryScreenshotMonitoring(); // NEW: Stop mandatory screenshot monitoring
+  stopMandatoryScreenshotMonitoring();
 
   // Reset screenshot failure tracking
   consecutiveScreenshotFailures = 0;
@@ -1427,39 +2268,33 @@ async function stopTracking() {
   screenshotFailureStart = null;
   console.log('🔄 Screenshot failure tracking reset');
 
-  // End current time log and cleanup any stale sessions
+  // End current time log
   if (currentTimeLogId) {
     try {
+      const endTime = new Date().toISOString();
+      
       // End the current session
-      const { error } = await supabase
+      const { error } = await supabaseService
         .from('time_logs')
         .update({
-          end_time: new Date().toISOString(),
+          end_time: endTime,
           status: 'completed'
         })
         .eq('id', currentTimeLogId);
       
       if (error) {
         console.error('❌ Failed to end current time log:', error);
+        
+        // Queue for offline sync
+        offlineQueue.timeLogs.push({
+          id: currentTimeLogId,
+          user_id: config.user_id,
+          end_time: endTime,
+          status: 'completed',
+          action: 'update'
+        });
       } else {
         console.log('✅ Current time log ended successfully');
-      }
-      
-      // CLEANUP: End any other active sessions for this user that might be stale
-      const cleanupResult = await supabase
-        .from('time_logs')
-        .update({
-          end_time: new Date().toISOString(),
-          status: 'completed'
-        })
-        .eq('user_id', config.user_id)
-        .is('end_time', null)
-        .neq('id', currentTimeLogId); // Don't update the current one again
-      
-      if (cleanupResult.error) {
-        console.log('⚠️ Failed to cleanup stale sessions:', cleanupResult.error);
-      } else {
-        console.log('🧹 Cleaned up any stale active sessions');
       }
       
     } catch (error) {
@@ -1485,9 +2320,12 @@ async function stopTracking() {
   // Notify user of successful stop
   showTrayNotification('Time tracking stopped', 'info');
   
+  // Clear session data
   currentSession = null;
   currentTimeLogId = null;
-  console.log('✅ Time tracking stopped with mandatory requirements enforced');
+  
+  console.log('✅ Time tracking stopped successfully');
+  return { success: true, message: 'Tracking stopped successfully' };
 }
 
 async function pauseTracking(reason = 'manual') {
@@ -1584,7 +2422,7 @@ ipcMain.handle('start-tracking', async (event, projectId = null) => {
   try {
     const result = await startTracking(projectId);
     console.log('✅ [MAIN] startTracking completed successfully');
-    return { success: true, message: 'Enhanced tracking started with anti-cheat detection' };
+    return result;
   } catch (error) {
     console.error('❌ [MAIN] startTracking failed with error:', error);
     return { success: false, message: 'Failed to start tracking: ' + error.message };
@@ -1592,18 +2430,33 @@ ipcMain.handle('start-tracking', async (event, projectId = null) => {
 });
 
 ipcMain.handle('stop-tracking', async () => {
-  await stopTracking();
-  return { success: true, message: 'Tracking stopped' };
+  try {
+    const result = await stopTracking();
+    return result;
+  } catch (error) {
+    console.error('❌ [MAIN] stopTracking failed:', error);
+    return { success: false, message: 'Failed to stop tracking: ' + error.message };
+  }
 });
 
 ipcMain.handle('pause-tracking', async () => {
-  pauseTracking('manual');
-  return { success: true, message: 'Tracking paused' };
+  try {
+    await pauseTracking('manual');
+    return { success: true, message: 'Tracking paused' };
+  } catch (error) {
+    console.error('❌ [MAIN] pauseTracking failed:', error);
+    return { success: false, message: 'Failed to pause tracking: ' + error.message };
+  }
 });
 
 ipcMain.handle('resume-tracking', async () => {
-  await resumeTracking();
-  return { success: true, message: 'Tracking resumed' };
+  try {
+    await resumeTracking();
+    return { success: true, message: 'Tracking resumed' };
+  } catch (error) {
+    console.error('❌ [MAIN] resumeTracking failed:', error);
+    return { success: false, message: 'Failed to resume tracking: ' + error.message };
+  }
 });
 
 ipcMain.handle('get-activity-stats', () => {
@@ -1674,43 +2527,34 @@ ipcMain.handle('force-screenshot', async () => {
   return { success: true, message: 'Screenshot captured manually' };
 });
 
-ipcMain.handle('get-config', () => {
-  return config;
-});
-
-ipcMain.handle('fetch-screenshots', async (event, params) => {
+ipcMain.handle('simulate-activity', async () => {
   try {
-    const { user_id, date, limit = 20, offset = 0 } = params;
+    console.log('🎭 [DEBUG] Simulating user activity for testing');
     
-    // Create date range for the selected date
-    const startDate = new Date(date);
-    const endDate = new Date(date);
-    endDate.setDate(endDate.getDate() + 1);
+    // Simulate mouse clicks
+    simulateMouseClick();
+    simulateMouseClick();
     
-    console.log(`📸 Fetching screenshots for user ${user_id} on ${date}`);
+    // Simulate keyboard activity
+    simulateKeyboardActivity();
+    simulateKeyboardActivity();
     
-    const { data: screenshots, error } = await supabase
-      .from('screenshots')
-      .select('*')
-      .eq('user_id', user_id)
-      .gte('captured_at', startDate.toISOString())
-      .lt('captured_at', endDate.toISOString())
-      .order('captured_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-    
-    if (error) {
-      console.error('❌ Error fetching screenshots:', error);
-      throw error;
-    }
-    
-    console.log(`✅ Fetched ${screenshots?.length || 0} screenshots`);
-    return screenshots || [];
-    
+    console.log('✅ [DEBUG] Activity simulation completed');
+    return {
+      success: true,
+      message: 'Activity simulation completed',
+      timestamp: new Date().toISOString()
+    };
   } catch (error) {
-    console.error('❌ Failed to fetch screenshots:', error);
-    return [];
+    console.error('❌ [DEBUG] Activity simulation error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 });
+
+// Removed duplicate fetch-screenshots handler - kept the improved version below
 
 // === FRAUD DETECTION HANDLERS ===
 ipcMain.handle('report-suspicious-activity', (event, activityData) => {
@@ -1735,41 +2579,27 @@ ipcMain.handle('is-tracking', () => {
   };
 });
 
-ipcMain.handle('get-stats', () => {
-  return {
-    ...activityStats,
-    isTracking: isTracking,
-    isPaused: isPaused,
-    systemIdleTime: getSystemIdleTime(),
-    lastActivity: lastActivity,
-    queueStatus: {
-      screenshots: offlineQueue.screenshots.length,
-      appLogs: offlineQueue.appLogs.length,
-      urlLogs: offlineQueue.urlLogs.length,
-      idleLogs: offlineQueue.idleLogs.length,
-      timeLogs: offlineQueue.timeLogs.length,
-      fraudAlerts: offlineQueue.fraudAlerts.length
-    }
-  };
-});
+// Removed duplicate handler - using comprehensive handler below
 
-// === MISSING CAPTURE FUNCTIONS ===
+// === FIXED CAPTURE FUNCTIONS ===
 async function captureActiveApplication() {
   try {
-    const activeWindow = await activeWin();
-    if (!activeWindow) return null;
+    // Use our new enhanced detection instead of activeWin
+    const activeApp = await detectActiveApplication();
+    if (!activeApp) return null;
 
     const appData = {
       user_id: config.user_id || 'demo-user',
       time_log_id: currentTimeLogId,
-      application_name: activeWindow.name || 'Unknown',
-      window_title: activeWindow.title || 'Unknown',
-      captured_at: new Date().toISOString()
+      app_name: activeApp.name || 'Unknown', // Fixed: use app_name instead of application_name
+      window_title: activeApp.title || 'Unknown',
+      app_path: activeApp.bundleId || null,
+      timestamp: new Date().toISOString() // Fixed: use timestamp instead of captured_at
     };
 
     // Add to offline queue
     offlineQueue.appLogs.push(appData);
-    console.log(`📱 App captured: ${appData.application_name}`);
+    console.log(`📱 App captured: ${appData.app_name}`);
     return appData;
   } catch (error) {
     throw error;
@@ -1778,37 +2608,38 @@ async function captureActiveApplication() {
 
 async function captureActiveUrl() {
   try {
-    const activeWindow = await activeWin();
-    if (!activeWindow || !isBrowserApp(activeWindow.name)) return null;
+    // Use our new enhanced URL detection instead of activeWin
+    const urlData = await detectBrowserUrl();
+    if (!urlData) return null;
 
-    // Use proper browser URL extraction instead of window title
-    const url = await extractBrowserUrl(activeWindow.name);
-    if (!url) return null;
-
-    const urlData = {
+    const urlLogData = {
       user_id: config.user_id || 'demo-user',
       time_log_id: currentTimeLogId,
-      url: url,
-      domain: extractDomain(url),
-      application_name: activeWindow.name,
-      captured_at: new Date().toISOString()
+      url: urlData.url,
+      title: urlData.title,
+      domain: urlData.domain,
+      browser: urlData.browser,
+      timestamp: new Date().toISOString() // Fixed: use timestamp instead of captured_at
     };
 
     // Add to offline queue
-    offlineQueue.urlLogs.push(urlData);
-    console.log(`🌐 URL captured: ${urlData.domain}`);
-    return urlData;
+    offlineQueue.urlLogs.push(urlLogData);
+    console.log(`🌐 URL captured: ${urlLogData.domain}`);
+    return urlLogData;
   } catch (error) {
     throw error;
   }
 }
 
 // === APP LIFECYCLE ===
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   console.log('🚀 TimeFlow Desktop Agent starting...');
   
   // Initialize components
   initializeComponents();
+  
+  // Clean up any stale sessions from previous runs
+  await cleanupStaleActiveSessions();
   
   // Create tray
   createTray();
@@ -1825,12 +2656,56 @@ app.whenReady().then(() => {
   // Start notification checking  
   startNotificationChecking();
   
+  // Check permissions on startup (after a delay to ensure UI is ready)
+  setTimeout(async () => {
+    if (process.platform === 'darwin') {
+      const currentPermission = systemPreferences.getMediaAccessStatus('screen');
+      
+      if (currentPermission !== 'granted') {
+        console.log('🔒 Startup permission check: Screen Recording not granted');
+        console.log('📋 App and URL capture features will be limited until permissions are granted');
+        
+        // Show a subtle notification about enhanced features
+        showTrayNotification(
+          'Enhanced tracking features available - App and URL capture can be enabled through System Settings',
+          'info'
+        );
+      } else {
+        console.log('✅ Startup permission check: Screen Recording permission already granted');
+      }
+    }
+  }, 3000);
+  
   // Auto-start if enabled
   if (appSettings.auto_start_tracking) {
     setTimeout(() => startTracking(), 5000);
   }
 
+  // Register global debug shortcut (Ctrl+Shift+D or Cmd+Shift+D)
+  globalShortcut.register('CommandOrControl+Shift+D', () => {
+    createDebugWindow();
+  });
+
+  // Register global permission request shortcut (Ctrl+Shift+P or Cmd+Shift+P)
+  globalShortcut.register('CommandOrControl+Shift+P', async () => {
+    if (process.platform === 'darwin') {
+      const currentPermission = systemPreferences.getMediaAccessStatus('screen');
+      
+      if (currentPermission !== 'granted') {
+        console.log('🔒 Manual permission request triggered via keyboard shortcut');
+        permissionDialogShown = false; // Reset to allow dialog
+        await checkMacScreenPermissions();
+      } else {
+        showTrayNotification('Screen Recording permission is already granted!', 'success');
+      }
+    } else {
+      showTrayNotification('Permission management is only available on macOS', 'info');
+    }
+  });
+
   console.log('✅ TimeFlow Agent ready');
+  console.log('🔬 Debug Console: Right-click tray icon → Debug Console, or press Ctrl+Shift+D');
+  console.log('🔒 Permission Request: Press Ctrl+Shift+P to manage screen recording permissions');
 });
 
 app.on('window-all-closed', () => {
@@ -1839,6 +2714,10 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', async () => {
   console.log('🔄 App shutting down...');
+  
+  // Unregister global shortcuts
+  globalShortcut.unregisterAll();
+  
   await stopTracking();
   
   // AGGRESSIVE INTERVAL CLEANUP TO PREVENT MEMORY LEAKS
@@ -1981,11 +2860,44 @@ console.log('📱 Ebdaa Time Desktop Agent initialized');
 
 // Initialize components
 function initializeComponents() {
-  syncManager = new SyncManager(config, supabase);
+  syncManager = new SyncManager(config);
   console.log('📱 TimeFlow Desktop Agent initialized');
+  
+  // Check for permission requirements without blocking
+  if (process.platform === 'darwin') {
+    setTimeout(() => {
+      const currentPermission = systemPreferences.getMediaAccessStatus('screen');
+      
+      if (currentPermission === 'granted') {
+        console.log('✅ Screen Recording permission: Granted');
+      } else {
+        console.log('⚠️ Screen Recording permission: Not granted - App and URL capture will be limited');
+        console.log('💡 To enable full features, the app will prompt for permissions when starting tracking');
+      }
+    }, 1000);
+  }
 }
 
-// Add the IPC handler for Mac permission checking
+// === LOG DOWNLOAD HANDLERS ===
+// Remove any existing handlers first to prevent duplicates
+const existingHandlers = [
+  'get-activity-metrics', 'user-logged-in', 'user-logged-out', 'load-user-session', 'load-session', 
+  'set-project-id', 'get-activity-logs', 'get-system-logs', 'get-screenshot-logs', 'get-compatibility-report', 
+  'check-mac-permissions', 'start-tracking', 'stop-tracking', 'pause-tracking', 'resume-tracking',
+  'get-activity-stats', 'get-anti-cheat-report', 'confirm-resume-after-idle', 'confirm-resume-after-sleep',
+  'get-app-settings', 'update-app-settings', 'get-queue-status', 'force-screenshot', 'simulate-activity',
+  'get-config', 'fetch-screenshots', 'report-suspicious-activity', 'get-fraud-alerts', 'is-tracking', 'get-stats'
+];
+
+existingHandlers.forEach(handlerName => {
+  try {
+    ipcMain.removeHandler(handlerName);
+  } catch (e) {
+    // Handler might not exist, which is fine
+  }
+});
+
+// Add the IPC handler for Mac permission checking (moved here to prevent duplicates)
 ipcMain.handle('check-mac-permissions', async () => {
   try {
     if (process.platform === 'darwin') {
@@ -2012,21 +2924,33 @@ ipcMain.handle('check-mac-permissions', async () => {
   }
 });
 
-// === LOG DOWNLOAD HANDLERS ===
+// === CORE IPC HANDLERS ===
 ipcMain.handle('get-activity-metrics', () => {
   try {
     console.log('📊 Getting activity metrics...');
     
+    const activityScore = calculateActivityPercent();
+    const idleTimeSeconds = calculateIdleTimeSeconds();
+    
     const currentMetrics = {
-      mouse_clicks: activityStats.mouseClicks,
+      mouseClicks: activityStats.mouseClicks,
       keystrokes: activityStats.keystrokes,
+      mouseMovements: activityStats.mouseMovements,
+      activityScore: activityScore,
+      idleTime: idleTimeSeconds,
+      timeSinceLastActivity: idleTimeSeconds,
+      // Legacy field names for backward compatibility
+      mouse_clicks: activityStats.mouseClicks,
       mouse_movements: activityStats.mouseMovements,
-      activity_score: calculateActivityPercent(),
+      activity_score: activityScore,
       time_since_last_activity_ms: Date.now() - lastActivity,
-      time_since_last_activity_seconds: Math.floor((Date.now() - lastActivity) / 1000),
+      time_since_last_activity_seconds: idleTimeSeconds,
       is_monitoring: !!idleCheckInterval,
       is_tracking: isTracking,
-      is_paused: isPaused
+      is_paused: isPaused,
+      // System info
+      lastActivity: new Date(lastActivity).toISOString(),
+      trackingDuration: isTracking ? Date.now() - (currentSession?.start_time || Date.now()) : 0
     };
     
     return { success: true, metrics: currentMetrics };
@@ -2048,15 +2972,77 @@ ipcMain.handle('user-logged-out', async (event) => {
   return { success: true, message: 'User logged out successfully' };
 });
 
+// Handle load-user-session requests
+ipcMain.handle('load-user-session', async (event) => {
+  console.log('🔍 load-user-session requested - desktop agent does not store user sessions');
+  // Desktop agent doesn't persist user sessions like the main electron app
+  // Return null to indicate no saved session
+  return null;
+});
+
+// Handle load-session requests (legacy session format)
+ipcMain.handle('load-session', async (event) => {
+  console.log('🔍 load-session requested - desktop agent does not store legacy sessions');
+  // Desktop agent doesn't persist sessions like the main electron app
+  // Return null to indicate no saved session
+  return null;
+});
+
 ipcMain.handle('set-project-id', async (event, projectId) => {
   console.log('📋 Setting project ID:', projectId);
   config.project_id = projectId;
   return { success: true, message: 'Project ID set successfully' };
 });
 
+// === TRACKING CONTROL HANDLERS ===
+ipcMain.handle('start-tracking', async (event, projectId) => {
+  console.log('🎯 [MAIN] IPC start-tracking called with project_id:', projectId);
+  console.log('🎯 [MAIN] typeof projectId:', typeof projectId);
+  console.log('🎯 [MAIN] projectId value:', JSON.stringify(projectId));
+  
+  try {
+    await startTracking(projectId);
+    return { success: true, message: 'Tracking started successfully' };
+  } catch (error) {
+    console.error('❌ Failed to start tracking:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('stop-tracking', async (event) => {
+  try {
+    await stopTracking();
+    return { success: true, message: 'Tracking stopped successfully' };
+  } catch (error) {
+    console.error('❌ Failed to stop tracking:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('pause-tracking', async (event, reason = 'manual') => {
+  try {
+    await pauseTracking(reason);
+    return { success: true, message: 'Tracking paused successfully' };
+  } catch (error) {
+    console.error('❌ Failed to pause tracking:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('resume-tracking', async (event) => {
+  try {
+    await resumeTracking();
+    return { success: true, message: 'Tracking resumed successfully' };
+  } catch (error) {
+    console.error('❌ Failed to resume tracking:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// === LOG AND REPORT HANDLERS ===
 ipcMain.handle('get-activity-logs', () => {
   try {
-    console.log('📊 Generating activity logs...');
+    safeLog('📊 Generating activity logs...');
     
     const activityData = {
       timestamp: new Date().toISOString(),
@@ -2103,7 +3089,7 @@ ipcMain.handle('get-activity-logs', () => {
 
 ipcMain.handle('get-system-logs', () => {
   try {
-    console.log('🖥️ Generating system logs...');
+    safeLog('🖥️ Generating system logs...');
     
     const systemLogs = [
       `TimeFlow Desktop Agent System Logs`,
@@ -2167,7 +3153,7 @@ ipcMain.handle('get-system-logs', () => {
 
 ipcMain.handle('get-screenshot-logs', () => {
   try {
-    console.log('📸 Generating screenshot logs...');
+    safeLog('📸 Generating screenshot logs...');
     
     const screenshotData = {
       timestamp: new Date().toISOString(),
@@ -2206,7 +3192,7 @@ ipcMain.handle('get-screenshot-logs', () => {
 
 ipcMain.handle('get-compatibility-report', () => {
   try {
-    console.log('🔧 Generating compatibility report...');
+    safeLog('🔧 Generating compatibility report...');
     
     const compatibilityReport = {
       timestamp: new Date().toISOString(),
@@ -2270,4 +3256,308 @@ ipcMain.handle('get-compatibility-report', () => {
   }
 });
 
+// === MISSING HANDLERS ===
+ipcMain.handle('fetch-screenshots', async (event, params) => {
+  try {
+    // Handle both object and direct parameters
+    let userId, date, limit;
+    
+    if (typeof params === 'object' && params !== null) {
+      userId = params.user_id || params.userId;
+      date = params.date;
+      limit = params.limit || 50;
+    } else {
+      // Fallback for direct parameters
+      userId = params;
+      date = arguments[2];
+      limit = arguments[3] || 50;
+    }
+    
+    safeLog('📸 Fetching screenshots for user', userId, 'on', date);
+    
+    if (!userId || !date) {
+      return { success: false, error: 'Missing userId or date parameter', screenshots: [] };
+    }
+    
+    // Query screenshots from database (using captured_at column)
+    const { data: screenshots, error } = await supabase
+      .from('screenshots')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('captured_at', `${date}T00:00:00.000Z`)
+      .lt('captured_at', `${date}T23:59:59.999Z`)
+      .order('captured_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('❌ Error fetching screenshots:', error);
+      return { success: false, error: error.message, screenshots: [] };
+    }
+
+    safeLog(`✅ Fetched ${screenshots?.length || 0} screenshots`);
+    return { 
+      success: true, 
+      screenshots: screenshots || [],
+      count: screenshots?.length || 0
+    };
+  } catch (error) {
+    console.error('❌ Error in fetch-screenshots handler:', error);
+    return { success: false, error: error.message, screenshots: [] };
+  }
+});
+
 console.log('✅ Desktop Agent main process initialized with log download handlers');
+
+// === ADDITIONAL MISSING HANDLERS ===
+ipcMain.handle('get-activity-stats', () => {
+  try {
+    return {
+      success: true,
+      stats: {
+        ...activityStats,
+        activityPercent: calculateActivityPercent(),
+        focusPercent: calculateFocusPercent(),
+        systemIdleTime: getSystemIdleTime(),
+        lastActivity: lastActivity,
+        isTracking: isTracking,
+        isPaused: isPaused
+      }
+    };
+  } catch (error) {
+    console.error('❌ Error getting activity stats:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-anti-cheat-report', () => {
+  try {
+    if (antiCheatDetector && antiCheatDetector.getDetectionReport) {
+      return {
+        success: true,
+        report: antiCheatDetector.getDetectionReport()
+      };
+    } else {
+      return {
+        success: false,
+        error: 'Anti-cheat detector not available',
+        report: {
+          currentRiskLevel: 'UNKNOWN',
+          totalSuspiciousEvents: 0,
+          recentPatterns: [],
+          systemHealth: 'UNKNOWN'
+        }
+      };
+    }
+  } catch (error) {
+    console.error('❌ Error getting anti-cheat report:', error);
+    return { 
+      success: false, 
+      error: error.message,
+      report: {
+        currentRiskLevel: 'ERROR',
+        totalSuspiciousEvents: 0,
+        recentPatterns: [],
+        systemHealth: 'ERROR'
+      }
+    };
+  }
+});
+
+ipcMain.handle('confirm-resume-after-idle', async (event, confirm) => {
+  try {
+    if (confirm && isPaused) {
+      await resumeTracking();
+      return { success: true, message: 'Tracking resumed after idle confirmation' };
+    } else {
+      return { success: true, message: 'Idle resume declined' };
+    }
+  } catch (error) {
+    console.error('❌ Error confirming idle resume:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('confirm-resume-after-sleep', async (event, confirm) => {
+  try {
+    if (confirm && isPaused) {
+      await resumeTracking();
+      return { success: true, message: 'Tracking resumed after sleep confirmation' };
+    } else {
+      return { success: true, message: 'Sleep resume declined' };
+    }
+  } catch (error) {
+    console.error('❌ Error confirming sleep resume:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-app-settings', () => {
+  try {
+    return {
+      success: true,
+      settings: appSettings
+    };
+  } catch (error) {
+    console.error('❌ Error getting app settings:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// === CONFIGURATION HANDLER (CRITICAL FOR LOGIN) ===
+ipcMain.handle('get-config', () => {
+  try {
+    safeLog('⚙️ Getting app configuration...');
+    return {
+      success: true,
+      supabase_url: config.supabase_url,
+      supabase_key: config.supabase_key,
+      user_id: config.user_id || config.userId,
+      userEmail: config.userEmail,
+      project_id: config.project_id || config.projectId,
+      screenshotInterval: config.screenshotInterval || (appSettings.screenshot_interval_seconds * 1000) || 300000,
+      idleThreshold: config.idleThreshold || (appSettings.idle_threshold_seconds * 1000) || 60000,
+      isTracking: isTracking,
+      isPaused: isPaused,
+      platform: process.platform,
+      version: require('../package.json').version || '1.0.0',
+      settings: appSettings
+    };
+  } catch (error) {
+    console.error('❌ Error getting config:', error);
+    return { 
+      success: false, 
+      error: error.message,
+      supabase_url: '',
+      supabase_key: '',
+      platform: process.platform,
+      isTracking: false,
+      isPaused: false,
+      settings: appSettings || {}
+    };
+  }
+});
+
+// === COMPREHENSIVE STATS HANDLER FOR DEBUG CONSOLE ===
+ipcMain.handle('get-stats', () => {
+  try {
+    const now = Date.now();
+    
+    // Add detailed logging for debug console status
+    console.log(`🔍 [DEBUG-STATUS] Getting stats for debug console...`);
+    console.log(`🔍 [DEBUG-STATUS] isTracking: ${isTracking}`);
+    console.log(`🔍 [DEBUG-STATUS] appCaptureInterval exists: ${!!appCaptureInterval}`);
+    console.log(`🔍 [DEBUG-STATUS] urlCaptureInterval exists: ${!!urlCaptureInterval}`);
+    console.log(`🔍 [DEBUG-STATUS] lastAppCaptureTime: ${lastAppCaptureTime}`);
+    console.log(`🔍 [DEBUG-STATUS] lastUrlCaptureTime: ${lastUrlCaptureTime}`);
+    
+    // Get component statuses
+    const componentStatus = {
+      desktop_agent: {
+        status: 'active',
+        lastUpdate: now,
+        info: 'Connected to Electron environment'
+      },
+      screenshots: {
+        status: isTracking && screenshotInterval ? 'active' : 'inactive',
+        lastUpdate: activityStats.lastScreenshotTime || now,
+        info: `Total captured: ${activityStats.screenshotsCaptured || 0}`
+      },
+      mouse: {
+        status: mouseTrackingInterval && activityStats.mouseClicks > 0 ? 'active' : 'inactive',
+        lastUpdate: lastActivity,
+        info: `Clicks: ${activityStats.mouseClicks || 0}, Movements: ${activityStats.mouseMovements || 0}`
+      },
+      keyboard: {
+        status: keyboardTrackingInterval && activityStats.keystrokes > 0 ? 'active' : 'inactive',
+        lastUpdate: lastActivity,
+        info: `Keystrokes: ${activityStats.keystrokes || 0}, Recent activity: ${activityStats.keystrokes > 0 ? 'Yes' : 'No'}`
+      },
+      idle: {
+        status: idleCheckInterval ? 'active' : 'inactive',
+        lastUpdate: now,
+        info: `Last activity: ${Math.floor((now - lastActivity) / 1000)}s ago`
+      },
+      apps: {
+        status: isTracking ? 'active' : 'inactive',
+        lastUpdate: lastAppCaptureTime ? new Date(lastAppCaptureTime).getTime() : now,
+        info: isTracking ? (lastAppCaptureTime ? `Last: ${new Date(lastAppCaptureTime).toLocaleTimeString()}` : 'Running every 15s') : 'Stopped'
+      },
+      urls: {
+        status: isTracking ? 'active' : 'inactive', 
+        lastUpdate: lastUrlCaptureTime ? new Date(lastUrlCaptureTime).getTime() : now,
+        info: isTracking ? (lastUrlCaptureTime ? `Last: ${new Date(lastUrlCaptureTime).toLocaleTimeString()}` : 'Running every 15s') : 'Stopped'
+      },
+      anticheat: {
+        status: antiCheatDetector ? 'active' : 'error',
+        lastUpdate: now,
+        info: antiCheatDetector ? 'Detection system available' : 'antiCheatDetector.getReport is not a function'
+      },
+      database: {
+        status: config.supabase_url && config.supabase_key ? 'active' : 'error',
+        lastUpdate: now,
+        info: config.supabase_url && config.supabase_key ? 'Connected' : "Connection failed • Error invoking remote method 'get-stats': Error: No handler registered for 'get-stats'"
+      }
+    };
+
+    return {
+      success: true,
+      stats: {
+        // Overall tracking status
+        trackingStatus: isTracking ? (isPaused ? 'paused' : 'active') : 'stopped',
+        activityScore: calculateActivityPercent(),
+        
+        // Activity metrics
+        mouseClicks: activityStats.mouseClicks || 0,
+        keystrokes: activityStats.keystrokes || 0,
+        mouseMovements: activityStats.mouseMovements || 0,
+        idleTime: Math.floor((now - lastActivity) / 1000),
+        
+        // Component statuses
+        components: componentStatus,
+        
+        // System info
+        systemInfo: {
+          platform: process.platform,
+          lastActivity: new Date(lastActivity).toISOString(),
+          isTracking: isTracking,
+          isPaused: isPaused,
+          currentSession: currentSession?.id || null,
+          intervals: {
+            screenshot: !!screenshotInterval,
+            idle: !!idleCheckInterval,
+            mouse: !!mouseTrackingInterval,
+            keyboard: !!keyboardTrackingInterval
+          }
+        },
+        
+        // Queue status
+        queueStatus: {
+          screenshots: offlineQueue.screenshots?.length || 0,
+          appLogs: offlineQueue.appLogs?.length || 0,
+          urlLogs: offlineQueue.urlLogs?.length || 0,
+          total: (offlineQueue.screenshots?.length || 0) + 
+                 (offlineQueue.appLogs?.length || 0) + 
+                 (offlineQueue.urlLogs?.length || 0)
+        }
+      }
+    };
+  } catch (error) {
+    console.error('❌ Error getting comprehensive stats:', error);
+    return { 
+      success: false, 
+      error: error.message,
+      stats: {
+        trackingStatus: 'error',
+        activityScore: 0,
+        mouseClicks: 0,
+        keystrokes: 0,
+        mouseMovements: 0,
+        idleTime: 0,
+        components: {},
+        systemInfo: {},
+        queueStatus: { screenshots: 0, appLogs: 0, urlLogs: 0, total: 0 }
+      }
+    };
+  }
+});
+

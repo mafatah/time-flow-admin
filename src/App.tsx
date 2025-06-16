@@ -37,6 +37,7 @@ import EmailReportsPage from '@/pages/admin/email-reports';
 import AdminScreenshotsPage from '@/pages/admin/screenshots';
 import AdminIdleLogsPage from '@/pages/admin/idle-logs';
 import AdminDashboard from '@/pages/admin';
+
 // import DebugUrlTracking from '@/components/debug/debug-url-tracking';
 
 
@@ -541,7 +542,7 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
-      {/* Debug Route - Available to both admin and employee */}
+
       
       {/* Employee Routes */}
       <Route path="/employee" element={

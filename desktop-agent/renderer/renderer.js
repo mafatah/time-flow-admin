@@ -26,15 +26,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         const config = await ipcRenderer.invoke('get-config');
         console.log('✅ Config loaded:', config);
         
-        // Initialize Supabase client if available
-        if (typeof window.supabase !== 'undefined') {
-            supabaseClient = window.supabase.createClient(config.supabase_url, config.supabase_key);
-            console.log('✅ Supabase client initialized');
-        } else {
-            console.error('❌ Supabase library not loaded');
-            showError('Authentication system not available');
-            return;
-        }
+        // Initialize Supabase client
+        supabaseClient = supabase.createClient(config.supabase_url, config.supabase_key);
+        console.log('✅ Supabase client initialized');
+        
+        // Test Supabase client configuration
+        console.log('🔧 Supabase client configuration test:', {
+            hasUrl: !!config.supabase_url,
+            hasKey: !!config.supabase_key,
+            urlLength: config.supabase_url?.length || 0,
+            keyLength: config.supabase_key?.length || 0,
+            clientMethods: {
+                hasAuth: !!supabaseClient.auth,
+                hasFrom: !!supabaseClient.from,
+                hasSignInWithPassword: !!supabaseClient.auth?.signInWithPassword
+            }
+        });
         
         // Initialize the app
         initializeApp();
@@ -64,13 +71,31 @@ async function initializeApp() {
     try {
         console.log('🚀 TimeFlow Desktop Agent initializing...');
         
-        // Get config from main process
-        const config = await ipcRenderer.invoke('get-config');
-        console.log('✅ Config loaded:', config);
-        
-        // Initialize Supabase client
-        supabaseClient = supabase.createClient(config.supabase_url, config.supabase_key);
-        console.log('✅ Supabase client initialized');
+        // Skip Supabase client initialization if already created
+        if (!supabaseClient) {
+            // Get config from main process
+            const config = await ipcRenderer.invoke('get-config');
+            console.log('✅ Config loaded:', config);
+            
+            // Initialize Supabase client
+            supabaseClient = supabase.createClient(config.supabase_url, config.supabase_key);
+            console.log('✅ Supabase client initialized');
+            
+            // Test Supabase client configuration
+            console.log('🔧 Supabase client configuration test:', {
+                hasUrl: !!config.supabase_url,
+                hasKey: !!config.supabase_key,
+                urlLength: config.supabase_url?.length || 0,
+                keyLength: config.supabase_key?.length || 0,
+                clientMethods: {
+                    hasAuth: !!supabaseClient.auth,
+                    hasFrom: !!supabaseClient.from,
+                    hasSignInWithPassword: !!supabaseClient.auth?.signInWithPassword
+                }
+            });
+        } else {
+            console.log('✅ Using existing Supabase client');
+        }
         
         // Try to load saved user session first
         const savedUserSession = await ipcRenderer.invoke('load-user-session');
@@ -286,7 +311,13 @@ async function handleLogin(e) {
     const loginLoader = document.getElementById('loginLoader');
     const errorDiv = document.getElementById('loginError');
 
-    console.log('🔐 Attempting login for:', email, 'Remember me:', rememberMe);
+    console.log('🔐 Starting Supabase authentication...');
+    console.log('📊 Login attempt details:', {
+        email: email,
+        passwordLength: password.length,
+        supabaseClientExists: !!supabaseClient,
+        rememberMe: rememberMe
+    });
 
     // Reset error state
     if (errorDiv) {
@@ -306,7 +337,31 @@ async function handleLogin(e) {
             password: password
         });
 
+        console.log('📥 Supabase auth response:', {
+            hasData: !!authData,
+            hasError: !!authError,
+            errorDetails: authError ? {
+                message: authError.message,
+                status: authError.status,
+                code: authError.code,
+                details: authError.details
+            } : null,
+            userData: authData ? {
+                hasUser: !!authData.user,
+                hasSession: !!authData.session,
+                userId: authData.user?.id,
+                userEmail: authData.user?.email
+            } : null
+        });
+
         if (authError) {
+            console.error('🚨 Supabase authentication error details:', {
+                message: authError.message,
+                status: authError.status,
+                code: authError.code,
+                details: authError.details,
+                stack: authError.stack
+            });
             throw new Error(authError.message);
         }
 
@@ -978,12 +1033,15 @@ async function loadRecentScreenshots() {
         }
 
         // Fetch screenshots from main process
-        const screenshots = await ipcRenderer.invoke('fetch-screenshots', {
+        const response = await ipcRenderer.invoke('fetch-screenshots', {
             user_id: currentUser.id,
             date: selectedDate,
             limit: 20
         });
 
+        // Handle the new response format: { success: true, screenshots: [...] }
+        const screenshots = response && response.success ? response.screenshots : [];
+        
         displayScreenshots(screenshots);
         
         if (screenshots && screenshots.length > 0) {

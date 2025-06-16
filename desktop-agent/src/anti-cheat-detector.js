@@ -300,6 +300,73 @@ class AntiCheatDetector {
   analyzeScreenshotTiming() {
     return this.detectScreenshotEvasion();
   }
+  
+  // Add missing analyzeScreenshot method
+  async analyzeScreenshot(imageBuffer, context = {}) {
+    try {
+      const analysis = {
+        suspicious: false,
+        confidence: 0,
+        details: {},
+        timestamp: Date.now()
+      };
+      
+      // Record screenshot activity
+      this.recordActivity('screenshot', { timestamp: Date.now() });
+      
+      // Analyze activity patterns during screenshot capture
+      const screenshotEvasion = this.detectScreenshotEvasion();
+      if (screenshotEvasion.suspicious) {
+        analysis.suspicious = true;
+        analysis.confidence = Math.max(analysis.confidence, screenshotEvasion.confidence);
+        analysis.details.screenshotEvasion = screenshotEvasion;
+      }
+      
+      // Analyze current activity levels
+      const currentActivityLevel = this.calculateActivityLevel();
+      const recentPatterns = this.analyzeActivity();
+      
+      if (recentPatterns && Array.isArray(recentPatterns) && recentPatterns.length > 0) {
+        analysis.suspicious = true;
+        analysis.confidence = Math.max(analysis.confidence, 0.7);
+        analysis.details.suspiciousPatterns = recentPatterns;
+      }
+      
+      // Factor in context from screenshot capture
+      if (context.activityPercent !== undefined && context.focusPercent !== undefined) {
+        // Very low activity with very high focus might be suspicious
+        if (context.activityPercent < 10 && context.focusPercent > 95) {
+          analysis.suspicious = true;
+          analysis.confidence = Math.max(analysis.confidence, 0.5);
+          analysis.details.staticActivity = {
+            activityPercent: context.activityPercent,
+            focusPercent: context.focusPercent
+          };
+        }
+        
+        // Extremely high activity might indicate automation
+        if (context.activityPercent > 90 && (context.mouseClicks > 100 || context.keystrokes > 200)) {
+          analysis.suspicious = true;
+          analysis.confidence = Math.max(analysis.confidence, 0.6);
+          analysis.details.excessiveActivity = {
+            activityPercent: context.activityPercent,
+            mouseClicks: context.mouseClicks,
+            keystrokes: context.keystrokes
+          };
+        }
+      }
+      
+      return analysis;
+      
+    } catch (error) {
+      console.log('⚠️ Screenshot analysis failed:', error.message);
+      return {
+        suspicious: false,
+        confidence: 0,
+        error: error.message
+      };
+    }
+  }
 
   performDeepAnalysis() {
     console.log('🔍 Performing deep anti-cheat analysis...');
@@ -499,6 +566,46 @@ class AntiCheatDetector {
     this.keyboardTimestamps = this.keyboardTimestamps.slice(-50);
     
     console.log('🧹 Aggressive cleanup completed - memory usage reduced');
+  }
+
+  // Generate comprehensive report for debug screen
+  generateReport() {
+    const now = Date.now();
+    const recentPatterns = this.suspiciousPatterns.slice(-10);
+    const activityLevel = this.calculateActivityLevel();
+    const behaviorProfile = this.generateBehaviorProfile();
+    
+    return {
+      timestamp: now,
+      isMonitoring: this.isMonitoring,
+      suspicious_activities: recentPatterns,
+      patterns: recentPatterns.map(pattern => ({
+        type: pattern.type,
+        severity: pattern.severity,
+        confidence: pattern.details.confidence || 0,
+        timestamp: pattern.timestamp
+      })),
+      overall_confidence: recentPatterns.length > 0 ? 
+        Math.max(...recentPatterns.map(p => p.details.confidence || 0)) : 0,
+      activity_summary: {
+        total_events: this.activityHistory.length,
+        recent_events: activityLevel.totalEvents,
+        mouse_movements: activityLevel.mouseMovements,
+        mouse_clicks: activityLevel.mouseClicks,
+        keystrokes: activityLevel.keystrokes
+      },
+      behavior_analysis: behaviorProfile,
+      risk_assessment: {
+        level: this.suspiciousPatterns.length > 5 ? 'HIGH' : 
+               this.suspiciousPatterns.length > 2 ? 'MEDIUM' : 'LOW',
+        score: this.calculateRiskScore({
+          totalSuspiciousEvents: this.suspiciousPatterns.length,
+          recentActivityLevel: activityLevel,
+          behaviorProfile: behaviorProfile
+        }),
+        details: `${this.suspiciousPatterns.length} suspicious patterns detected in the last ${this.PATTERN_WINDOW / 60000} minutes`
+      }
+    };
   }
 
   getDetectionReport() {

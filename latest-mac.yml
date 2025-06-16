@@ -1,13 +1,11 @@
-version: 1.0.18
+version: 1.0.19
 files:
-  - url: Ebdaa-Work-Time-1.0.18-arm64.dmg
-    sha512: 064489932a54f9cf4ad470d6d6f37be740f5e349bc08d6af1fcfc0de9eb5f4b14e41fd56e6d6dc980fd1357cd3040ba5493579ab85e4c3a3510e2406fa91dc18
-    size: 135124313
-    blockMapSize: 150000
-  - url: Ebdaa-Work-Time-1.0.18.dmg
-    sha512: a74c1a8ab1be26f4080e17da11fb1e45f6416b93e569a818cbfb2e600ebfde0f07d9e58ebd08f0ff42eb1826e3622c543142b9855fc7cde5e822d18e9134a598
-    size: 141612066
-    blockMapSize: 155000
-path: Ebdaa-Work-Time-1.0.18-arm64.dmg
-sha512: 064489932a54f9cf4ad470d6d6f37be740f5e349bc08d6af1fcfc0de9eb5f4b14e41fd56e6d6dc980fd1357cd3040ba5493579ab85e4c3a3510e2406fa91dc18
-releaseDate: '2025-06-15T10:00:00.000Z' 
+  - url: Ebdaa-Work-Time-1.0.19-arm64.dmg
+    sha512: x8swL5aySEsJqbj1W4vyYS9tCzanRYJ4fSU5RgrCSvatj2aATabSpjN6aNCnAvA00PpcG1kVEKvwKQGLNh5jsA==
+    size: 116413255
+  - url: Ebdaa-Work-Time-1.0.19.dmg
+    sha512: ZNacKJ71Z1WfNdZEPrUVcoDZEFSn6EkJKToIonZ4At18gi3AiGXVW5W3i7rwRtq6ZYVtjugxIA57aSDFf+7K7Q==
+    size: 122923044
+path: Ebdaa-Work-Time-1.0.19-arm64.dmg
+sha512: x8swL5aySEsJqbj1W4vyYS9tCzanRYJ4fSU5RgrCSvatj2aATabSpjN6aNCnAvA00PpcG1kVEKvwKQGLNh5jsA==
+releaseDate: '2025-06-16T11:00:18.656Z'

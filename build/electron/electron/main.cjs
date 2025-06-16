@@ -337,6 +337,11 @@ electron_1.app.whenReady().then(async () => {
     // Setup auto-updater
     (0, autoUpdater_1.setupUpdaterIPC)();
     (0, autoUpdater_1.enableAutoUpdates)();
+    // Register global debug shortcut (Ctrl+Shift+I or Cmd+Shift+I for main app)
+    electron_1.globalShortcut.register('CommandOrControl+Shift+I', () => {
+        createDebugWindow();
+        console.log('🔬 Main app debug window opened via keyboard shortcut (Cmd+Shift+I)');
+    });
     electron_1.app.on('activate', async () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0)
             await createWindow();
@@ -353,6 +358,8 @@ electron_1.app.on('before-quit', () => {
     if (timerInterval) {
         clearInterval(timerInterval);
     }
+    // Unregister global shortcuts
+    electron_1.globalShortcut.unregisterAll();
 });
 // Handle user login from desktop-agent UI - FIX: Use handle instead of on for invoke calls
 electron_1.ipcMain.handle('user-logged-in', (event, userData) => {
@@ -559,25 +566,52 @@ electron_1.ipcMain.handle('load-user-session', () => {
 electron_1.ipcMain.on('clear-session', () => (0, tracker_1.clearSavedSession)());
 // Add missing get-config handler if not already present
 electron_1.ipcMain.handle('get-config', () => {
+    // Try to load from desktop-agent config.json as fallback
+    let desktopConfig = {};
+    try {
+        const configPath = path.join(__dirname, '../desktop-agent/config.json');
+        if (fs.existsSync(configPath)) {
+            desktopConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            console.log('📄 Loaded config from desktop-agent/config.json');
+        }
+    }
+    catch (error) {
+        console.log('⚠️ Could not load desktop-agent config.json:', error);
+    }
     return {
-        supabase_url: process.env.VITE_SUPABASE_URL || 'https://fkpiqcxkmrtaetvfgcli.supabase.co',
-        supabase_key: process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4',
-        user_id: process.env.USER_ID || '',
-        project_id: process.env.PROJECT_ID || '00000000-0000-0000-0000-000000000001',
-        screenshot_interval_seconds: config_1.screenshotIntervalSeconds,
-        idle_threshold_seconds: Number(process.env.IDLE_TIMEOUT_MINUTES || 1) * 60,
-        enable_screenshots: true,
-        enable_idle_detection: true,
-        enable_activity_tracking: true,
-        enable_anti_cheat: process.env.ANTI_CHEAT_ENABLED !== 'false'
+        supabase_url: process.env.VITE_SUPABASE_URL || desktopConfig.supabase_url || '',
+        supabase_key: process.env.VITE_SUPABASE_ANON_KEY || desktopConfig.supabase_key || '',
+        user_id: process.env.USER_ID || desktopConfig.user_id || '',
+        project_id: process.env.PROJECT_ID || desktopConfig.project_id || '00000000-0000-0000-0000-000000000001',
+        screenshot_interval_seconds: desktopConfig.screenshot_interval_seconds || config_1.screenshotIntervalSeconds,
+        idle_threshold_seconds: desktopConfig.idle_threshold_seconds || Number(process.env.IDLE_TIMEOUT_MINUTES || 1) * 60,
+        enable_screenshots: desktopConfig.enable_screenshots !== undefined ? desktopConfig.enable_screenshots : true,
+        enable_idle_detection: desktopConfig.enable_idle_detection !== undefined ? desktopConfig.enable_idle_detection : true,
+        enable_activity_tracking: desktopConfig.enable_activity_tracking !== undefined ? desktopConfig.enable_activity_tracking : true,
+        enable_anti_cheat: desktopConfig.enable_anti_cheat !== undefined ? desktopConfig.enable_anti_cheat : process.env.ANTI_CHEAT_ENABLED !== 'false'
     };
 });
 // Add missing fetch-screenshots handler if not already present
 electron_1.ipcMain.handle('fetch-screenshots', async (event, params) => {
     try {
-        const { createClient } = await Promise.resolve().then(() => __importStar(require('@supabase/supabase-js')));
-        const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
-        const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
+        // Get config from desktop-agent as fallback
+        let desktopConfig = {};
+        try {
+            const configPath = path.join(__dirname, '../desktop-agent/config.json');
+            if (fs.existsSync(configPath)) {
+                desktopConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            }
+        }
+        catch (error) {
+            console.log('⚠️ Could not load desktop-agent config.json:', error);
+        }
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || desktopConfig.supabase_url;
+        const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || desktopConfig.supabase_key;
+        if (!supabaseUrl || !supabaseKey) {
+            console.error('❌ Missing Supabase configuration in fetch-screenshots handler');
+            return [];
+        }
+        const { createClient } = require('@supabase/supabase-js');
         const supabase = createClient(supabaseUrl, supabaseKey);
         const { user_id, date, limit = 20, offset = 0 } = params;
         // Create date range for the selected date
@@ -714,13 +748,56 @@ function createTray() {
 // Create a simple icon as base64 (16x16 green circle)
 function createSimpleIcon() {
     // This is a simple 16x16 PNG icon encoded as base64
-    return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
+    return 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVDiNpZM9SwNBEIafgwQLwcJCG1sLwUKwsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQsLGwsLBQ';
+}
+// Create debug window
+let debugWindow = null;
+function createDebugWindow() {
+    if (debugWindow) {
+        debugWindow.focus();
+        return debugWindow;
+    }
+    debugWindow = new electron_1.BrowserWindow({
+        width: 1400,
+        height: 900,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        },
+        icon: path.join(__dirname, '../assets/icon.png'),
+        title: '🔬 TimeFlow Debug Console',
+        resizable: true,
+        show: false,
+        minWidth: 1000,
+        minHeight: 700
+    });
+    // Always load the detailed debug window from desktop-agent
+    const debugHtmlPath = path.join(__dirname, '../desktop-agent/debug-window.html');
+    if (fs.existsSync(debugHtmlPath)) {
+        debugWindow.loadFile(debugHtmlPath);
+        console.log('🔬 Loading detailed debug console from desktop-agent');
+    }
+    else {
+        console.error('❌ Desktop agent debug-window.html not found at:', debugHtmlPath);
+        debugWindow.destroy();
+        debugWindow = null;
+        return null;
+    }
+    debugWindow.once('ready-to-show', () => {
+        debugWindow.show();
+        console.log('🔬 Debug window opened');
+    });
+    debugWindow.on('closed', () => {
+        debugWindow = null;
+        console.log('🔬 Debug window closed');
+    });
+    return debugWindow;
 }
 // Update tray menu
 function updateTrayMenu() {
     const updateStatus = (0, autoUpdater_1.getUpdateStatus)();
     const updateLabel = updateStatus.updateAvailable
-        ? '⬇️ Download Update'
+        ? `⬇️ Download v${updateStatus.updateInfo?.version}`
         : updateStatus.updateCheckInProgress
             ? '🔍 Checking...'
             : '🔄 Check for Updates';
@@ -764,6 +841,12 @@ function updateTrayMenu() {
             enabled: false
         },
         { type: 'separator' },
+        {
+            label: '🔬 Debug Console',
+            click: () => {
+                createDebugWindow();
+            }
+        },
         {
             label: '🚪 Logout',
             click: () => {
@@ -1003,4 +1086,40 @@ electron_1.ipcMain.handle('test-comprehensive-activity', (event, count = 1) => {
         console.error('❌ Error running comprehensive activity test:', error);
         return { success: false, error: error.message };
     }
+});
+// === Debug Console IPC handlers (for desktop-agent debug-window.html compatibility) ===
+electron_1.ipcMain.handle('get-stats', () => {
+    try {
+        // Reuse get-activity-metrics for convenience
+        const { getCurrentActivityMetrics } = require('./activityMonitor.cjs');
+        const metrics = getCurrentActivityMetrics ? getCurrentActivityMetrics() : {};
+        return { success: true, stats: metrics };
+    }
+    catch (error) {
+        console.error('❌ Error in get-stats handler:', error);
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('get-screenshot-logs', () => {
+    try {
+        // Provide very basic placeholder data; integrate with screenshot manager if available
+        const lastCaptureTime = globalThis.lastScreenshotTime || null;
+        const screenshotStats = {
+            totalCaptured: globalThis.totalScreenshots || 0,
+            lastCaptureTime,
+            lastCaptureTimeFormatted: lastCaptureTime ? new Date(lastCaptureTime).toISOString() : null
+        };
+        return { success: true, data: { screenshotStats } };
+    }
+    catch (error) {
+        console.error('❌ Error in get-screenshot-logs handler:', error);
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('get-anti-cheat-report', () => {
+    // The main app currently has no anti-cheat detector; return a stubbed response
+    return {
+        success: false,
+        error: 'Anti-cheat detector not available in main process'
+    };
 });

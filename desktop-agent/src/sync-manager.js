@@ -1,11 +1,16 @@
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 class SyncManager {
   constructor(config) {
     this.config = config;
     this.supabase = createClient(config.supabase_url, config.supabase_key);
+    // Use service role for database operations if available
+    this.supabaseService = config.supabase_service_key ? 
+      createClient(config.supabase_url, config.supabase_service_key) : 
+      this.supabase;
     this.isOnline = true;
     this.syncInterval = null;
     this.queuePath = path.join(__dirname, '..', 'offline-queue.json');
@@ -94,20 +99,18 @@ class SyncManager {
       .from('screenshots')
       .getPublicUrl(fileName);
 
-    // Save to database
-    const { error: dbError } = await this.supabase
+    // Save to database - use correct column names based on actual schema
+    const { error: dbError } = await this.supabaseService
       .from('screenshots')
       .insert({
         user_id: metadata.user_id,
-        time_log_id: metadata.time_log_id,
+        project_id: metadata.project_id, // Use project_id instead of time_log_id based on actual schema
         image_url: publicUrl.publicUrl,
         activity_percent: metadata.activity_percent,
         focus_percent: metadata.focus_percent,
-        mouse_clicks: metadata.mouse_clicks,
-        keystrokes: metadata.keystrokes,
-        mouse_movements: metadata.mouse_movements,
-        is_blurred: metadata.is_blurred,
-        captured_at: metadata.captured_at
+        captured_at: metadata.captured_at,
+        file_path: publicUrl.publicUrl, // Add file_path which seems to be required
+        classification: metadata.activity_percent > 50 ? 'productive' : 'idle'
       });
 
     if (dbError) throw dbError;
@@ -139,7 +142,7 @@ class SyncManager {
   }
 
   async uploadAppLogs(logData) {
-    const { error } = await this.supabase
+    const { error } = await this.supabaseService
       .from('app_logs')
       .insert(logData.logs);
 
@@ -172,7 +175,7 @@ class SyncManager {
   }
 
   async uploadUrlLogs(logData) {
-    const { error } = await this.supabase
+    const { error } = await this.supabaseService
       .from('url_logs')
       .insert(logData.logs);
 
@@ -205,7 +208,7 @@ class SyncManager {
   }
 
   async uploadIdleLog(logData) {
-    const { error } = await this.supabase
+    const { error } = await this.supabaseService
       .from('idle_logs')
       .insert(logData.log);
 
@@ -215,7 +218,7 @@ class SyncManager {
   // === TIME LOGS HANDLING ===
   async addTimeLog(timeLog) {
     const logData = {
-      id: `time_log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: crypto.randomUUID(), // Use proper UUID format
       log: timeLog,
       timestamp: new Date().toISOString(),
       retries: 0
@@ -239,14 +242,14 @@ class SyncManager {
 
   async uploadTimeLog(logData) {
     if (logData.log.action === 'update_idle') {
-      const { error } = await this.supabase
+      const { error } = await this.supabaseService
         .from('time_logs')
         .update(logData.log.data)
         .eq('id', logData.log.id);
 
       if (error) throw error;
     } else {
-      const { error } = await this.supabase
+      const { error } = await this.supabaseService
         .from('time_logs')
         .insert(logData.log);
 

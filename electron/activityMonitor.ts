@@ -7,6 +7,39 @@ import { queueScreenshot, queueAppLog } from './unsyncedManager';
 import { logError, showError } from './errorHandler';
 import { screenshotIntervalSeconds, idleTimeoutMinutes } from './config';
 
+// Safe console logging to prevent EPIPE errors
+function safeLog(...args: any[]) {
+  try {
+    console.log(...args);
+  } catch (error) {
+    // Silently ignore EPIPE errors when stdout is broken
+    if ((error as any).code !== 'EPIPE') {
+      // For non-EPIPE errors, try to log to stderr
+      try {
+        console.error('Console error:', error);
+      } catch (e) {
+        // If even stderr fails, just ignore
+      }
+    }
+  }
+}
+
+function safeError(...args: any[]) {
+  try {
+    console.error(...args);
+  } catch (error) {
+    // Silently ignore EPIPE errors when stderr is broken
+    if ((error as any).code !== 'EPIPE') {
+      // Try alternative logging
+      try {
+        process.stderr.write(`Error: ${args.join(' ')}\n`);
+      } catch (e) {
+        // If all logging fails, just ignore
+      }
+    }
+  }
+}
+
 // Import app events for communication with main process
 let appEvents: any = null;
 // Note: Don't use require('./main') here as it causes circular dependency issues
@@ -104,11 +137,11 @@ const MANDATORY_SCREENSHOT_INTERVAL = 15 * 60 * 1000; // 15 minutes in milliseco
 // Always-on activity monitoring - starts when app launches
 export async function startActivityMonitoring(userId: string) {
   if (isMonitoring) {
-    console.log('🔄 Activity monitoring already running');
+    safeLog('🔄 Activity monitoring already running');
     return;
   }
 
-  console.log('🚀 Starting always-on activity monitoring for user:', userId);
+  safeLog('🚀 Starting always-on activity monitoring for user:', userId);
   currentUserId = userId;
   isMonitoring = true;
   lastActivityTime = Date.now();
@@ -166,13 +199,13 @@ export async function startActivityMonitoring(userId: string) {
     resetActivityMetrics();
   }, 10 * 60 * 1000); // 10 minutes
 
-  console.log(`✅ Activity monitoring started - Random screenshots (2 per 10 min), App tracking every 5s, Activity metrics every 1s, Reset every 10min`);
+  safeLog(`✅ Activity monitoring started - Random screenshots (2 per 10 min), App tracking every 5s, Activity metrics every 1s, Reset every 10min`);
 }
 
 export function stopActivityMonitoring() {
   if (!isMonitoring) return;
 
-  console.log('🛑 Stopping activity monitoring');
+  safeLog('🛑 Stopping activity monitoring');
   isMonitoring = false;
 
   if (activityInterval) {
@@ -220,7 +253,7 @@ export function stopActivityMonitoring() {
       currentApp.mouse_movements = activityMetrics.mouse_movements;
       saveAppActivity();
     } catch (error) {
-      console.error('❌ Error saving final app activity during stop:', error);
+      safeError('❌ Error saving final app activity during stop:', error);
       // Don't throw error, just log it
     }
   }
@@ -234,11 +267,11 @@ function isUserActive(): boolean {
   const idleTimeMs = appSettings.idle_threshold_seconds * 1000;
   const timeSinceLastActivity = Date.now() - activityMetrics.last_activity_time;
   
-  // Only stop monitoring if we have consecutive technical failures, not just lack of screenshots
-  if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
-    console.log(`❌ Too many consecutive screenshot failures (${consecutiveScreenshotFailures}), stopping monitoring due to technical issues`);
-    return false;
-  }
+      // Only stop monitoring if we have consecutive technical failures, not just lack of screenshots
+    if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
+      safeLog(`❌ Too many consecutive screenshot failures (${consecutiveScreenshotFailures}), stopping monitoring due to technical issues`);
+      return false;
+    }
   
   // Check actual user activity (mouse/keyboard), not screenshot success
   return timeSinceLastActivity < idleTimeMs;
@@ -273,7 +306,7 @@ async function trackActivityMetrics() {
       activityMetrics.activity_score = Math.max(0, activityMetrics.activity_score - decayRate);
       
       if (oldScore !== activityMetrics.activity_score) {
-        console.log('💤 ACTIVITY DECAY:', {
+        safeLog('💤 ACTIVITY DECAY:', {
           idle_duration_seconds: secondsIdle,
           decay_rate: decayRate,
           activity_score_before: oldScore,
@@ -317,7 +350,7 @@ async function trackActivityMetrics() {
     }
 
   } catch (error) {
-    console.error('❌ Activity metrics tracking failed:', error);
+    safeError('❌ Activity metrics tracking failed:', error);
     logError('trackActivityMetrics', error);
   }
 }
@@ -338,7 +371,7 @@ export async function fetchSettings() {
         max_laptop_closed_hours: config.max_laptop_closed_hours || 1,
         mandatory_screenshot_interval_minutes: config.mandatory_screenshot_interval_minutes || 15
       };
-      console.log('✅ Settings loaded from config:', appSettings);
+      safeLog('✅ Settings loaded from config:', appSettings);
       return;
     }
 
@@ -349,7 +382,7 @@ export async function fetchSettings() {
       .single();
     
     if (error) {
-      console.log('⚠️ Could not fetch settings, using defaults:', error);
+      safeLog('⚠️ Could not fetch settings, using defaults:', error);
       return;
     }
     
@@ -361,10 +394,10 @@ export async function fetchSettings() {
         max_laptop_closed_hours: data.max_laptop_closed_hours || 1,
         mandatory_screenshot_interval_minutes: data.mandatory_screenshot_interval_minutes || 15
       };
-      console.log('✅ Settings loaded from database:', appSettings);
+      safeLog('✅ Settings loaded from database:', appSettings);
     }
   } catch (error) {
-    console.error('❌ Settings fetch error:', error);
+    safeError('❌ Settings fetch error:', error);
     logError('fetchSettings', error);
   }
 }
@@ -375,13 +408,13 @@ async function blurImage(buffer: Buffer): Promise<Buffer> {
     // For now, we'll use a simple approach - in production you'd want to use sharp or canvas
     // This is a placeholder that returns the original buffer
     // In a real implementation, you'd blur the image here
-    console.log('🔄 Blurring screenshot...');
+    safeLog('🔄 Blurring screenshot...');
     
     // TODO: Implement actual image blurring using sharp or canvas
     // For now, just return original buffer
     return buffer;
   } catch (error) {
-    console.error('❌ Image blur failed:', error);
+    safeError('❌ Image blur failed:', error);
     return buffer; // Return original if blur fails
   }
 }
@@ -390,8 +423,8 @@ async function captureActivityScreenshot() {
   if (!currentUserId || !currentActivitySession) return;
 
   try {
-    console.log('📸 Capturing activity screenshot...');
-    console.log('🔍 Screenshot attempt details:', {
+    safeLog('📸 Capturing activity screenshot...');
+    safeLog('🔍 Screenshot attempt details:', {
       userId: currentUserId,
       sessionId: currentActivitySession.id,
       timestamp: new Date().toISOString()
@@ -400,43 +433,43 @@ async function captureActivityScreenshot() {
     // Reduce timeout to 5 seconds and add more detailed error handling
     const screenshotPromise = new Promise(async (resolve, reject) => {
       try {
-        console.log('🖥️ Getting primary display...');
+        safeLog('🖥️ Getting primary display...');
         const primaryDisplay = screen.getPrimaryDisplay();
         const { width, height } = primaryDisplay.workAreaSize;
-        console.log(`📐 Display dimensions: ${width}x${height}`);
+        safeLog(`📐 Display dimensions: ${width}x${height}`);
         
-        console.log('🔍 Getting desktop sources...');
+        safeLog('🔍 Getting desktop sources...');
         const sources = await desktopCapturer.getSources({ 
           types: ['screen'], 
           thumbnailSize: { width: Math.min(width, 1920), height: Math.min(height, 1080) }
         });
         
-        console.log(`📺 Found ${sources.length} screen sources`);
+        safeLog(`📺 Found ${sources.length} screen sources`);
         
         if (sources.length === 0) {
           throw new Error('No screen sources available - check macOS Screen Recording permissions');
         }
 
-        console.log('🖼️ Converting thumbnail to PNG buffer...');
+        safeLog('🖼️ Converting thumbnail to PNG buffer...');
         let buffer = sources[0].thumbnail.toPNG();
-        console.log(`📊 Screenshot buffer size: ${buffer.length} bytes`);
+        safeLog(`📊 Screenshot buffer size: ${buffer.length} bytes`);
         
         // Apply blur if enabled in settings
         if (appSettings.blur_screenshots) {
-          console.log('🔄 Applying blur to screenshot...');
+          safeLog('🔄 Applying blur to screenshot...');
           buffer = await blurImage(buffer);
         }
         
         const filename = `activity_${Date.now()}_${randomUUID().slice(0, 8)}.png`;
         const tempPath = path.join(app.getPath('temp'), filename);
         
-        console.log(`💾 Saving screenshot to: ${tempPath}`);
+        safeLog(`💾 Saving screenshot to: ${tempPath}`);
         fs.writeFileSync(tempPath, buffer);
-        console.log('✅ Screenshot file saved successfully');
+        safeLog('✅ Screenshot file saved successfully');
 
         resolve({ tempPath, filename });
       } catch (error) {
-        console.error('❌ Screenshot capture error:', error);
+        safeError('❌ Screenshot capture error:', error);
         reject(error);
       }
     });
@@ -446,10 +479,10 @@ async function captureActivityScreenshot() {
       setTimeout(() => reject(new Error('Screenshot capture timeout (5s)')), 5000);
     });
 
-    console.log('⏱️ Starting screenshot capture with 5s timeout...');
+    safeLog('⏱️ Starting screenshot capture with 5s timeout...');
     const { tempPath, filename } = await Promise.race([screenshotPromise, timeoutPromise]) as any;
 
-    console.log('☁️ Starting upload to Supabase...');
+    safeLog('☁️ Starting upload to Supabase...');
     // Upload to Supabase with activity metrics
     await uploadActivityScreenshot(tempPath, filename);
     
@@ -464,30 +497,30 @@ async function captureActivityScreenshot() {
     
     // Reset system unavailable tracking
     if (systemUnavailableStart) {
-      console.log('✅ System available again after being unavailable');
+      safeLog('✅ System available again after being unavailable');
       systemUnavailableStart = null;
     }
     
     // Reset laptop closed tracking on successful screenshot
     if (laptopClosedStart) {
-      console.log('✅ Laptop appears to be open again - successful screenshot captured');
+      safeLog('✅ Laptop appears to be open again - successful screenshot captured');
       laptopClosedStart = null;
     }
     
     // Skip event emission to avoid circular dependency issues with main.ts
-    console.log('📸 Screenshot capture and upload completed successfully!');
-    console.log(`📊 Total screenshots this session: ${currentActivitySession?.total_screenshots || 0}`);
+    safeLog('📸 Screenshot capture and upload completed successfully!');
+    safeLog(`📊 Total screenshots this session: ${currentActivitySession?.total_screenshots || 0}`);
     
     // Calculate next screenshot time for user information
     const nextScreenshotSeconds = screenshotIntervalSeconds;
     const nextMinutes = Math.floor(nextScreenshotSeconds / 60);
     const nextSecondsRemainder = nextScreenshotSeconds % 60;
-    console.log(`📸 Next screenshot in ${nextMinutes} minutes ${nextSecondsRemainder} seconds`);
+    safeLog(`📸 Next screenshot in ${nextMinutes} minutes ${nextSecondsRemainder} seconds`);
 
   } catch (error) {
     consecutiveScreenshotFailures++;
-    console.error(`💥 Screenshot failed (attempt ${consecutiveScreenshotFailures}/${MAX_SCREENSHOT_FAILURES}):`);
-    console.error('📋 Error details:', {
+    safeError(`💥 Screenshot failed (attempt ${consecutiveScreenshotFailures}/${MAX_SCREENSHOT_FAILURES}):`);
+    safeError('📋 Error details:', {
       name: (error as Error).name,
       message: (error as Error).message,
       stack: (error as Error).stack?.split('\n').slice(0, 3).join('\n')
@@ -497,13 +530,13 @@ async function captureActivityScreenshot() {
     // Track when system became unavailable
     if (!systemUnavailableStart) {
       systemUnavailableStart = Date.now();
-      console.log('⚠️ System appears to be unavailable, starting timer');
+      safeLog('⚠️ System appears to be unavailable, starting timer');
     }
     
     // Check if laptop might be closed (multiple screenshot failures)
     if (consecutiveScreenshotFailures >= 2 && !laptopClosedStart) {
       laptopClosedStart = Date.now();
-      console.log('💤 Laptop appears to be closed, starting laptop closure timer');
+      safeLog('💤 Laptop appears to be closed, starting laptop closure timer');
     }
     
     // Check various stop conditions
@@ -511,8 +544,8 @@ async function captureActivityScreenshot() {
     
     if (shouldStopTracking) {
       const { reason, details } = getStopReason();
-      console.log(`🛑 Stopping tracking due to: ${reason}`);
-      console.log(`📊 Details: ${details}`);
+      safeLog(`🛑 Stopping tracking due to: ${reason}`);
+      safeLog(`📊 Details: ${details}`);
       
       // Stop all monitoring
       stopActivityMonitoring();
@@ -532,7 +565,7 @@ async function captureActivityScreenshot() {
           });
         }
       } catch (e) {
-        console.log('⚠️ Could not notify main process:', e);
+        safeLog('⚠️ Could not notify main process:', e);
       }
       
       // Show notification if possible
@@ -646,7 +679,7 @@ function getNotificationMessage(reason: string, details: string): string {
 
 async function uploadActivityScreenshot(filePath: string, filename: string) {
   if (!currentUserId) {
-    console.log('⚠️ No user ID available, queuing screenshot for later upload');
+    safeLog('⚠️ No user ID available, queuing screenshot for later upload');
     queueScreenshot({
       user_id: 'unknown',
       project_id: '00000000-0000-0000-0000-000000000001',
@@ -660,8 +693,8 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
   // This will be replaced with real task ID when proper time tracking is active
   const taskId = ACTIVITY_MONITORING_TASK_ID;
   
-  console.log(`☁️ Starting upload process...`);
-  console.log(`📋 Upload details:`, {
+  safeLog(`☁️ Starting upload process...`);
+  safeLog(`📋 Upload details:`, {
     userId: currentUserId,
     taskId: taskId,
     filename: filename,
@@ -669,11 +702,11 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
   });
 
   try {
-    console.log('📂 Reading file buffer...');
+    safeLog('📂 Reading file buffer...');
     const fileBuffer = fs.readFileSync(filePath);
-    console.log(`📊 File buffer size: ${fileBuffer.length} bytes`);
+    safeLog(`📊 File buffer size: ${fileBuffer.length} bytes`);
     
-    console.log('☁️ Uploading to Supabase Storage...');
+    safeLog('☁️ Uploading to Supabase Storage...');
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('screenshots')
@@ -683,7 +716,7 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
       });
 
     if (uploadError) {
-      console.error('❌ Supabase Storage upload failed:', {
+      safeError('❌ Supabase Storage upload failed:', {
         error: uploadError.message,
         code: uploadError.name,
         details: uploadError
@@ -697,15 +730,15 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
       throw new Error(`Storage upload failed: ${uploadError.message}`);
     }
 
-    console.log('✅ Storage upload successful, getting public URL...');
+    safeLog('✅ Storage upload successful, getting public URL...');
     // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('screenshots')
       .getPublicUrl(`${currentUserId}/${filename}`);
 
-    console.log(`🔗 Public URL generated: ${publicUrl}`);
+    safeLog(`🔗 Public URL generated: ${publicUrl}`);
 
-    console.log('💾 Saving to database...');
+    safeLog('💾 Saving to database...');
     // Save to database with activity metrics - handle idle states properly
     const timeSinceLastActivity = Date.now() - activityMetrics.last_activity_time;
     const isCurrentlyIdle = timeSinceLastActivity > (appSettings.idle_threshold_seconds * 1000);
@@ -759,14 +792,14 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
       mouse_movements: activityMetrics.mouse_movements
     };
 
-    console.log('📊 Database payload:', dbPayload);
+    safeLog('📊 Database payload:', dbPayload);
 
     const { error: dbError } = await supabase
       .from('screenshots')
       .insert(dbPayload);
 
     if (dbError) {
-      console.error('❌ Database save failed:', {
+      safeError('❌ Database save failed:', {
         error: dbError.message,
         code: dbError.code,
         details: dbError
@@ -780,14 +813,14 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
       throw new Error(`Database save failed: ${dbError.message}`);
     }
 
-    console.log('🎉 Screenshot uploaded and saved to database successfully!');
+    safeLog('🎉 Screenshot uploaded and saved to database successfully!');
     
     // Clean up temp file
     try {
       fs.unlinkSync(filePath);
-      console.log('🗑️ Temporary file cleaned up');
+      safeLog('🗑️ Temporary file cleaned up');
     } catch (cleanupError) {
-      console.log('⚠️ Could not clean up temp file:', (cleanupError as Error).message);
+      safeLog('⚠️ Could not clean up temp file:', (cleanupError as Error).message);
     }
     
     // Emit event to trigger notification in main process
@@ -800,11 +833,11 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
         appEvents.emit('screenshot-captured');
       }
     } catch (e) {
-      console.log('⚠️ Could not emit screenshot-captured event:', (e as Error).message);
+      safeLog('⚠️ Could not emit screenshot-captured event:', (e as Error).message);
     }
 
   } catch (error) {
-    console.error('💥 Upload process failed:', error);
+    safeError('💥 Upload process failed:', error);
     throw error; // Re-throw to be handled by calling function
   }
 }
@@ -841,7 +874,7 @@ async function getCurrentAppName(): Promise<string> {
     } catch (error) {
       // Only log occasionally to reduce spam
       if (Math.random() < 0.01) { // Log only 1% of the time
-        console.log('⚠️ App detection failed occasionally, using System Application');
+        safeLog('⚠️ App detection failed occasionally, using System Application');
       }
       return 'System Application';
     }
@@ -885,7 +918,7 @@ async function getCurrentWindowTitle(): Promise<string> {
       return `${appName} Window`;
     }
   } catch (error) {
-    console.error('❌ Window title detection failed:', error);
+    safeError('❌ Window title detection failed:', error);
     return 'Unknown Window';
   }
 }
@@ -963,7 +996,7 @@ async function trackCurrentApp() {
 
     // Validate that we got valid data
     if (!appName || appName === 'Unknown Application') {
-      console.log('⚠️ Could not detect valid app name, skipping app tracking');
+      safeLog('⚠️ Could not detect valid app name, skipping app tracking');
       return;
     }
 
@@ -989,8 +1022,8 @@ async function trackCurrentApp() {
         if (currentApp.url) {
           await saveURLActivity(currentApp);
         }
-      } catch (error) {
-        console.error('❌ Error saving previous app activity:', error);
+              } catch (error) {
+        safeError('❌ Error saving previous app activity:', error);
         // Continue with new app tracking even if saving previous failed
       }
     }
@@ -1010,7 +1043,7 @@ async function trackCurrentApp() {
 
       // Validate the new currentApp object
       if (!currentApp.app_name) {
-        console.error('❌ Failed to create valid currentApp object');
+        safeError('❌ Failed to create valid currentApp object');
         currentApp = null;
         return;
       }
@@ -1018,14 +1051,14 @@ async function trackCurrentApp() {
       currentActivitySession.total_apps++;
       saveActivitySession();
 
-      console.log('📱 App activity:', appName, '-', windowTitle, currentURL ? `(${currentURL})` : '');
+      safeLog('📱 App activity:', appName, '-', windowTitle, currentURL ? `(${currentURL})` : '');
     } catch (error) {
-      console.error('❌ Error creating new app activity:', error);
+      safeError('❌ Error creating new app activity:', error);
       currentApp = null;
     }
 
   } catch (error) {
-    console.error('❌ App tracking failed:', error);
+    safeError('❌ App tracking failed:', error);
     logError('trackCurrentApp', error);
     // Reset currentApp if tracking fails completely
     currentApp = null;
@@ -1035,23 +1068,23 @@ async function trackCurrentApp() {
 async function saveAppActivity() {
   // Add comprehensive null checks to prevent the error
   if (!currentApp) {
-    console.log('⚠️ No current app to save - skipping saveAppActivity');
+    safeLog('⚠️ No current app to save - skipping saveAppActivity');
     return;
   }
   
   if (!currentUserId) {
-    console.log('⚠️ No current user ID - skipping saveAppActivity');
+    safeLog('⚠️ No current user ID - skipping saveAppActivity');
     return;
   }
   
   if (!currentActivitySession) {
-    console.log('⚠️ No current activity session - skipping saveAppActivity');
+    safeLog('⚠️ No current activity session - skipping saveAppActivity');
     return;
   }
 
   // Additional validation to ensure currentApp has required properties
   if (!currentApp.app_name) {
-    console.log('⚠️ Current app missing app_name - skipping saveAppActivity');
+    safeLog('⚠️ Current app missing app_name - skipping saveAppActivity');
     return;
   }
 
@@ -1074,10 +1107,10 @@ async function saveAppActivity() {
       throw error;
     }
 
-    console.log('✅ App activity saved:', currentApp.app_name);
+    safeLog('✅ App activity saved:', currentApp.app_name);
 
   } catch (error) {
-    console.error('❌ Failed to save app activity:', error);
+    safeError('❌ Failed to save app activity:', error);
     logError('saveAppActivity', error);
   }
 }
@@ -1277,38 +1310,38 @@ async function saveActivitySession() {
 
 // Manual activity trigger (for testing)
 export function triggerActivityCapture() {
-  console.log('🧪 triggerActivityCapture() called');
-  console.log('📊 Activity monitoring state - isMonitoring:', isMonitoring, 'currentUserId:', currentUserId);
+  safeLog('🧪 triggerActivityCapture() called');
+  safeLog('📊 Activity monitoring state - isMonitoring:', isMonitoring, 'currentUserId:', currentUserId);
   
   // Use the real task ID from active tracking if available, otherwise skip
   if (!currentUserId) {
-    console.log('⚠️ No user ID set for activity capture - skipping screenshot');
+    safeLog('⚠️ No user ID set for activity capture - skipping screenshot');
     return;
   }
   
-  console.log('📸 Triggering manual screenshot capture...');
+  safeLog('📸 Triggering manual screenshot capture...');
   captureActivityScreenshot();
 }
 
 // Direct screenshot test function (for testing without activity monitoring)
 export async function triggerDirectScreenshot() {
-  console.log('🧪 triggerDirectScreenshot() called - testing basic screenshot functionality');
+  safeLog('🧪 triggerDirectScreenshot() called - testing basic screenshot functionality');
   
   try {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
     
-    console.log(`🖥️ Display size: ${width}x${height}`);
+    safeLog(`🖥️ Display size: ${width}x${height}`);
     
     const sources = await desktopCapturer.getSources({ 
       types: ['screen'], 
       thumbnailSize: { width: Math.min(width, 1920), height: Math.min(height, 1080) }
     });
     
-    console.log(`📺 Available sources: ${sources.length}`);
+    safeLog(`📺 Available sources: ${sources.length}`);
     
     if (sources.length === 0) {
-      console.log('❌ No screen sources available - check macOS Screen Recording permissions');
+      safeLog('❌ No screen sources available - check macOS Screen Recording permissions');
       return false;
     }
 
@@ -1317,8 +1350,8 @@ export async function triggerDirectScreenshot() {
     const tempPath = path.join(app.getPath('temp'), filename);
     fs.writeFileSync(tempPath, buffer);
 
-    console.log(`💾 Test screenshot saved to: ${tempPath}`);
-    console.log(`📊 Screenshot size: ${buffer.length} bytes`);
+    safeLog(`💾 Test screenshot saved to: ${tempPath}`);
+    safeLog(`📊 Screenshot size: ${buffer.length} bytes`);
 
     // For testing, let's just save locally and not upload to avoid DB issues
     const testDir = path.join(app.getPath('userData'), 'test_screenshots');
@@ -1327,11 +1360,11 @@ export async function triggerDirectScreenshot() {
     fs.copyFileSync(tempPath, finalPath);
     fs.unlinkSync(tempPath);
 
-    console.log(`✅ Test screenshot saved successfully to: ${finalPath}`);
+    safeLog(`✅ Test screenshot saved successfully to: ${finalPath}`);
     return true;
     
   } catch (error) {
-    console.error('❌ Direct screenshot test failed:', error);
+    safeError('❌ Direct screenshot test failed:', error);
     logError('triggerDirectScreenshot', error);
     return false;
   }

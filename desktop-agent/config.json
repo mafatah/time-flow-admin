@@ -1,8 +1,6 @@
 {
-  "user_id": "employee@timeflow.com",
+  "user_id": "0c3d3092-913e-436f-a352-3378e558c34f",
   "project_id": null,
-  "supabase_url": "https://fkpiqcxkmrtaetvfgcli.supabase.co",
-  "supabase_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4",
   "auto_start_tracking": false,
   "screenshot_interval_seconds": 300,
   "idle_threshold_seconds": 300,
@@ -22,5 +20,7 @@
   "suspicious_activity_threshold": 10,
   "pattern_detection_window_minutes": 15,
   "minimum_mouse_distance": 50,
-  "keyboard_diversity_threshold": 5
+  "keyboard_diversity_threshold": 5,
+  "supabase_url": "https://fkpiqcxkmrtaetvfgcli.supabase.co",
+  "supabase_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4"
 }

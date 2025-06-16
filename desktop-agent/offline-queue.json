@@ -2,33 +2,6 @@
   "screenshots": [],
   "appLogs": [],
   "urlLogs": [],
-  "idleLogs": [
-    {
-      "id": "idle_log_1748427752963_xj63fbmjy",
-      "log": {
-        "user_id": "189a8371-8aaf-4551-9b33-8fed7f4cee5d",
-        "time_log_id": "offline_1748427180357",
-        "idle_start": "2025-05-28T10:21:29.471Z",
-        "idle_end": "2025-05-28T10:22:32.486Z",
-        "duration_seconds": 63,
-        "created_at": "2025-05-28T10:22:32.486Z"
-      },
-      "timestamp": "2025-05-28T10:22:32.963Z",
-      "retries": 3
-    },
-    {
-      "id": "idle_log_1748427832002_e1uq8a52t",
-      "log": {
-        "user_id": "189a8371-8aaf-4551-9b33-8fed7f4cee5d",
-        "time_log_id": "offline_1748427180357",
-        "idle_start": "2025-05-28T10:22:37.702Z",
-        "idle_end": "2025-05-28T10:23:51.744Z",
-        "duration_seconds": 74,
-        "created_at": "2025-05-28T10:23:51.744Z"
-      },
-      "timestamp": "2025-05-28T10:23:52.002Z",
-      "retries": 1
-    }
-  ],
+  "idleLogs": [],
   "timeLogs": []
 }
