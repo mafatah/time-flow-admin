@@ -1,11 +1,11 @@
-version: 1.0.16
+version: 1.0.19
 files:
-  - url: TimeFlow-v1.0.16-Intel.dmg
-    sha512: hqUNggCgCVjbj2H2H3KIFduw7z3yst1FtLKUcEVw+SkK+AK4nByMPTkKv7t0g3fRh4aL6cQady+I2JD8+dkVug==
-    size: 122924207
-  - url: TimeFlow-v1.0.16-ARM64.dmg
-    sha512: 7/HXuT+FRP0ZPsfas08/VHhBQCuAzAUGLIprAd1dj8mk+LNXXlA+WV70sNIeterHL1C/Nk6Cf0D80Idl6P48IQ==
-    size: 116412551
-path: TimeFlow-v1.0.16-Intel.dmg
-sha512: hqUNggCgCVjbj2H2H3KIFduw7z3yst1FtLKUcEVw+SkK+AK4nByMPTkKv7t0g3fRh4aL6cQady+I2JD8+dkVug==
-releaseDate: '2025-06-13T18:04:06.000Z'
+  - url: TimeFlow-v1.0.19-Intel.dmg
+    sha512: d18c66063ad6aab424b7bec603584172af8cd71fe39232d01f8f54ad35c5d629fad339e73111fa09970b774c4ebd3979625742716180fe788541da7fc4477975
+    size: 122935823
+  - url: TimeFlow-v1.0.19-ARM64.dmg
+    sha512: 0b0883ecbcc99865749e76fb436f5258f808f18580a0852ed6fa92d870e1514412374f1cf818cafc2c95dc579b17ebe72fe5d3659028ee64da8525320862d35d
+    size: 116424187
+path: TimeFlow-v1.0.19-Intel.dmg
+sha512: d18c66063ad6aab424b7bec603584172af8cd71fe39232d01f8f54ad35c5d629fad339e73111fa09970b774c4ebd3979625742716180fe788541da7fc4477975
+releaseDate: '2025-06-16T11:53:40.000Z'

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 const DownloadPage = () => {
-  const version = "v1.0.16";
+  const version = "v1.0.19";
   const releaseDate = new Date().toLocaleDateString();
   
   const downloads = [
