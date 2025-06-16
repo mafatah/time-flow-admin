@@ -21,7 +21,7 @@ const DownloadPage = () => {
       icon: <Apple className="h-6 w-6" />,
       description: "For M1, M2, M3 Macs",
       filename: "TimeFlow-v1.0.21-ARM64-Signed.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22/Ebdaa Work Time-1.0.22-arm64.dmg",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22-unsigned/Ebdaa-Work-Time-1.0.22-arm64.dmg",
       size: "~112 MB",
       requirements: "macOS 11.0+",
       verified: true
@@ -31,7 +31,7 @@ const DownloadPage = () => {
       icon: <Apple className="h-6 w-6" />,
       description: "For Intel-based Macs",
       filename: "TimeFlow-v1.0.21-Intel-Signed.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22/Ebdaa Work Time-1.0.22.dmg",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22-unsigned/Ebdaa-Work-Time-1.0.22-Intel.dmg",
       size: "~118 MB",
       requirements: "macOS 10.14+",
       verified: true
@@ -41,7 +41,7 @@ const DownloadPage = () => {
       icon: <Monitor className="h-6 w-6" />,
       description: "For Windows 10/11",
       filename: "TimeFlow-Setup-v1.0.21-Windows-x64.exe",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22/Ebdaa Work Time Setup 1.0.22.exe",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22-unsigned/Ebdaa Work Time Setup 1.0.22.exe",
       size: "~85 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true
@@ -51,7 +51,7 @@ const DownloadPage = () => {
       icon: <Smartphone className="h-6 w-6" />,
       description: "AppImage for Linux",
       filename: "TimeFlow-v1.0.21-Linux-x64.AppImage",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22/Ebdaa Work Time-1.0.22.AppImage",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22-unsigned/Ebdaa Work Time-1.0.22.AppImage",
       size: "~121 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: true
