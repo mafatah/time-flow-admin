@@ -22,8 +22,7 @@ function loadConfig() {
     console.log('📄 Found .env file, loading credentials...');
     const envContent = fs.readFileSync(envPath, 'utf8');
     
-    envContent.split('
-').forEach(line => {
+    envContent.split('\n').forEach(line => {
       const trimmedLine = line.trim();
       if (trimmedLine && !trimmedLine.startsWith('#')) {
         const [key, ...valueParts] = trimmedLine.split('=');
