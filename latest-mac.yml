@@ -1,11 +1,11 @@
 version: 1.0.19
 files:
-  - url: Ebdaa-Work-Time-1.0.19-arm64.dmg
-    sha512: x8swL5aySEsJqbj1W4vyYS9tCzanRYJ4fSU5RgrCSvatj2aATabSpjN6aNCnAvA00PpcG1kVEKvwKQGLNh5jsA==
-    size: 116413255
   - url: Ebdaa-Work-Time-1.0.19.dmg
-    sha512: ZNacKJ71Z1WfNdZEPrUVcoDZEFSn6EkJKToIonZ4At18gi3AiGXVW5W3i7rwRtq6ZYVtjugxIA57aSDFf+7K7Q==
-    size: 122923044
-path: Ebdaa-Work-Time-1.0.19-arm64.dmg
-sha512: x8swL5aySEsJqbj1W4vyYS9tCzanRYJ4fSU5RgrCSvatj2aATabSpjN6aNCnAvA00PpcG1kVEKvwKQGLNh5jsA==
-releaseDate: '2025-06-16T11:00:18.656Z'
+    sha512: hqUNggCgCVjbj2H2H3KIFduw7z3yst1FtLKUcEVw+SkK+AK4nByMPTkKv7t0g3fRh4aL6cQady+I2JD8+dkVug==
+    size: 122924207
+  - url: Ebdaa-Work-Time-1.0.19-arm64.dmg
+    sha512: 7/HXuT+FRP0ZPsfas08/VHhBQCuAzAUGLIprAd1dj8mk+LNXXlA+WV70sNIeterHL1C/Nk6Cf0D80Idl6P48IQ==
+    size: 116412551
+path: Ebdaa-Work-Time-1.0.19.dmg
+sha512: hqUNggCgCVjbj2H2H3KIFduw7z3yst1FtLKUcEVw+SkK+AK4nByMPTkKv7t0g3fRh4aL6cQady+I2JD8+dkVug==
+releaseDate: '2025-06-16T11:05:29.624Z'
