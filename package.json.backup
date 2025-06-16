@@ -1,23 +1,38 @@
 {
   "name": "vite_react_shadcn_ts",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.23",
   "type": "module",
-  "main": "build/electron/main.cjs",
+  "author": "Ebdaa Digital Technology",
+  "description": "Ebdaa Work Time - Employee time tracking and productivity monitoring application",
+  "overrides": {
+    "nan": "2.16.0"
+  },
+  "main": "build/electron/electron/main.cjs",
   "scripts": {
-    "start": "concurrently \"npm:dev\" \"npm:electron\"",
-    "start:desktop": "npm run build:all && npx electron build/electron/main.cjs",
-    "electron": "npm run build:electron && npx electron build/electron/main.cjs",
+    "start": "SCREENSHOT_INTERVAL_SECONDS=20 concurrently \"npm:dev\" \"npm:electron\"",
+    "start:desktop": "npm run build:all && npx electron build/electron/electron/main.cjs",
+    "electron": "SCREENSHOT_INTERVAL_SECONDS=20 npm run build:electron && SCREENSHOT_INTERVAL_SECONDS=20 npx electron build/electron/electron/main.cjs",
     "dev:electron": "ts-node-esm --project tsconfig.electron.json electron/main.ts",
     "dev": "vite",
-    "build": "electron-builder",
+    "build": "vite build",
     "build:dev": "vite build --mode development",
-    "lint": "eslint .",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "electron:build": "electron-builder",
+    "electron:build-unsigned": "electron-builder --config.mac.identity=null --config.mac.notarize=null",
     "build:web": "tsc -p tsconfig.app.json",
-    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\;",
-    "build:all": "npm run build:dev && npm run build:electron && mkdir -p build/dist && cp -r dist/* build/dist/"
+    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\; && node fix-imports.cjs && mkdir -p build/desktop-agent && cp -r desktop-agent/renderer desktop-agent/config.json desktop-agent/assets desktop-agent/debug-window.html build/desktop-agent/ && mkdir -p build/electron/assets && cp -r electron/assets/* build/electron/assets/ && cp public/app-update.yml build/electron/",
+    "build:all": "npm run build:dev && npm run build:electron && mkdir -p build/dist && cp -r dist/* build/dist/",
+    "build:notarized": "scripts/build-notarized.sh",
+    "build:release": "scripts/build-and-release.sh",
+    "build:signed": "npx electron-builder --mac --win --publish=never",
+    "setup:signing": "./scripts/setup-code-signing.sh",
+    "install:certificates": "./scripts/install-certificates.sh",
+    "deploy": "./scripts/build-and-deploy.sh",
+    "update:links": "./scripts/update-web-links.sh",
+    "test:windows": "node test-windows-compatibility.cjs",
+    "test:cross-platform": "node test-windows-compatibility.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -48,7 +63,9 @@
     "@radix-ui/react-toggle": "^1.1.0",
     "@radix-ui/react-toggle-group": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.1.4",
+    "@supabase/supabase-js": "^2.49.8",
     "@tanstack/react-query": "^5.56.2",
+    "@types/react-big-calendar": "^1.16.1",
     "active-win": "^8.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -56,19 +73,22 @@
     "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
     "electron-auto-launch": "^5.0.1",
+    "electron-updater": "^6.6.2",
     "embla-carousel-react": "^8.3.0",
+    "glob": "^11.0.3",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.462.0",
     "nanoid": "^5.0.6",
     "next-themes": "^0.3.0",
+    "node-global-key-listener": "^0.3.0",
     "react": "^18.3.1",
+    "react-big-calendar": "^1.18.0",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
     "react-resizable-panels": "^2.1.3",
     "react-router-dom": "^6.26.2",
     "recharts": "^2.12.7",
-    "robotjs": "^0.6.0",
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
@@ -76,8 +96,8 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "@eslint/js": "^9.9.0",
-    "@supabase/supabase-js": "^2.49.8",
     "@tailwindcss/typography": "^0.5.15",
     "@types/electron": "^1.4.38",
     "@types/node": "^22.15.21",
@@ -110,15 +130,107 @@
     "vite": "^5.4.1"
   },
   "build": {
-    "appId": "com.timeflow.admin",
+    "appId": "com.ebdaadt.timetracker",
+    "productName": "Ebdaa Work Time",
+    "icon": "electron/assets/icon.png",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "mafatah",
+      "repo": "time-flow-admin"
+    },
+    "files": [
+      "build/electron/**/*",
+      "build/desktop-agent/**/*",
+      "!build/entitlements.mac.plist",
+      "!build/dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "build/dist",
+        "to": "app",
+        "filter": [
+          "**/*",
+          "!downloads/**/*",
+          "!*.dmg",
+          "!*.blockmap"
+        ]
+      }
+    ],
     "mac": {
-      "target": "dmg"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": "arm64"
+        },
+        {
+          "target": "dmg",
+          "arch": "x64"
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "identity": "Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "icon": "electron/assets/icon.png",
+      "notarize": {
+        "teamId": "6GW49LK9V9"
+      }
+    },
+    "dmg": {
+      "format": "UDZO",
+      "icon": "electron/assets/icon.png",
+      "iconSize": 80,
+      "title": "Install Ebdaa Work Time",
+      "window": {
+        "width": 600,
+        "height": 420
+      },
+      "contents": [
+        {
+          "x": 150,
+          "y": 220,
+          "type": "file"
+        },
+        {
+          "x": 450,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     },
     "win": {
-      "target": "nsis"
+      "target": {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      },
+      "icon": "electron/assets/icon.png",
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
+      "publisherName": "Ebdaa Digital Technology"
     },
     "linux": {
-      "target": "AppImage"
+      "target": {
+        "target": "AppImage",
+        "arch": [
+          "x64"
+        ]
+      },
+      "category": "Office",
+      "icon": "electron/assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }

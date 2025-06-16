@@ -1,7 +1,7 @@
 {
   "name": "vite_react_shadcn_ts",
   "private": true,
-  "version": "1.0.22",
+  "version": "1.0.23",
   "type": "module",
   "author": "Ebdaa Digital Technology",
   "description": "Ebdaa Work Time - Employee time tracking and productivity monitoring application",
@@ -172,7 +172,7 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "identity": "Ebdaa Digital Technology",
+      "identity": "Ebdaa Digital Technology (6GW49LK9V9)",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",

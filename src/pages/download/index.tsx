@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 const DownloadPage = () => {
-  const version = "v1.0.21";
+  const version = "v1.0.23";
   const releaseDate = new Date().toLocaleDateString();
   
   const downloads = [
@@ -21,8 +21,8 @@ const DownloadPage = () => {
       icon: <Apple className="h-6 w-6" />,
       description: "For M1, M2, M3 Macs",
       filename: "TimeFlow-v1.0.21-ARM64-Signed.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22-unsigned/Ebdaa-Work-Time-1.0.22-arm64.dmg",
-      size: "~112 MB",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.23/Ebdaa Work Time-1.0.23-arm64.dmg",
+      size: "~111 MB",
       requirements: "macOS 11.0+",
       verified: true
     },
@@ -31,7 +31,7 @@ const DownloadPage = () => {
       icon: <Apple className="h-6 w-6" />,
       description: "For Intel-based Macs",
       filename: "TimeFlow-v1.0.21-Intel-Signed.dmg",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22-unsigned/Ebdaa-Work-Time-1.0.22-Intel.dmg",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.23/Ebdaa Work Time-1.0.23.dmg",
       size: "~118 MB",
       requirements: "macOS 10.14+",
       verified: true
@@ -41,7 +41,7 @@ const DownloadPage = () => {
       icon: <Monitor className="h-6 w-6" />,
       description: "For Windows 10/11",
       filename: "TimeFlow-Setup-v1.0.21-Windows-x64.exe",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22-unsigned/Ebdaa Work Time Setup 1.0.22.exe",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.23/Ebdaa Work Time Setup 1.0.23.exe",
       size: "~85 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true
@@ -51,7 +51,7 @@ const DownloadPage = () => {
       icon: <Smartphone className="h-6 w-6" />,
       description: "AppImage for Linux",
       filename: "TimeFlow-v1.0.21-Linux-x64.AppImage",
-      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.22-unsigned/Ebdaa Work Time-1.0.22.AppImage",
+      url: "https://github.com/mafatah/time-flow-admin/releases/download/v1.0.23/Ebdaa Work Time-1.0.23.AppImage",
       size: "~121 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: true
@@ -181,7 +181,7 @@ const DownloadPage = () => {
         <div className="text-center text-gray-600 space-y-4">
           <div className="flex justify-center gap-6 text-sm">
             <a 
-              href="https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.22"
+              href="https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.23"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-blue-600"

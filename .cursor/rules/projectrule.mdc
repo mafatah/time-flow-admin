@@ -1,0 +1,16 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Project Rules
+
+- macOS builds (.dmg) must be code signed with Apple Developer ID Application certificate
+- All .dmg builds must be notarized via Apple notarization service
+- Staple notarization ticket to all DMG files before publishing
+- Windows builds (.exe) must be signed using EV Code Signing Certificate (via signtool)
+- Push signed .dmg and .exe files to GitHub Releases automatically after CI build
+- Update app download URLs in web and app after each new release
+- Use secrets manager to inject Apple signing credentials in CI
+- Use SHA256 and timestamp server during Windows signing
+- Include .cursorrules file in repository
