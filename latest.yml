@@ -1,11 +1,11 @@
-version: 1.0.16
+version: 1.0.19
 files:
-  - url: TimeFlow-1.0.16-Setup.exe
-    sha512: d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5
-    size: 85000000
-  - url: TimeFlow-1.0.16.AppImage
-    sha512: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2
-    size: 120000000
-path: TimeFlow-1.0.16-Setup.exe
-sha512: d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5
-releaseDate: '2025-06-13T18:04:06.000Z'
+  - url: TimeFlow-v1.0.19-Setup.exe
+    sha512: 57b44e09342e27bd19e5d52e5c57f04cc6d7016cc2e7abbe0c47b67d51b590b1af7b0c7d8c14d137540bfc24256c27053366a3db00a4f09b456070165ee47e1b
+    size: 89532399
+  - url: TimeFlow-v1.0.19.AppImage
+    sha512: d78b695ac3bff35bda3f16171c9811ce9e12e1d56057f46e00ff2f0affe6543f2e44483e3daf4467d48e1acbbd17125194196f535be2f9416841c9d7a46db420
+    size: 126847236
+path: TimeFlow-v1.0.19-Setup.exe
+sha512: 57b44e09342e27bd19e5d52e5c57f04cc6d7016cc2e7abbe0c47b67d51b590b1af7b0c7d8c14d137540bfc24256c27053366a3db00a4f09b456070165ee47e1b
+releaseDate: '2025-01-16T21:50:30.000Z'
