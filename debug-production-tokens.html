@@ -64,6 +64,8 @@
 <body>
     <h1>🔍 TimeFlow Production Token Debug</h1>
     <p class="info">This tool helps diagnose authentication and token issues in production.</p>
+    <p>⚠️ This file has been cleaned for security</p>
+    <p>Environment variables should be used instead of hardcoded credentials</p>
     
     <div class="debug-section">
         <h2>📊 Environment Check</h2>
@@ -102,9 +104,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Your production Supabase configuration
-        const SUPABASE_URL = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
+        // Use environment variables - no hardcoded credentials
+        console.log('Use process.env.VITE_SUPABASE_URL instead of hardcoded values');
 
         let supabase;
 
@@ -131,10 +132,10 @@
                     <strong>✅ Current Domain:</strong> ${window.location.origin}
                 </div>
                 <div class="test-result test-success">
-                    <strong>✅ Supabase URL:</strong> ${SUPABASE_URL}
+                    <strong>✅ Supabase URL:</strong> ${process.env.VITE_SUPABASE_URL}
                 </div>
                 <div class="test-result test-success">
-                    <strong>✅ Anon Key:</strong> ${SUPABASE_ANON_KEY.substring(0, 50)}...
+                    <strong>✅ Anon Key:</strong> ${process.env.VITE_SUPABASE_ANON_KEY.substring(0, 50)}...
                 </div>
                 <div class="test-result test-success">
                     <strong>✅ User Agent:</strong> ${navigator.userAgent}
@@ -144,7 +145,7 @@
 
         function initializeSupabase() {
             try {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                supabase = window.supabase.createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY, {
                     auth: {
                         autoRefreshToken: true,
                         persistSession: true,
@@ -288,11 +289,11 @@
                 log('cors-result', `✅ Current origin: ${window.location.origin}`, 'success');
                 
                 // Test if we can make a request
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+                const response = await fetch(`${process.env.VITE_SUPABASE_URL}/rest/v1/`, {
                     method: 'GET',
                     headers: {
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                        'apikey': process.env.VITE_SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${process.env.VITE_SUPABASE_ANON_KEY}`
                     }
                 });
 

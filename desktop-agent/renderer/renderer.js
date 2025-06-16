@@ -97,53 +97,68 @@ async function initializeApp() {
             console.log('✅ Using existing Supabase client');
         }
         
-        // Try to load saved user session first
+        // Load remembered login data for form auto-fill
+        loadRememberedLoginData();
+        
+        // Try to load saved user session first for auto-login
         const savedUserSession = await ipcRenderer.invoke('load-user-session');
-        if (savedUserSession) {
-            console.log('📂 Found saved user session, auto-logging in...', {
+        if (savedUserSession && savedUserSession.remember_me) {
+            console.log('📂 Found saved user session, attempting auto-login...', {
                 email: savedUserSession.email,
                 remember_me: savedUserSession.remember_me
             });
             
-            // Restore Supabase session
-            const { data: sessionData, error: sessionError } = await supabaseClient.auth.setSession({
-                access_token: savedUserSession.access_token,
-                refresh_token: savedUserSession.refresh_token
-            });
-            
-            if (!sessionError && sessionData.session) {
-                // Set current user from saved session
-                currentUser = {
-                    id: savedUserSession.id,
-                    email: savedUserSession.email,
-                    name: savedUserSession.user_metadata.full_name || savedUserSession.email.split('@')[0],
-                    role: 'employee'
-                };
+            try {
+                // Restore Supabase session with proper error handling
+                const { data: sessionData, error: sessionError } = await supabaseClient.auth.setSession({
+                    access_token: savedUserSession.access_token,
+                    refresh_token: savedUserSession.refresh_token
+                });
                 
-                console.log('👤 User restored from saved session:', currentUser);
-                showMainApp();
-                showNotification('Welcome back! Automatically signed in.', 'success');
-                
-                // Also save to localStorage for UI consistency
-                localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
-                localStorage.setItem('timeflow_remember_email', savedUserSession.email);
-                localStorage.setItem('timeflow_remember_me', 'true');
-            } else {
-                console.log('⚠️ Failed to restore session:', sessionError);
-                // Clear invalid session
+                if (!sessionError && sessionData.session && sessionData.user) {
+                    // Get fresh user details from database
+                    const { data: userDetails, error: userError } = await supabaseClient
+                        .from('users')
+                        .select('id, email, full_name, role')
+                        .eq('id', sessionData.user.id)
+                        .single();
+                    
+                    // Set current user from saved session
+                    currentUser = {
+                        id: sessionData.user.id,
+                        email: sessionData.user.email,
+                        name: userDetails ? userDetails.full_name : sessionData.user.email.split('@')[0],
+                        role: userDetails ? userDetails.role : 'employee'
+                    };
+                    
+                    console.log('👤 User restored from saved session:', currentUser);
+                    
+                    // Update localStorage for UI consistency
+                    localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
+                    localStorage.setItem('timeflow_remember_email', currentUser.email);
+                    localStorage.setItem('timeflow_remember_me', 'true');
+                    
+                    // Auto-login successful - go directly to main app
+                    showMainApp();
+                    showNotification('Welcome back! Automatically signed in.', 'success');
+                    
+                    console.log('✅ Auto-login successful');
+                } else {
+                    console.log('⚠️ Failed to restore session:', sessionError);
+                    // Clear invalid session
+                    await ipcRenderer.invoke('user-logged-out');
+                    showLogin();
+                }
+            } catch (error) {
+                console.error('❌ Auto-login error:', error);
+                // Clear invalid session and show login
                 await ipcRenderer.invoke('user-logged-out');
+                showLogin();
             }
         } else {
-            console.log('ℹ️ No saved user session found, showing login form');
-            // Try to load old session format (tracking session)
-            const savedSession = await ipcRenderer.invoke('load-session');
-            if (savedSession && savedSession.user) {
-                console.log('📂 Found saved tracking session, auto-logging in...');
-                await handleUserLogin(savedSession.user);
-            }
+            console.log('ℹ️ No saved user session found or remember me disabled, showing login form');
+            showLogin();
         }
-        
-        // Test buttons removed for cleaner interface
         
         // Add Mac permission check
         checkMacPermissions();
@@ -152,6 +167,7 @@ async function initializeApp() {
     } catch (error) {
         console.error('❌ App initialization failed:', error);
         showNotification('Failed to initialize app: ' + error.message, 'error');
+        showLogin();
     }
 }
 
@@ -223,26 +239,10 @@ function setupEventListeners() {
         dashboardProjectSelect.addEventListener('change', handleDashboardProjectSelection);
     }
     
-
-    
     // === LOGOUT EVENT ===
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', logout);
-    }
-    
-    // === DEBUG: Add session test button (development only) ===
-    if (process.env.NODE_ENV === 'development') {
-        const debugBtn = document.createElement('button');
-        debugBtn.textContent = '🔍 Test Session';
-        debugBtn.className = 'px-3 py-1 bg-gray-500 text-white rounded text-xs';
-        debugBtn.onclick = testSessionPersistence;
-        
-        // Add to login form if it exists
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.appendChild(debugBtn);
-        }
     }
     
     console.log('✅ Event listeners set up successfully');
@@ -1847,42 +1847,4 @@ function generateProductivityInsight(focusScore, clicks, keystrokes) {
     }
 }
 
-// Update functionality moved to system tray menu for cleaner interface
-
-// === DEBUG FUNCTIONS ===
-async function testSessionPersistence() {
-    console.log('🔍 Testing session persistence...');
-    
-    try {
-        // Check current session state
-        const savedSession = await ipcRenderer.invoke('load-user-session');
-        console.log('💾 Current saved session:', savedSession ? {
-            email: savedSession.email,
-            remember_me: savedSession.remember_me,
-            expires_at: new Date(savedSession.expires_at)
-        } : 'None');
-        
-        // Check localStorage
-        const localUser = localStorage.getItem('timeflow_user');
-        const localRemember = localStorage.getItem('timeflow_remember_me');
-        const localEmail = localStorage.getItem('timeflow_remember_email');
-        
-        console.log('🏪 localStorage state:', {
-            user: localUser ? JSON.parse(localUser) : 'None',
-            remember_me: localRemember,
-            email: localEmail
-        });
-        
-        // Show in UI
-        showNotification(
-            `Session: ${savedSession ? 'Found' : 'None'}, ` +
-            `LocalStorage: ${localUser ? 'Found' : 'None'}, ` +
-            `Remember: ${localRemember || 'false'}`,
-            'info'
-        );
-        
-    } catch (error) {
-        console.error('❌ Error testing session:', error);
-        showNotification('Session test failed: ' + error.message, 'error');
-    }
-}
+console.log('📱 TimeFlow Desktop Agent Renderer loaded successfully');

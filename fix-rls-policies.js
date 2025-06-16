@@ -1,7 +1,27 @@
 import { createClient } from '@supabase/supabase-js';
+import 'dotenv/config';
 
-const supabaseUrl = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
-const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzgzODg4MiwiZXhwIjoyMDYzNDE0ODgyfQ.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8'; // Service role key needed for admin operations
+// Use environment variables only - no hardcoded fallbacks
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Validate environment variables
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ Missing required environment variables:');
+  console.error('   - VITE_SUPABASE_URL');
+  console.error('   - SUPABASE_SERVICE_ROLE_KEY');
+  console.error('Please check your .env file.');
+  process.exit(1);
+}
+
+// Environment variable validation
+if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_ANON_KEY) {
+  console.error('❌ Missing required environment variables:');
+  console.error('   - VITE_SUPABASE_URL');  
+  console.error('   - VITE_SUPABASE_ANON_KEY');
+  console.error('Please check your .env file or environment configuration.');
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 

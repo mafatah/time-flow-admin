@@ -96,3 +96,20 @@ test-*
 debug-*
 check-*
 .vercel
+
+
+# Security - Environment Variables
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Security - Credentials
+*.pem
+*.key
+credentials.json
+
+# Development Scripts with Credentials
+temp_env_source.js
+setup-idle-logs-remote.js
+create-idle-logs-table.js

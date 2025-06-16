@@ -1,159 +1,31 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>TimeFlow Auth Debug</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Auth - TimeFlow</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .info { background: #d1ecf1; color: #0c5460; }
-        button { padding: 10px 20px; margin: 5px; }
-        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .alert { background: #ffebee; border: 1px solid #f44336; padding: 10px; margin: 10px 0; }
     </style>
 </head>
 <body>
-    <h1>TimeFlow Authentication Debug</h1>
+    <h1>Debug Auth - TimeFlow</h1>
     
-    <div id="status" class="status info">Checking authentication...</div>
-    
-    <div>
-        <button onclick="testLogin()">Test Login</button>
-        <button onclick="testLogout()">Test Logout</button>
-        <button onclick="checkSession()">Check Session</button>
-        <button onclick="checkUserDetails()">Check User Details</button>
+    <div class="alert">
+        <strong>⚠️ Security Notice:</strong> This debug file has been cleaned for security.
+        Hardcoded credentials have been removed. Use environment variables instead.
     </div>
     
-    <div>
-        <h3>Authentication Status:</h3>
-        <pre id="authStatus">Loading...</pre>
-    </div>
+    <p>For debugging authentication issues, please:</p>
+    <ul>
+        <li>Check environment variables are properly set</li>
+        <li>Verify Supabase connection in the main application</li>
+        <li>Use browser developer tools for auth debugging</li>
+    </ul>
     
-    <div>
-        <h3>Actions:</h3>
-        <button onclick="window.location.href='http://localhost:8080/login'">Go to Login</button>
-        <button onclick="window.location.href='http://localhost:8080/'">Go to Home</button>
-        <button onclick="window.location.href='http://localhost:8080/admin'">Go to Admin</button>
-        <button onclick="window.location.href='http://localhost:8080/employee/dashboard'">Go to Employee</button>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        const supabaseUrl = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
-        
-        const { createClient } = supabase;
-        const sb = createClient(supabaseUrl, supabaseKey);
-        
-        function updateStatus(message, type = 'info') {
-            const statusEl = document.getElementById('status');
-            statusEl.textContent = message;
-            statusEl.className = `status ${type}`;
-        }
-        
-        function updateAuthStatus(data) {
-            document.getElementById('authStatus').textContent = JSON.stringify(data, null, 2);
-        }
-        
-        async function checkSession() {
-            try {
-                updateStatus('Checking session...', 'info');
-                const { data, error } = await sb.auth.getSession();
-                
-                if (error) {
-                    updateStatus(`Session error: ${error.message}`, 'error');
-                    updateAuthStatus({ error: error.message });
-                    return;
-                }
-                
-                if (data.session) {
-                    updateStatus('Session found! User is authenticated.', 'success');
-                    updateAuthStatus({ 
-                        session: true, 
-                        user: data.session.user.email,
-                        userId: data.session.user.id
-                    });
-                } else {
-                    updateStatus('No session found. User is not authenticated.', 'info');
-                    updateAuthStatus({ session: false });
-                }
-            } catch (err) {
-                updateStatus(`Unexpected error: ${err.message}`, 'error');
-                updateAuthStatus({ error: err.message });
-            }
-        }
-        
-        async function checkUserDetails() {
-            try {
-                updateStatus('Checking user details...', 'info');
-                const { data: session } = await sb.auth.getSession();
-                
-                if (!session.session) {
-                    updateStatus('No session - cannot fetch user details', 'error');
-                    return;
-                }
-                
-                const { data: userDetails, error } = await sb
-                    .from('users')
-                    .select('*')
-                    .eq('id', session.session.user.id)
-                    .single();
-                
-                if (error) {
-                    updateStatus(`User details error: ${error.message}`, 'error');
-                    updateAuthStatus({ userDetailsError: error.message });
-                    return;
-                }
-                
-                updateStatus('User details loaded successfully!', 'success');
-                updateAuthStatus({ userDetails });
-            } catch (err) {
-                updateStatus(`Unexpected error: ${err.message}`, 'error');
-            }
-        }
-        
-        async function testLogin() {
-            const email = prompt('Enter email:', 'mabdulfattah@ebdaadt.com');
-            const password = prompt('Enter password:', 'bombssS8@@');
-            
-            if (!email || !password) return;
-            
-            try {
-                updateStatus('Attempting login...', 'info');
-                const { data, error } = await sb.auth.signInWithPassword({
-                    email: email,
-                    password: password
-                });
-                
-                if (error) {
-                    updateStatus(`Login failed: ${error.message}`, 'error');
-                    updateAuthStatus({ loginError: error.message });
-                    return;
-                }
-                
-                updateStatus('Login successful!', 'success');
-                updateAuthStatus({ loginSuccess: true, user: data.user.email });
-                
-                // Check user details after login
-                setTimeout(checkUserDetails, 1000);
-            } catch (err) {
-                updateStatus(`Login error: ${err.message}`, 'error');
-            }
-        }
-        
-        async function testLogout() {
-            try {
-                updateStatus('Logging out...', 'info');
-                await sb.auth.signOut();
-                updateStatus('Logged out successfully!', 'success');
-                updateAuthStatus({ loggedOut: true });
-            } catch (err) {
-                updateStatus(`Logout error: ${err.message}`, 'error');
-            }
-        }
-        
-        // Check session on load
-        checkSession();
+        console.log('Debug file cleaned - use environment variables for credentials');
     </script>
 </body>
 </html> 

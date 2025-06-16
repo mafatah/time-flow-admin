@@ -1,13 +1,24 @@
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
 async function fixDatabase() {
   console.log('🔧 Fixing database for desktop agent...');
   
   // Use the working anonymous key for now
-  const supabaseUrl = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
-  const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
+  const supabaseUrl = 'process.env.VITE_SUPABASE_URL';
+  const anonKey = 'process.env.VITE_SUPABASE_ANON_KEY';
   
-  const supabase = createClient(supabaseUrl, anonKey);
+  
+// Environment variable validation
+if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_ANON_KEY) {
+  console.error('❌ Missing required environment variables:');
+  console.error('   - VITE_SUPABASE_URL');
+  console.error('   - VITE_SUPABASE_ANON_KEY');
+  console.error('Please check your .env file.');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, anonKey);
   
   try {
     console.log('📊 Connecting to database...');

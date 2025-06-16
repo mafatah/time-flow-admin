@@ -1,10 +1,21 @@
+require('dotenv').config();
 #!/usr/bin/env node
 
 const { createClient } = require('@supabase/supabase-js');
 
 // Supabase configuration
-const supabaseUrl = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM0MTI4MDAsImV4cCI6MjA0ODk4ODgwMH0.l6zdv_OiGGJIYZKp5C4VXFYbEa_0SgwLz5t6ckeLZsE';
+const supabaseUrl = 'process.env.VITE_SUPABASE_URL';
+const supabaseKey = 'process.env.VITE_SUPABASE_ANON_KEY';
+
+
+// Environment variable validation
+if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_ANON_KEY) {
+  console.error('❌ Missing required environment variables:');
+  console.error('   - VITE_SUPABASE_URL');
+  console.error('   - VITE_SUPABASE_ANON_KEY');
+  console.error('Please check your .env file.');
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

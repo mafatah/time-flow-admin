@@ -10,20 +10,39 @@
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
+import 'dotenv/config';
 
-console.log('🚀 SUPABASE MIGRATION TOOL');
-console.log('==========================\n');
+console.log('🔄 MIGRATING TO NEW SUPABASE PROJECT');
+console.log('===================================');
+
+// Use environment variables - no hardcoded credentials
+const OLD_SUPABASE_URL = process.env.OLD_SUPABASE_URL;
+const OLD_SUPABASE_KEY = process.env.OLD_SUPABASE_KEY;
+const NEW_SUPABASE_URL = process.env.VITE_SUPABASE_URL;  
+const NEW_SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
+
+// Validate environment variables
+if (!OLD_SUPABASE_URL || !OLD_SUPABASE_KEY || !NEW_SUPABASE_URL || !NEW_SUPABASE_KEY) {
+  console.error('❌ Missing required environment variables:');
+  console.error('   - OLD_SUPABASE_URL');
+  console.error('   - OLD_SUPABASE_KEY');
+  console.error('   - VITE_SUPABASE_URL (new project)');
+  console.error('   - VITE_SUPABASE_ANON_KEY (new project)');
+  console.error('Please set these in your .env file before running migration.');
+  process.exit(1);
+}
+
+const oldSupabase = createClient(OLD_SUPABASE_URL, OLD_SUPABASE_KEY);
+const newSupabase = createClient(NEW_SUPABASE_URL, NEW_SUPABASE_KEY);
+
+console.log('✅ Supabase clients configured from environment variables');
+console.log('⚠️  This script has been secured - no hardcoded credentials');
+console.log('📝 Please ensure your .env file contains the correct migration credentials');
 
 // STEP 1: Export data from compromised project
 async function exportCurrentData() {
   console.log('📦 STEP 1: Exporting data from compromised project...');
   
-  // Using the compromised keys for export (one last time)
-  const oldSupabase = createClient(
-    'https://fkpiqcxkmrtaetvfgcli.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2'
-  );
-
   const exportData = {
     timestamp: new Date().toISOString(),
     tables: {}

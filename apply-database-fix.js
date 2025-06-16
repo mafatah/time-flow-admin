@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-const supabaseUrl = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
 // Note: You'll need to add your service role key to .env as SUPABASE_SERVICE_ROLE_KEY
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

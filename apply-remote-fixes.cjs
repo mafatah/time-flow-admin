@@ -1,8 +1,19 @@
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
 // Note: You'll need the SERVICE_ROLE key for admin operations, not the anon key
-const SUPABASE_URL = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
+const SUPABASE_URL = 'process.env.VITE_SUPABASE_URL';
 const SUPABASE_SERVICE_ROLE_KEY = 'YOUR_SERVICE_ROLE_KEY_HERE'; // Replace with actual service role key
+
+
+// Environment variable validation
+if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_ANON_KEY) {
+  console.error('❌ Missing required environment variables:');
+  console.error('   - VITE_SUPABASE_URL');
+  console.error('   - VITE_SUPABASE_ANON_KEY');
+  console.error('Please check your .env file.');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 

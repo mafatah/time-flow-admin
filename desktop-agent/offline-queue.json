@@ -1,7 +1,24 @@
 {
   "screenshots": [],
   "appLogs": [],
-  "urlLogs": [],
+  "urlLogs": [
+    {
+      "id": "url_logs_1750078716056_fk0eeopc8",
+      "logs": [
+        {
+          "user_id": "0c3d3092-913e-436f-a352-3378e558c34f",
+          "time_log_id": "52564caf-8f62-44da-9322-e5cafd525dc6",
+          "url": "http://localhost:8081/settings",
+          "title": "cd desktop-agent && npm start — time-flow-admin",
+          "domain": "localhost",
+          "browser": "Safari",
+          "timestamp": "2025-06-16T12:58:36.056Z"
+        }
+      ],
+      "timestamp": "2025-06-16T12:58:36.056Z",
+      "retries": 0
+    }
+  ],
   "idleLogs": [],
   "timeLogs": []
 }

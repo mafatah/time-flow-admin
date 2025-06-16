@@ -1,7 +1,7 @@
 {
   "name": "vite_react_shadcn_ts",
   "private": true,
-  "version": "1.0.19",
+  "version": "1.0.20",
   "type": "module",
   "author": "Ebdaa Digital Technology",
   "description": "Ebdaa Work Time - Employee time tracking and productivity monitoring application",
@@ -75,6 +75,7 @@
     "electron-auto-launch": "^5.0.1",
     "electron-updater": "^6.6.2",
     "embla-carousel-react": "^8.3.0",
+    "glob": "^11.0.3",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.462.0",
     "nanoid": "^5.0.6",

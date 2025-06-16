@@ -26,6 +26,7 @@ interface User {
   id: string;
   email: string;
   full_name?: string;
+  role: string;
 }
 
 interface Project {
@@ -136,11 +137,11 @@ export default function ScreenshotsViewer() {
 
       setScreenshots(mappedScreenshots);
 
-      // Fetch users
+      // Fetch users - FIXED: Load all users, not just employees
       let { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('id, email, full_name')
-        .eq('role', 'employee');
+        .select('id, email, full_name, role')
+        .order('email');
 
       if (usersError) throw usersError;
       setUsers(usersData || []);
@@ -408,7 +409,7 @@ export default function ScreenshotsViewer() {
                   <SelectItem value="all">All Users</SelectItem>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
-                      {user.full_name || user.email}
+                      {user.full_name || user.email} ({user.role})
                     </SelectItem>
                   ))}
                 </SelectContent>
