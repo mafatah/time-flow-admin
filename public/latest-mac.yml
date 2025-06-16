@@ -1,13 +1,13 @@
-version: v1.0.19
+version: v1.0.20
 files:
-  - url: Ebdaa-Work-Time-v1.0.19-arm64.dmg
+  - url: Ebdaa-Work-Time-v1.0.20-arm64.dmg
     sha512: placeholder_hash_will_be_updated_after_build
     size: 120000000
     blockMapSize: 150000
-  - url: Ebdaa-Work-Time-v1.0.19.dmg  
+  - url: Ebdaa-Work-Time-v1.0.20.dmg  
     sha512: placeholder_hash_will_be_updated_after_build
     size: 125000000
     blockMapSize: 155000
-path: Ebdaa-Work-Time-v1.0.19-arm64.dmg
+path: Ebdaa-Work-Time-v1.0.20-arm64.dmg
 sha512: placeholder_hash_will_be_updated_after_build
-releaseDate: '2025-06-16T11:06:15.3NZ'
+releaseDate: '2025-06-16T13:15:11.3NZ'
