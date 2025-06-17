@@ -141,8 +141,20 @@ async function startActivityMonitoring(userId) {
     startRandomScreenshotCapture();
     // Start app activity tracking every 5 seconds - DON'T reset activity timer!
     appTrackingInterval = setInterval(async () => {
-        if (currentUserId && isUserActive()) {
+        const userActive = isUserActive();
+        safeLog('🔍 [APP-TRACKING] Interval check:', {
+            currentUserId: !!currentUserId,
+            isUserActive: userActive,
+            will_track_app: currentUserId && userActive
+        });
+        if (currentUserId && userActive) {
             await trackCurrentApp();
+        }
+        else if (currentUserId && !userActive) {
+            safeLog('⚠️ [APP-TRACKING] Skipped - user not active');
+        }
+        else if (!currentUserId) {
+            safeLog('⚠️ [APP-TRACKING] Skipped - no user ID');
         }
     }, 5000);
     // Start activity metrics tracking every 1 second
@@ -213,50 +225,106 @@ function stopActivityMonitoring() {
     currentUserId = null;
 }
 function isUserActive() {
-    const idleTimeMs = appSettings.idle_threshold_seconds * 1000;
-    const timeSinceLastActivity = Date.now() - activityMetrics.last_activity_time;
+    // Use improved idle detection instead of corrupted activity tracking
+    const currentIdleTime = calculateIdleTimeSeconds();
+    const idleThreshold = appSettings.idle_threshold_seconds;
     // Only stop monitoring if we have consecutive technical failures, not just lack of screenshots
     if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
         safeLog(`❌ Too many consecutive screenshot failures (${consecutiveScreenshotFailures}), stopping monitoring due to technical issues`);
         return false;
     }
-    // Check actual user activity (mouse/keyboard), not screenshot success
-    return timeSinceLastActivity < idleTimeMs;
+    // Check actual user activity using improved detection
+    const isActive = currentIdleTime < idleThreshold;
+    // Log for debugging user activity detection
+    if (currentIdleTime > 30) { // Only log when approaching idle threshold
+        safeLog('👤 USER ACTIVITY CHECK:', {
+            current_idle_seconds: currentIdleTime,
+            idle_threshold: idleThreshold,
+            is_active: isActive,
+            detection_method: 'IMPROVED_SYSTEM_IDLE'
+        });
+    }
+    return isActive;
 }
 function updateLastActivity() {
     lastActivityTime = Date.now();
     activityMetrics.last_activity_time = Date.now();
+}
+// Get system idle time using Electron's powerMonitor (more reliable than activity tracking)
+function getSystemIdleTime() {
+    try {
+        return electron_1.powerMonitor.getSystemIdleTime() * 1000; // Convert to milliseconds
+    }
+    catch (error) {
+        safeError('❌ Failed to get system idle time:', error);
+        return 0; // Fallback to 0 if system idle detection fails
+    }
+}
+// Calculate idle time using both system and manual detection for accuracy
+function calculateIdleTimeSeconds() {
+    // Use system idle time as primary method (more reliable)
+    const systemIdleMs = getSystemIdleTime();
+    const systemIdleSeconds = Math.floor(systemIdleMs / 1000);
+    // Also calculate manual tracking for comparison
+    const now = Date.now();
+    const manualIdleSeconds = Math.floor((now - activityMetrics.last_activity_time) / 1000);
+    // Use the larger of the two values (system idle is more reliable for detecting real idle time)
+    const finalIdleSeconds = Math.max(systemIdleSeconds, manualIdleSeconds);
+    // ALWAYS log for debugging - let's see what's happening
+    safeLog('🕐 ELECTRON IDLE TIME CALCULATION:', {
+        system_idle_ms: systemIdleMs,
+        system_idle_seconds: systemIdleSeconds,
+        manual_idle_seconds: manualIdleSeconds,
+        final_idle_seconds: finalIdleSeconds,
+        last_activity_ago: manualIdleSeconds,
+        using_system_idle: systemIdleSeconds >= manualIdleSeconds,
+        detection_method: 'ELECTRON_SYSTEM_IDLE',
+        timestamp: new Date().toISOString(),
+        powerMonitor_available: typeof electron_1.powerMonitor !== 'undefined'
+    });
+    return finalIdleSeconds;
 }
 // Track real activity metrics instead of simulating
 async function trackActivityMetrics() {
     if (!currentUserId || !isMonitoring)
         return;
     try {
-        const now = Date.now();
-        const timeSinceLastActivity = now - activityMetrics.last_activity_time;
-        const idleThresholdMs = appSettings.idle_threshold_seconds * 1000;
-        const isCurrentlyIdle = timeSinceLastActivity > idleThresholdMs;
+        // === IMPROVED IDLE DETECTION ===
+        // Use system idle time instead of corrupted activity tracking
+        const currentIdleTime = calculateIdleTimeSeconds();
+        const idleThreshold = appSettings.idle_threshold_seconds; // Already in seconds
+        const isCurrentlyIdle = currentIdleTime > idleThreshold;
         // === ACTIVITY_DECAY_SYSTEM ===
-        // Gradually decrease activity score over time when idle
+        // Gradually decrease activity score over time when idle using improved detection
         if (isCurrentlyIdle) {
-            const secondsIdle = Math.floor(timeSinceLastActivity / 1000);
             // Progressive decay: faster decay as idle time increases
             let decayRate = 1; // Base decay per second
-            if (secondsIdle > 60)
+            if (currentIdleTime > 60)
                 decayRate = 2; // Faster after 1 minute
-            if (secondsIdle > 300)
+            if (currentIdleTime > 300)
                 decayRate = 5; // Much faster after 5 minutes
             const oldScore = activityMetrics.activity_score;
             activityMetrics.activity_score = Math.max(0, activityMetrics.activity_score - decayRate);
             if (oldScore !== activityMetrics.activity_score) {
-                safeLog('💤 ACTIVITY DECAY:', {
-                    idle_duration_seconds: secondsIdle,
+                safeLog('💤 ELECTRON ACTIVITY DECAY:', {
+                    idle_duration_seconds: currentIdleTime,
+                    idle_threshold: idleThreshold,
                     decay_rate: decayRate,
                     activity_score_before: oldScore,
                     activity_score_after: activityMetrics.activity_score,
-                    user_status: 'IDLE_DECAY'
+                    user_status: 'ELECTRON_IDLE_DECAY',
+                    using_system_idle: true
                 });
             }
+        }
+        else if (currentIdleTime > 0) {
+            // Log when approaching idle but not there yet
+            safeLog('⏰ ELECTRON APPROACHING IDLE:', {
+                idle_duration_seconds: currentIdleTime,
+                idle_threshold: idleThreshold,
+                seconds_until_decay: idleThreshold - currentIdleTime,
+                current_activity_score: activityMetrics.activity_score
+            });
         }
         // === DETAILED IDLE DETECTION LOGGING ===
         // Commented out to reduce log noise during debugging
@@ -624,12 +692,22 @@ async function uploadActivityScreenshot(filePath, filename) {
             .getPublicUrl(`${currentUserId}/${filename}`);
         safeLog(`🔗 Public URL generated: ${publicUrl}`);
         safeLog('💾 Saving to database...');
-        // Save to database with activity metrics - handle idle states properly
-        const timeSinceLastActivity = Date.now() - activityMetrics.last_activity_time;
-        const isCurrentlyIdle = timeSinceLastActivity > (appSettings.idle_threshold_seconds * 1000);
+        // Save to database with activity metrics - handle idle states properly using improved detection
+        const currentIdleTime = calculateIdleTimeSeconds();
+        const isCurrentlyIdle = currentIdleTime > appSettings.idle_threshold_seconds;
         // If user is idle, activity should be 0
         const activityPercent = isCurrentlyIdle ? 0 : Math.round(activityMetrics.activity_score);
         const focusPercent = isCurrentlyIdle ? 0 : Math.round(activityMetrics.activity_score * 0.8);
+        // Log detailed idle detection for screenshots
+        safeLog('📸 SCREENSHOT IDLE DETECTION:', {
+            current_idle_seconds: currentIdleTime,
+            idle_threshold: appSettings.idle_threshold_seconds,
+            is_idle: isCurrentlyIdle,
+            activity_percent: activityPercent,
+            focus_percent: focusPercent,
+            activity_score: activityMetrics.activity_score,
+            detection_method: 'IMPROVED_SYSTEM_IDLE'
+        });
         // === DETAILED ACTIVITY PERCENTAGE LOGGING ===
         // Commented out to reduce log noise during debugging
         /*
@@ -869,13 +947,25 @@ async function getCurrentURL() {
     }
 }
 async function trackCurrentApp() {
-    if (!currentUserId || !currentActivitySession)
+    if (!currentUserId || !currentActivitySession) {
+        safeLog('⚠️ [TRACK-APP] Early return - missing userId or session:', {
+            hasUserId: !!currentUserId,
+            hasSession: !!currentActivitySession
+        });
         return;
+    }
     try {
+        safeLog('🔍 [TRACK-APP] Starting app detection...');
         // Get current active application with timeout and error handling
         const appName = await getCurrentAppName();
         const windowTitle = await getCurrentWindowTitle();
         const currentURL = await getCurrentURL();
+        safeLog('🔍 [TRACK-APP] Detection results:', {
+            appName: appName || 'NOT_DETECTED',
+            windowTitle: windowTitle || 'NOT_DETECTED',
+            currentURL: currentURL || 'NO_URL',
+            hasURL: !!currentURL
+        });
         // Validate that we got valid data
         if (!appName || appName === 'Unknown Application') {
             safeLog('⚠️ Could not detect valid app name, skipping app tracking');
@@ -928,6 +1018,17 @@ async function trackCurrentApp() {
             currentActivitySession.total_apps++;
             saveActivitySession();
             safeLog('📱 App activity:', appName, '-', windowTitle, currentURL ? `(${currentURL})` : '');
+            // Log URL detection specifically
+            if (currentURL) {
+                safeLog('🌐 [URL-DETECTED]:', {
+                    url: currentURL,
+                    app: appName,
+                    will_save_url: true
+                });
+            }
+            else {
+                safeLog('🌐 [URL-DETECTION] No URL detected for app:', appName);
+            }
         }
         catch (error) {
             safeError('❌ Error creating new app activity:', error);
@@ -1073,8 +1174,15 @@ function calculateProductivityScore(app) {
     return Math.round(baseScore * activityMultiplier);
 }
 async function saveURLActivity(appActivity) {
-    if (!appActivity.url || !currentUserId)
+    safeLog('🔍 [SAVE-URL] Attempting to save URL:', {
+        hasURL: !!appActivity.url,
+        hasUserId: !!currentUserId,
+        url: appActivity.url || 'NO_URL'
+    });
+    if (!appActivity.url || !currentUserId) {
+        safeLog('⚠️ [SAVE-URL] Skipped - missing URL or user ID');
         return;
+    }
     try {
         // Use minimal url_logs schema
         const urlLogData = {
@@ -1082,15 +1190,16 @@ async function saveURLActivity(appActivity) {
             site_url: appActivity.url,
             category: getURLCategory(appActivity.url)
         };
+        safeLog('🔍 [SAVE-URL] Inserting URL data:', urlLogData);
         const { error } = await supabase_1.supabase
             .from('url_logs')
             .insert(urlLogData);
         if (error) {
-            console.error('❌ Failed to save URL activity:', error);
+            safeError('❌ Failed to save URL activity:', error);
             // Could queue for later upload here
         }
         else {
-            console.log('✅ URL activity saved:', appActivity.url);
+            safeLog('✅ URL activity saved successfully:', appActivity.url);
         }
     }
     catch (error) {

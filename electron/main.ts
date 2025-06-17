@@ -11,6 +11,7 @@ import { startSyncLoop } from './unsyncedManager';
 import { startActivityMonitoring, stopActivityMonitoring, triggerActivityCapture, triggerDirectScreenshot, recordRealActivity, demonstrateEnhancedLogging } from './activityMonitor';
 import { ensureScreenRecordingPermission, testScreenCapture } from './permissionManager';
 import { screenshotIntervalSeconds } from './config';
+// Linux dependency checking is handled in linuxDependencyChecker.ts automatically
 import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 import { checkForUpdates, enableAutoUpdates, setupUpdaterIPC, getUpdateStatus } from './autoUpdater';
@@ -754,10 +755,10 @@ ipcMain.handle('manual-screenshot', async () => {
 // Create tray icon
 function createTray() {
   try {
-    // Use the assets from the electron directory
-    const iconPath = process.platform === 'darwin' 
-      ? path.join(__dirname, '../assets/tray-icon.png')  // macOS uses regular PNG
-      : path.join(__dirname, '../assets/tray-icon.png');
+    // Use platform-appropriate tray icons
+    const iconPath = process.platform === 'win32'
+      ? path.join(__dirname, '../assets/tray-icon.ico')  // Windows prefers ICO
+      : path.join(__dirname, '../assets/tray-icon.png'); // macOS and Linux use PNG
     
     console.log('🔍 Loading tray icon from:', iconPath);
     console.log('🔍 Icon path exists:', fs.existsSync(iconPath));

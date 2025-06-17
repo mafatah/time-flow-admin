@@ -46,6 +46,7 @@ const unsyncedManager_1 = require("./unsyncedManager.cjs");
 const activityMonitor_1 = require("./activityMonitor.cjs");
 const permissionManager_1 = require("./permissionManager.cjs");
 const config_1 = require("./config.cjs");
+// Linux dependency checking is handled in linuxDependencyChecker.ts automatically
 const events_1 = require("events");
 const autoUpdater_1 = require("./autoUpdater.cjs");
 // Safe console logging to prevent EPIPE errors
@@ -698,10 +699,10 @@ electron_1.ipcMain.handle('manual-screenshot', async () => {
 // Create tray icon
 function createTray() {
     try {
-        // Use the assets from the electron directory
-        const iconPath = process.platform === 'darwin'
-            ? path.join(__dirname, '../assets/tray-icon.png') // macOS uses regular PNG
-            : path.join(__dirname, '../assets/tray-icon.png');
+        // Use platform-appropriate tray icons
+        const iconPath = process.platform === 'win32'
+            ? path.join(__dirname, '../assets/tray-icon.ico') // Windows prefers ICO
+            : path.join(__dirname, '../assets/tray-icon.png'); // macOS and Linux use PNG
         console.log('🔍 Loading tray icon from:', iconPath);
         console.log('🔍 Icon path exists:', fs.existsSync(iconPath));
         console.log('🔍 Platform:', process.platform);

@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-VERSION="1.0.22"
+VERSION="1.0.27"
 CERT_NAME="Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)"
 TEAM_ID="6GW49LK9V9"
 APPLE_ID="alshqawe66@gmail.com"
@@ -274,11 +274,12 @@ update_web_links() {
     # Update download page with new release URLs
     BASE_URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}"
     
-    # Find the download page files
+    # Find the download page files (including login page download component)
     DOWNLOAD_FILES=(
         "src/pages/download/index.tsx"
         "src/components/dashboard/QuickActions.tsx"
         "src/features/dashboard/components/QuickActions.tsx"
+        "src/components/ui/desktop-download.tsx"
     )
     
     for file in "${DOWNLOAD_FILES[@]}"; do

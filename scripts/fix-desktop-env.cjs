@@ -4,24 +4,36 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-console.log('🔧 Fixing desktop agent environment variables...');
+console.log('🔧 Setting up secure desktop agent environment...');
 
-// Supabase credentials from main project
-const supabaseUrl = 'https://fkpiqcxkmrtaetvfgcli.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4';
+// Get credentials from environment variables (SECURE METHOD)
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ ERROR: Missing required environment variables!');
+  console.error('Please set the following in your .env file:');
+  console.error('- VITE_SUPABASE_URL=your_supabase_url');
+  console.error('- VITE_SUPABASE_ANON_KEY=your_anon_key');
+  console.error('');
+  console.error('You can find these values in your Supabase dashboard > Settings > API');
+  process.exit(1);
+}
 
 const desktopAgentDir = path.join(__dirname, '..', 'desktop-agent');
 
-// 1. Create desktop-agent/.env file
+// Create desktop-agent/.env file with credentials from main .env
 const envPath = path.join(desktopAgentDir, '.env');
-const envContent = `VITE_SUPABASE_URL=${supabaseUrl}
+const envContent = `# Desktop Agent Environment Variables (Generated Securely)
+# These are copied from your main .env file for desktop agent use
+VITE_SUPABASE_URL=${supabaseUrl}
 VITE_SUPABASE_ANON_KEY=${supabaseAnonKey}
 SUPABASE_URL=${supabaseUrl}
 SUPABASE_ANON_KEY=${supabaseAnonKey}
 `;
 
 fs.writeFileSync(envPath, envContent);
-console.log('✅ Created desktop-agent/.env file');
+console.log('✅ Created secure desktop-agent/.env file');
 
 // 2. Create a JavaScript config file that gets bundled with the app
 const envConfigPath = path.join(desktopAgentDir, 'env-config.js');
@@ -142,18 +154,12 @@ fs.writeFileSync(loadConfigPath, loadConfigContent);
 console.log('✅ Updated desktop-agent/load-config.js with embedded config support');
 
 console.log('');
-console.log('🎉 Desktop agent environment fix completed!');
+console.log('🎉 Secure desktop agent setup completed!');
 console.log('');
-console.log('The following changes were made:');
-console.log('1. ✅ Created desktop-agent/.env file with Supabase credentials');
-console.log('2. ✅ Created desktop-agent/env-config.js for packaged apps');
-console.log('3. ✅ Updated desktop-agent/config.json with fallback credentials');
-console.log('4. ✅ Enhanced desktop-agent/load-config.js with multiple fallbacks');
+console.log('🔒 SECURITY IMPROVEMENTS:');
+console.log('1. ✅ Desktop agent .env file created from main environment');
+console.log('2. ✅ No hardcoded credentials in script');
+console.log('3. ✅ Proper validation and error handling');
 console.log('');
-console.log('Now the desktop agent will work in all scenarios:');
-console.log('- ✅ Development (uses .env file)');
-console.log('- ✅ Packaged app (uses embedded env-config.js)');
-console.log('- ✅ Fallback (uses config.json)');
-console.log('');
-console.log('🧪 Test the fix by running:');
-console.log('   cd desktop-agent && node test-deployment-scenario.js'); 
+console.log('🔧 The existing load-config.js will continue to work with:');
+console.log('   Priority: process.env > .env > embedded > config.json'); 

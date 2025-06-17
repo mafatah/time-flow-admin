@@ -6,14 +6,14 @@ console.log('🚨 EMERGENCY COMPREHENSIVE CLEANUP - REMOVING ALL HARDCODED CREDE
 console.log('=====================================================================');
 
 const HARDCODED_PATTERNS = {
-  url: 'https://fkpiqcxkmrtaetvfgcli.supabase.co',
-  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4',
-  serviceKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzgzODg4MiwiZXhwIjoyMDYzNDE0ODgyfQ.4ojeHqMiMpifXDJbxKISeeXSiyYEJtqc0zfM-kfYGLE'
+  url: 'REMOVED_FOR_SECURITY',
+  anonKey: 'REMOVED_FOR_SECURITY',
+  serviceKey: 'REMOVED_FOR_SECURITY'
 };
 
 // Old key patterns that might still exist
 const OLD_KEY_PATTERNS = [
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM0MTI4MDAsImV4cCI6MjA0ODk4ODgwMH0.l6zdv_OiGGJIYZKp5C4VXFYbEa_0SgwLz5t6ckeLZsE'
+  'REMOVED_FOR_SECURITY'
 ];
 
 const SKIP_PATTERNS = [
@@ -154,7 +154,7 @@ console.log(`📊 Files cleaned: ${totalCleaned}`);
 
 if (totalCleaned > 0) {
   console.log('\n⚠️  IMPORTANT: You must create a .env file with:');
-  console.log('VITE_SUPABASE_URL=https://fkpiqcxkmrtaetvfgcli.supabase.co');
+  console.log('VITE_SUPABASE_URL=https://your-project.supabase.co');
   console.log('VITE_SUPABASE_ANON_KEY=your_anon_key');
   console.log('SUPABASE_SERVICE_ROLE_KEY=your_service_key');
 }

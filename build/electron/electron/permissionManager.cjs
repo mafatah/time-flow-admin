@@ -7,8 +7,12 @@ exports.testScreenCapture = testScreenCapture;
 const electron_1 = require("electron");
 const errorHandler_1 = require("./errorHandler.cjs");
 async function checkScreenRecordingPermission() {
-    if (process.platform !== 'darwin') {
-        console.log('🟢 Not macOS, screen recording permission not required');
+    if (process.platform === 'win32') {
+        console.log('🔍 Checking Windows Screen Capture capability...');
+        return await testWindowsScreenCapture();
+    }
+    else if (process.platform !== 'darwin') {
+        console.log('🟢 Not macOS/Windows, screen recording permission not required');
         return true;
     }
     console.log('🔍 Checking macOS Screen Recording permission...');
@@ -84,10 +88,60 @@ async function ensureScreenRecordingPermission() {
     }
     return true;
 }
+// Windows-specific screen capture test
+async function testWindowsScreenCapture() {
+    try {
+        const { desktopCapturer } = require('electron');
+        console.log('🧪 Testing Windows screen capture capability...');
+        const sources = await desktopCapturer.getSources({
+            types: ['screen'],
+            thumbnailSize: { width: 1920, height: 1080 }
+        });
+        if (sources.length === 0) {
+            console.log('❌ Windows screen capture failed: No screen sources available');
+            console.log('   This might be due to:');
+            console.log('   - Windows Privacy Settings blocking screen capture');
+            console.log('   - Windows Defender or enterprise policies');
+            console.log('   - App needs to run as administrator');
+            console.log('   - Graphics driver issues');
+            return false;
+        }
+        // Test if we can actually get a thumbnail
+        try {
+            const testBuffer = sources[0].thumbnail.toPNG();
+            if (testBuffer.length < 1000) {
+                console.log('❌ Windows screen capture failed: Empty or corrupted screenshot data');
+                return false;
+            }
+            console.log(`✅ Windows screen capture test passed: ${sources.length} sources, ${testBuffer.length} bytes captured`);
+            return true;
+        }
+        catch (thumbnailError) {
+            console.log('❌ Windows screen capture failed: Cannot generate thumbnail');
+            console.error('   Thumbnail error:', thumbnailError);
+            return false;
+        }
+    }
+    catch (error) {
+        console.error('❌ Windows screen capture test failed:', error);
+        (0, errorHandler_1.logError)('testWindowsScreenCapture', error);
+        // Provide specific Windows troubleshooting
+        console.log('🔧 Windows Screenshot Troubleshooting:');
+        console.log('   1. Check Windows Privacy Settings > Camera/Screenshots');
+        console.log('   2. Try running as Administrator');
+        console.log('   3. Disable Windows Defender Real-time Protection temporarily');
+        console.log('   4. Check enterprise policies if on corporate network');
+        console.log('   5. Update graphics drivers');
+        return false;
+    }
+}
 // Test function to verify permission is working
 async function testScreenCapture() {
-    if (process.platform !== 'darwin') {
-        console.log('🟢 Not macOS, screen capture test skipped');
+    if (process.platform === 'win32') {
+        return await testWindowsScreenCapture();
+    }
+    else if (process.platform !== 'darwin') {
+        console.log('🟢 Not macOS/Windows, screen capture test skipped');
         return true;
     }
     try {

@@ -108,6 +108,10 @@ check-*
 *.pem
 *.key
 credentials.json
+config-with-credentials.json
+
+# Security - Desktop Agent Environment Files
+desktop-agent/.env
 
 # Development Scripts with Credentials
 temp_env_source.js

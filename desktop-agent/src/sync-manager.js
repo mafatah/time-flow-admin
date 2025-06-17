@@ -18,6 +18,9 @@ class SyncManager {
     // Initialize offline queue
     this.queue = this.loadQueue();
     
+    // Clean up any old URL logs with is_active field
+    this.cleanBadUrlLogs();
+    
     // Start sync process
     this.startSyncProcess();
     
@@ -442,6 +445,24 @@ class SyncManager {
       total: Object.values(this.queue).reduce((sum, arr) => sum + arr.length, 0),
       isOnline: this.isOnline
     };
+  }
+
+  cleanBadUrlLogs() {
+    const originalCount = this.queue.urlLogs.length;
+    
+    // Remove URL logs that contain is_active field (old format causing database errors)
+    this.queue.urlLogs = this.queue.urlLogs.filter(urlLog => {
+      const hasInvalidField = urlLog.logs && urlLog.logs.some(log => 
+        log.hasOwnProperty('is_active')
+      );
+      return !hasInvalidField;
+    });
+    
+    const removedCount = originalCount - this.queue.urlLogs.length;
+    if (removedCount > 0) {
+      this.saveQueue();
+      console.log(`🧹 Cleaned ${removedCount} bad URL logs from queue (had is_active field)`);
+    }
   }
 
   clearQueue() {

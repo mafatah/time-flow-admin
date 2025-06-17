@@ -15,8 +15,8 @@
 
 ### **🚨 PRIMARY EXPOSED TOKEN:**
 ```
-Database: fkpiqcxkmrtaetvfgcli.supabase.co
-Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2
+Database: [REDACTED_PROJECT_ID].supabase.co
+Token: [REDACTED_ANON_KEY]
 Role: anon (anonymous access)
 Expires: 2063 (long-term)
 ```
@@ -24,7 +24,7 @@ Expires: 2063 (long-term)
 ### **🚨 SECONDARY EXPOSED TOKEN:**
 ```
 Database: cmlkfcqepqmytndqsmbx.supabase.co  
-Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtbGtmY3FlcHFteXRuZHFzbWJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMzMTY3NzAsImV4cCI6MjA0ODg5Mjc3MH0.NLFGAM-1tnhAFdhS3XAhgKk0iDGNfEqInxg
+Token: [REDACTED_OLD_ANON_KEY]
 ```
 
 ### **🗂️ FILES WITH EXPOSED SUPABASE TOKENS (60+ files):**
@@ -164,7 +164,7 @@ debug-*.html files
 ### **Replace Hardcoded Tokens:**
 ```javascript
 // ❌ INSECURE - DO NOT USE
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+const supabaseKey = '[REDACTED_FOR_SECURITY]'
 
 // ✅ SECURE - USE THIS
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY

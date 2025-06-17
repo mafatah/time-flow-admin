@@ -14,15 +14,15 @@
 
 #### **Primary Exposed Token:**
 ```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2
+[REDACTED_ANON_KEY]
 ```
-- **Database**: fkpiqcxkmrtaetvfgcli.supabase.co
+- **Database**: [REDACTED_PROJECT_ID].supabase.co
 - **Role**: anon (anonymous access)
 - **Expires**: 2063 (long-term exposure)
 
 #### **Secondary Exposed Token:**
 ```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtbGtmY3FlcHFteXRuZHFzbWJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMzMTY3NzAsImV4cCI6MjA0ODg5Mjc3MH0.NLFGAM-1tnhAFdhS3XAhgKk0iDGNfEqInxg
+[REDACTED_OLD_ANON_KEY]
 ```
 - **Database**: cmlkfcqepqmytndqsmbx.supabase.co
 

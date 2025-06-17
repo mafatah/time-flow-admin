@@ -55,9 +55,43 @@ async function captureAndUpload(userId, projectId) {
         types: ['screen'],
         thumbnailSize: { width, height }
     });
-    if (sources.length === 0)
+    if (sources.length === 0) {
+        const platform = process.platform;
+        console.error(`❌ No screen sources available on ${platform}`);
+        if (platform === 'win32') {
+            console.error('🔧 Windows Screenshot Issue - Possible causes:');
+            console.error('   1. Windows Privacy Settings blocking screen capture');
+            console.error('   2. App needs Administrator privileges');
+            console.error('   3. Windows Defender or enterprise policies blocking');
+            console.error('   4. Graphics driver issues');
+            console.error('   5. DWM (Desktop Window Manager) disabled');
+        }
+        else if (platform === 'darwin') {
+            console.error('🔧 macOS Screenshot Issue - Check Screen Recording permissions');
+        }
         return;
+    }
     const buffer = sources[0].thumbnail.toPNG();
+    // Windows-specific validation for screenshot data
+    if (process.platform === 'win32') {
+        if (buffer.length < 1000) {
+            console.error('❌ Windows screenshot failed: Buffer too small (corrupted or blank screenshot)');
+            console.error('   This usually indicates:');
+            console.error('   - Screen is locked or display is off');
+            console.error('   - Privacy settings blocking capture');
+            console.error('   - Graphics driver issues');
+            return;
+        }
+        // Check for completely black screenshots (common Windows issue)
+        const sampleBytes = buffer.slice(0, Math.min(buffer.length, 10000));
+        const blackPixelRatio = sampleBytes.filter(byte => byte < 10).length / sampleBytes.length;
+        if (blackPixelRatio > 0.95) {
+            console.warn('⚠️ Windows screenshot appears to be mostly black - screen may be locked or off');
+        }
+        else {
+            console.log(`✅ Windows screenshot validation passed: ${buffer.length} bytes, not blank`);
+        }
+    }
     const filename = `screenshot_${(0, crypto_1.randomUUID)()}.png`;
     const tempPath = path_1.default.join(electron_1.app.getPath('temp'), filename);
     fs_1.default.writeFileSync(tempPath, buffer);

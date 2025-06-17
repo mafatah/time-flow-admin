@@ -1180,49 +1180,45 @@ const MAX_URL_CAPTURE_FAILURES = 3;
 // Enhanced browser URL detection
 async function detectBrowserUrl() {
   try {
+    // First try the active application (fastest method)
     const activeApp = await detectActiveApplication();
     
-    if (!activeApp || !activeApp.name) {
-      console.log('🔍 [URL-DETECT] No active app detected');
-      return null;
+    if (activeApp && activeApp.name && isBrowserApp(activeApp.name)) {
+      console.log(`🔍 [URL-DETECT] Active browser detected: "${activeApp.name}"`);
+      const url = await extractUrlFromBrowser(activeApp.name, activeApp.title);
+      if (url) {
+        console.log(`✅ [URL-DETECT] Successfully extracted URL from active browser: ${url}`);
+        return {
+          url: url,
+          title: activeApp.title,
+          browser: activeApp.name,
+          domain: extractDomain(url)
+        };
+      }
     }
     
-    if (!isBrowserApp(activeApp.name)) {
-      console.log(`🔍 [URL-DETECT] App "${activeApp.name}" is not a browser`);
-      return null; // Not a browser
+    // If active app isn't a browser or URL extraction failed, check ALL running browsers
+    console.log(`🔍 [URL-DETECT] Active app "${activeApp?.name || 'unknown'}" is not a browser or URL extraction failed - checking all browsers...`);
+    
+    const runningBrowsers = await getAllRunningBrowsers();
+    console.log(`🔍 [URL-DETECT] Found ${runningBrowsers.length} running browsers: ${runningBrowsers.map(b => b.name).join(', ')}`);
+    
+    // Try to extract URLs from all running browsers
+    for (const browser of runningBrowsers) {
+      const url = await extractUrlFromBrowser(browser.name, browser.title);
+      if (url) {
+        console.log(`✅ [URL-DETECT] Successfully extracted URL from background browser ${browser.name}: ${url}`);
+        return {
+          url: url,
+          title: browser.title,
+          browser: browser.name,
+          domain: extractDomain(url)
+        };
+      }
     }
     
-    console.log(`🔍 [URL-DETECT] Browser detected: "${activeApp.name}"`);
-    
-    
-    const platform = process.platform;
-    let url = null;
-    
-    switch (platform) {
-      case 'darwin':
-        url = await getMacBrowserUrl(activeApp.name);
-        break;
-      case 'win32':
-        url = await getWindowsBrowserUrl(activeApp.name, activeApp.title);
-        break;
-      case 'linux':
-        url = await getLinuxBrowserUrl(activeApp.title);
-        break;
-    }
-    
-    if (url) {
-      const result = {
-        url: url,
-        title: activeApp.title,
-        browser: activeApp.name,
-        domain: extractDomain(url)
-      };
-      console.log(`🔍 [URL-DETECT] Successfully extracted URL: ${url} from ${activeApp.name}`);
-      return result;
-    } else {
-      console.log(`🔍 [URL-DETECT] Failed to extract URL from ${activeApp.name} (${platform})`);
-      return null;
-    }
+    console.log('🔍 [URL-DETECT] No URLs found from any running browsers');
+    return null;
     
   } catch (error) {
     console.log('⚠️ URL detection failed:', error.message);
@@ -1230,15 +1226,66 @@ async function detectBrowserUrl() {
   }
 }
 
+async function getAllRunningBrowsers() {
+  try {
+    const { execSync } = require('child_process');
+    const platform = process.platform;
+    
+    if (platform === 'darwin') {
+      // Get all running applications on macOS
+      const appsOutput = execSync(`ps aux | grep -E "(Safari|Chrome|Firefox|Edge)" | grep -v grep | awk '{print $11}'`, { encoding: 'utf8' });
+      const runningApps = appsOutput.trim().split('\n').filter(app => app);
+      
+      const browsers = [];
+      const browserMappings = {
+        'Safari': 'Safari',
+        'Google Chrome': 'Google Chrome', 
+        'Firefox': 'Firefox',
+        'Microsoft Edge': 'Microsoft Edge'
+      };
+      
+      for (const [processName, browserName] of Object.entries(browserMappings)) {
+        if (runningApps.some(app => app.includes(processName))) {
+          browsers.push({ name: browserName, title: '' });
+        }
+      }
+      
+      console.log(`🔍 [BROWSER-DETECT] Found running browsers: ${browsers.map(b => b.name).join(', ')}`);
+      return browsers;
+    }
+    
+    // For other platforms, return empty for now
+    return [];
+  } catch (error) {
+    console.log('⚠️ Failed to get running browsers:', error.message);
+    return [];
+  }
+}
+
+async function extractUrlFromBrowser(browserName, windowTitle) {
+  const platform = process.platform;
+  
+  switch (platform) {
+    case 'darwin':
+      return await getMacBrowserUrl(browserName);
+    case 'win32':
+      return await getWindowsBrowserUrl(browserName, windowTitle);
+    case 'linux':
+      return await getLinuxBrowserUrl(windowTitle);
+    default:
+      return null;
+  }
+}
+
 async function getMacBrowserUrl(browserName) {
   try {
-    console.log(`🔍 [URL-EXTRACT] Attempting to extract URL from "${browserName}"...`);
+    console.log(`🔍 [URL-EXTRACT] Attempting to extract active tab URL from "${browserName}"...`);
     const { execSync } = require('child_process');
     const lowerBrowser = browserName.toLowerCase();
     let script = '';
     
     if (lowerBrowser.includes('safari')) {
-      console.log(`🔍 [URL-EXTRACT] Using Safari URL extraction script...`);
+      console.log(`🔍 [URL-EXTRACT] Using Safari active tab URL extraction script...`);
       script = `
         tell application "Safari"
           if (count of windows) > 0 then
@@ -1247,7 +1294,7 @@ async function getMacBrowserUrl(browserName) {
         end tell
       `;
     } else if (lowerBrowser.includes('chrome') || lowerBrowser.includes('google chrome')) {
-      console.log(`🔍 [URL-EXTRACT] Using Chrome URL extraction script...`);
+      console.log(`🔍 [URL-EXTRACT] Using Chrome active tab URL extraction script...`);
       script = `
         tell application "Google Chrome"
           if (count of windows) > 0 then
@@ -1256,11 +1303,20 @@ async function getMacBrowserUrl(browserName) {
         end tell
       `;
     } else if (lowerBrowser.includes('firefox')) {
-      console.log(`🔍 [URL-EXTRACT] Firefox detected - AppleScript not well supported`);
+      console.log(`🔍 [URL-EXTRACT] Firefox detected - extracting from window title`);
       // Firefox doesn't support AppleScript well, extract from title
-      return null;
+      script = `
+        tell application "System Events"
+          tell process "Firefox"
+            try
+              set windowTitle to name of front window
+              return windowTitle
+            end try
+          end tell
+        end tell
+      `;
     } else if (lowerBrowser.includes('edge')) {
-      console.log(`🔍 [URL-EXTRACT] Using Edge URL extraction script...`);
+      console.log(`🔍 [URL-EXTRACT] Using Edge active tab URL extraction script...`);
       script = `
         tell application "Microsoft Edge"
           if (count of windows) > 0 then
@@ -1276,16 +1332,27 @@ async function getMacBrowserUrl(browserName) {
     console.log(`🔍 [URL-EXTRACT] Executing AppleScript for ${browserName}...`);
     const result = execSync(`osascript -e '${script}'`, { 
       encoding: 'utf8',
-      timeout: 5000  // Increased timeout
+      timeout: 5000  // Standard timeout
     }).trim();
     
     console.log(`🔍 [URL-EXTRACT] Raw AppleScript result: "${result}"`);
     
-    if (result && result.startsWith('http')) {
-      console.log(`✅ [URL-EXTRACT] Successfully extracted URL: ${result}`);
-      return result;
-    } else {
+    if (result && result !== '') {
+      if (result.startsWith('http')) {
+        console.log(`✅ [URL-EXTRACT] Successfully extracted active tab URL: ${result}`);
+        return result;
+      } else if (lowerBrowser.includes('firefox') && result.includes('http')) {
+        // Firefox window title - try to extract URL
+        const urlMatch = result.match(/(https?:\/\/[^\s]+)/);
+        if (urlMatch) {
+          console.log(`✅ [URL-EXTRACT] Extracted URL from Firefox title: ${urlMatch[1]}`);
+          return urlMatch[1];
+        }
+      }
       console.log(`⚠️ [URL-EXTRACT] No valid URL found (result: "${result}")`);
+      return null;
+    } else {
+      console.log(`⚠️ [URL-EXTRACT] No URL found (empty result)`);
       return null;
     }
   } catch (error) {
@@ -1321,10 +1388,13 @@ async function getLinuxBrowserUrl(windowTitle) {
   }
 }
 
+// Track last URL per browser to only capture changes
+let lastBrowserUrls = new Map(); // browser -> last_captured_url
+
 function startUrlCapture() {
   if (urlCaptureInterval) clearInterval(urlCaptureInterval);
   
-  console.log('🌐 Starting enhanced URL capture every 5s');
+  console.log('🌐 Starting enhanced URL capture every 5s - will check ALL running browsers');
   
   urlCaptureInterval = setInterval(async () => {
     console.log('🔍 [URL-CAPTURE] Running URL capture interval...');
@@ -1334,44 +1404,56 @@ function startUrlCapture() {
     }
     
     try {
-      console.log('🔍 [URL-CAPTURE] Checking for browser URLs...');
-      const urlData = await detectBrowserUrl();
+      console.log('🔍 [URL-CAPTURE] Checking for browser URLs from all running browsers...');
       
-      if (!urlData || !urlData.url) {
-        console.log('🔍 [URL-CAPTURE] No browser URL detected (not a browser or URL unavailable)');
-        return; // No URL detected
+      // Get all running browsers and try to extract URLs from each
+      const runningBrowsers = await getAllRunningBrowsers();
+      console.log(`🔍 [URL-CAPTURE] Found ${runningBrowsers.length} running browsers`);
+      
+      if (runningBrowsers.length === 0) {
+        console.log('🔍 [URL-CAPTURE] No running browsers detected');
+        return;
       }
       
-      console.log(`🔍 [URL-CAPTURE] Detected: "${urlData.url}" | Browser: "${urlData.browser}" | Domain: "${urlData.domain}"`);
+      let urlsFound = [];
       
-      // Avoid duplicate captures
-      if (lastUrlCapture === urlData.url) {
-        console.log(`🔍 [URL-CAPTURE] Skipping duplicate URL: ${urlData.domain}`);
-        return; // Same URL, skip
+      // Get the currently active app to mark which browser is active
+      const activeApp = await detectActiveApplication();
+      const activeBrowserName = (activeApp && isBrowserApp(activeApp.name)) ? activeApp.name : null;
+      
+      console.log(`🔍 [URL-CAPTURE] Active app: ${activeApp?.name || 'none'}, Active browser: ${activeBrowserName || 'none'}`);
+      
+      // Check ALL running browsers (remove skip logic to capture multiple browsers)
+      for (const browser of runningBrowsers) {
+        console.log(`🔍 [URL-CAPTURE] Checking browser: ${browser.name}...`);
+        
+        const url = await extractUrlFromBrowser(browser.name, browser.title);
+        if (url) {
+          const isActiveBrowser = activeBrowserName === browser.name;
+          urlsFound.push({
+            url: url,
+            title: activeApp?.title || browser.title,
+            browser: browser.name,
+            domain: extractDomain(url),
+            isActive: isActiveBrowser
+          });
+          
+          console.log(`✅ [URL-CAPTURE] Found URL from ${browser.name}: ${extractDomain(url)} (${isActiveBrowser ? 'ACTIVE' : 'background'})`);
+        } else {
+          console.log(`⚠️ [URL-CAPTURE] No URL found from ${browser.name}`);
+        }
       }
       
-      lastUrlCapture = urlData.url;
-      lastUrlCaptureTime = new Date().toISOString();
+      console.log(`🔍 [URL-CAPTURE] Found ${urlsFound.length} URLs from browsers`);
       
-      const urlLog = {
-        user_id: config.user_id,
-        time_log_id: currentTimeLogId,
-        url: urlData.url,
-        title: urlData.title,
-        domain: urlData.domain,
-        browser: urlData.browser,
-        timestamp: new Date().toISOString() // Fixed: use timestamp instead of captured_at
-      };
+      // Process all found URLs
+      for (const urlData of urlsFound) {
+        await processFoundUrl(urlData);
+      }
       
-      // Queue for upload
-      await syncManager.addUrlLogs([urlLog]);
-      console.log(`🔗 URL captured: ${urlLog.domain} - ${urlLog.url}`);
-      
-      // Reset failure count on success
-      urlCaptureFailureCount = 0;
-      
-      // Send to UI
-      mainWindow?.webContents.send('url-captured', urlLog);
+      if (urlsFound.length === 0) {
+        console.log('🔍 [URL-CAPTURE] No URLs detected from any running browsers');
+      }
       
     } catch (error) {
       urlCaptureFailureCount++;
@@ -1386,6 +1468,55 @@ function startUrlCapture() {
       }
     }
   }, 5000); // Every 5 seconds (increased frequency)
+}
+
+async function processFoundUrl(urlData) {
+  try {
+    // Validate URL data before creating log
+    if (!urlData.url || urlData.url.trim() === '') {
+      console.log('⚠️ Skipping URL log - empty URL detected');
+      return;
+    }
+    
+    // Check if this URL is different from the last one captured for this browser
+    const lastUrl = lastBrowserUrls.get(urlData.browser);
+    
+    if (lastUrl === urlData.url) {
+      // Same URL as last time - don't log duplicate
+      console.log(`🔍 [URL-CAPTURE] Skipping duplicate URL: ${urlData.domain} (same as last capture for ${urlData.browser})`);
+      return;
+    }
+    
+    console.log(`🔗 [URL-CAPTURE] NEW URL DETECTED: "${urlData.url}" | Browser: "${urlData.browser}" | Domain: "${urlData.domain}" | Previous: "${lastUrl || 'none'}"`);
+    
+    // Update last URL for this browser
+    lastBrowserUrls.set(urlData.browser, urlData.url);
+    lastUrlCapture = urlData.url;
+    lastUrlCaptureTime = new Date().toISOString();
+
+    const urlLog = {
+      user_id: config.user_id,
+      time_log_id: currentTimeLogId,
+      site_url: urlData.url.trim(),
+      title: urlData.title || 'Untitled',
+      domain: urlData.domain || extractDomain(urlData.url),
+      browser: urlData.browser || 'Unknown',
+      timestamp: new Date().toISOString()
+    };
+    
+    // Queue for upload
+    await syncManager.addUrlLogs([urlLog]);
+    console.log(`✅ [URL-CAPTURE] Successfully captured: ${urlLog.domain} from ${urlLog.browser} (${urlData.isActive ? 'active' : 'background'})`);
+    
+    // Reset failure count on success
+    urlCaptureFailureCount = 0;
+    
+    // Send to UI
+    mainWindow?.webContents.send('url-captured', urlLog);
+    
+  } catch (error) {
+    console.log('❌ Failed to process URL:', urlData.url, error.message);
+  }
 }
 
 // Enhanced browser detection
@@ -1794,28 +1925,36 @@ function getPlatformScreenshotOptions() {
 function checkScreenshotStopConditions() {
   const now = Date.now();
   
-  // In development mode (no screen recording permission), be more lenient
-  const hasPermission = systemPreferences.getMediaAccessStatus('screen') === 'granted';
-  if (!hasPermission) {
-    console.log('⚠️ Development mode - allowing tracking to continue without strict screenshot requirements');
-    return false; // Don't stop tracking in development
-  }
+  // === MANDATORY SCREENSHOT ENFORCEMENT ===
+  console.log('🔍 [SCREENSHOT-CHECK] Checking stop conditions:', {
+    consecutiveFailures: consecutiveScreenshotFailures,
+    maxFailures: MAX_SCREENSHOT_FAILURES,
+    lastSuccessfulTime: lastSuccessfulScreenshotTime,
+    mandatoryInterval: MANDATORY_SCREENSHOT_INTERVAL / (60 * 1000) + ' minutes',
+    failureStartTime: screenshotFailureStart
+  });
   
-  // Stop if too many consecutive failures
+  // Stop if too many consecutive failures (ALWAYS enforce this rule)
   if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
+    console.log(`🛑 [SCREENSHOT-CHECK] STOPPING: ${consecutiveScreenshotFailures} consecutive failures >= ${MAX_SCREENSHOT_FAILURES}`);
     return true;
   }
   
-  // Stop if mandatory screenshot interval exceeded (30 minutes without successful screenshot)
+  // Stop if mandatory screenshot interval exceeded (15 minutes without successful screenshot)
   if (lastSuccessfulScreenshotTime > 0 && (now - lastSuccessfulScreenshotTime) > MANDATORY_SCREENSHOT_INTERVAL) {
+    const minutesWithout = Math.floor((now - lastSuccessfulScreenshotTime) / (60 * 1000));
+    console.log(`🛑 [SCREENSHOT-CHECK] STOPPING: ${minutesWithout} minutes since last successful screenshot`);
     return true;
   }
   
   // Stop if we're tracking but haven't had any successful screenshots for the mandatory interval
   if (isTracking && screenshotFailureStart && (now - screenshotFailureStart) > MANDATORY_SCREENSHOT_INTERVAL) {
+    const minutesSinceFailure = Math.floor((now - screenshotFailureStart) / (60 * 1000));
+    console.log(`🛑 [SCREENSHOT-CHECK] STOPPING: ${minutesSinceFailure} minutes of continuous failures`);
     return true;
   }
   
+  console.log('✅ [SCREENSHOT-CHECK] Continue tracking - conditions not met for stopping');
   return false;
 }
 
@@ -1857,6 +1996,7 @@ function calculateActivityPercent() {
   const now = Date.now();
   const timeSinceReset = now - activityStats.lastReset;
   const timeSinceResetMinutes = timeSinceReset / (1000 * 60);
+  const timeSinceLastActivity = now - lastActivity;
   
   // Base activity calculation
   const mouseClickWeight = 15; // Each click is worth 15 points
@@ -1875,24 +2015,80 @@ function calculateActivityPercent() {
   const expectedActivityPerMinute = 500; // Baseline for 100% activity
   let activityPercent = Math.min(100, Math.max(0, (activityPerMinute / expectedActivityPerMinute) * 100));
   
-  // Apply recency bonus: more recent activity gets higher weight
-  const timeSinceLastActivity = now - lastActivity;
-  if (timeSinceLastActivity < 30000) { // Within last 30 seconds
-    const recencyBonus = Math.max(0, 1 - (timeSinceLastActivity / 30000)); // 0-1 multiplier
-    activityPercent = Math.min(100, activityPercent * (1 + recencyBonus * 0.5)); // Up to 50% bonus
-  }
+  // === ACTIVITY DECAY SYSTEM ===
+  // Apply activity decay during idle periods using improved idle detection
+  const currentIdleTime = calculateIdleTimeSeconds();
+  const idleThreshold = appSettings.idle_threshold_seconds || 60; // 1 minute default
   
-  // Ensure we always show some activity if there's been recent input
-  if (timeSinceLastActivity < 10000 && activityPercent < 10) {
-    activityPercent = Math.max(10, activityPercent);
+  if (currentIdleTime > idleThreshold) {
+    // Progressive decay rates
+    let decayRate = 1; // 1% per second base rate
+    if (currentIdleTime > 60) decayRate = 2; // 2% per second after 1 minute
+    if (currentIdleTime > 300) decayRate = 5; // 5% per second after 5 minutes
+    
+    const totalDecay = Math.min(50, currentIdleTime * decayRate); // Cap at 50% total decay
+    const activityBeforeDecay = activityPercent;
+    activityPercent = Math.max(0, activityPercent - totalDecay);
+    
+    console.log('💤 ACTIVITY DECAY:', {
+      idle_duration_seconds: currentIdleTime,
+      idle_threshold: idleThreshold,
+      decay_rate: decayRate,
+      total_decay: totalDecay,
+      activity_score_before: activityBeforeDecay,
+      activity_score_after: activityPercent,
+      user_status: 'IDLE_DECAY',
+      using_system_idle: true
+    });
+  } else if (currentIdleTime > 0) {
+    // Log when we're approaching idle but not there yet
+    console.log('⏰ APPROACHING IDLE:', {
+      idle_duration_seconds: currentIdleTime,
+      idle_threshold: idleThreshold,
+      seconds_until_decay: idleThreshold - currentIdleTime,
+      current_activity_score: activityPercent
+    });
+  } else {
+    // Apply recency bonus: more recent activity gets higher weight
+    if (timeSinceLastActivity < 30000) { // Within last 30 seconds
+      const recencyBonus = Math.max(0, 1 - (timeSinceLastActivity / 30000)); // 0-1 multiplier
+      activityPercent = Math.min(100, activityPercent * (1 + recencyBonus * 0.5)); // Up to 50% bonus
+    }
+    
+    // Ensure we always show some activity if there's been recent input
+    if (timeSinceLastActivity < 10000 && activityPercent < 10) {
+      activityPercent = Math.max(10, activityPercent);
+    }
   }
   
   return Math.round(activityPercent);
 }
 
 function calculateIdleTimeSeconds() {
+  // Use system idle time instead of our activity tracking to avoid fake input interference
+  const systemIdleMs = getSystemIdleTime();
+  const systemIdleSeconds = Math.floor(systemIdleMs / 1000);
+  
+  // Also calculate our manual tracking for comparison
   const now = Date.now();
-  return Math.floor((now - lastActivity) / 1000);
+  const manualIdleSeconds = Math.floor((now - lastActivity) / 1000);
+  
+  // Use the larger of the two values (system idle is more reliable)
+  const finalIdleSeconds = Math.max(systemIdleSeconds, manualIdleSeconds);
+  
+  // ALWAYS log for debugging - let's see what's happening
+  console.log('🕐 DESKTOP AGENT IDLE TIME CALCULATION:', {
+    system_idle_ms: systemIdleMs,
+    system_idle_seconds: systemIdleSeconds,
+    manual_idle_seconds: manualIdleSeconds,
+    final_idle_seconds: finalIdleSeconds,
+    last_activity_ago: manualIdleSeconds,
+    using_system_idle: systemIdleSeconds >= manualIdleSeconds,
+    timestamp: new Date().toISOString(),
+    powerMonitor_available: typeof powerMonitor !== 'undefined'
+  });
+  
+  return finalIdleSeconds;
 }
 
 function calculateFocusPercent() {
@@ -2211,13 +2407,45 @@ async function startTracking(projectId = null) {
 let mandatoryScreenshotInterval = null;
 
 function startMandatoryScreenshotMonitoring() {
-  // Check every 3 minutes if mandatory screenshot requirement is being met
-  mandatoryScreenshotInterval = setInterval(() => {
+  // Check every 30 seconds for screenshot failures and mandatory requirements
+  mandatoryScreenshotInterval = setInterval(async () => {
     if (!isTracking) return;
     
     const now = Date.now();
     const timeSinceLastSuccess = now - lastSuccessfulScreenshotTime;
     const minutesSinceLastSuccess = Math.floor(timeSinceLastSuccess / (60 * 1000));
+    
+    // Log current status for debugging
+    console.log('🔍 [MANDATORY-CHECK] Screenshot monitoring status:', {
+      consecutiveFailures: consecutiveScreenshotFailures,
+      maxFailures: MAX_SCREENSHOT_FAILURES,
+      minutesSinceLastSuccess: minutesSinceLastSuccess,
+      mandatoryIntervalMinutes: MANDATORY_SCREENSHOT_INTERVAL / (60 * 1000),
+      isTracking: isTracking
+    });
+    
+    // Check if we should stop tracking due to screenshot failures
+    const shouldStop = checkScreenshotStopConditions();
+    if (shouldStop) {
+      const { reason, message } = getScreenshotStopReason();
+      console.log(`🛑 [MANDATORY-CHECK] STOPPING TRACKING: ${reason}`);
+      
+      // Force stop tracking
+      await stopTracking();
+      
+      showTrayNotification(message, 'error');
+      
+      // Show detailed notification
+      try {
+        new Notification({
+          title: 'TimeFlow - Screenshot Requirement Failed',
+          body: message
+        }).show();
+      } catch (e) {
+        console.log('⚠️ Could not show screenshot failure notification:', e);
+      }
+      return; // Exit after stopping
+    }
     
     // Warn at 12 minutes (3 minutes before mandatory stop at 15 minutes)
     if (timeSinceLastSuccess > (12 * 60 * 1000) && timeSinceLastSuccess < (15 * 60 * 1000)) {
@@ -2228,31 +2456,9 @@ function startMandatoryScreenshotMonitoring() {
       );
     }
     
-    // Check if mandatory interval exceeded (15 minutes)
-    if (timeSinceLastSuccess > MANDATORY_SCREENSHOT_INTERVAL) {
-      console.log(`🛑 [MANDATORY] Stopping tracking: ${minutesSinceLastSuccess} minutes without screenshot`);
-      
-      // Force stop tracking
-      stopTracking();
-      
-      showTrayNotification(
-        `Tracking stopped: Screenshots are required every 15 minutes. ${minutesSinceLastSuccess} minutes have passed without a successful screenshot.`,
-        'error'
-      );
-      
-      // Show detailed notification
-      try {
-        new Notification({
-          title: 'TimeFlow - Mandatory Screenshot Requirement',
-          body: `Time tracking has been stopped because ${minutesSinceLastSuccess} minutes have passed without a successful screenshot. Screenshots are required every 15 minutes for time tracking verification. Please restart tracking and ensure proper permissions.`
-        }).show();
-      } catch (e) {
-        console.log('⚠️ Could not show mandatory screenshot notification:', e);
-      }
-    }
-  }, 3 * 60 * 1000); // Check every 3 minutes (more frequent for 15-minute interval)
+  }, 30 * 1000); // Check every 30 seconds for faster response
   
-  console.log('✅ [MANDATORY] Mandatory screenshot monitoring started (checking every 3 minutes)');
+  console.log('✅ [MANDATORY] Enhanced screenshot monitoring started (checking every 30 seconds)');
 }
 
 function stopMandatoryScreenshotMonitoring() {
@@ -2634,7 +2840,7 @@ async function captureActiveUrl() {
     const urlLogData = {
       user_id: config.user_id || 'demo-user',
       time_log_id: currentTimeLogId,
-      url: urlData.url,
+      site_url: urlData.url,
       title: urlData.title,
       domain: urlData.domain,
       browser: urlData.browser,
@@ -3327,6 +3533,17 @@ ipcMain.handle('fetch-screenshots', async (event, params) => {
 
 console.log('✅ Desktop Agent main process initialized with log download handlers');
 
+// === IDLE DETECTION TEST ===
+setInterval(() => {
+  console.log('🧪 IDLE TEST RESULTS:', {
+    calculateIdleTimeSeconds: calculateIdleTimeSeconds(),
+    getSystemIdleTime_ms: getSystemIdleTime(),
+    manual_calculation: Math.floor((Date.now() - lastActivity) / 1000),
+    powerMonitor_available: typeof powerMonitor !== 'undefined',
+    timestamp: new Date().toISOString()
+  });
+}, 5000); // Test every 5 seconds
+
 // === ADDITIONAL MISSING HANDLERS ===
 ipcMain.handle('get-activity-stats', () => {
   try {
@@ -3529,7 +3746,7 @@ ipcMain.handle('get-stats', () => {
         mouseClicks: activityStats.mouseClicks || 0,
         keystrokes: activityStats.keystrokes || 0,
         mouseMovements: activityStats.mouseMovements || 0,
-        idleTime: Math.floor((now - lastActivity) / 1000),
+        idleTime: calculateIdleTimeSeconds(),
         
         // Component statuses
         components: componentStatus,
