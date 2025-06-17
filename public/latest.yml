@@ -1,8 +1,11 @@
 version: 1.0.26
 files:
   - url: https://github.com/mafatah/time-flow-admin/releases/download/v1.0.26/TimeFlow-v1.0.26-Setup.exe
-    sha512: 5/ui/Z7OzAjImFhY+lPDjMIlrp0K4iI9fUk0IFaXxrT0=
+    sha512: df5822f6009bf8c417cfbed65720bf50807c3f57a4dada3d24f85349a4109a41a0e0c2d1552f37cb7157768349535acfaa4ac8fc62b20756cd376d6a01c96aa1
     size: 96235071
+  - url: https://github.com/mafatah/time-flow-admin/releases/download/v1.0.26/TimeFlow-v1.0.26-Linux.AppImage
+    sha512: eb635d9923e68777fb21765ab000f20bfa55e2985dfb9723ae4f790c465e29c03a80a49a6d5654b1fc8022725abc75e584311d9d52416d6c82adaaeefe57d126
+    size: 137960059
 path: TimeFlow-v1.0.26-Setup.exe
-sha512: 5/ui/Z7OzAjImFhY+lPDjMIlrp0K4iI9fUk0IFaXxrT0=
+sha512: df5822f6009bf8c417cfbed65720bf50807c3f57a4dada3d24f85349a4109a41a0e0c2d1552f37cb7157768349535acfaa4ac8fc62b20756cd376d6a01c96aa1
 releaseDate: 2025-06-17T08:23:00.000Z
