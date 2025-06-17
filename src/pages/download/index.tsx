@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 const DownloadPage = () => {
-  const version = "v1.0.26"; // Updated automatically by release pipeline
+  const version = "v1.0.27"; // Updated automatically by release pipeline
   const releaseDate = new Date().toLocaleDateString();
   
   const downloads = [
@@ -22,7 +22,7 @@ const DownloadPage = () => {
       description: "For M1, M2, M3 Macs",
       filename: `TimeFlow-${version}-ARM64.dmg`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-ARM64.dmg`,
-      size: "~111 MB",
+      size: "~112 MB",
       requirements: "macOS 11.0+",
       verified: true
     },
@@ -42,7 +42,7 @@ const DownloadPage = () => {
       description: "For Windows 10/11",
       filename: `TimeFlow-${version}-Setup.exe`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Setup.exe`,
-      size: "~85 MB",
+      size: "~86 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true
     },
@@ -52,7 +52,7 @@ const DownloadPage = () => {
       description: "AppImage for Linux",
       filename: `TimeFlow-${version}-Linux.AppImage`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Linux.AppImage`,
-      size: "~121 MB", 
+      size: "~132 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: true
     }
@@ -181,7 +181,7 @@ const DownloadPage = () => {
         <div className="text-center text-gray-600 space-y-4">
           <div className="flex justify-center gap-6 text-sm">
             <a 
-              href="https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.25"
+              href={`https://github.com/mafatah/time-flow-admin/releases/tag/${version}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-blue-600"
