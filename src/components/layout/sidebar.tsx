@@ -150,10 +150,16 @@ const Sidebar = () => {
           description: "Screen captures"
         },
         {
-          title: "App Activity",
-          href: "/reports/apps-urls-idle",
+          title: "Application Activity",
+          href: "/app-activity",
           icon: Monitor,
-          description: "Apps & URL tracking"
+          description: "Application usage tracking"
+        },
+        {
+          title: "URL Activity",
+          href: "/url-activity",
+          icon: Globe,
+          description: "Website visit tracking"
         },
         {
           title: "Suspicious Activity",
