@@ -1,13 +1,11 @@
-version: v1.0.20
+version: 1.0.26
 files:
-  - url: Ebdaa-Work-Time-v1.0.20-arm64.dmg
-    sha512: placeholder_hash_will_be_updated_after_build
-    size: 120000000
-    blockMapSize: 150000
-  - url: Ebdaa-Work-Time-v1.0.20.dmg  
-    sha512: placeholder_hash_will_be_updated_after_build
-    size: 125000000
-    blockMapSize: 155000
-path: Ebdaa-Work-Time-v1.0.20-arm64.dmg
-sha512: placeholder_hash_will_be_updated_after_build
-releaseDate: '2025-06-16T13:25:22.3NZ'
+  - url: https://github.com/mafatah/time-flow-admin/releases/download/v1.0.26/TimeFlow-v1.0.26-ARM64.dmg
+    sha512: YN9GZn6K2+GrFt9mDe0cwYOgDwqrfySso2OT9I7rZZg=
+    size: 125185723
+  - url: https://github.com/mafatah/time-flow-admin/releases/download/v1.0.26/TimeFlow-v1.0.26-Intel.dmg
+    sha512: kqqDmDwU2has/3oj8o7AjV0NIqObjupzsaHyN6JXTvU=
+    size: 131728949
+path: TimeFlow-v1.0.26-ARM64.dmg
+sha512: YN9GZn6K2+GrFt9mDe0cwYOgDwqrfySso2OT9I7rZZg=
+releaseDate: 2025-06-17T08:23:00.000Z
