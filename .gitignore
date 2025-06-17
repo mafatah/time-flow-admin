@@ -112,6 +112,7 @@ config-with-credentials.json
 
 # Security - Desktop Agent Environment Files
 desktop-agent/.env
+desktop-agent/env-config.js
 
 # Development Scripts with Credentials
 temp_env_source.js

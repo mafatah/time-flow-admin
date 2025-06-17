@@ -21,7 +21,5 @@
   "pattern_detection_window_minutes": 15,
   "minimum_mouse_distance": 50,
   "keyboard_diversity_threshold": 5,
-  "_security_note": "Supabase credentials are loaded from environment variables for security",
-  "supabase_url": "https://fkpiqcxkmrtaetvfgcli.supabase.co",
-  "supabase_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4"
+  "_security_note": "Supabase credentials are loaded from environment variables for security. Never hardcode credentials in this file."
 }

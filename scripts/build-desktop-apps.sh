@@ -20,6 +20,18 @@ mkdir -p public/downloads
 mkdir -p dist
 mkdir -p build
 
+# Step 0: Generate embedded configuration for desktop agent
+echo -e "${BLUE}🔑 Generating embedded configuration...${NC}"
+cd desktop-agent
+if node generate-env-config.js; then
+    echo -e "${GREEN}✅ Embedded configuration generated successfully${NC}"
+else
+    echo -e "${RED}❌ Failed to generate embedded configuration${NC}"
+    echo -e "${YELLOW}💡 Make sure desktop-agent/.env exists with proper credentials${NC}"
+    exit 1
+fi
+cd ..
+
 # Step 1: Build web app
 echo -e "${BLUE}🌐 Building web application...${NC}"
 npm run build:dev
