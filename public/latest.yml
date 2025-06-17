@@ -1,8 +1,8 @@
-version: v1.0.20
+version: 1.0.26
 files:
-  - url: Ebdaa-Work-Time-Setup-v1.0.20.exe
-    sha512: placeholder_hash_will_be_updated_after_build
-    size: 90000000
-path: Ebdaa-Work-Time-Setup-v1.0.20.exe
-sha512: placeholder_hash_will_be_updated_after_build
-releaseDate: '2025-06-16T13:25:22.3NZ'
+  - url: https://github.com/mafatah/time-flow-admin/releases/download/v1.0.26/TimeFlow-v1.0.26-Setup.exe
+    sha512: 5/ui/Z7OzAjImFhY+lPDjMIlrp0K4iI9fUk0IFaXxrT0=
+    size: 96235071
+path: TimeFlow-v1.0.26-Setup.exe
+sha512: 5/ui/Z7OzAjImFhY+lPDjMIlrp0K4iI9fUk0IFaXxrT0=
+releaseDate: 2025-06-17T08:23:00.000Z

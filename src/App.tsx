@@ -21,6 +21,8 @@ import AllEmployeeReport from '@/pages/reports/all-employee-report';
 import IndividualEmployeeReport from '@/pages/reports/individual-employee-report';
 import InsightsPage from '@/pages/insights';
 import AppsUrlsIdle from '@/pages/reports/apps-urls-idle';
+import AppActivityPage from '@/pages/app-activity';
+import UrlActivityPage from '@/pages/url-activity';
 import UsersPage from '@/pages/users/users-management';
 import ProjectsPage from '@/pages/projects';
 import ScreenshotsPage from '@/pages/screenshots';
@@ -355,6 +357,26 @@ function AppRoutes() {
           <AdminRoute>
             <AppLayout>
               <AppsUrlsIdle />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/app-activity" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <AppActivityPage />
+            </AppLayout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/url-activity" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AppLayout>
+              <UrlActivityPage />
             </AppLayout>
           </AdminRoute>
         </ProtectedRoute>
