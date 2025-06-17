@@ -11,11 +11,23 @@ import {
   ExternalLink
 } from "lucide-react";
 
+interface DownloadItem {
+  platform: string;
+  icon: React.ReactNode;
+  description: string;
+  filename: string;
+  url: string;
+  size: string;
+  requirements: string;
+  verified: boolean;
+  disabled?: boolean;
+}
+
 const DownloadPage = () => {
   const version = "v1.0.27"; // Updated automatically by release pipeline
   const releaseDate = new Date().toLocaleDateString();
   
-  const downloads = [
+  const downloads: DownloadItem[] = [
     {
       platform: "macOS (Apple Silicon)",
       icon: <Apple className="h-6 w-6" />,
@@ -49,12 +61,13 @@ const DownloadPage = () => {
     {
       platform: "Linux",
       icon: <Smartphone className="h-6 w-6" />,
-      description: "AppImage for Linux",
+      description: "AppImage for Linux (Coming Soon)",
       filename: `TimeFlow-${version}-Linux.AppImage`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Linux.AppImage`,
       size: "~132 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
-      verified: true
+      verified: false,
+      disabled: true
     }
   ];
 
@@ -103,7 +116,7 @@ const DownloadPage = () => {
         {/* Download Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
           {downloads.map((download, index) => (
-            <Card key={index} className="hover:shadow-lg transition-shadow">
+            <Card key={index} className={`hover:shadow-lg transition-shadow ${download.disabled ? 'opacity-60' : ''}`}>
               <CardHeader>
                 <div className="flex items-center gap-3 mb-2">
                   {download.icon}
@@ -112,6 +125,11 @@ const DownloadPage = () => {
                     <Badge className="bg-green-100 text-green-800">
                       <Shield className="h-3 w-3 mr-1" />
                       Verified
+                    </Badge>
+                  )}
+                  {download.disabled && (
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-600">
+                      Coming Soon
                     </Badge>
                   )}
                 </div>
@@ -126,12 +144,13 @@ const DownloadPage = () => {
                   </div>
                   
                   <Button 
-                    onClick={() => handleDownload(download.url, download.filename)}
+                    onClick={() => !download.disabled && handleDownload(download.url, download.filename)}
                     className="w-full"
                     size="lg"
+                    disabled={download.disabled}
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    Download for {download.platform.split(' ')[0]}
+                    {download.disabled ? 'Coming Soon' : `Download for ${download.platform.split(' ')[0]}`}
                   </Button>
                 </div>
               </CardContent>

@@ -570,21 +570,16 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
                 </div>
               </Button>
 
-              {/* Linux Download */}
+              {/* Linux Download - Disabled temporarily as AppImage not available in v1.0.27 */}
               <Button
-                variant={os === 'linux' ? 'default' : 'outline'}
-                onClick={() => handleDownload('linux')}
-                disabled={downloading === 'linux'}
-                className="flex flex-col items-center gap-2 h-auto p-4"
+                variant="outline"
+                disabled={true}
+                className="flex flex-col items-center gap-2 h-auto p-4 opacity-50"
               >
-                {downloading === 'linux' ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-background border-t-transparent" />
-                ) : (
-                  <Laptop className="h-5 w-5" />
-                )}
+                <Laptop className="h-5 w-5" />
                 <div className="text-center">
                   <div className="font-medium">Linux</div>
-                  <div className="text-xs opacity-70">AppImage • {getFileSize('linux')}</div>
+                  <div className="text-xs opacity-70">Coming Soon</div>
                 </div>
               </Button>
             </div>
