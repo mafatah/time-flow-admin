@@ -113,7 +113,7 @@ export default function AppsViewer() {
       let { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('id, email, full_name')
-        .eq('role', 'employee');
+        .in('role', ['employee', 'admin', 'manager']);
 
       if (usersError) throw usersError;
       setUsers(usersData || []);

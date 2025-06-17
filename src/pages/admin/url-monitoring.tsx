@@ -80,7 +80,7 @@ export default function URLMonitoring() {
       const { data, error } = await supabase
         .from('users')
         .select('id, email, full_name')
-        .eq('role', 'employee');
+        .in('role', ['employee', 'admin', 'manager']);
 
       if (error) throw error;
       setUsers(data || []);

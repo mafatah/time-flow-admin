@@ -65,7 +65,7 @@ export default function AppActivityPage() {
       const { data, error } = await supabase
         .from('users')
         .select('id, full_name, email')
-        .eq('role', 'employee')
+        .in('role', ['employee', 'admin', 'manager'])
         .order('full_name');
 
       if (error) throw error;

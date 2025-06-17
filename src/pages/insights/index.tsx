@@ -101,7 +101,7 @@ export default function InsightsPage() {
       const { data: usersData } = await supabase
         .from('users')
         .select('id, full_name, email')
-        .eq('role', 'employee')
+        .in('role', ['employee', 'admin', 'manager'])
         .order('full_name');
 
       // Fetch projects
@@ -150,7 +150,7 @@ export default function InsightsPage() {
       let usersQuery = supabase
         .from('users')
         .select('id')
-        .eq('role', 'employee');
+        .in('role', ['employee', 'admin', 'manager']);
       
       if (selectedUser !== 'all') {
         usersQuery = usersQuery.eq('id', selectedUser);

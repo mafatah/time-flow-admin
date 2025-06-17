@@ -188,7 +188,7 @@ export function EnhancedDashboard() {
       const { data, error } = await supabase
         .from('users')
         .select('id, full_name, email')
-        .eq('role', 'employee');
+        .in('role', ['employee', 'admin', 'manager']);
 
       if (error) throw error;
       setUsers(data || []);
