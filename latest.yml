@@ -1,11 +1,11 @@
-version: 1.0.27
+version: 1.0.28
 files:
-  - url: TimeFlow-v1.0.27-Setup.exe
+  - url: TimeFlow-v1.0.28-Setup.exe
     sha512: 6168f7237310be14c23d6ff948c0c7bc84427703834559d340b6d207b2d947aa2c8d83e1936e9da60cf18af59a32e2829ce9e840d080f94c2b910b0f045c592e
     size: 89747951
-  - url: TimeFlow-v1.0.27-Linux.AppImage
+  - url: TimeFlow-v1.0.28-Linux.AppImage
     sha512: eb635d9923e68777fb21765ab000f20bfa55e2985dfb9723ae4f790c465e29c03a80a49a6d5654b1fc8022725abc75e584311d9d52416d6c82adaaeefe57d126
     size: 137960059
-path: TimeFlow-v1.0.27-Setup.exe
+path: TimeFlow-v1.0.28-Setup.exe
 sha512: 6168f7237310be14c23d6ff948c0c7bc84427703834559d340b6d207b2d947aa2c8d83e1936e9da60cf18af59a32e2829ce9e840d080f94c2b910b0f045c592e
-releaseDate: '2025-06-17T16:11:00.000Z'
+releaseDate: '2025-06-18T00:25:00.000Z'
