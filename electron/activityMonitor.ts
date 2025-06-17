@@ -1010,6 +1010,7 @@ async function getCurrentURL(): Promise<string | undefined> {
   try {
     // Only try to get URLs from actual browser applications
     const appName = await getCurrentAppName();
+    const windowTitle = await getCurrentWindowTitle();
     
     // Check if it's actually a browser
     const browsers = ['Google Chrome', 'Safari', 'Firefox', 'Microsoft Edge', 'Arc', 'chrome', 'firefox', 'msedge'];
@@ -1018,6 +1019,12 @@ async function getCurrentURL(): Promise<string | undefined> {
     if (!isBrowser) {
       return undefined;
     }
+
+    safeLog('🌐 [URL-EXTRACTION] Attempting URL extraction:', {
+      appName,
+      windowTitle: windowTitle?.substring(0, 100) + '...',
+      isBrowser
+    });
 
     const { exec } = require('child_process');
     const { promisify } = require('util');
@@ -1031,39 +1038,137 @@ async function getCurrentURL(): Promise<string | undefined> {
         if (appName.toLowerCase().includes('chrome')) {
           // For Chrome on Windows - this is a simplified approach
           // In production, you'd need more sophisticated methods
-          return undefined; // Placeholder - Windows URL detection is complex
+          return extractURLFromWindowTitle(windowTitle);
         } else if (appName.toLowerCase().includes('edge')) {
-          return undefined; // Placeholder
+          return extractURLFromWindowTitle(windowTitle);
         }
-        return undefined;
+        return extractURLFromWindowTitle(windowTitle);
       } else if (process.platform === 'darwin') {
-        // macOS implementation
+        // macOS implementation - try AppleScript first, then fallback
         if (appName.includes('Chrome') || appName.includes('Arc')) {
           script = `osascript -e 'tell application "Google Chrome" to get URL of active tab of front window'`;
         } else if (appName.includes('Safari')) {
           script = `osascript -e 'tell application "Safari" to get URL of front document'`;
         } else if (appName.includes('Firefox')) {
-          // Firefox doesn't support AppleScript for URL access
-          return undefined;
+          // Firefox doesn't support AppleScript for URL access - use window title
+          return extractURLFromWindowTitle(windowTitle);
         } else {
-          return undefined;
+          return extractURLFromWindowTitle(windowTitle);
         }
         
-        const { stdout } = await execAsync(script);
+        safeLog('🍎 [APPLESCRIPT] Executing:', script);
+        
+        const { stdout, stderr } = await execAsync(script);
+        
+        if (stderr) {
+          safeLog('⚠️ [APPLESCRIPT] Error output:', stderr);
+        }
+        
         const url = stdout.trim();
+        
+        safeLog('🍎 [APPLESCRIPT] Raw result:', {
+          stdout: stdout.substring(0, 200),
+          url: url.substring(0, 200),
+          isValidURL: url && (url.startsWith('http://') || url.startsWith('https://'))
+        });
         
         // Only return valid URLs
         if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+          safeLog('✅ [URL-APPLESCRIPT] Successfully extracted:', url);
           return url;
+        } else {
+          safeLog('⚠️ [APPLESCRIPT] Invalid URL result, trying window title fallback');
+          return extractURLFromWindowTitle(windowTitle);
         }
       }
       
-      return undefined;
+      return extractURLFromWindowTitle(windowTitle);
     } catch (error) {
-      // Don't log URL detection errors as they're common when browser isn't open
-      return undefined;
+      safeLog('❌ [APPLESCRIPT] Failed, trying window title fallback:', (error as Error).message || error);
+      return extractURLFromWindowTitle(windowTitle);
     }
   } catch (error) {
+    safeLog('❌ [URL-EXTRACTION] Complete failure:', (error as Error).message || error);
+    return undefined;
+  }
+}
+
+// New function to extract URLs from window titles as fallback
+function extractURLFromWindowTitle(windowTitle: string | undefined): string | undefined {
+  if (!windowTitle) {
+    return undefined;
+  }
+
+  safeLog('🔍 [TITLE-EXTRACTION] Analyzing window title:', windowTitle.substring(0, 100) + '...');
+
+  // Common patterns for extracting URLs from browser window titles
+  try {
+    // Method 1: Direct URL in title (some browsers show this)
+    const urlMatch = windowTitle.match(/(https?:\/\/[^\s]+)/);
+    if (urlMatch) {
+      const extractedUrl = urlMatch[1];
+      safeLog('✅ [TITLE-URL] Found direct URL:', extractedUrl);
+      return extractedUrl;
+    }
+
+    // Method 2: Domain-based reconstruction for common sites
+    const domainMappings = [
+      // Social Media
+      { patterns: ['Instagram'], url: 'https://www.instagram.com/' },
+      { patterns: ['Facebook'], url: 'https://www.facebook.com/' },
+      { patterns: ['Twitter', 'X.com'], url: 'https://twitter.com/' },
+      { patterns: ['LinkedIn'], url: 'https://www.linkedin.com/' },
+      
+      // Work Tools
+      { patterns: ['GitHub'], url: 'https://github.com/' },
+      { patterns: ['Supabase'], url: 'https://supabase.com/dashboard' },
+      { patterns: ['Lovable'], url: 'https://lovable.dev/' },
+      { patterns: ['Vercel'], url: 'https://vercel.com/' },
+      
+      // Work Time specific
+      { patterns: ['Ebdaa Work Time', 'Employee Time Tracking'], url: 'https://worktime.ebdaadt.com/' },
+      { patterns: ['TimeFlow Admin'], url: 'https://worktime.ebdaadt.com/admin' },
+      
+      // Development
+      { patterns: ['Stack Overflow'], url: 'https://stackoverflow.com/' },
+      { patterns: ['MDN Web Docs'], url: 'https://developer.mozilla.org/' },
+      
+      // Common sites
+      { patterns: ['Google'], url: 'https://www.google.com/' },
+      { patterns: ['YouTube'], url: 'https://www.youtube.com/' },
+      { patterns: ['Gmail'], url: 'https://mail.google.com/' }
+    ];
+
+    for (const mapping of domainMappings) {
+      if (mapping.patterns.some(pattern => windowTitle.includes(pattern))) {
+        safeLog('✅ [TITLE-MAPPING] Mapped to:', mapping.url);
+        return mapping.url;
+      }
+    }
+
+    // Method 3: Extract domain from common title formats
+    // "Site Name - Domain" or "Page Title | Site Name"
+    const titlePatterns = [
+      /([a-zA-Z0-9-]+\.(?:com|org|net|edu|gov|io|co|dev))/,
+      /\| ([a-zA-Z0-9-]+\.(?:com|org|net|edu|gov|io|co|dev))/,
+      /- ([a-zA-Z0-9-]+\.(?:com|org|net|edu|gov|io|co|dev))/
+    ];
+
+    for (const pattern of titlePatterns) {
+      const match = windowTitle.match(pattern);
+      if (match) {
+        const domain = match[1];
+        const reconstructedUrl = `https://${domain}`;
+        safeLog('✅ [TITLE-DOMAIN] Reconstructed URL:', reconstructedUrl);
+        return reconstructedUrl;
+      }
+    }
+
+    safeLog('⚠️ [TITLE-EXTRACTION] No URL patterns found in title');
+    return undefined;
+
+  } catch (error) {
+    safeLog('❌ [TITLE-EXTRACTION] Error:', (error as Error).message || error);
     return undefined;
   }
 }
