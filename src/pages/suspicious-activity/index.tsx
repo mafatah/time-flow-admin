@@ -16,6 +16,7 @@ interface Employee {
   id: string;
   email: string;
   full_name: string;
+  role: string;
 }
 
 interface SuspiciousActivity {
@@ -91,8 +92,8 @@ export default function SuspiciousActivityPage() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, email, full_name')
-        .eq('role', 'employee')
+        .select('id, email, full_name, role')
+        .in('role', ['employee', 'admin', 'manager'])
         .order('full_name');
 
       if (error) throw error;

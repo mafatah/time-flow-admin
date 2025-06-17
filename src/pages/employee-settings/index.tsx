@@ -79,8 +79,8 @@ export default function EmployeeSettingsPage() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, email, full_name, custom_screenshot_interval_seconds')
-        .eq('role', 'employee')
+        .select('id, email, full_name, custom_screenshot_interval_seconds, role')
+        .in('role', ['employee', 'admin', 'manager'])
         .order('full_name');
 
       if (error) throw error;

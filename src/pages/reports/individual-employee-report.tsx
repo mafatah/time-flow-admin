@@ -34,6 +34,7 @@ interface Employee {
   id: string;
   name: string;
   email: string;
+  role: string;
 }
 
 interface SessionSummary {
@@ -109,8 +110,8 @@ export default function IndividualEmployeeReport() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, full_name, email')
-        .eq('role', 'employee')
+        .select('id, full_name, email, role')
+        .in('role', ['employee', 'admin', 'manager'])
         .order('full_name');
 
       if (error) throw error;
@@ -118,7 +119,8 @@ export default function IndividualEmployeeReport() {
       const employeeList = (data || []).map(emp => ({
         id: emp.id,
         name: emp.full_name || 'Unknown',
-        email: emp.email
+        email: emp.email,
+        role: emp.role
       }));
 
       setEmployees(employeeList);

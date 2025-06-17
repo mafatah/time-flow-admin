@@ -231,7 +231,12 @@ export default function UsersManagement() {
           email,
           full_name,
           role,
-          avatar_url
+          avatar_url,
+          is_active,
+          paused_at,
+          paused_by,
+          pause_reason,
+          last_activity
         `)
         .order("full_name");
 
@@ -240,16 +245,16 @@ export default function UsersManagement() {
         throw usersError;
       }
 
-      // For now, set all users as confirmed (we'll enhance this with a server function later)
+      // Use actual database values, with fallbacks only for missing auth status
       const usersWithStatus = (usersData || []).map(user => ({
         ...user,
-        auth_status: 'confirmed' as const,
+        auth_status: 'confirmed' as const, // Still defaulting this until proper auth status is implemented
         email_confirmed_at: new Date().toISOString(),
-        is_active: true,
-        paused_at: null,
-        paused_by: null,
-        pause_reason: null,
-        last_activity: new Date().toISOString()
+        is_active: user.is_active ?? true, // Use database value or default to true if null
+        paused_at: user.paused_at,
+        paused_by: user.paused_by,
+        pause_reason: user.pause_reason,
+        last_activity: user.last_activity || new Date().toISOString()
       }));
       
       console.log('Users fetched:', usersWithStatus);

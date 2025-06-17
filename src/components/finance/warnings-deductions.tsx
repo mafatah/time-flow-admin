@@ -34,6 +34,7 @@ interface Employee {
   id: string;
   email: string;
   full_name: string;
+  role: string;
 }
 
 interface EmployeeSummary {
@@ -121,8 +122,8 @@ export default function WarningsDeductions({ selectedMonth }: WarningsDeductions
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, email, full_name')
-        .eq('role', 'employee')
+        .select('id, email, full_name, role')
+        .in('role', ['employee', 'admin', 'manager'])
         .eq('is_active', true)
         .order('full_name');
 
