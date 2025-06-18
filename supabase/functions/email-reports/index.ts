@@ -264,6 +264,9 @@ async function generateDailyReport(supabase: any) {
   // Get URL usage stats for today
   const urlUsageStats = await getUrlUsageStatsForPeriod(supabase, startOfDay, endOfDay);
 
+  console.log('📊 App usage stats found:', appUsageStats.length);
+  console.log('📊 URL usage stats found:', urlUsageStats.length);
+
   // Get low activity alerts
   const lowActivityAlerts = employeeStats.filter(emp => emp.activity_percentage < 30);
 
@@ -306,6 +309,8 @@ async function generateWeeklyReport(supabase: any) {
   
   // Get app usage stats for this week
   const appUsageStats = await getAppUsageStatsForPeriod(supabase, startOfWeek, endOfWeek);
+
+  console.log('📊 Weekly app usage stats found:', appUsageStats.length);
 
   // Calculate summary statistics
   const totalHours = employeeStats.reduce((sum, emp) => sum + emp.total_hours, 0);
@@ -489,79 +494,141 @@ async function getProjectStatsForPeriod(supabase: any, startDate: Date, endDate:
 
 // Get app usage statistics for a time period
 async function getAppUsageStatsForPeriod(supabase: any, startDate: Date, endDate: Date): Promise<AppUsageStats[]> {
+  console.log('🔍 Fetching app logs from:', startDate.toISOString(), 'to:', endDate.toISOString());
+  
   const { data: appLogs, error } = await supabase
     .from('app_logs')
-    .select('app_name, duration_seconds')
+    .select('app_name, duration_seconds, started_at, ended_at')
     .gte('started_at', startDate.toISOString())
-    .lte('started_at', endDate.toISOString())
-    .not('duration_seconds', 'is', null);
+    .lte('started_at', endDate.toISOString());
 
   if (error) {
     console.error('Error fetching app logs:', error);
     return [];
   }
 
+  console.log('📱 Raw app logs found:', appLogs?.length || 0);
+
+  if (!appLogs || appLogs.length === 0) {
+    console.log('📱 No app logs found, returning empty array');
+    return [];
+  }
+
   const appStats = new Map<string, number>();
 
-  appLogs?.forEach((log: any) => {
-    const appName = log.app_name;
-    const duration = log.duration_seconds || 0;
-    appStats.set(appName, (appStats.get(appName) || 0) + duration);
+  appLogs.forEach((log: any) => {
+    const appName = log.app_name || 'Unknown App';
+    let duration = 0;
+    
+    // Use duration_seconds if available, otherwise calculate from timestamps
+    if (log.duration_seconds) {
+      duration = log.duration_seconds;
+    } else if (log.started_at && log.ended_at) {
+      const start = new Date(log.started_at);
+      const end = new Date(log.ended_at);
+      duration = Math.floor((end.getTime() - start.getTime()) / 1000);
+    }
+    
+    if (duration > 0) {
+      appStats.set(appName, (appStats.get(appName) || 0) + duration);
+    }
   });
+
+  console.log('📱 Processed app stats:', appStats.size, 'unique apps');
 
   const totalTime = Array.from(appStats.values()).reduce((sum, time) => sum + time, 0);
 
-  return Array.from(appStats.entries())
+  const result = Array.from(appStats.entries())
     .map(([app_name, seconds]) => ({
       app_name,
       total_time: formatDuration(seconds),
       percentage: totalTime > 0 ? Math.round((seconds / totalTime) * 100) : 0
     }))
     .sort((a, b) => b.percentage - a.percentage);
+
+  console.log('📱 Final app usage stats:', result.length, 'entries');
+  return result;
 }
 
 // Get URL usage statistics for a time period
 async function getUrlUsageStatsForPeriod(supabase: any, startDate: Date, endDate: Date): Promise<UrlUsageStats[]> {
+  console.log('🔍 Fetching URL logs from:', startDate.toISOString(), 'to:', endDate.toISOString());
+  
   const { data: urlLogs, error } = await supabase
     .from('url_logs')
-    .select('domain, duration_seconds')
+    .select('domain, site_url, duration_seconds, started_at, ended_at')
     .gte('started_at', startDate.toISOString())
-    .lte('started_at', endDate.toISOString())
-    .not('duration_seconds', 'is', null);
+    .lte('started_at', endDate.toISOString());
 
   if (error) {
     console.error('Error fetching URL logs:', error);
     return [];
   }
 
+  console.log('🌐 Raw URL logs found:', urlLogs?.length || 0);
+
+  if (!urlLogs || urlLogs.length === 0) {
+    console.log('🌐 No URL logs found, returning empty array');
+    return [];
+  }
+
   const urlStats = new Map<string, number>();
 
-  urlLogs?.forEach((log: any) => {
-    const domain = log.domain;
-    const duration = log.duration_seconds || 0;
-    urlStats.set(domain, (urlStats.get(domain) || 0) + duration);
+  urlLogs.forEach((log: any) => {
+    const domain = log.domain || extractDomain(log.site_url) || 'Unknown Site';
+    let duration = 0;
+    
+    // Use duration_seconds if available, otherwise calculate from timestamps
+    if (log.duration_seconds) {
+      duration = log.duration_seconds;
+    } else if (log.started_at && log.ended_at) {
+      const start = new Date(log.started_at);
+      const end = new Date(log.ended_at);
+      duration = Math.floor((end.getTime() - start.getTime()) / 1000);
+    }
+    
+    if (duration > 0) {
+      urlStats.set(domain, (urlStats.get(domain) || 0) + duration);
+    }
   });
+
+  console.log('🌐 Processed URL stats:', urlStats.size, 'unique domains');
 
   const totalTime = Array.from(urlStats.values()).reduce((sum, time) => sum + time, 0);
 
-  return Array.from(urlStats.entries())
+  const result = Array.from(urlStats.entries())
     .map(([domain, seconds]) => ({
       domain,
       total_time: formatDuration(seconds),
       percentage: totalTime > 0 ? Math.round((seconds / totalTime) * 100) : 0
     }))
     .sort((a, b) => b.percentage - a.percentage);
+
+  console.log('🌐 Final URL usage stats:', result.length, 'entries');
+  return result;
+}
+
+// Helper function to extract domain from URL
+function extractDomain(url: string): string {
+  if (!url) return 'Unknown';
+  try {
+    const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
+    return urlObj.hostname;
+  } catch {
+    return url.split('/')[0] || 'Unknown';
+  }
 }
 
 // Format duration from seconds to human readable
 function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
   
   if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
-  return `${minutes}:${(seconds % 60).toString().padStart(2, '0')}`;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
 // Generate daily report HTML
@@ -668,18 +735,19 @@ function generateDailyReportHTML(data: any): string {
 
             <div class="section">
                 <h2>💻 Most Used Apps & Sites</h2>
-                ${data.app_usage.map((app: any) => `
+                ${data.app_usage && data.app_usage.length > 0 ? data.app_usage.map((app: any) => `
                 <div class="app-item">
                     <div style="font-weight: 500;">${app.app_name}</div>
                     <div>${app.total_time}</div>
                 </div>
-                `).join('')}
-                ${data.url_usage.map((url: any) => `
+                `).join('') : '<p style="color: #6b7280; font-style: italic;">No app usage data available for today.</p>'}
+                
+                ${data.url_usage && data.url_usage.length > 0 ? data.url_usage.map((url: any) => `
                 <div class="app-item">
                     <div style="font-weight: 500;">${url.domain}</div>
                     <div>${url.total_time}</div>
                 </div>
-                `).join('')}
+                `).join('') : '<p style="color: #6b7280; font-style: italic;">No website usage data available for today.</p>'}
             </div>
         </div>
         
@@ -777,12 +845,12 @@ function generateWeeklyReportHTML(data: any): string {
 
             <div class="section">
                 <h2>💻 Most Used Apps This Week</h2>
-                ${data.app_usage.slice(0, 10).map((app: any) => `
+                ${data.app_usage && data.app_usage.length > 0 ? data.app_usage.slice(0, 10).map((app: any) => `
                 <div class="app-item">
                     <div style="font-weight: 500;">${app.app_name}</div>
                     <div>${app.total_time}</div>
                 </div>
-                `).join('')}
+                `).join('') : '<p style="color: #6b7280; font-style: italic;">No app usage data available for this week.</p>'}
             </div>
         </div>
         
