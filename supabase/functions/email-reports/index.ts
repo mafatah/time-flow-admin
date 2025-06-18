@@ -72,7 +72,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log('📨 Sending test email...');
       const emailResponse = await resend.emails.send({
-        from: "TimeFlow Reports <reports@timeflow.app>",
+        from: "TimeFlow Reports <info@ebdaadt.com>",
         to: [admins[0].email],
         subject: '📧 TimeFlow Email Test - Configuration Successful',
         html: testHtml,
