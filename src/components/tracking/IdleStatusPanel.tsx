@@ -28,6 +28,12 @@ interface ActivityStats {
   suspiciousEvents: number;
   riskScore: number;
   screenshotsCaptured: number;
+  // Add new fields from main Electron process
+  mouse_clicks?: number;
+  activity_score?: number;
+  idle_time_seconds?: number;
+  idle_time_formatted?: string;
+  is_idle?: boolean;
 }
 
 interface AntiCheatReport {
@@ -72,40 +78,81 @@ export function IdleStatusPanel({ className }: IdleStatusPanelProps) {
   const [lastScreenshot, setLastScreenshot] = useState<any>(null);
 
   useEffect(() => {
-    // Only try to access Electron API if it exists and has the required methods
-    if (window.electron && typeof window.electron.getActivityStats === 'function') {
-      const handleActivityStats = (stats: ActivityStats) => {
-        setActivityStats(stats);
-      };
-      
-      const handleIdleStatus = (status: IdleStatus) => {
-        setIdleStatus(status);
-      };
-      
-      const handleScreenshot = (screenshot: any) => {
-        setLastScreenshot(screenshot);
+    // Only try to access Electron API if it exists
+    if (window.electron && typeof window.electron.invoke === 'function') {
+      const fetchActivityData = async () => {
+        try {
+          // Get activity metrics from main Electron process (has idle time data)
+          const result = await window.electron!.invoke('get-activity-metrics');
+          console.log('🔍 UI invoke response:', result); // Debug log
+          if (result.success && result.metrics) {
+            const metrics = result.metrics;
+            console.log('🔍 UI received activity metrics:', metrics); // Debug log
+            setActivityStats({
+              mouseClicks: metrics.mouse_clicks || 0,
+              keystrokes: metrics.keystrokes || 0,
+              mouseMovements: metrics.mouse_movements || 0,
+              idleSeconds: metrics.idle_time_seconds || 0, // Use the correct idle time field
+              activeSeconds: 0, // Can calculate if needed
+              suspiciousEvents: 0,
+              riskScore: 0,
+              screenshotsCaptured: 0,
+              // Store additional fields
+              mouse_clicks: metrics.mouse_clicks,
+              activity_score: metrics.activity_score,
+              idle_time_seconds: metrics.idle_time_seconds,
+              idle_time_formatted: metrics.idle_time_formatted,
+              is_idle: metrics.is_idle
+            });
+            
+            // Update idle status based on main process data
+            setIdleStatus({
+              isIdle: metrics.is_idle || false,
+              idleSeconds: metrics.idle_time_seconds || 0
+            });
+          }
+        } catch (error) {
+          console.log('Error fetching activity metrics:', error);
+          
+          // Try fallback simpler handler
+          try {
+            const fallbackResult = await window.electron!.invoke('get-idle-time');
+            console.log('🔍 UI fallback response:', fallbackResult);
+            if (fallbackResult.success) {
+              setActivityStats(prev => ({
+                ...prev,
+                idleSeconds: fallbackResult.idleTime || 0,
+                activity_score: fallbackResult.activityScore || 100,
+                idle_time_seconds: fallbackResult.idleTime || 0,
+                is_idle: fallbackResult.isIdle || false
+              }));
+              
+              setIdleStatus({
+                isIdle: fallbackResult.isIdle || false,
+                idleSeconds: fallbackResult.idleTime || 0
+              });
+            }
+          } catch (fallbackError) {
+            console.log('Fallback also failed:', fallbackError);
+          }
+        }
+        
+        try {
+          // Still try to get anti-cheat data if available
+          if (window.electron && window.electron.getAntiCheatReport) {
+            const report = await window.electron.getAntiCheatReport();
+            setAntiCheatReport(report);
+          }
+        } catch (error) {
+          console.log('Anti-cheat data not available');
+        }
       };
 
-      // Set up listeners if they exist
-      if (window.electron.onActivityStatsUpdate) {
-        window.electron.onActivityStatsUpdate(handleActivityStats);
-      }
-      if (window.electron.onIdleStatusChange) {
-        window.electron.onIdleStatusChange(handleIdleStatus);
-      }
-      if (window.electron.onScreenshotCaptured) {
-        window.electron.onScreenshotCaptured(handleScreenshot);
-      }
-      
       // Fetch initial data
-      window.electron.getActivityStats?.().then(setActivityStats).catch(() => {});
-      window.electron.getAntiCheatReport?.().then(setAntiCheatReport).catch(() => {});
+      fetchActivityData();
       
-      // Periodic updates
-      const interval = setInterval(() => {
-        window.electron?.getActivityStats?.().then(setActivityStats).catch(() => {});
-        window.electron?.getAntiCheatReport?.().then(setAntiCheatReport).catch(() => {});
-      }, 5000);
+      // Periodic updates every 1 second for real-time idle time
+      const interval = setInterval(fetchActivityData, 1000);
       
       return () => {
         clearInterval(interval);
@@ -129,6 +176,11 @@ export function IdleStatusPanel({ className }: IdleStatusPanelProps) {
   };
 
   const getActivityScore = () => {
+    // Use the activity score from main Electron process if available (has decay logic)
+    if (activityStats.activity_score !== undefined) {
+      return Math.round(activityStats.activity_score);
+    }
+    // Fallback to calculated score
     const total = activityStats.mouseClicks + activityStats.keystrokes + (activityStats.mouseMovements / 10);
     return Math.min(100, Math.round(total * 2));
   };

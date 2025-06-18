@@ -2115,28 +2115,47 @@ function resetActivityStats() {
 function startScreenshotCapture() {
   if (screenshotInterval) clearInterval(screenshotInterval);
 
-  console.log(`📸 Starting random screenshots - 2 per 10 minute period`);
+      console.log(`📸 Starting random screenshots - 3 per 10 minute period`);
   
   // Schedule first screenshot with initial random delay
   scheduleRandomScreenshot();
 }
 
 function scheduleRandomScreenshot() {
-  if (screenshotInterval) clearTimeout(screenshotInterval);
-  
-  // Generate random interval between 2-8 minutes (120-480 seconds)
-  // This ensures 2 screenshots within each 10-minute window at random times
-  const minInterval = 120; // 2 minutes 
-  const maxInterval = 480; // 8 minutes
-  const randomInterval = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
-  
-  console.log(`📸 Next screenshot in ${Math.round(randomInterval / 60)} minutes ${randomInterval % 60} seconds`);
-  
-  screenshotInterval = setTimeout(async () => {
-    await captureScreenshot();
-    // Schedule next random screenshot
-    scheduleRandomScreenshot();
-  }, randomInterval * 1000);
+  try {
+    if (!isTrackingActive || !currentSession) {
+      console.log('⏭️ Skipping screenshot scheduling - tracking not active or no session');
+      return;
+    }
+
+    // Generate random interval between 2-6 minutes (120-360 seconds)  
+    // This ensures 3 screenshots within each 10-minute window at random times
+    const minInterval = 120; // 2 minutes
+    const maxInterval = 360; // 6 minutes (reduced from 480 to fit 3 screenshots)
+    const randomInterval = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
+    
+    const nextScreenshotTime = new Date(Date.now() + randomInterval * 1000);
+    
+    console.log(`📸 Next random screenshot scheduled in ${randomInterval} seconds (${Math.round(randomInterval/60)} minutes) at ${nextScreenshotTime.toLocaleTimeString()}`);
+    
+    screenshotTimeout = setTimeout(async () => {
+      try {
+        if (isTrackingActive && currentSession) {
+          await captureRandomScreenshot();
+        }
+        
+        // Schedule the next screenshot
+        scheduleRandomScreenshot();
+      } catch (error) {
+        console.error('❌ Random screenshot capture failed:', error);
+        // Still schedule next screenshot even if this one failed
+        scheduleRandomScreenshot();
+      }
+    }, randomInterval * 1000);
+    
+  } catch (error) {
+    console.error('❌ Failed to schedule random screenshot:', error);
+  }
 }
 
 function stopScreenshotCapture() {
@@ -2565,7 +2584,7 @@ async function pauseTracking(reason = 'manual') {
   stopAppCapture();
   stopUrlCapture();
 
-  // Update time log
+  // Update idle status for manual pause
   if (currentTimeLogId) {
     await updateTimeLogIdleStatus(true);
   }
@@ -2581,15 +2600,15 @@ async function resumeTracking() {
   
   isPaused = false;
   
+  // Update idle status
+  if (currentTimeLogId) {
+    await updateTimeLogIdleStatus(false);
+  }
+  
   // Restart captures
   startScreenshotCapture();
   startAppCapture();
   startUrlCapture();
-
-  // Update time log
-  if (currentTimeLogId) {
-    await updateTimeLogIdleStatus(false);
-  }
 
   // Update UI
   mainWindow?.webContents.send('tracking-resumed');
@@ -2988,8 +3007,10 @@ powerMonitor.on('suspend', () => {
   systemSleepStart = Date.now();
   
   if (isTracking) {
-    pauseTracking('system_suspend');
-    showTrayNotification('System sleep detected - tracking paused', 'info');
+    // Stop tracking immediately when laptop is closed
+    console.log('🛑 Laptop closed - stopping tracking immediately');
+    stopTracking();
+    showTrayNotification('Laptop closed - tracking stopped', 'info');
   }
   
   // Stop all monitoring during sleep
@@ -3005,44 +3026,6 @@ powerMonitor.on('resume', () => {
   
   console.log(`⚡ System resumed after ${sleepHours}h ${sleepMinutes % 60}m`);
   
-  // Log the sleep period as idle time
-  if (systemSleepStart && currentTimeLogId) {
-    logIdlePeriod(systemSleepStart, Date.now(), Math.floor(sleepDuration / 1000));
-  }
-  
-  // Check if laptop was closed for more than 1 hour (configurable)
-  const maxLaptopClosedHours = appSettings.max_laptop_closed_hours || 1;
-  const maxLaptopClosedTime = maxLaptopClosedHours * 60 * 60 * 1000; // Convert to milliseconds
-  
-  if (sleepDuration > maxLaptopClosedTime) {
-    console.log(`🛑 Laptop was closed for ${sleepHours} hours (max: ${maxLaptopClosedHours}h) - stopping tracking`);
-    
-    // Stop tracking due to extended closure
-    if (isTracking) {
-      stopTracking();
-      showTrayNotification(
-        `Tracking stopped: Laptop was closed for ${sleepHours} hours. Please restart tracking when you resume work.`, 
-        'warning'
-      );
-    }
-    
-    // Update tray to reflect stopped state
-    updateTrayMenu();
-    
-    // Show detailed notification
-    try {
-      new Notification({
-        title: 'TimeFlow - Extended Absence Detected',
-        body: `Time tracking has been stopped because your laptop was closed for ${sleepHours} hours (maximum allowed: ${maxLaptopClosedHours} hour). This ensures accurate time tracking. Please start tracking again when you resume work.`
-      }).show();
-    } catch (e) {
-      console.log('⚠️ Could not show extended absence notification:', e);
-    }
-    
-    systemSleepStart = null;
-    return; // Don't auto-resume
-  }
-  
   // Restart anti-cheat monitoring
   if (appSettings.enable_anti_cheat) {
     if (!antiCheatDetector) {
@@ -3051,14 +3034,14 @@ powerMonitor.on('resume', () => {
     antiCheatDetector.startMonitoring();
   }
   
-  // Auto-resume for shorter sleep periods (under 1 hour)
-  if (isPaused && currentSession) {
-    setTimeout(() => {
-      // Always auto-resume tracking without asking - employee doesn't need to be interrupted
-      resumeTracking();
-      showTrayNotification(`Tracking resumed after ${sleepHours}h ${sleepMinutes % 60}m sleep`, 'success');
-    }, 5000); // Wait 5 seconds after resume
-  }
+  // Show notification that user needs to restart tracking manually
+  showTrayNotification(
+    `Laptop reopened after ${sleepHours}h ${sleepMinutes % 60}m. Please start tracking manually when ready.`, 
+    'info'
+  );
+  
+  // Update tray to reflect stopped state
+  updateTrayMenu();
   
   systemSleepStart = null;
 });

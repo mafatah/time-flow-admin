@@ -22,13 +22,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         console.log('🚀 TimeFlow Desktop Agent initializing...');
         
-        // Get config from main process
-        const config = await ipcRenderer.invoke('get-config');
-        console.log('✅ Config loaded:', config);
+        // Get config from main process via IPC
+        console.log('🔄 Desktop agent requesting config from main process...');
         
-        // Initialize Supabase client
+        const config = await ipcRenderer.invoke('get-config');
+        
+        console.log('✅ Config received from main process:', {
+            hasUrl: !!config.supabase_url,
+            hasKey: !!config.supabase_key,
+            urlLength: config.supabase_url?.length || 0,
+            keyLength: config.supabase_key?.length || 0,
+            actualUrl: config.supabase_url,
+            urlType: typeof config.supabase_url
+        });
+        
+        // Validate config before creating client
+        if (!config.supabase_url || !config.supabase_key) {
+            throw new Error('Missing Supabase configuration from main process');
+        }
+        
+        if (typeof config.supabase_url !== 'string' || !config.supabase_url.startsWith('http')) {
+            throw new Error(`Invalid Supabase URL: ${config.supabase_url}`);
+        }
+        
+        // Initialize Supabase client with validated config
         supabaseClient = supabase.createClient(config.supabase_url, config.supabase_key);
-        console.log('✅ Supabase client initialized');
+        console.log('✅ Supabase client initialized with main process config');
         
         // Test Supabase client configuration
         console.log('🔧 Supabase client configuration test:', {
@@ -73,26 +92,7 @@ async function initializeApp() {
         
         // Skip Supabase client initialization if already created
         if (!supabaseClient) {
-            // Get config from main process
-            const config = await ipcRenderer.invoke('get-config');
-            console.log('✅ Config loaded:', config);
-            
-            // Initialize Supabase client
-            supabaseClient = supabase.createClient(config.supabase_url, config.supabase_key);
-            console.log('✅ Supabase client initialized');
-            
-            // Test Supabase client configuration
-            console.log('🔧 Supabase client configuration test:', {
-                hasUrl: !!config.supabase_url,
-                hasKey: !!config.supabase_key,
-                urlLength: config.supabase_url?.length || 0,
-                keyLength: config.supabase_key?.length || 0,
-                clientMethods: {
-                    hasAuth: !!supabaseClient.auth,
-                    hasFrom: !!supabaseClient.from,
-                    hasSignInWithPassword: !!supabaseClient.auth?.signInWithPassword
-                }
-            });
+            console.log('✅ Using existing Supabase client from main initialization');
         } else {
             console.log('✅ Using existing Supabase client');
         }

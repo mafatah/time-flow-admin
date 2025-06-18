@@ -587,7 +587,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
             <div className="bg-muted/50 p-3 rounded-lg">
               <h4 className="font-medium text-sm mb-2">Features included:</h4>
               <ul className="text-sm space-y-1 text-muted-foreground">
-                <li>• Random screenshot capture (2 per 10 minutes)</li>
+                                  <li>• Random screenshot capture (3 per 10 minutes)</li>
                 <li>• Activity and idle time tracking</li>
                 <li>• Application usage monitoring</li>
                 <li>• Real-time sync with dashboard</li>

@@ -10,7 +10,7 @@ import { initSystemMonitor } from './systemMonitor';
 import { startSyncLoop } from './unsyncedManager';
 import { startActivityMonitoring, stopActivityMonitoring, triggerActivityCapture, triggerDirectScreenshot, recordRealActivity, demonstrateEnhancedLogging } from './activityMonitor';
 import { ensureScreenRecordingPermission, testScreenCapture } from './permissionManager';
-import { screenshotIntervalSeconds } from './config';
+import { initializeConfig, screenshotIntervalSeconds } from './config';
 // Linux dependency checking is handled in linuxDependencyChecker.ts automatically
 import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
@@ -148,7 +148,7 @@ export const appEvents = new EventEmitter();
 // Debug environment variables
 console.log('🔧 Environment variables at startup:');
 console.log('   SCREENSHOT_INTERVAL_SECONDS:', process.env.SCREENSHOT_INTERVAL_SECONDS);
-console.log('   Config screenshotIntervalSeconds:', screenshotIntervalSeconds);
+console.log('   Config screenshotIntervalSeconds will be available after config initialization');
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -323,6 +323,18 @@ app.whenReady().then(async () => {
   // CRITICAL: Check if running from DMG and prevent crashes
   if (!checkDMGAndPreventCrash()) {
     console.log('🛑 App startup prevented due to DMG location - quitting safely');
+    app.quit();
+    return;
+  }
+  
+  // Initialize secure configuration system
+  console.log('🔧 Initializing secure configuration...');
+  try {
+    await initializeConfig();
+    console.log('✅ Configuration initialized successfully');
+  } catch (error) {
+    console.error('❌ Configuration initialization failed:', error);
+    console.log('🛑 App startup cancelled - configuration setup required');
     app.quit();
     return;
   }
@@ -619,58 +631,106 @@ let configCache: any = null;
 let lastConfigLoad = 0;
 const CONFIG_CACHE_TTL = 5000; // 5 seconds
 
-ipcMain.handle('get-config', () => {
+ipcMain.handle('get-config', async () => {
   // Use cached config to prevent excessive file reads
   const now = Date.now();
   if (configCache && (now - lastConfigLoad) < CONFIG_CACHE_TTL) {
+    console.log('📦 Returning cached config for desktop agent');
     return configCache;
   }
 
-  // Try to load from desktop-agent config.json as fallback
-  let desktopConfig = {};
   try {
-    const configPath = path.join(__dirname, '../../desktop-agent/config.json');
-    if (fs.existsSync(configPath)) {
-      desktopConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      console.log('📄 Loaded config from desktop-agent/config.json');
-      lastConfigLoad = now;
-    }
-  } catch (error) {
-    console.log('⚠️ Could not load desktop-agent config.json:', error);
-  }
-
-  configCache = {
-    supabase_url: process.env.VITE_SUPABASE_URL || (desktopConfig as any).supabase_url || '',
-    supabase_key: process.env.VITE_SUPABASE_ANON_KEY || (desktopConfig as any).supabase_key || '',
-    user_id: process.env.USER_ID || (desktopConfig as any).user_id || '',
-    project_id: process.env.PROJECT_ID || (desktopConfig as any).project_id || '00000000-0000-0000-0000-000000000001',
-    screenshot_interval_seconds: (desktopConfig as any).screenshot_interval_seconds || screenshotIntervalSeconds,
-    idle_threshold_seconds: (desktopConfig as any).idle_threshold_seconds || Number(process.env.IDLE_TIMEOUT_MINUTES || 1) * 60,
-    enable_screenshots: (desktopConfig as any).enable_screenshots !== undefined ? (desktopConfig as any).enable_screenshots : true,
-    enable_idle_detection: (desktopConfig as any).enable_idle_detection !== undefined ? (desktopConfig as any).enable_idle_detection : true,
-    enable_activity_tracking: (desktopConfig as any).enable_activity_tracking !== undefined ? (desktopConfig as any).enable_activity_tracking : true,
-    enable_anti_cheat: (desktopConfig as any).enable_anti_cheat !== undefined ? (desktopConfig as any).enable_anti_cheat : process.env.ANTI_CHEAT_ENABLED !== 'false'
-  };
-
-  return configCache;
-});
-
-// Add missing fetch-screenshots handler if not already present
-ipcMain.handle('fetch-screenshots', async (event, params) => {
-  try {
-    // Get config from desktop-agent as fallback
+    // CRITICAL: Ensure configuration is initialized before returning credentials
+    console.log('🔄 Desktop agent requesting config - ensuring initialization...');
+    
+    // Import both the secure config and initialization function
+    const { getSupabaseCredentials } = await import('./secure-config');
+    const { initializeConfig } = await import('./config');
+    
+    // Make sure config is initialized (this is idempotent - safe to call multiple times)
+    await initializeConfig();
+    
+    // Get encrypted credentials
+    const credentials = getSupabaseCredentials();
+    console.log('🔑 Retrieved encrypted credentials for desktop agent');
+    console.log(`   URL: ${credentials.url}`);
+    console.log(`   Key length: ${credentials.key.length} characters`);
+    
+    // Try to load from desktop-agent config.json as fallback for other settings
     let desktopConfig = {};
     try {
       const configPath = path.join(__dirname, '../../desktop-agent/config.json');
       if (fs.existsSync(configPath)) {
         desktopConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        console.log('📄 Loaded additional config from desktop-agent/config.json');
       }
     } catch (error) {
       console.log('⚠️ Could not load desktop-agent config.json:', error);
     }
 
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || (desktopConfig as any).supabase_url;
-    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || (desktopConfig as any).supabase_key;
+    configCache = {
+      supabase_url: credentials.url,
+      supabase_key: credentials.key,
+      user_id: process.env.USER_ID || (desktopConfig as any).user_id || '',
+      project_id: process.env.PROJECT_ID || (desktopConfig as any).project_id || '00000000-0000-0000-0000-000000000001',
+      screenshot_interval_seconds: (desktopConfig as any).screenshot_interval_seconds || screenshotIntervalSeconds,
+      idle_threshold_seconds: (desktopConfig as any).idle_threshold_seconds || Number(process.env.IDLE_TIMEOUT_MINUTES || 1) * 60,
+      enable_screenshots: (desktopConfig as any).enable_screenshots !== undefined ? (desktopConfig as any).enable_screenshots : true,
+      enable_idle_detection: (desktopConfig as any).enable_idle_detection !== undefined ? (desktopConfig as any).enable_idle_detection : true,
+      enable_activity_tracking: (desktopConfig as any).enable_activity_tracking !== undefined ? (desktopConfig as any).enable_activity_tracking : true,
+      enable_anti_cheat: (desktopConfig as any).enable_anti_cheat !== undefined ? (desktopConfig as any).enable_anti_cheat : process.env.ANTI_CHEAT_ENABLED !== 'false'
+    };
+
+    lastConfigLoad = now;
+    console.log('✅ Desktop agent config prepared with encrypted credentials');
+    return configCache;
+    
+  } catch (error) {
+    console.error('❌ Failed to get encrypted credentials for desktop agent:', error);
+    
+    // Fallback to try desktop-agent config.json
+    let desktopConfig = {};
+    try {
+      const configPath = path.join(__dirname, '../../desktop-agent/config.json');
+      if (fs.existsSync(configPath)) {
+        desktopConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        console.log('📄 Using fallback config from desktop-agent/config.json');
+      }
+    } catch (fallbackError) {
+      console.log('⚠️ Could not load fallback desktop-agent config.json:', fallbackError);
+    }
+
+    configCache = {
+      supabase_url: process.env.VITE_SUPABASE_URL || (desktopConfig as any).supabase_url || '',
+      supabase_key: process.env.VITE_SUPABASE_ANON_KEY || (desktopConfig as any).supabase_key || '',
+      user_id: process.env.USER_ID || (desktopConfig as any).user_id || '',
+      project_id: process.env.PROJECT_ID || (desktopConfig as any).project_id || '00000000-0000-0000-0000-000000000001',
+      screenshot_interval_seconds: (desktopConfig as any).screenshot_interval_seconds || screenshotIntervalSeconds,
+      idle_threshold_seconds: (desktopConfig as any).idle_threshold_seconds || Number(process.env.IDLE_TIMEOUT_MINUTES || 1) * 60,
+      enable_screenshots: (desktopConfig as any).enable_screenshots !== undefined ? (desktopConfig as any).enable_screenshots : true,
+      enable_idle_detection: (desktopConfig as any).enable_idle_detection !== undefined ? (desktopConfig as any).enable_idle_detection : true,
+      enable_activity_tracking: (desktopConfig as any).enable_activity_tracking !== undefined ? (desktopConfig as any).enable_activity_tracking : true,
+      enable_anti_cheat: (desktopConfig as any).enable_anti_cheat !== undefined ? (desktopConfig as any).enable_anti_cheat : process.env.ANTI_CHEAT_ENABLED !== 'false'
+    };
+
+    lastConfigLoad = now;
+    return configCache;
+  }
+});
+
+// Add missing fetch-screenshots handler if not already present
+ipcMain.handle('fetch-screenshots', async (event, params) => {
+  try {
+    // Use encrypted credentials for consistency
+    const { getSupabaseCredentials } = await import('./secure-config');
+    const { initializeConfig } = await import('./config');
+    
+    // Ensure config is initialized
+    await initializeConfig();
+    const credentials = getSupabaseCredentials();
+    
+    const supabaseUrl = credentials.url;
+    const supabaseKey = credentials.key;
 
     if (!supabaseUrl || !supabaseKey) {
       console.error('❌ Missing Supabase configuration in fetch-screenshots handler');
@@ -896,16 +956,20 @@ function updateTrayMenu() {
       : '🔄 Check for Updates';
 
   const contextMenu = Menu.buildFromTemplate([
-    { 
-      label: isTracking ? '⏸ Stop Tracking' : '▶️ Start Tracking', 
-      click: () => {
-        if (isTracking) {
-          stopTrackingTimer();
-        } else {
-          startTrackingTimer();
-        }
-      }
-    },
+            {
+            label: isTracking ? '⏸ Stop Tracking' : '▶️ Start Tracking',
+            click: () => {
+                if (isTracking) {
+                    console.log('⏸️ Manual tracking stop requested from tray');
+                    stopTracking();
+                    stopTrackingTimer();
+                } else {
+                    console.log('▶️ Manual tracking start requested from tray');
+                    startTracking();
+                    startTrackingTimer();
+                }
+            }
+        },
     { type: 'separator' },
     { 
       label: '📊 Open Dashboard', 
@@ -1177,9 +1241,31 @@ ipcMain.handle('get-activity-metrics', () => {
     // Import the function to get current metrics - fix path for built version
     const { getCurrentActivityMetrics } = require('./activityMonitor.cjs');
     const metrics = getCurrentActivityMetrics();
+    console.log('🔍 MAIN PROCESS sending metrics to UI:', {
+      idle_time_seconds: metrics.idle_time_seconds,
+      activity_score: metrics.activity_score,
+      mouse_clicks: metrics.mouse_clicks
+    });
     return { success: true, metrics };
   } catch (error) {
     console.error('❌ Error getting activity metrics:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// Add simpler handler for just idle time (fallback)
+ipcMain.handle('get-idle-time', () => {
+  try {
+    const { getCurrentActivityMetrics } = require('./activityMonitor.cjs');
+    const metrics = getCurrentActivityMetrics();
+    return { 
+      success: true, 
+      idleTime: metrics.idle_time_seconds || 0,
+      isIdle: metrics.is_idle || false,
+      activityScore: metrics.activity_score || 100
+    };
+  } catch (error) {
+    console.error('❌ Error getting idle time:', error);
     return { success: false, error: (error as Error).message };
   }
 });

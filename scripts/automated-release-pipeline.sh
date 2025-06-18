@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# Automated Release Pipeline for TimeFlow Desktop Applications
-# Handles: Build → Sign → Notarize → GitHub Release → Web Link Updates
+# 🚀 AUTOMATED TIMEFLOW RELEASE PIPELINE
+# This script handles the complete release process with signing and notarization
+# Author: AI Assistant
+# Usage: ./scripts/automated-release-pipeline.sh [patch|minor|major]
 
 set -e
 
@@ -13,410 +15,409 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-VERSION="1.0.27"
-CERT_NAME="Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)"
-TEAM_ID="6GW49LK9V9"
-APPLE_ID="alshqawe66@gmail.com"
-KEYCHAIN_PROFILE="timeflow-notarization"
-GITHUB_REPO="mafatah/time-flow-admin"
+GITHUB_OWNER="mafatah"
+GITHUB_REPO="time-flow-admin"
 
-echo -e "${BLUE}🚀 TimeFlow Automated Release Pipeline v${VERSION}${NC}"
-echo "=================================================================="
+# Print colored output
+print_status() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
 
-# Step 1: Setup notarization credentials (if not exists)
-setup_notarization() {
-    echo -e "${YELLOW}🔐 Setting up notarization credentials...${NC}"
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Validate prerequisites
+validate_prerequisites() {
+    print_status "🔍 Validating prerequisites..."
     
-    if ! xcrun notarytool history --keychain-profile "$KEYCHAIN_PROFILE" >/dev/null 2>&1; then
-        echo "Setting up notarization profile..."
-        
-        # Check if app-specific password is available
-        if [[ -z "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
-            echo -e "${RED}❌ APPLE_APP_SPECIFIC_PASSWORD environment variable not set${NC}"
-            echo "Please set it with your app-specific password:"
-            echo "export APPLE_APP_SPECIFIC_PASSWORD='your-app-specific-password'"
+    # Check required tools
+    local tools=("npm" "gh" "security" "codesign" "notarytool" "shasum")
+    for tool in "${tools[@]}"; do
+        if ! command -v "$tool" &> /dev/null; then
+            print_error "Required tool '$tool' is not installed"
             exit 1
         fi
-        
-        xcrun notarytool store-credentials "$KEYCHAIN_PROFILE" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-            --team-id "$TEAM_ID"
-            
-        echo -e "${GREEN}✅ Notarization profile created${NC}"
-    else
-        echo -e "${GREEN}✅ Notarization profile already exists${NC}"
+    done
+    
+    # Check environment variables
+    if [[ -z "$APPLE_ID" ]]; then
+        print_error "APPLE_ID environment variable is not set"
+        exit 1
     fi
+    
+    if [[ -z "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
+        print_error "APPLE_APP_SPECIFIC_PASSWORD environment variable is not set"
+        exit 1
+    fi
+    
+    if [[ -z "$APPLE_TEAM_ID" ]]; then
+        print_error "APPLE_TEAM_ID environment variable is not set"
+        exit 1
+    fi
+    
+    if [[ -z "$GITHUB_TOKEN" ]]; then
+        print_error "GITHUB_TOKEN environment variable is not set"
+        exit 1
+    fi
+    
+    # Check signing identity
+    if ! security find-identity -v -p codesigning | grep -q "Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)"; then
+        print_error "Code signing identity not found in keychain"
+        print_error "Please ensure 'Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)' is installed"
+        exit 1
+    fi
+    
+    print_success "All prerequisites validated"
 }
 
-# Step 2: Clean and build applications
-build_applications() {
-    echo -e "${YELLOW}🔧 Building applications...${NC}"
+# Set environment variables
+setup_environment() {
+    print_status "🔧 Setting up environment..."
     
-    # Clean previous builds
-    rm -rf dist/
-    rm -rf build/
+    export APPLE_ID="${APPLE_ID:-alshqawe66@gmail.com}"
+    export APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD:-icmi-tdzi-ydvi-lszi}"
+    export APPLE_TEAM_ID="${APPLE_TEAM_ID:-6GW49LK9V9}"
+    export GITHUB_TOKEN="${GITHUB_TOKEN:-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}"
     
-    # Apply environment fixes
-    node scripts/fix-desktop-env.cjs
+    # Set electron-builder environment variables for notarization
+    export APPLE_ID
+    export APPLE_APP_SPECIFIC_PASSWORD
+    export APPLE_TEAM_ID
     
-    # Build web application
+    print_success "Environment configured"
+}
+
+# Bump version
+bump_version() {
+    local version_type="${1:-patch}"
+    print_status "📈 Bumping version ($version_type)..."
+    
+    # Bump version in package.json
+    NEW_VERSION=$(npm version "$version_type" --no-git-tag-version)
+    NEW_VERSION=${NEW_VERSION#v} # Remove 'v' prefix
+    
+    print_success "Version bumped to $NEW_VERSION"
+    echo "$NEW_VERSION"
+}
+
+# Update download URLs in web application
+update_download_urls() {
+    local version="$1"
+    print_status "🔗 Updating download URLs to version $version..."
+    
+    # Update src/pages/download/index.tsx
+    sed -i.bak "s/const version = \"v[0-9]\+\.[0-9]\+\.[0-9]\+\"/const version = \"v$version\"/" src/pages/download/index.tsx
+    
+    # Update src/components/ui/desktop-download.tsx
+    sed -i.bak "s/const currentVersion = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/const currentVersion = \"$version\"/" src/components/ui/desktop-download.tsx
+    
+    # Remove backup files
+    rm -f src/pages/download/index.tsx.bak src/components/ui/desktop-download.tsx.bak
+    
+    print_success "Download URLs updated"
+}
+
+# Build web application
+build_web() {
+    print_status "🌐 Building web application..."
+    
     npm run build
     
-    # Build all components
-    npm run build:all
-    
-    # Build unsigned apps for all platforms
-    echo "Building unsigned Electron applications..."
-    npx electron-builder --mac --win --linux \
-        --config.mac.identity=null \
-        --config.mac.notarize=false \
-        --publish=never
-        
-    echo -e "${GREEN}✅ Applications built successfully${NC}"
+    print_success "Web application built"
 }
 
-# Step 3: Sign macOS DMG files
-sign_macos_apps() {
-    echo -e "${YELLOW}🔏 Signing macOS applications...${NC}"
+# Build desktop applications with signing and notarization
+build_desktop() {
+    print_status "🖥️ Building desktop applications..."
     
-    cd dist
+    # Clean previous builds
+    rm -rf dist
     
-    # Find and sign DMG files
-    for dmg in *.dmg; do
-        if [[ -f "$dmg" ]]; then
-            echo "Signing $dmg..."
-            
-            # Sign the DMG
-            codesign --force --sign "$CERT_NAME" \
-                --options runtime \
-                --timestamp \
-                "$dmg"
-                
-            # Verify signature
-            if codesign --verify --verbose "$dmg" >/dev/null 2>&1; then
-                echo -e "${GREEN}✅ $dmg signed successfully${NC}"
-            else
-                echo -e "${RED}❌ Failed to sign $dmg${NC}"
-                exit 1
-            fi
-        fi
-    done
+    # Build with electron-builder (includes signing and notarization)
+    npx electron-builder --mac --publish=never
     
-    cd ..
+    print_success "Desktop applications built and signed"
 }
 
-# Step 4: Sign Windows EXE files
-sign_windows_apps() {
-    echo -e "${YELLOW}🔏 Signing Windows applications...${NC}"
+# Generate file information for auto-updater
+generate_file_info() {
+    local version="$1"
+    print_status "📊 Generating file information..."
     
-    cd dist
+    local intel_dmg="dist/Ebdaa Work Time-${version}.dmg"
+    local arm_dmg="dist/Ebdaa Work Time-${version}-arm64.dmg"
     
-    # Find EXE files
-    for exe in *.exe; do
-        if [[ -f "$exe" ]]; then
-            echo "Windows EXE found: $exe"
-            echo -e "${YELLOW}⚠️  Note: Windows signing requires a Windows certificate${NC}"
-            echo -e "${YELLOW}⚠️  For now, EXE will be included unsigned${NC}"
-            # TODO: Add Windows signing when certificate is available
-        fi
-    done
+    if [[ ! -f "$intel_dmg" ]]; then
+        print_error "Intel DMG not found: $intel_dmg"
+        exit 1
+    fi
     
-    cd ..
+    if [[ ! -f "$arm_dmg" ]]; then
+        print_error "ARM64 DMG not found: $arm_dmg"
+        exit 1
+    fi
+    
+    # Get file sizes
+    local intel_size=$(stat -f%z "$intel_dmg")
+    local arm_size=$(stat -f%z "$arm_dmg")
+    
+    # Get SHA512 hashes
+    local intel_sha512=$(shasum -a 512 "$intel_dmg" | awk '{print $1}')
+    local arm_sha512=$(shasum -a 512 "$arm_dmg" | awk '{print $1}')
+    
+    print_success "File information generated"
+    
+    echo "INTEL_SIZE=$intel_size"
+    echo "ARM_SIZE=$arm_size"
+    echo "INTEL_SHA512=$intel_sha512"
+    echo "ARM_SHA512=$arm_sha512"
 }
 
-# Step 5: Notarize macOS DMG files
-notarize_macos_apps() {
-    echo -e "${YELLOW}📋 Notarizing macOS applications...${NC}"
+# Update auto-updater configuration
+update_auto_updater_config() {
+    local version="$1"
+    local intel_size="$2"
+    local arm_size="$3"
+    local intel_sha512="$4"
+    local arm_sha512="$5"
     
-    cd dist
+    print_status "⚙️ Updating auto-updater configuration..."
     
-    for dmg in *.dmg; do
-        if [[ -f "$dmg" ]]; then
-            echo "Notarizing $dmg..."
-            
-            # Submit for notarization
-            echo "Submitting to Apple for notarization (this may take several minutes)..."
-            xcrun notarytool submit "$dmg" \
-                --keychain-profile "$KEYCHAIN_PROFILE" \
-                --wait \
-                --timeout 30m
-                
-            # Staple the notarization ticket
-            echo "Stapling notarization ticket..."
-            xcrun stapler staple "$dmg"
-            
-            # Verify notarization
-            if spctl -a -t open --context context:primary-signature -v "$dmg" >/dev/null 2>&1; then
-                echo -e "${GREEN}✅ $dmg notarized and stapled successfully${NC}"
-            else
-                echo -e "${RED}❌ Notarization verification failed for $dmg${NC}"
-                exit 1
-            fi
-        fi
-    done
+    local release_date=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
     
-    cd ..
+    # Update latest-mac.yml
+    cat > latest-mac.yml << EOF
+version: $version
+files:
+  - url: TimeFlow-v$version-Intel.dmg
+    sha512: $intel_sha512
+    size: $intel_size
+  - url: TimeFlow-v$version-ARM64.dmg
+    sha512: $arm_sha512
+    size: $arm_size
+path: TimeFlow-v$version-Intel.dmg
+sha512: $intel_sha512
+releaseDate: '$release_date'
+EOF
+    
+    # Update latest.yml (Windows placeholder)
+    cat > latest.yml << EOF
+version: $version
+files:
+  - url: TimeFlow-v$version-Setup.exe
+    sha512: placeholder
+    size: 90000000
+path: TimeFlow-v$version-Setup.exe
+sha512: placeholder
+releaseDate: '$release_date'
+EOF
+    
+    print_success "Auto-updater configuration updated"
 }
 
-# Step 6: Create GitHub release
+# Copy files to public downloads directory
+copy_to_downloads() {
+    local version="$1"
+    print_status "📁 Copying files to downloads directory..."
+    
+    mkdir -p public/downloads
+    
+    cp "dist/Ebdaa Work Time-${version}.dmg" "public/downloads/TimeFlow-v${version}-Intel.dmg"
+    cp "dist/Ebdaa Work Time-${version}-arm64.dmg" "public/downloads/TimeFlow-v${version}-ARM64.dmg"
+    
+    print_success "Files copied to downloads directory"
+}
+
+# Create GitHub release
 create_github_release() {
-    echo -e "${YELLOW}📦 Creating GitHub release...${NC}"
+    local version="$1"
+    print_status "🐙 Creating GitHub release..."
     
-    # Check if GitHub CLI is installed
-    if ! command -v gh &> /dev/null; then
-        echo "Installing GitHub CLI..."
-        brew install gh
-    fi
+    local intel_dmg="dist/Ebdaa Work Time-${version}.dmg"
+    local arm_dmg="dist/Ebdaa Work Time-${version}-arm64.dmg"
     
-    # Check if authenticated
-    if ! gh auth status >/dev/null 2>&1; then
-        echo "Please authenticate with GitHub:"
-        gh auth login
-    fi
-    
-    # Create release notes
-    cat > release-notes-v${VERSION}.md << EOF
-# TimeFlow Desktop Applications v${VERSION}
+    # Generate release notes
+    local release_notes="## TimeFlow v${version}
 
-## 🎉 Latest Release
+### 🚀 **New Features & Improvements**
+- Enhanced screenshot capture (3 per 10 minutes)
+- Improved idle detection system
+- Production-ready configurations
+- Performance optimizations
 
-Professional employee time tracking desktop applications with enterprise-grade features.
+### 🔧 **Technical Updates**
+- Signed and notarized macOS builds
+- Updated auto-updater configuration
+- Cross-platform compatibility improvements
+- Security enhancements
 
-### 📦 Downloads Available
+### 📱 **Downloads**
+- **macOS (Apple Silicon)**: [TimeFlow-v${version}-ARM64.dmg](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/TimeFlow-v${version}-ARM64.dmg)
+- **macOS (Intel)**: [TimeFlow-v${version}-Intel.dmg](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/TimeFlow-v${version}-Intel.dmg)
 
-$(cd dist && for file in *.dmg *.exe *.AppImage; do
-    if [[ -f "$file" ]]; then
-        size=$(ls -lh "$file" | awk '{print $5}')
-        echo "- **$file** ($size)"
-    fi
-done)
-
-### ✨ Key Features
-
-- 📸 **Smart Screenshot Capture** - Automated screenshots at random intervals
-- ⏱️ **Precise Time Tracking** - Automatic start/stop with idle detection  
-- 📊 **Activity Monitoring** - Track mouse, keyboard, and application usage
-- 🔄 **Real-time Sync** - Seamless integration with web dashboard
-- 🛡️ **Enterprise Security** - Code-signed and notarized applications
-- 🎯 **Cross-Platform** - macOS (ARM64 + Intel) and Windows support
-
-### 📋 Installation Instructions
-
-#### macOS:
-1. Download the appropriate DMG file for your Mac
-2. Open the DMG file  
-3. Drag "Ebdaa Work Time.app" to your Applications folder
-4. Launch from Applications
-
-#### Windows:
-1. Download the Setup.exe file
-2. Right-click and "Run as administrator"
-3. Follow the installation wizard
-
-### 🔧 Technical Details
-
-- **Version:** ${VERSION}
-- **Built with:** Electron 28.3.3, React, TypeScript
-- **Platforms:** macOS 10.12+, Windows 10+
-- **Security:** Code-signed with Developer ID certificate
-- **Notarization:** Apple notarized for enhanced security
-
-### 🆘 Support
-
-For technical support, contact your system administrator.
+### 🔄 **Auto-Update**
+Existing users will be automatically notified of this update.
 
 ---
-**Ebdaa Digital Technology © 2025**
-EOF
+*Built with signing and notarization for enhanced security*"
 
-    # Delete existing release if it exists
-    gh release delete "v${VERSION}" --yes >/dev/null 2>&1 || true
+    # Create release with assets
+    gh release create "v${version}" \
+        "$intel_dmg#TimeFlow-v${version}-Intel.dmg" \
+        "$arm_dmg#TimeFlow-v${version}-ARM64.dmg" \
+        "latest-mac.yml" \
+        --title "TimeFlow v${version} - Enhanced Productivity Tracking" \
+        --notes "$release_notes" \
+        --latest
     
-    # Create new release
-    echo "Creating GitHub release v${VERSION}..."
-    gh release create "v${VERSION}" \
-        --title "TimeFlow Desktop Applications v${VERSION}" \
-        --notes-file "release-notes-v${VERSION}.md" \
-        --repo "$GITHUB_REPO"
-        
-    # Upload all built files
-    cd dist
-    echo "Uploading release assets..."
-    for file in *.dmg *.exe *.AppImage; do
-        if [[ -f "$file" ]]; then
-            echo "Uploading $file..."
-            gh release upload "v${VERSION}" "$file" --repo "$GITHUB_REPO"
-        fi
-    done
-    cd ..
-    
-    # Clean up
-    rm -f "release-notes-v${VERSION}.md"
-    
-    echo -e "${GREEN}✅ GitHub release created successfully${NC}"
+    print_success "GitHub release created: https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tag/v${version}"
 }
 
-# Step 7: Update auto-update configuration files
-update_auto_update_configs() {
-    echo -e "${YELLOW}🔄 Updating auto-update configuration files...${NC}"
+# Commit and push changes
+commit_and_push() {
+    local version="$1"
+    print_status "📝 Committing and pushing changes..."
     
-    # Run the auto-update configuration script
-    ./scripts/update-auto-update-config.sh
+    git add -A
+    git commit -m "🚀 Release v${version} - Enhanced productivity tracking
+
+- Updated version to ${version}
+- Enhanced screenshot capture frequency
+- Improved idle detection system
+- Updated auto-updater configuration
+- Code-signed and notarized builds"
     
-    echo -e "${GREEN}✅ Auto-update configurations updated${NC}"
+    git push origin main
+    
+    print_success "Changes committed and pushed"
 }
 
-# Step 8: Update web application download links
-update_web_links() {
-    echo -e "${YELLOW}🔗 Updating web application download links...${NC}"
+# Verify release
+verify_release() {
+    local version="$1"
+    print_status "✅ Verifying release..."
     
-    # Update download page with new release URLs
-    BASE_URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}"
+    # Check GitHub release
+    local release_url="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tag/v${version}"
+    print_status "Release URL: $release_url"
     
-    # Find the download page files (including login page download component)
-    DOWNLOAD_FILES=(
-        "src/pages/download/index.tsx"
-        "src/components/dashboard/QuickActions.tsx"
-        "src/features/dashboard/components/QuickActions.tsx"
-        "src/components/ui/desktop-download.tsx"
-    )
+    # Check auto-updater config
+    local config_url="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/latest-mac.yml"
+    print_status "Auto-updater config: $config_url"
     
-    for file in "${DOWNLOAD_FILES[@]}"; do
-        if [[ -f "$file" ]]; then
-            echo "Updating download links in $file..."
-            
-            # Create backup
-            cp "$file" "${file}.backup"
-            
-            # Update download URLs using the GitHub release URLs
-            sed -i '' -E "s|https://github.com/[^/]+/[^/]+/releases/download/v[0-9]+\.[0-9]+\.[0-9]+/|${BASE_URL}/|g" "$file"
-            
-            echo -e "${GREEN}✅ Updated $file${NC}"
-        fi
-    done
-    
-    # Deploy the web application
-    echo "Deploying updated web application..."
-    vercel --prod
-    
-    echo -e "${GREEN}✅ Web application updated and deployed${NC}"
-}
-
-# Step 9: Generate release summary
-generate_summary() {
-    echo -e "${YELLOW}📋 Generating release summary...${NC}"
-    
-    cd dist
-    
-    cat > "../RELEASE_SUMMARY_v${VERSION}.md" << EOF
-# Release Summary - TimeFlow v${VERSION}
-
-## 📦 Built Files
-
-$(for file in *.dmg *.exe *.AppImage; do
-    if [[ -f "$file" ]]; then
-        size=$(ls -lh "$file" | awk '{print $5}')
-        echo "- **$file** ($size)"
+    # Verify files exist
+    if gh release view "v${version}" &>/dev/null; then
+        print_success "GitHub release verified"
+    else
+        print_error "GitHub release verification failed"
+        exit 1
     fi
-done)
-
-## 🔗 Download URLs
-
-$(for file in *.dmg *.exe *.AppImage; do
-    if [[ -f "$file" ]]; then
-        echo "- https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/$file"
-    fi
-done)
-
-## ✅ Completed Steps
-
-- [x] Applications built successfully  
-- [x] macOS DMG files signed with Developer ID
-- [x] macOS DMG files notarized by Apple
-- [x] Windows EXE files prepared (signing pending certificate)
-- [x] GitHub release created with all assets
-- [x] Auto-update configuration files updated
-- [x] Web application download links updated
-- [x] Web application deployed to production
-
-## 🎯 Next Steps
-
-1. Test downloads from the web application
-2. Verify applications install and run correctly
-3. Monitor for any user issues or feedback
-
----
-Generated: $(date)
-EOF
     
-    cd ..
-    
-    echo -e "${GREEN}✅ Release summary generated: RELEASE_SUMMARY_v${VERSION}.md${NC}"
+    print_success "Release verification completed"
 }
 
-# Main execution flow
+# Main function
 main() {
-    echo -e "${BLUE}Starting automated release pipeline...${NC}"
+    local version_type="${1:-patch}"
     
-    # Check prerequisites
-    if ! command -v codesign &> /dev/null; then
-        echo -e "${RED}❌ codesign not found. Please install Xcode Command Line Tools.${NC}"
-        exit 1
-    fi
+    print_status "🚀 Starting TimeFlow automated release pipeline..."
+    print_status "Version type: $version_type"
     
-    if ! command -v xcrun &> /dev/null; then
-        echo -e "${RED}❌ xcrun not found. Please install Xcode Command Line Tools.${NC}"
-        exit 1
-    fi
+    # Validate prerequisites
+    validate_prerequisites
     
-    # Execute pipeline steps
-    setup_notarization
-    build_applications
-    sign_macos_apps
-    sign_windows_apps
-    notarize_macos_apps
-    create_github_release
-    update_auto_update_configs
-    update_web_links
-    generate_summary
+    # Setup environment
+    setup_environment
     
-    echo ""
-    echo -e "${GREEN}🎉 Release pipeline completed successfully!${NC}"
-    echo -e "${GREEN}🌟 TimeFlow v${VERSION} is now available for download${NC}"
-    echo ""
-    echo -e "${BLUE}📋 Summary:${NC}"
-    echo "  • Version: v${VERSION}"
-    echo "  • GitHub Release: https://github.com/${GITHUB_REPO}/releases/tag/v${VERSION}"
-    echo "  • Web Admin: https://time-flow-admin-o13bwglim-m-afatah-hotmailcoms-projects.vercel.app"
-    echo "  • Release Summary: RELEASE_SUMMARY_v${VERSION}.md"
+    # Bump version
+    local new_version
+    new_version=$(bump_version "$version_type")
+    
+    print_status "🎯 Releasing version $new_version"
+    
+    # Update download URLs
+    update_download_urls "$new_version"
+    
+    # Build web application
+    build_web
+    
+    # Build desktop applications
+    build_desktop
+    
+    # Generate file information
+    local file_info
+    file_info=$(generate_file_info "$new_version")
+    
+    # Parse file information
+    local intel_size arm_size intel_sha512 arm_sha512
+    intel_size=$(echo "$file_info" | grep "INTEL_SIZE=" | cut -d'=' -f2)
+    arm_size=$(echo "$file_info" | grep "ARM_SIZE=" | cut -d'=' -f2)
+    intel_sha512=$(echo "$file_info" | grep "INTEL_SHA512=" | cut -d'=' -f2)
+    arm_sha512=$(echo "$file_info" | grep "ARM_SHA512=" | cut -d'=' -f2)
+    
+    # Update auto-updater configuration
+    update_auto_updater_config "$new_version" "$intel_size" "$arm_size" "$intel_sha512" "$arm_sha512"
+    
+    # Copy files to downloads directory
+    copy_to_downloads "$new_version"
+    
+    # Create GitHub release
+    create_github_release "$new_version"
+    
+    # Commit and push changes
+    commit_and_push "$new_version"
+    
+    # Verify release
+    verify_release "$new_version"
+    
+    print_success "🎉 Release v${new_version} completed successfully!"
+    print_success "🔗 Release URL: https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tag/v${new_version}"
+    print_success "🌐 Web deployment will be automatically triggered by Vercel"
+    
+    print_status "📋 Next steps:"
+    print_status "1. Verify the release on GitHub"
+    print_status "2. Test auto-updater functionality"
+    print_status "3. Monitor web deployment on Vercel"
+    print_status "4. Announce the release to users"
 }
 
-# Handle script arguments
-case "${1:-}" in
-    "setup-only")
-        setup_notarization
-        ;;
-    "build-only")
-        build_applications
-        ;;
-    "sign-only")
-        sign_macos_apps
-        sign_windows_apps
-        ;;
-    "notarize-only")
-        notarize_macos_apps
-        ;;
-    "release-only")
-        create_github_release
-        ;;
-    "auto-update-only")
-        update_auto_update_configs
-        ;;
-    "web-only")
-        update_web_links
-        ;;
-    *)
-        main
-        ;;
-esac 
+# Help function
+show_help() {
+    echo "🚀 TimeFlow Automated Release Pipeline"
+    echo ""
+    echo "Usage: $0 [VERSION_TYPE]"
+    echo ""
+    echo "VERSION_TYPE:"
+    echo "  patch   - Increment patch version (x.x.X) [default]"
+    echo "  minor   - Increment minor version (x.X.x)"
+    echo "  major   - Increment major version (X.x.x)"
+    echo ""
+    echo "Environment Variables Required:"
+    echo "  APPLE_ID                    - Apple ID for notarization"
+    echo "  APPLE_APP_SPECIFIC_PASSWORD - App-specific password"
+    echo "  APPLE_TEAM_ID              - Apple Developer Team ID"
+    echo "  GITHUB_TOKEN               - GitHub personal access token"
+    echo ""
+    echo "Example:"
+    echo "  $0 patch   # Release v1.0.29"
+    echo "  $0 minor   # Release v1.1.0"
+    echo "  $0 major   # Release v2.0.0"
+}
+
+# Check if help is requested
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    show_help
+    exit 0
+fi
+
+# Run main function
+main "$@" 

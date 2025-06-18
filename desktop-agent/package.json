@@ -4,6 +4,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "electron": "electron .",
     "test-mac": "electron test-mac-permissions.js",
     "test-screenshot": "node test-screenshot.js"
   },

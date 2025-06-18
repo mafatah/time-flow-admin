@@ -7,7 +7,7 @@ let idleCheckInterval: NodeJS.Timeout | null = null;
 
 function checkIdleStatus() {
   const idleTime = powerMonitor.getSystemIdleTime(); // seconds
-  const isIdle = idleTime >= idleTimeoutMinutes * 60;
+  const isIdle = idleTime >= idleTimeoutMinutes() * 60;
   if (isIdle !== currentIdleStatus) {
     currentIdleStatus = isIdle;
     updateTimeLogStatus(isIdle).catch(err =>

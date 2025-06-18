@@ -9,7 +9,7 @@ let currentIdleStatus = false;
 let idleCheckInterval = null;
 function checkIdleStatus() {
     const idleTime = electron_1.powerMonitor.getSystemIdleTime(); // seconds
-    const isIdle = idleTime >= config_1.idleTimeoutMinutes * 60;
+    const isIdle = idleTime >= (0, config_1.idleTimeoutMinutes)() * 60;
     if (isIdle !== currentIdleStatus) {
         currentIdleStatus = isIdle;
         (0, tracker_1.updateTimeLogStatus)(isIdle).catch(err => console.error('Failed to update idle status:', err));

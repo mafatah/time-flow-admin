@@ -114,6 +114,10 @@ config-with-credentials.json
 desktop-agent/.env
 desktop-agent/env-config.js
 
+# Security - Build Environment Files (Contains embedded credentials)
+build/electron/electron/env-config.js
+build/**/env-config.js
+
 # Development Scripts with Credentials
 temp_env_source.js
 setup-idle-logs-remote.js

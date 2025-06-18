@@ -61,7 +61,7 @@ function safeError(...args) {
 }
 // Import app events for communication with main process
 let appEvents = null;
-// Note: Don't use require('./main') here as it causes circular dependency issues
+// Note: Don't use require('./main.cjs') here as it causes circular dependency issues
 const UNSYNCED_ACTIVITY_PATH = path_1.default.join(electron_1.app.getPath('userData'), 'unsynced_activity.json');
 // Special UUID for activity monitoring - this represents a virtual "task" for general activity monitoring
 const ACTIVITY_MONITORING_TASK_ID = '00000000-0000-0000-0000-000000000001';
@@ -69,7 +69,7 @@ const ACTIVITY_MONITORING_TASK_ID = '00000000-0000-0000-0000-000000000001';
 let appSettings = {
     blur_screenshots: false,
     screenshot_interval_seconds: 60,
-    idle_threshold_seconds: 300, // 5 minutes default
+    idle_threshold_seconds: 10, // TEMPORARILY REDUCED TO 10 SECONDS FOR TESTING
     max_laptop_closed_hours: 1, // Stop tracking after 1 hour of laptop being closed (reduced from 15)
     mandatory_screenshot_interval_minutes: 15 // Screenshots are mandatory every 15 minutes (reduced from 30)
 };
@@ -113,13 +113,13 @@ async function startActivityMonitoring(userId) {
     currentUserId = userId;
     isMonitoring = true;
     lastActivityTime = Date.now();
-    // Reset activity metrics
+    // Reset activity metrics - start with baseline activity score
     activityMetrics = {
         mouse_clicks: 0,
         keystrokes: 0,
         mouse_movements: 0,
         last_activity_time: Date.now(),
-        activity_score: 0
+        activity_score: 100 // Start with 100% activity score that can decay
     };
     // Fetch settings from server first
     await fetchSettings();
@@ -227,21 +227,21 @@ function stopActivityMonitoring() {
 function isUserActive() {
     // Use improved idle detection instead of corrupted activity tracking
     const currentIdleTime = calculateIdleTimeSeconds();
-    const idleThreshold = appSettings.idle_threshold_seconds;
+    const testingIdleThreshold = 10; // Force 10 seconds for testing
     // Only stop monitoring if we have consecutive technical failures, not just lack of screenshots
     if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
         safeLog(`❌ Too many consecutive screenshot failures (${consecutiveScreenshotFailures}), stopping monitoring due to technical issues`);
         return false;
     }
     // Check actual user activity using improved detection
-    const isActive = currentIdleTime < idleThreshold;
+    const isActive = currentIdleTime < testingIdleThreshold;
     // Log for debugging user activity detection
-    if (currentIdleTime > 30) { // Only log when approaching idle threshold
+    if (currentIdleTime > 5) { // Log more frequently for testing
         safeLog('👤 USER ACTIVITY CHECK:', {
             current_idle_seconds: currentIdleTime,
-            idle_threshold: idleThreshold,
+            idle_threshold: testingIdleThreshold,
             is_active: isActive,
-            detection_method: 'IMPROVED_SYSTEM_IDLE'
+            detection_method: 'IMPROVED_SYSTEM_IDLE_TESTING'
         });
     }
     return isActive;
@@ -268,8 +268,13 @@ function calculateIdleTimeSeconds() {
     // Also calculate manual tracking for comparison
     const now = Date.now();
     const manualIdleSeconds = Math.floor((now - activityMetrics.last_activity_time) / 1000);
-    // Use the larger of the two values (system idle is more reliable for detecting real idle time)
-    const finalIdleSeconds = Math.max(systemIdleSeconds, manualIdleSeconds);
+    // ALWAYS use the larger of the two values to prevent losing idle time
+    let finalIdleSeconds = Math.max(systemIdleSeconds, manualIdleSeconds);
+    // Extra safety: if system idle is suspiciously low but manual is high, trust manual
+    if (systemIdleSeconds < 5 && manualIdleSeconds > 60) {
+        finalIdleSeconds = manualIdleSeconds;
+        safeLog('🔧 IDLE DETECTION OVERRIDE: Using manual idle due to suspicious system idle reading');
+    }
     // ALWAYS log for debugging - let's see what's happening
     safeLog('🕐 ELECTRON IDLE TIME CALCULATION:', {
         system_idle_ms: systemIdleMs,
@@ -278,25 +283,54 @@ function calculateIdleTimeSeconds() {
         final_idle_seconds: finalIdleSeconds,
         last_activity_ago: manualIdleSeconds,
         using_system_idle: systemIdleSeconds >= manualIdleSeconds,
-        detection_method: 'ELECTRON_SYSTEM_IDLE',
+        detection_method: 'ELECTRON_SYSTEM_IDLE_ENHANCED',
         timestamp: new Date().toISOString(),
-        powerMonitor_available: typeof electron_1.powerMonitor !== 'undefined'
+        powerMonitor_available: typeof electron_1.powerMonitor !== 'undefined',
+        override_applied: systemIdleSeconds < 5 && manualIdleSeconds > 60
     });
     return finalIdleSeconds;
 }
 // Track real activity metrics instead of simulating
 async function trackActivityMetrics() {
-    if (!currentUserId || !isMonitoring)
+    // === FUNCTION ENTRY LOGGING ===
+    safeLog('🎬 ACTIVITY METRICS FUNCTION CALLED:', {
+        timestamp: new Date().toISOString(),
+        currentUserId: currentUserId ? 'EXISTS' : 'MISSING',
+        isMonitoring: isMonitoring,
+        will_proceed: !!(currentUserId && isMonitoring)
+    });
+    if (!currentUserId || !isMonitoring) {
+        safeLog('🚫 ACTIVITY METRICS SKIPPED:', {
+            reason: !currentUserId ? 'NO_USER_ID' : 'NOT_MONITORING',
+            currentUserId: !!currentUserId,
+            isMonitoring: isMonitoring
+        });
         return;
+    }
     try {
         // === IMPROVED IDLE DETECTION ===
         // Use system idle time instead of corrupted activity tracking
         const currentIdleTime = calculateIdleTimeSeconds();
         const idleThreshold = appSettings.idle_threshold_seconds; // Already in seconds
-        const isCurrentlyIdle = currentIdleTime > idleThreshold;
+        // === FORCE TESTING THRESHOLD ===
+        const testingIdleThreshold = 10; // Force 10 seconds for testing
+        const isCurrentlyIdle = currentIdleTime >= testingIdleThreshold;
+        // === ENHANCED DEBUGGING FOR DECAY LOGIC ===
+        safeLog('🔍 DECAY LOGIC DEBUG:', {
+            function_called: 'trackActivityMetrics',
+            timestamp: new Date().toISOString(),
+            currentIdleTime: currentIdleTime,
+            idleThreshold: testingIdleThreshold,
+            idleThreshold_original: idleThreshold,
+            isCurrentlyIdle: isCurrentlyIdle,
+            idle_comparison: `${currentIdleTime} >= ${testingIdleThreshold} = ${currentIdleTime >= testingIdleThreshold}`,
+            current_activity_score: activityMetrics.activity_score,
+            will_decay: isCurrentlyIdle && activityMetrics.activity_score > 0
+        });
         // === ACTIVITY_DECAY_SYSTEM ===
         // Gradually decrease activity score over time when idle using improved detection
         if (isCurrentlyIdle) {
+            safeLog('🎯 ENTERING DECAY BRANCH - User is currently idle');
             // Progressive decay: faster decay as idle time increases
             let decayRate = 1; // Base decay per second
             if (currentIdleTime > 60)
@@ -304,26 +338,47 @@ async function trackActivityMetrics() {
             if (currentIdleTime > 300)
                 decayRate = 5; // Much faster after 5 minutes
             const oldScore = activityMetrics.activity_score;
+            safeLog('🎯 BEFORE DECAY CALCULATION:', {
+                currentIdleTime: currentIdleTime,
+                oldScore: oldScore,
+                decayRate: decayRate,
+                willDecay: oldScore > 0
+            });
             activityMetrics.activity_score = Math.max(0, activityMetrics.activity_score - decayRate);
+            safeLog('🎯 AFTER DECAY CALCULATION:', {
+                oldScore: oldScore,
+                newScore: activityMetrics.activity_score,
+                scoreChanged: oldScore !== activityMetrics.activity_score,
+                decayAmount: oldScore - activityMetrics.activity_score
+            });
+            // Always log decay attempts, even if score doesn't change
+            safeLog('💤 ELECTRON ACTIVITY DECAY ATTEMPT:', {
+                idle_duration_seconds: currentIdleTime,
+                idle_threshold: testingIdleThreshold,
+                decay_rate: decayRate,
+                activity_score_before: oldScore,
+                activity_score_after: activityMetrics.activity_score,
+                score_changed: oldScore !== activityMetrics.activity_score,
+                user_status: 'ELECTRON_IDLE_DECAY',
+                using_system_idle: true
+            });
             if (oldScore !== activityMetrics.activity_score) {
-                safeLog('💤 ELECTRON ACTIVITY DECAY:', {
-                    idle_duration_seconds: currentIdleTime,
-                    idle_threshold: idleThreshold,
-                    decay_rate: decayRate,
-                    activity_score_before: oldScore,
-                    activity_score_after: activityMetrics.activity_score,
-                    user_status: 'ELECTRON_IDLE_DECAY',
-                    using_system_idle: true
-                });
+                safeLog('✅ DECAY SUCCESSFUL - SCORE CHANGED!');
+            }
+            else {
+                safeLog('⚠️ DECAY SKIPPED - SCORE ALREADY AT MINIMUM');
             }
         }
         else if (currentIdleTime > 0) {
             // Log when approaching idle but not there yet
+            safeLog('🎯 ENTERING APPROACHING IDLE BRANCH - User not yet idle');
             safeLog('⏰ ELECTRON APPROACHING IDLE:', {
                 idle_duration_seconds: currentIdleTime,
-                idle_threshold: idleThreshold,
-                seconds_until_decay: idleThreshold - currentIdleTime,
-                current_activity_score: activityMetrics.activity_score
+                idle_threshold: testingIdleThreshold,
+                seconds_until_decay: testingIdleThreshold - currentIdleTime,
+                current_activity_score: activityMetrics.activity_score,
+                debug_calculation: `${testingIdleThreshold} - ${currentIdleTime} = ${testingIdleThreshold - currentIdleTime}`,
+                should_be_idle: currentIdleTime >= testingIdleThreshold ? 'YES_BUT_NOT_DETECTED' : 'NO'
             });
         }
         // === DETAILED IDLE DETECTION LOGGING ===
@@ -497,7 +552,7 @@ async function captureActivityScreenshot() {
         safeLog('📸 Screenshot capture and upload completed successfully!');
         safeLog(`📊 Total screenshots this session: ${currentActivitySession?.total_screenshots || 0}`);
         // Calculate next screenshot time for user information
-        const nextScreenshotSeconds = config_1.screenshotIntervalSeconds;
+        const nextScreenshotSeconds = (0, config_1.screenshotIntervalSeconds)();
         const nextMinutes = Math.floor(nextScreenshotSeconds / 60);
         const nextSecondsRemainder = nextScreenshotSeconds % 60;
         safeLog(`📸 Next screenshot in ${nextMinutes} minutes ${nextSecondsRemainder} seconds`);
@@ -532,7 +587,7 @@ async function captureActivityScreenshot() {
             // Notify main process to stop timer tracking
             try {
                 if (!appEvents) {
-                    appEvents = require('./main').appEvents;
+                    appEvents = require('./main.cjs').appEvents;
                 }
                 if (appEvents) {
                     appEvents.emit('auto-stop-tracking', {
@@ -782,7 +837,7 @@ async function uploadActivityScreenshot(filePath, filename) {
         try {
             if (!appEvents) {
                 // Try to get app events again in case it wasn't available during initialization
-                appEvents = require('./main').appEvents;
+                appEvents = require('./main.cjs').appEvents;
             }
             if (appEvents) {
                 appEvents.emit('screenshot-captured');
@@ -1623,7 +1678,7 @@ function triggerActivityRefresh() {
 function setupAppEventHandlers() {
     try {
         if (!appEvents) {
-            appEvents = require('./main').appEvents;
+            appEvents = require('./main.cjs').appEvents;
         }
         if (appEvents) {
             // Listen for focus events
@@ -1681,6 +1736,7 @@ function scheduleRandomScreenshot() {
 }
 // Export function to get current activity metrics
 function getCurrentActivityMetrics() {
+    const currentIdleTime = calculateIdleTimeSeconds();
     return {
         mouse_clicks: activityMetrics.mouse_clicks,
         keystrokes: activityMetrics.keystrokes,
@@ -1689,6 +1745,9 @@ function getCurrentActivityMetrics() {
         last_activity_time: activityMetrics.last_activity_time,
         last_activity_formatted: new Date(activityMetrics.last_activity_time).toISOString(),
         time_since_last_activity_seconds: Math.round((Date.now() - activityMetrics.last_activity_time) / 1000),
+        idle_time_seconds: currentIdleTime,
+        idle_time_formatted: `${Math.floor(currentIdleTime / 60)}m ${currentIdleTime % 60}s`,
+        is_idle: currentIdleTime > 10, // Using testing threshold
         is_monitoring: isMonitoring,
         current_user_id: currentUserId
     };

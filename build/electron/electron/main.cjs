@@ -166,7 +166,7 @@ exports.appEvents = new events_1.EventEmitter();
 // Debug environment variables
 console.log('🔧 Environment variables at startup:');
 console.log('   SCREENSHOT_INTERVAL_SECONDS:', process.env.SCREENSHOT_INTERVAL_SECONDS);
-console.log('   Config screenshotIntervalSeconds:', config_1.screenshotIntervalSeconds);
+console.log('   Config screenshotIntervalSeconds will be available after config initialization');
 let mainWindow = null;
 let tray = null;
 let isTracking = false;
@@ -312,6 +312,18 @@ electron_1.app.whenReady().then(async () => {
     // CRITICAL: Check if running from DMG and prevent crashes
     if (!checkDMGAndPreventCrash()) {
         console.log('🛑 App startup prevented due to DMG location - quitting safely');
+        electron_1.app.quit();
+        return;
+    }
+    // Initialize secure configuration system
+    console.log('🔧 Initializing secure configuration...');
+    try {
+        await (0, config_1.initializeConfig)();
+        console.log('✅ Configuration initialized successfully');
+    }
+    catch (error) {
+        console.error('❌ Configuration initialization failed:', error);
+        console.log('🛑 App startup cancelled - configuration setup required');
         electron_1.app.quit();
         return;
     }
@@ -577,55 +589,95 @@ electron_1.ipcMain.on('clear-session', () => (0, tracker_1.clearSavedSession)())
 let configCache = null;
 let lastConfigLoad = 0;
 const CONFIG_CACHE_TTL = 5000; // 5 seconds
-electron_1.ipcMain.handle('get-config', () => {
+electron_1.ipcMain.handle('get-config', async () => {
     // Use cached config to prevent excessive file reads
     const now = Date.now();
     if (configCache && (now - lastConfigLoad) < CONFIG_CACHE_TTL) {
+        console.log('📦 Returning cached config for desktop agent');
         return configCache;
     }
-    // Try to load from desktop-agent config.json as fallback
-    let desktopConfig = {};
     try {
-        const configPath = path.join(__dirname, '../../desktop-agent/config.json');
-        if (fs.existsSync(configPath)) {
-            desktopConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-            console.log('📄 Loaded config from desktop-agent/config.json');
-            lastConfigLoad = now;
-        }
-    }
-    catch (error) {
-        console.log('⚠️ Could not load desktop-agent config.json:', error);
-    }
-    configCache = {
-        supabase_url: process.env.VITE_SUPABASE_URL || desktopConfig.supabase_url || '',
-        supabase_key: process.env.VITE_SUPABASE_ANON_KEY || desktopConfig.supabase_key || '',
-        user_id: process.env.USER_ID || desktopConfig.user_id || '',
-        project_id: process.env.PROJECT_ID || desktopConfig.project_id || '00000000-0000-0000-0000-000000000001',
-        screenshot_interval_seconds: desktopConfig.screenshot_interval_seconds || config_1.screenshotIntervalSeconds,
-        idle_threshold_seconds: desktopConfig.idle_threshold_seconds || Number(process.env.IDLE_TIMEOUT_MINUTES || 1) * 60,
-        enable_screenshots: desktopConfig.enable_screenshots !== undefined ? desktopConfig.enable_screenshots : true,
-        enable_idle_detection: desktopConfig.enable_idle_detection !== undefined ? desktopConfig.enable_idle_detection : true,
-        enable_activity_tracking: desktopConfig.enable_activity_tracking !== undefined ? desktopConfig.enable_activity_tracking : true,
-        enable_anti_cheat: desktopConfig.enable_anti_cheat !== undefined ? desktopConfig.enable_anti_cheat : process.env.ANTI_CHEAT_ENABLED !== 'false'
-    };
-    return configCache;
-});
-// Add missing fetch-screenshots handler if not already present
-electron_1.ipcMain.handle('fetch-screenshots', async (event, params) => {
-    try {
-        // Get config from desktop-agent as fallback
+        // CRITICAL: Ensure configuration is initialized before returning credentials
+        console.log('🔄 Desktop agent requesting config - ensuring initialization...');
+        // Import both the secure config and initialization function
+        const { getSupabaseCredentials } = await Promise.resolve().then(() => __importStar(require('./secure-config.cjs')));
+        const { initializeConfig } = await Promise.resolve().then(() => __importStar(require('./config.cjs')));
+        // Make sure config is initialized (this is idempotent - safe to call multiple times)
+        await initializeConfig();
+        // Get encrypted credentials
+        const credentials = getSupabaseCredentials();
+        console.log('🔑 Retrieved encrypted credentials for desktop agent');
+        console.log(`   URL: ${credentials.url}`);
+        console.log(`   Key length: ${credentials.key.length} characters`);
+        // Try to load from desktop-agent config.json as fallback for other settings
         let desktopConfig = {};
         try {
             const configPath = path.join(__dirname, '../../desktop-agent/config.json');
             if (fs.existsSync(configPath)) {
                 desktopConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                console.log('📄 Loaded additional config from desktop-agent/config.json');
             }
         }
         catch (error) {
             console.log('⚠️ Could not load desktop-agent config.json:', error);
         }
-        const supabaseUrl = process.env.VITE_SUPABASE_URL || desktopConfig.supabase_url;
-        const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || desktopConfig.supabase_key;
+        configCache = {
+            supabase_url: credentials.url,
+            supabase_key: credentials.key,
+            user_id: process.env.USER_ID || desktopConfig.user_id || '',
+            project_id: process.env.PROJECT_ID || desktopConfig.project_id || '00000000-0000-0000-0000-000000000001',
+            screenshot_interval_seconds: desktopConfig.screenshot_interval_seconds || config_1.screenshotIntervalSeconds,
+            idle_threshold_seconds: desktopConfig.idle_threshold_seconds || Number(process.env.IDLE_TIMEOUT_MINUTES || 1) * 60,
+            enable_screenshots: desktopConfig.enable_screenshots !== undefined ? desktopConfig.enable_screenshots : true,
+            enable_idle_detection: desktopConfig.enable_idle_detection !== undefined ? desktopConfig.enable_idle_detection : true,
+            enable_activity_tracking: desktopConfig.enable_activity_tracking !== undefined ? desktopConfig.enable_activity_tracking : true,
+            enable_anti_cheat: desktopConfig.enable_anti_cheat !== undefined ? desktopConfig.enable_anti_cheat : process.env.ANTI_CHEAT_ENABLED !== 'false'
+        };
+        lastConfigLoad = now;
+        console.log('✅ Desktop agent config prepared with encrypted credentials');
+        return configCache;
+    }
+    catch (error) {
+        console.error('❌ Failed to get encrypted credentials for desktop agent:', error);
+        // Fallback to try desktop-agent config.json
+        let desktopConfig = {};
+        try {
+            const configPath = path.join(__dirname, '../../desktop-agent/config.json');
+            if (fs.existsSync(configPath)) {
+                desktopConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                console.log('📄 Using fallback config from desktop-agent/config.json');
+            }
+        }
+        catch (fallbackError) {
+            console.log('⚠️ Could not load fallback desktop-agent config.json:', fallbackError);
+        }
+        configCache = {
+            supabase_url: process.env.VITE_SUPABASE_URL || desktopConfig.supabase_url || '',
+            supabase_key: process.env.VITE_SUPABASE_ANON_KEY || desktopConfig.supabase_key || '',
+            user_id: process.env.USER_ID || desktopConfig.user_id || '',
+            project_id: process.env.PROJECT_ID || desktopConfig.project_id || '00000000-0000-0000-0000-000000000001',
+            screenshot_interval_seconds: desktopConfig.screenshot_interval_seconds || config_1.screenshotIntervalSeconds,
+            idle_threshold_seconds: desktopConfig.idle_threshold_seconds || Number(process.env.IDLE_TIMEOUT_MINUTES || 1) * 60,
+            enable_screenshots: desktopConfig.enable_screenshots !== undefined ? desktopConfig.enable_screenshots : true,
+            enable_idle_detection: desktopConfig.enable_idle_detection !== undefined ? desktopConfig.enable_idle_detection : true,
+            enable_activity_tracking: desktopConfig.enable_activity_tracking !== undefined ? desktopConfig.enable_activity_tracking : true,
+            enable_anti_cheat: desktopConfig.enable_anti_cheat !== undefined ? desktopConfig.enable_anti_cheat : process.env.ANTI_CHEAT_ENABLED !== 'false'
+        };
+        lastConfigLoad = now;
+        return configCache;
+    }
+});
+// Add missing fetch-screenshots handler if not already present
+electron_1.ipcMain.handle('fetch-screenshots', async (event, params) => {
+    try {
+        // Use encrypted credentials for consistency
+        const { getSupabaseCredentials } = await Promise.resolve().then(() => __importStar(require('./secure-config.cjs')));
+        const { initializeConfig } = await Promise.resolve().then(() => __importStar(require('./config.cjs')));
+        // Ensure config is initialized
+        await initializeConfig();
+        const credentials = getSupabaseCredentials();
+        const supabaseUrl = credentials.url;
+        const supabaseKey = credentials.key;
         if (!supabaseUrl || !supabaseKey) {
             console.error('❌ Missing Supabase configuration in fetch-screenshots handler');
             return [];
@@ -672,7 +724,7 @@ electron_1.ipcMain.handle('test-screenshot', async () => {
     console.log('🧪 Manual screenshot test requested');
     try {
         // Import the activity monitor function
-        const { triggerDirectScreenshot } = await Promise.resolve().then(() => __importStar(require('./activityMonitor')));
+        const { triggerDirectScreenshot } = await Promise.resolve().then(() => __importStar(require('./activityMonitor.cjs')));
         const result = await triggerDirectScreenshot();
         console.log('✅ Screenshot test completed:', result);
         return { success: result, message: 'Screenshot test completed' };
@@ -686,7 +738,7 @@ electron_1.ipcMain.handle('manual-screenshot', async () => {
     console.log('📸 Manual screenshot capture requested');
     try {
         // Import the activity monitor function
-        const { triggerActivityCapture } = await Promise.resolve().then(() => __importStar(require('./activityMonitor')));
+        const { triggerActivityCapture } = await Promise.resolve().then(() => __importStar(require('./activityMonitor.cjs')));
         triggerActivityCapture();
         console.log('✅ Manual screenshot triggered');
         return { success: true, message: 'Manual screenshot triggered' };
@@ -825,9 +877,13 @@ function updateTrayMenu() {
             label: isTracking ? '⏸ Stop Tracking' : '▶️ Start Tracking',
             click: () => {
                 if (isTracking) {
+                    console.log('⏸️ Manual tracking stop requested from tray');
+                    (0, tracker_1.stopTracking)();
                     stopTrackingTimer();
                 }
                 else {
+                    console.log('▶️ Manual tracking start requested from tray');
+                    (0, tracker_1.startTracking)();
                     startTrackingTimer();
                 }
             }
@@ -846,7 +902,7 @@ function updateTrayMenu() {
             click: () => {
                 if (updateStatus.updateAvailable) {
                     // Import downloadUpdate dynamically to avoid circular imports
-                    Promise.resolve().then(() => __importStar(require('./autoUpdater'))).then(({ downloadUpdate }) => {
+                    Promise.resolve().then(() => __importStar(require('./autoUpdater.cjs'))).then(({ downloadUpdate }) => {
                         downloadUpdate();
                     });
                 }
@@ -1074,10 +1130,32 @@ electron_1.ipcMain.handle('get-activity-metrics', () => {
         // Import the function to get current metrics - fix path for built version
         const { getCurrentActivityMetrics } = require('./activityMonitor.cjs');
         const metrics = getCurrentActivityMetrics();
+        console.log('🔍 MAIN PROCESS sending metrics to UI:', {
+            idle_time_seconds: metrics.idle_time_seconds,
+            activity_score: metrics.activity_score,
+            mouse_clicks: metrics.mouse_clicks
+        });
         return { success: true, metrics };
     }
     catch (error) {
         console.error('❌ Error getting activity metrics:', error);
+        return { success: false, error: error.message };
+    }
+});
+// Add simpler handler for just idle time (fallback)
+electron_1.ipcMain.handle('get-idle-time', () => {
+    try {
+        const { getCurrentActivityMetrics } = require('./activityMonitor.cjs');
+        const metrics = getCurrentActivityMetrics();
+        return {
+            success: true,
+            idleTime: metrics.idle_time_seconds || 0,
+            isIdle: metrics.is_idle || false,
+            activityScore: metrics.activity_score || 100
+        };
+    }
+    catch (error) {
+        console.error('❌ Error getting idle time:', error);
         return { success: false, error: error.message };
     }
 });
@@ -1097,7 +1175,7 @@ electron_1.ipcMain.handle('demonstrate-enhanced-logging', () => {
 electron_1.ipcMain.handle('test-comprehensive-activity', (event, count = 1) => {
     try {
         console.log(`🧪 Starting comprehensive activity test with count: ${count}`);
-        const { testActivity } = require('./activityMonitor');
+        const { testActivity } = require('./activityMonitor.cjs');
         const metrics = testActivity('all', count);
         return { success: true, message: `Comprehensive activity test completed`, metrics };
     }

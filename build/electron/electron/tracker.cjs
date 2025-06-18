@@ -151,8 +151,8 @@ async function startTracking() {
             }
             console.log('📸 Calling captureAndUpload...');
             (0, screenshotManager_1.captureAndUpload)(userId, currentProjectId);
-        }, config_1.screenshotIntervalSeconds * 1000);
-        console.log(`✅ Screenshot interval set up successfully - will capture every ${config_1.screenshotIntervalSeconds}s`);
+        }, (0, config_1.screenshotIntervalSeconds)() * 1000);
+        console.log(`✅ Screenshot interval set up successfully - will capture every ${(0, config_1.screenshotIntervalSeconds)()}s`);
     }
     if (!appInterval) {
         appInterval = setInterval(() => {
