@@ -740,8 +740,10 @@ export type Database = {
       screenshots: {
         Row: {
           activity_percent: number | null
+          app_name: string | null
           captured_at: string
           classification: string | null
+          file_path: string | null
           focus_percent: number | null
           id: string
           image_url: string
@@ -751,12 +753,17 @@ export type Database = {
           mouse_movements: number | null
           project_id: string | null
           task_id: string | null
+          time_log_id: string | null
+          url: string | null
           user_id: string | null
+          window_title: string | null
         }
         Insert: {
           activity_percent?: number | null
+          app_name?: string | null
           captured_at?: string
           classification?: string | null
+          file_path?: string | null
           focus_percent?: number | null
           id?: string
           image_url: string
@@ -766,12 +773,17 @@ export type Database = {
           mouse_movements?: number | null
           project_id?: string | null
           task_id?: string | null
+          time_log_id?: string | null
+          url?: string | null
           user_id?: string | null
+          window_title?: string | null
         }
         Update: {
           activity_percent?: number | null
+          app_name?: string | null
           captured_at?: string
           classification?: string | null
+          file_path?: string | null
           focus_percent?: number | null
           id?: string
           image_url?: string
@@ -781,7 +793,10 @@ export type Database = {
           mouse_movements?: number | null
           project_id?: string | null
           task_id?: string | null
+          time_log_id?: string | null
+          url?: string | null
           user_id?: string | null
+          window_title?: string | null
         }
         Relationships: [
           {
@@ -803,6 +818,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "screenshots_time_log_id_fkey"
+            columns: ["time_log_id"]
+            isOneToOne: false
+            referencedRelation: "time_logs"
             referencedColumns: ["id"]
           },
         ]
