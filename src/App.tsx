@@ -115,127 +115,164 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected route wrapper that requires authentication
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+// Global flag to control debug logging (set to false for production)
+const DEBUG_LOGGING = false;
+
+const safeLog = (...args: any[]) => {
+  if (DEBUG_LOGGING) {
+    console.log(...args);
+  }
+};
+
+// Optimized Protected route wrapper
+const ProtectedRoute = React.memo(({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  
-  console.log('🔒 ProtectedRoute - user:', !!user, 'loading:', loading);
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
   
   if (!user) {
-    console.log('🚫 No user found, redirecting to login');
+    safeLog('🚫 No user found, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
-  console.log('✅ User authenticated, rendering protected content');
+  safeLog('✅ User authenticated, rendering protected content');
   return <>{children}</>;
-}
+});
 
-// Admin route wrapper that requires admin role
-function AdminRoute({ children }: { children: React.ReactNode }) {
+// Optimized Admin route wrapper
+const AdminRoute = React.memo(({ children }: { children: React.ReactNode }) => {
   const { userDetails, loading } = useAuth();
   
-  console.log('👑 AdminRoute - userDetails:', userDetails, 'loading:', loading);
+  safeLog('👑 AdminRoute - userDetails:', userDetails, 'loading:', loading);
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
   
   if (!userDetails) {
-    console.log('🚫 No user details found, redirecting to login');
+    safeLog('🚫 No user details found, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
   if (userDetails.role !== 'admin') {
-    console.log('🚫 User is not admin, redirecting to employee dashboard');
+    safeLog('🚫 User is not admin, redirecting to employee dashboard');
     return <Navigate to="/employee" replace />;
   }
   
-  console.log('✅ Admin user authenticated, rendering admin content');
+  safeLog('✅ Admin user authenticated, rendering admin content');
   return <>{children}</>;
-}
+});
 
-// Employee route wrapper
-function EmployeeRoute({ children }: { children: React.ReactNode }) {
+// Optimized Employee route wrapper
+const EmployeeRoute = React.memo(({ children }: { children: React.ReactNode }) => {
   const { userDetails, loading } = useAuth();
   
-  console.log('👤 EmployeeRoute - userDetails:', userDetails, 'loading:', loading);
+  safeLog('👤 EmployeeRoute - userDetails:', userDetails, 'loading:', loading);
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
   
   if (!userDetails) {
-    console.log('🚫 No user details found, redirecting to login');
+    safeLog('🚫 No user details found, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
   // If admin tries to access employee routes, redirect to admin dashboard
   if (userDetails.role === 'admin') {
-    console.log('🚫 Admin user accessing employee route, redirecting to admin dashboard');
+    safeLog('🚫 Admin user accessing employee route, redirecting to admin dashboard');
     return <Navigate to="/dashboard" replace />;
   }
   
-  console.log('✅ Employee user authenticated, rendering employee content');
+  safeLog('✅ Employee user authenticated, rendering employee content');
   return <>{children}</>;
-}
+});
 
-// Layout wrapper for authenticated pages
-function AppLayout({ children }: { children: React.ReactNode }) {
-  console.log('🏗️ AppLayout rendering');
+// Optimized Layout wrapper for authenticated pages
+const AppLayout = React.memo(({ children }: { children: React.ReactNode }) => {
+  safeLog('🏗️ AppLayout rendering');
   return (
     <MainLayout>
       {children}
     </MainLayout>
   );
-}
+});
 
-// Safe Navigate component to prevent SecurityError
-function SafeNavigate({ to, replace = false }: { to: string; replace?: boolean }) {
+// Optimized Safe Navigate component
+const SafeNavigate = React.memo(({ to, replace = false }: { to: string; replace?: boolean }) => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  console.log('🧭 SafeNavigate called:', { to, replace, currentPath: location.pathname });
+  safeLog('🧭 SafeNavigate called:', { to, replace, currentPath: location.pathname });
   
   React.useEffect(() => {
     // Prevent navigation to the same route
     if (location.pathname !== to) {
-      console.log('🧭 Navigating from', location.pathname, 'to', to);
+      safeLog('🧭 Navigating from', location.pathname, 'to', to);
       const timer = setTimeout(() => {
         navigate(to, { replace });
       }, 10); // Small delay to prevent rapid navigation
       
       return () => clearTimeout(timer);
     } else {
-      console.log('🧭 Already at destination:', to);
+      safeLog('🧭 Already at destination:', to);
     }
   }, [to, replace, navigate, location.pathname]);
   
   return <div className="flex items-center justify-center min-h-screen">Redirecting...</div>;
-}
+});
 
-// Component to wrap route components with error tracking
-function RouteWrapper({ children, routeName }: { children: React.ReactNode; routeName: string }) {
-  console.log(`🛣️ Rendering route: ${routeName}`);
+// Simplified Route Wrapper without excessive logging
+const RouteWrapper = React.memo(({ children, routeName }: { children: React.ReactNode; routeName: string }) => {
+  safeLog(`🛣️ Rendering route: ${routeName}`);
   
   React.useEffect(() => {
-    console.log(`📍 Route mounted: ${routeName}`);
+    safeLog(`📍 Route mounted: ${routeName}`);
     return () => {
-      console.log(`📍 Route unmounted: ${routeName}`);
+      safeLog(`📍 Route unmounted: ${routeName}`);
     };
   }, [routeName]);
   
   return <>{children}</>;
-}
+});
+
+// Combined Admin Layout wrapper to reduce nesting
+const AdminLayoutWrapper = React.memo(({ children, routeName }: { children: React.ReactNode; routeName: string }) => {
+  return (
+    <ProtectedRoute>
+      <AdminRoute>
+        <AppLayout>
+          <RouteWrapper routeName={routeName}>
+            {children}
+          </RouteWrapper>
+        </AppLayout>
+      </AdminRoute>
+    </ProtectedRoute>
+  );
+});
+
+// Combined Employee Layout wrapper
+const EmployeeLayoutWrapper = React.memo(({ children, routeName }: { children: React.ReactNode; routeName: string }) => {
+  return (
+    <ProtectedRoute>
+      <EmployeeRoute>
+        <AppLayout>
+          <RouteWrapper routeName={routeName}>
+            {children}
+          </RouteWrapper>
+        </AppLayout>
+      </EmployeeRoute>
+    </ProtectedRoute>
+  );
+});
 
 // Main routes component that will be wrapped by AuthProvider
 function AppRoutes() {
   const { user, userDetails, loading } = useAuth();
   
-  console.log('🛣️ AppRoutes - user:', !!user, 'userDetails:', userDetails, 'loading:', loading);
+  safeLog('🛣️ AppRoutes - user:', !!user, 'userDetails:', userDetails, 'loading:', loading);
   
   // Show loading while auth is being determined
   if (loading) {
@@ -295,308 +332,176 @@ function AppRoutes() {
         } 
       />
       
-      {/* Admin Routes */}
+      {/* Admin Routes - Using optimized wrapper */}
       <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <RouteWrapper routeName="dashboard">
-                <DashboardPage />
-              </RouteWrapper>
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="dashboard">
+          <DashboardPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/reports" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <RouteWrapper routeName="reports">
-                <ReportsPage />
-              </RouteWrapper>
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="reports">
+          <ReportsPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/reports/time-reports" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <RouteWrapper routeName="time-reports">
-                <TimeReportsPage />
-              </RouteWrapper>
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="time-reports">
+          <TimeReportsPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/reports/all-employee" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <AllEmployeeReport />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="all-employee">
+          <AllEmployeeReport />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/reports/individual-employee" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <IndividualEmployeeReport />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="individual-employee">
+          <IndividualEmployeeReport />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/reports/apps-urls-idle" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <AppsUrlsIdle />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="apps-urls-idle">
+          <AppsUrlsIdle />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/app-activity" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <AppActivityPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="app-activity">
+          <AppActivityPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/url-activity" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <UrlActivityPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="url-activity">
+          <UrlActivityPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/insights" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <InsightsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="insights">
+          <InsightsPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/users" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <UsersPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="users">
+          <UsersPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/projects" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <ProjectsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="projects">
+          <ProjectsPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/screenshots" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <ScreenshotsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="screenshots">
+          <ScreenshotsPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/apps" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <AppsViewer />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="apps">
+          <AppsViewer />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/urls" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <UrlsViewer />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="urls">
+          <UrlsViewer />
+        </AdminLayoutWrapper>
       } />
-      
-      {/* Debug route temporarily disabled for production build
-      <Route path="/debug-url-tracking" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <DebugUrlTracking />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
-      } />
-      */}
       
       <Route path="/settings" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <SettingsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="settings">
+          <SettingsPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/calendar" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <CalendarPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="calendar">
+          <CalendarPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/time-tracking" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <TimeTrackingPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="time-tracking">
+          <TimeTrackingPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/time-logs" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <TimeLogsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="time-logs">
+          <TimeLogsPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/employee-settings" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <EmployeeSettingsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="employee-settings">
+          <EmployeeSettingsPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/finance" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <FinancePage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="finance">
+          <FinancePage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/suspicious-activity" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <SuspiciousActivityPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="suspicious-activity">
+          <SuspiciousActivityPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/admin" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <AdminDashboard />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="admin">
+          <AdminDashboard />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/admin/email-reports" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <EmailReportsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="admin-email-reports">
+          <EmailReportsPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/admin/screenshots" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <AdminScreenshotsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="admin-screenshots">
+          <AdminScreenshotsPage />
+        </AdminLayoutWrapper>
       } />
       
       <Route path="/admin/idle-logs" element={
-        <ProtectedRoute>
-          <AdminRoute>
-            <AppLayout>
-              <AdminIdleLogsPage />
-            </AppLayout>
-          </AdminRoute>
-        </ProtectedRoute>
+        <AdminLayoutWrapper routeName="admin-idle-logs">
+          <AdminIdleLogsPage />
+        </AdminLayoutWrapper>
       } />
 
-
-      
-      {/* Employee Routes */}
+      {/* Employee Routes - Using optimized wrapper */}
       <Route path="/employee" element={
-        <ProtectedRoute>
-          <EmployeeRoute>
-            <AppLayout>
-              <EmployeeDashboard />
-            </AppLayout>
-          </EmployeeRoute>
-        </ProtectedRoute>
+        <EmployeeLayoutWrapper routeName="employee">
+          <EmployeeDashboard />
+        </EmployeeLayoutWrapper>
       } />
       
       <Route path="/employee/time-tracker" element={
-        <ProtectedRoute>
-          <EmployeeRoute>
-            <AppLayout>
-              <TrackerProvider>
-                <EmployeeTimeTracker />
-              </TrackerProvider>
-            </AppLayout>
-          </EmployeeRoute>
-        </ProtectedRoute>
+        <EmployeeLayoutWrapper routeName="employee-time-tracker">
+          <TrackerProvider>
+            <EmployeeTimeTracker />
+          </TrackerProvider>
+        </EmployeeLayoutWrapper>
       } />
       
       <Route path="/employee/reports" element={
-        <ProtectedRoute>
-          <EmployeeRoute>
-            <AppLayout>
-              <EmployeeReports />
-            </AppLayout>
-          </EmployeeRoute>
-        </ProtectedRoute>
+        <EmployeeLayoutWrapper routeName="employee-reports">
+          <EmployeeReports />
+        </EmployeeLayoutWrapper>
       } />
       
       {/* Catch all route */}
@@ -606,7 +511,7 @@ function AppRoutes() {
 }
 
 function App() {
-  console.log('🎯 App component rendering');
+  safeLog('🎯 App component rendering');
   
   return (
     <ErrorBoundary>

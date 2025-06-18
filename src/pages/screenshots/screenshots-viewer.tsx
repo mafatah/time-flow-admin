@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/providers/auth-provider';
 import { format, startOfDay, endOfDay, addMinutes, differenceInMinutes } from 'date-fns';
-import { Calendar, Camera, Users, Filter, Search, Download, Clock, Activity, Pause, Grid, List, Eye, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Calendar, Camera, Users, Filter, Search, Download, Clock, Activity, Pause, Grid, List, Eye, ChevronDown, ChevronUp, X, RefreshCw } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
@@ -82,6 +82,21 @@ export default function ScreenshotsViewer() {
 
   useEffect(() => {
     fetchData();
+  }, [selectedDate]);
+
+  // Add auto-refresh for real-time updates
+  useEffect(() => {
+    const isToday = selectedDate === format(new Date(), 'yyyy-MM-dd');
+    
+    if (isToday) {
+      // Auto-refresh every 30 seconds when viewing today's screenshots
+      const refreshInterval = setInterval(() => {
+        console.log('🔄 Auto-refreshing screenshots for real-time updates...');
+        fetchData();
+      }, 30000); // 30 seconds
+      
+      return () => clearInterval(refreshInterval);
+    }
   }, [selectedDate]);
 
   useEffect(() => {
@@ -351,6 +366,18 @@ export default function ScreenshotsViewer() {
         
         {/* View Mode Controls */}
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              console.log('🔄 Manual refresh triggered');
+              fetchData();
+            }}
+            size="sm"
+            title="Refresh Screenshots"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button
             variant={viewMode === 'combined' ? 'default' : 'outline'}
             onClick={() => setViewMode('combined')}

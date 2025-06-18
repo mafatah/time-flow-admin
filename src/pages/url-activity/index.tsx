@@ -103,11 +103,7 @@ export default function UrlActivityPage() {
       setLoading(true);
       const { start, end } = getDateRange();
 
-      console.log('🔍 Fetching URL data for range:', {
-        start: start.toISOString(),
-        end: end.toISOString(),
-        selectedUser
-      });
+      // Disabled for performance: console.log('🔍 Fetching URL data for range:', start, end, selectedUser);
 
       await fetchUrlData(start, end);
     } catch (error) {

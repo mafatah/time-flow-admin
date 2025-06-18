@@ -108,11 +108,7 @@ export default function AppsUrlsPage() {
       setLoading(true);
       const { start, end } = getDateRange();
 
-      console.log('🔍 Fetching app/URL data for range:', {
-        start: start.toISOString(),
-        end: end.toISOString(),
-        selectedUser
-      });
+      // Disabled for performance: console.log('🔍 Fetching app/URL data for range:', start, end, selectedUser);
 
       await Promise.all([
         fetchAppData(start, end),

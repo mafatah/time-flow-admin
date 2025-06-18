@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,20 +12,7 @@ import { format, subDays, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { Calendar, Clock, Download, Filter, Search } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-// Add logging for module loading
-console.log('🚀 TimeReports module loaded successfully');
-console.log('📦 Checking dependencies:', {
-  react: !!React,
-  supabase: !!supabase,
-  components: {
-    Card: !!Card,
-    Button: !!Button,
-    Badge: !!Badge,
-    Select: !!Select,
-    Input: !!Input,
-    Table: !!Table
-  }
-});
+// TimeReports module - optimized for performance
 
 interface TimeReport {
   id: string;
@@ -51,8 +38,6 @@ interface Project {
 }
 
 export default function TimeReports() {
-  console.log('🔧 TimeReports component function called');
-  
   const [reports, setReports] = useState<TimeReport[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -65,123 +50,59 @@ export default function TimeReports() {
     includeIdle: true
   });
 
-  console.log('🎯 Initial state set:', {
-    reportsCount: reports.length,
-    usersCount: users.length,
-    projectsCount: projects.length,
-    loading,
-    filters
-  });
-
   const { user } = useAuth();
   const { toast } = useToast();
 
-  console.log('🔐 Auth context:', { 
-    hasUser: !!user, 
-    userId: user?.id,
-    hasToast: !!toast 
-  });
+  // Memoize filter string to prevent unnecessary re-renders
+  const filtersKey = useMemo(() => 
+    JSON.stringify(filters), 
+    [filters.userId, filters.projectId, filters.startDate, filters.endDate, filters.includeIdle]
+  );
 
-  useEffect(() => {
-    console.log('🔄 Initial useEffect triggered - mounting component');
-    console.log('📡 Starting initial data fetch...');
-    
-    const initializeComponent = async () => {
-      try {
-        console.log('👥 Fetching users...');
-        await fetchUsers();
-        
-        console.log('📋 Fetching projects...');
-        await fetchProjects();
-        
-        console.log('📊 Fetching reports...');
-        await fetchReports();
-        
-        console.log('✅ Component initialization complete');
-      } catch (error) {
-        console.error('❌ Error during component initialization:', error);
-      }
-    };
-
-    initializeComponent();
-  }, []);
-
-  useEffect(() => {
-    console.log('🔄 Filters useEffect triggered - filters changed:', filters);
-    console.log('📊 Re-fetching reports due to filter change...');
-    fetchReports();
-  }, [filters]);
-
-  const fetchUsers = async () => {
-    console.log('👥 Starting fetchUsers');
+  const fetchUsers = useCallback(async () => {
     try {
-      console.log('📡 Making Supabase query for users...');
       const { data, error } = await supabase
         .from('users')
         .select('id, full_name, email')
         .order('full_name');
 
-      console.log('👥 Users query response:', { data: data?.length || 0, error });
-
-      if (error) {
-        console.error('❌ Error in users query:', error);
-        throw error;
-      }
-      
-      console.log('✅ Users fetched successfully:', data?.length || 0);
+      if (error) throw error;
       setUsers(data || []);
     } catch (error) {
-      console.error('❌ Error fetching users:', error);
+      console.error('Error fetching users:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch users',
         variant: 'destructive',
       });
     }
-  };
+  }, [toast]);
 
-  const fetchProjects = async () => {
-    console.log('📋 Starting fetchProjects');
+  const fetchProjects = useCallback(async () => {
     try {
-      console.log('📡 Making Supabase query for projects...');
       const { data, error } = await supabase
         .from('projects')
         .select('id, name')
         .order('name');
 
-      console.log('📋 Projects query response:', { data: data?.length || 0, error });
-
-      if (error) {
-        console.error('❌ Error in projects query:', error);
-        throw error;
-      }
-      
-      console.log('✅ Projects fetched successfully:', data?.length || 0);
+      if (error) throw error;
       setProjects(data || []);
     } catch (error) {
-      console.error('❌ Error fetching projects:', error);
+      console.error('Error fetching projects:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch projects',
         variant: 'destructive',
       });
     }
-  };
+  }, [toast]);
 
-  const fetchReports = async () => {
-    console.log('📊 Starting fetchReports');
+  const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
       const startDate = startOfDay(new Date(filters.startDate));
       const endDate = endOfDay(new Date(filters.endDate));
 
-      console.log('📅 Date range for query:', {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        filters
-      });
-
-      // Use a direct SQL-like query with joins to get user and project data
       let query = supabase
         .from('time_logs')
         .select(`
@@ -192,81 +113,68 @@ export default function TimeReports() {
         .gte('start_time', startDate.toISOString())
         .lte('start_time', endDate.toISOString());
 
-      console.log('🔍 Building query with filters...');
-
       if (filters.userId && filters.userId !== 'all') {
-        console.log('👤 Adding user filter:', filters.userId);
         query = query.eq('user_id', filters.userId);
       }
 
       if (filters.projectId && filters.projectId !== 'all') {
-        console.log('📁 Adding project filter:', filters.projectId);
         query = query.eq('project_id', filters.projectId);
       }
 
       if (!filters.includeIdle) {
-        console.log('⚡ Excluding idle time logs');
         query = query.eq('is_idle', false);
       }
 
-      console.log('📡 Executing time logs query...');
       const { data: timeLogData, error } = await query
         .order('start_time', { ascending: false });
 
-      console.log('📊 Time logs query response:', { 
-        dataCount: timeLogData?.length || 0, 
-        error,
-        hasData: !!timeLogData
-      });
-
-      if (error) {
-        console.error('❌ Error in time logs query:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       if (!timeLogData || timeLogData.length === 0) {
-        console.log('📊 No time log data found');
         setReports([]);
         return;
       }
 
-      console.log('🔄 Processing time log data...');
-      // Map the joined data directly
-      const enrichedReports = timeLogData.map((report, index) => {
-        const enriched = {
-          ...report,
-          user_name: (report as any).users?.full_name || 'Unknown User',
-          user_email: (report as any).users?.email || 'Unknown',
-          project_name: (report as any).projects?.name || 'Unknown Project'
-        };
-        
-        if (index < 3) { // Log first 3 records for debugging
-          console.log(`📝 Enriched record ${index}:`, {
-            id: enriched.id,
-            user_name: enriched.user_name,
-            project_name: enriched.project_name,
-            start_time: enriched.start_time,
-            is_idle: enriched.is_idle
-          });
-        }
-        
-        return enriched;
-      });
+      const enrichedReports = timeLogData.map((report) => ({
+        ...report,
+        user_name: (report as any).users?.full_name || 'Unknown User',
+        user_email: (report as any).users?.email || 'Unknown',
+        project_name: (report as any).projects?.name || 'Unknown Project'
+      }));
 
-      console.log('✅ Reports processed successfully:', enrichedReports.length);
       setReports(enrichedReports);
     } catch (error) {
-      console.error('❌ Error fetching reports:', error);
+      console.error('Error fetching reports:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch time reports',
         variant: 'destructive',
       });
     } finally {
-      console.log('🏁 fetchReports completed, setting loading to false');
       setLoading(false);
     }
-  };
+  }, [filters, toast]);
+
+  // Initial data fetch
+  useEffect(() => {
+    const initializeComponent = async () => {
+      try {
+        await Promise.all([fetchUsers(), fetchProjects()]);
+        await fetchReports();
+      } catch (error) {
+        console.error('Error during component initialization:', error);
+      }
+    };
+
+    initializeComponent();
+  }, [fetchUsers, fetchProjects, fetchReports]);
+
+  // Re-fetch reports when filters change (but not on initial mount)
+  useEffect(() => {
+    if (users.length > 0 && projects.length > 0) {
+      fetchReports();
+    }
+  }, [filtersKey, users.length, projects.length, fetchReports]);
 
   const calculateDuration = (start: string, end: string | null): string => {
     if (!end) return 'Ongoing';
@@ -281,8 +189,7 @@ export default function TimeReports() {
     return `${hours}h ${minutes}m`;
   };
 
-  const exportToCSV = () => {
-    console.log('📥 Starting CSV export with', reports.length, 'reports');
+  const exportToCSV = useCallback(() => {
     try {
       const csvData = reports.map((report: TimeReport) => ({
         'User': report.user_name,
@@ -310,7 +217,6 @@ export default function TimeReports() {
       a.href = url;
       a.download = `time-reports-${format(new Date(), 'yyyy-MM-dd')}.csv`;
       
-      console.log('✅ CSV export successful');
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -321,33 +227,35 @@ export default function TimeReports() {
         description: 'Report exported successfully',
       });
     } catch (error) {
-      console.error('❌ Error exporting to CSV:', error);
+      console.error('Error exporting to CSV:', error);
       toast({
         title: 'Error',
         description: 'Failed to export to CSV',
         variant: 'destructive',
       });
     }
-  };
+  }, [reports, toast]);
 
-  const getTotalHours = (): string => {
+  const getTotalHours = useMemo((): string => {
     const totalMs = reports.reduce((total, report) => {
       const start = new Date(report.start_time);
-      const end = report.end_time ? new Date(report.end_time) : new Date(); // Use current time for ongoing sessions
+      const end = report.end_time ? new Date(report.end_time) : new Date();
       return total + (end.getTime() - start.getTime());
     }, 0);
 
     const hours = Math.floor(totalMs / (1000 * 60 * 60));
     const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${minutes}m`;
-  };
+  }, [reports]);
 
-  const filteredReports = reports.filter(report => {
-    if (filters.userId && filters.userId !== 'all' && report.user_id !== filters.userId) return false;
-    if (filters.projectId && filters.projectId !== 'all' && report.project_id !== filters.projectId) return false;
-    if (!filters.includeIdle && report.is_idle) return false;
-    return true;
-  });
+  const filteredReports = useMemo(() => {
+    return reports.filter(report => {
+      if (filters.userId && filters.userId !== 'all' && report.user_id !== filters.userId) return false;
+      if (filters.projectId && filters.projectId !== 'all' && report.project_id !== filters.projectId) return false;
+      if (!filters.includeIdle && report.is_idle) return false;
+      return true;
+    });
+  }, [reports, filters.userId, filters.projectId, filters.includeIdle]);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -456,7 +364,7 @@ export default function TimeReports() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold">{getTotalHours()}</div>
+            <div className="text-2xl font-bold">{getTotalHours}</div>
             <div className="text-sm text-gray-500">Total Time</div>
           </CardContent>
         </Card>

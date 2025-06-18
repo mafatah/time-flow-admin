@@ -80,11 +80,7 @@ export default function AppActivityPage() {
       setLoading(true);
       const { start, end } = getDateRange();
 
-      console.log('🔍 Fetching app data for range:', {
-        start: start.toISOString(),
-        end: end.toISOString(),
-        selectedUser
-      });
+      // Disabled for performance: console.log('🔍 Fetching app data for range:', start, end, selectedUser);
 
       await fetchAppData(start, end);
     } catch (error) {

@@ -110,6 +110,13 @@ let idleStart = null;
 let lastActivity = Date.now();
 let lastMousePos = { x: 0, y: 0 };
 let systemSleepStart = null;
+let lastIdleLogTime = 0;
+let lastDuplicateAppLogTime = 0;
+let lastDuplicateUrlLogTime = 0;
+let lastMouseLogTime = 0;
+let lastKeyboardLogTime = 0;
+let lastAppCaptureLogTime = 0;
+let lastUrlCaptureLogTime = 0;
 
 // Permission dialog tracking
 let permissionDialogShown = false;
@@ -688,7 +695,8 @@ function startMouseTracking() {
           if (consecutiveMovements >= 2 && (now - lastMovementTime) < 200) {
             // Pattern suggests cursor movement followed by potential click
             activityStats.mouseClicks++;
-            console.log('🖱️ Mouse click detected (pattern-based)');
+            // Mouse activity logging disabled for performance
+        // console.log('🖱️ Mouse activity detected'); // Disabled
             
             if (antiCheatDetector) {
               antiCheatDetector.recordActivity('mouse_click', {
@@ -706,7 +714,7 @@ function startMouseTracking() {
           if (distance < 20 && consecutiveMovements >= 1) {
             // Small movements might indicate clicking
             activityStats.mouseClicks++;
-            console.log('🖱️ Mouse click detected (small movement pattern)');
+            // Reduced logging - already handled above
             consecutiveMovements = 0;
           }
         }
@@ -727,7 +735,7 @@ function startMouseTracking() {
         // System shows recent activity - likely user interaction
         if (Math.random() > 0.7) { // Add some randomness to avoid over-counting
           activityStats.mouseClicks++;
-          console.log('🖱️ Mouse click detected (system activity pattern)');
+          // Reduced logging - already handled above
           
           if (antiCheatDetector) {
             antiCheatDetector.recordActivity('mouse_click', {
@@ -744,7 +752,7 @@ function startMouseTracking() {
       if ((now - lastMouseCheck) > 5000 && currentIdleTime < 2000) {
         // User has been active in the last 2 seconds, add some activity
         activityStats.mouseClicks++;
-        console.log('🖱️ Mouse click detected (periodic activity boost)');
+        // Reduced logging - already handled above
       }
       
       lastMouseCheck = now;
@@ -777,7 +785,8 @@ function startKeyboardTracking() {
           activityStats.keystrokes++;
           lastActivity = now;
           lastKeyboardActivity = now;
-          console.log('⌨️ Keyboard activity detected');
+          // Keyboard activity logging disabled for performance
+      // console.log('⌨️ Keyboard activity detected'); // Disabled
           
           if (antiCheatDetector) {
             antiCheatDetector.recordActivity('keyboard', {
@@ -793,7 +802,7 @@ function startKeyboardTracking() {
       if (currentIdle < 500 && now - lastKeyboardActivity > 3000) {
         activityStats.keystrokes++;
         lastKeyboardActivity = now;
-        console.log('⌨️ Active typing detected');
+        // Reduced logging - already handled above
       }
       
       lastIdleCheck = currentIdle;
@@ -1109,7 +1118,8 @@ function startAppCapture() {
   console.log('🖥️ Starting enhanced cross-platform app capture every 5s');
   
   appCaptureInterval = setInterval(async () => {
-    console.log('🔍 [APP-CAPTURE] Running app capture interval...');
+    // App capture logging disabled for performance
+    // console.log('🔍 [APP-CAPTURE] Running interval...'); // Disabled
     if (!isTracking) {
       console.log('🔍 [APP-CAPTURE] Skipping - tracking not active');
       return;
@@ -1123,12 +1133,14 @@ function startAppCapture() {
         return;
       }
       
-      console.log(`🔍 [APP-CAPTURE] Detected: "${activeApp.name}" | Title: "${activeApp.title || 'No Title'}" | Platform: ${activeApp.platform || 'Unknown'}`);
+      // App detection logging disabled for performance
+      // console.log(`🔍 [APP-CAPTURE] Detected: "${activeApp.name}"`); // Disabled
       
       // Avoid duplicate captures
       const appKey = `${activeApp.name}|${activeApp.title}`;
       if (lastAppCapture === appKey) {
-        console.log(`🔍 [APP-CAPTURE] Skipping duplicate: ${activeApp.name}`);
+                // Duplicate app logging disabled for performance
+        // console.log(`🔍 [APP-CAPTURE] Skipping duplicate: ${activeApp.name}`); // Disabled
         return; // Same app, skip
       }
       
@@ -1250,7 +1262,7 @@ async function getAllRunningBrowsers() {
         }
       }
       
-      console.log(`🔍 [BROWSER-DETECT] Found running browsers: ${browsers.map(b => b.name).join(', ')}`);
+      // Browser detection logging disabled for performance
       return browsers;
     }
     
@@ -1279,7 +1291,8 @@ async function extractUrlFromBrowser(browserName, windowTitle) {
 
 async function getMacBrowserUrl(browserName) {
   try {
-    console.log(`🔍 [URL-EXTRACT] Attempting to extract active tab URL from "${browserName}"...`);
+    // URL extraction logging disabled for performance
+  // console.log(`🔍 [URL-EXTRACT] Attempting to extract from "${browserName}"...`); // Disabled
     const { execSync } = require('child_process');
     const lowerBrowser = browserName.toLowerCase();
     let script = '';
@@ -1329,17 +1342,17 @@ async function getMacBrowserUrl(browserName) {
       return null;
     }
     
-    console.log(`🔍 [URL-EXTRACT] Executing AppleScript for ${browserName}...`);
+            // AppleScript execution logging disabled for performance
     const result = execSync(`osascript -e '${script}'`, { 
       encoding: 'utf8',
       timeout: 5000  // Standard timeout
     }).trim();
     
-    console.log(`🔍 [URL-EXTRACT] Raw AppleScript result: "${result}"`);
+            // Raw AppleScript result logging disabled for performance
     
     if (result && result !== '') {
       if (result.startsWith('http')) {
-        console.log(`✅ [URL-EXTRACT] Successfully extracted active tab URL: ${result}`);
+        // URL extraction success logging disabled for performance
         return result;
       } else if (lowerBrowser.includes('firefox') && result.includes('http')) {
         // Firefox window title - try to extract URL
@@ -1397,18 +1410,19 @@ function startUrlCapture() {
   console.log('🌐 Starting enhanced URL capture every 5s - will check ALL running browsers');
   
   urlCaptureInterval = setInterval(async () => {
-    console.log('🔍 [URL-CAPTURE] Running URL capture interval...');
+    // URL capture logging disabled for performance
+    // console.log('🔍 [URL-CAPTURE] Running interval...'); // Disabled
     if (!isTracking) {
       console.log('🔍 [URL-CAPTURE] Skipping - tracking not active');
       return;
     }
     
     try {
-      console.log('🔍 [URL-CAPTURE] Checking for browser URLs from all running browsers...');
+              // Browser URLs checking logging disabled for performance
       
       // Get all running browsers and try to extract URLs from each
       const runningBrowsers = await getAllRunningBrowsers();
-      console.log(`🔍 [URL-CAPTURE] Found ${runningBrowsers.length} running browsers`);
+      // Running browsers count logging disabled for performance
       
       if (runningBrowsers.length === 0) {
         console.log('🔍 [URL-CAPTURE] No running browsers detected');
@@ -1425,7 +1439,7 @@ function startUrlCapture() {
       
       // Check ALL running browsers (remove skip logic to capture multiple browsers)
       for (const browser of runningBrowsers) {
-        console.log(`🔍 [URL-CAPTURE] Checking browser: ${browser.name}...`);
+        // Browser checking logging disabled for performance
         
         const url = await extractUrlFromBrowser(browser.name, browser.title);
         if (url) {
@@ -1438,7 +1452,7 @@ function startUrlCapture() {
             isActive: isActiveBrowser
           });
           
-          console.log(`✅ [URL-CAPTURE] Found URL from ${browser.name}: ${extractDomain(url)} (${isActiveBrowser ? 'ACTIVE' : 'background'})`);
+          // URL capture success logging disabled for performance
         } else {
           console.log(`⚠️ [URL-CAPTURE] No URL found from ${browser.name}`);
         }
@@ -1483,7 +1497,8 @@ async function processFoundUrl(urlData) {
     
     if (lastUrl === urlData.url) {
       // Same URL as last time - don't log duplicate
-      console.log(`🔍 [URL-CAPTURE] Skipping duplicate URL: ${urlData.domain} (same as last capture for ${urlData.browser})`);
+            // Duplicate URL logging disabled for performance
+      // console.log(`🔍 [URL-CAPTURE] Skipping duplicate URL: ${urlData.domain}`); // Disabled
       return;
     }
     
@@ -2076,17 +2091,15 @@ function calculateIdleTimeSeconds() {
   // Use the larger of the two values (system idle is more reliable)
   const finalIdleSeconds = Math.max(systemIdleSeconds, manualIdleSeconds);
   
-  // ALWAYS log for debugging - let's see what's happening
-  console.log('🕐 DESKTOP AGENT IDLE TIME CALCULATION:', {
-    system_idle_ms: systemIdleMs,
-    system_idle_seconds: systemIdleSeconds,
-    manual_idle_seconds: manualIdleSeconds,
-    final_idle_seconds: finalIdleSeconds,
-    last_activity_ago: manualIdleSeconds,
-    using_system_idle: systemIdleSeconds >= manualIdleSeconds,
-    timestamp: new Date().toISOString(),
-    powerMonitor_available: typeof powerMonitor !== 'undefined'
-  });
+  // Logging disabled for performance - was causing slowdowns
+  // Only log on significant changes (idle state transitions)
+  // if (Date.now() - lastIdleLogTime > 300000) { // 5 minutes
+  //   console.log('🕐 IDLE CALCULATION (5min update):', {
+  //     final_idle_seconds: finalIdleSeconds,
+  //     using_system_idle: systemIdleSeconds >= manualIdleSeconds
+  //   });
+  //   lastIdleLogTime = Date.now();
+  // }
   
   return finalIdleSeconds;
 }
@@ -2123,7 +2136,7 @@ function startScreenshotCapture() {
 
 function scheduleRandomScreenshot() {
   try {
-    if (!isTrackingActive || !currentSession) {
+    if (!isTracking || !currentSession) {
       console.log('⏭️ Skipping screenshot scheduling - tracking not active or no session');
       return;
     }
@@ -2140,8 +2153,8 @@ function scheduleRandomScreenshot() {
     
     screenshotTimeout = setTimeout(async () => {
       try {
-        if (isTrackingActive && currentSession) {
-          await captureRandomScreenshot();
+        if (isTracking && currentSession) {
+          await captureScreenshot();
         }
         
         // Schedule the next screenshot
@@ -3516,16 +3529,21 @@ ipcMain.handle('fetch-screenshots', async (event, params) => {
 
 console.log('✅ Desktop Agent main process initialized with log download handlers');
 
-// === IDLE DETECTION TEST ===
+// === IDLE DETECTION TEST (DISABLED FOR PERFORMANCE) ===
+// Disabled to improve performance - was causing excessive logging
+// Uncomment only for debugging idle detection issues
+/*
 setInterval(() => {
-  console.log('🧪 IDLE TEST RESULTS:', {
-    calculateIdleTimeSeconds: calculateIdleTimeSeconds(),
-    getSystemIdleTime_ms: getSystemIdleTime(),
-    manual_calculation: Math.floor((Date.now() - lastActivity) / 1000),
-    powerMonitor_available: typeof powerMonitor !== 'undefined',
-    timestamp: new Date().toISOString()
-  });
-}, 5000); // Test every 5 seconds
+  try {
+    console.log('🧪 IDLE TEST (debug only):', {
+      idle_seconds: calculateIdleTimeSeconds(),
+      system_available: typeof powerMonitor !== 'undefined'
+    });
+  } catch (error) {
+    // Ignore EPIPE errors from console.log
+  }
+}, 300000); // 5 minutes
+*/
 
 // === ADDITIONAL MISSING HANDLERS ===
 ipcMain.handle('get-activity-stats', () => {

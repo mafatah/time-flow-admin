@@ -37,12 +37,21 @@ import {
 
 } from "lucide-react";
 
+// Global flag to control debug logging (set to false for production)
+const DEBUG_LOGGING = false;
+
+const safeLog = (...args: any[]) => {
+  if (DEBUG_LOGGING) {
+    console.log(...args);
+  }
+};
+
 const Sidebar = () => {
   const location = useLocation();
   const { userDetails, signOut } = useAuth();
   
-  // Debug logging
-  console.log('🔍 Sidebar Debug:', {
+  // Debug logging (controlled by flag)
+  safeLog('🔍 Sidebar Debug:', {
     currentPath: location.pathname,
     userDetails: userDetails,
     userRole: userDetails?.role
