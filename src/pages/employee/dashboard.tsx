@@ -50,8 +50,8 @@ const EmployeeDashboard = () => {
   useEffect(() => {
     if (userDetails?.id) {
       fetchEmployeeStats();
-      // Refresh every minute
-      const interval = setInterval(fetchEmployeeStats, 60000);
+      // Refresh every 5 minutes to reduce server load
+      const interval = setInterval(fetchEmployeeStats, 300000);
       return () => clearInterval(interval);
     }
   }, [userDetails?.id]);
@@ -78,8 +78,7 @@ const EmployeeDashboard = () => {
 
       if (todayTimeLogsError) throw todayTimeLogsError;
 
-      console.log('Today time logs:', todayTimeLogs);
-      console.log('Today date range:', startOfToday.toISOString(), 'to', endOfToday.toISOString());
+        // Time logs logging disabled for performance
 
       // Get time logs for this week
       const { data: weekTimeLogs, error: weekTimeLogsError } = await supabase
@@ -133,29 +132,16 @@ const EmployeeDashboard = () => {
         const startTime = new Date(log.start_time);
         const endTime = log.end_time ? new Date(log.end_time) : new Date();
         
-        console.log('Processing log:', {
-          id: log.id,
-          start_time: log.start_time,
-          end_time: log.end_time,
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString()
-        });
+        // Processing log details disabled for performance
         
         // Ensure the session is within today's range
         const sessionStart = startTime < startOfToday ? startOfToday : startTime;
         const sessionEnd = endTime > endOfToday ? endOfToday : endTime;
         
-        console.log('Session bounds:', {
-          sessionStart: sessionStart.toISOString(),
-          sessionEnd: sessionEnd.toISOString()
-        });
-        
         // Only calculate if session is valid
         if (sessionStart < sessionEnd) {
           const durationMinutes = differenceInMinutes(sessionEnd, sessionStart);
           const hours = durationMinutes / 60;
-
-          console.log('Calculated duration:', { durationMinutes, hours });
 
           // Only add positive durations
           if (hours > 0) {
@@ -177,7 +163,7 @@ const EmployeeDashboard = () => {
         }
       });
 
-      console.log('Final calculated hours:', { todayHours, todayIdleTime });
+      // Final calculation logging disabled for performance
 
       // Process time logs for week
       weekTimeLogs?.forEach((log: any) => {

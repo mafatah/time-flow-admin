@@ -43,10 +43,7 @@ import AdminDashboard from '@/pages/admin';
 // import DebugUrlTracking from '@/components/debug/debug-url-tracking';
 
 
-console.log('🚀 App.tsx loading...');
-
-// Add global error handlers to catch JavaScript errors
-console.log('🔧 Setting up global error handlers...');
+// App loading and error handler setup logging disabled for performance
 
 // Catch unhandled JavaScript errors
 window.addEventListener('error', (event) => {
@@ -71,9 +68,7 @@ window.addEventListener('unhandledrejection', (event) => {
 // Add resource loading error detection
 const originalAddEventListener = document.addEventListener;
 document.addEventListener = function(type: string, listener: any, options?: any) {
-  if (type === 'error') {
-    console.log('📡 Error event listener added');
-  }
+  // Error event listener logging disabled for performance
   return originalAddEventListener.call(this, type, listener, options);
 };
 
@@ -82,10 +77,10 @@ const originalCreateElement = document.createElement;
 document.createElement = function(tagName: string) {
   const element = originalCreateElement.call(this, tagName);
   if (tagName.toLowerCase() === 'script') {
-    console.log('📜 Script element created');
+    // Script element logging disabled for performance
     const scriptElement = element as HTMLScriptElement;
     scriptElement.addEventListener('load', () => {
-      console.log('✅ Script loaded successfully:', scriptElement.src);
+      // Script load logging disabled for performance
     });
     scriptElement.addEventListener('error', (event) => {
       console.error('❌ Script failed to load:', {
@@ -97,14 +92,7 @@ document.createElement = function(tagName: string) {
   return element;
 };
 
-console.log('🌐 Environment check:', {
-  userAgent: navigator.userAgent,
-  url: window.location.href,
-  origin: window.location.origin,
-  pathname: window.location.pathname,
-  search: window.location.search,
-  hash: window.location.hash
-});
+// Environment check logging disabled for performance
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -67,11 +67,11 @@ export default function UrlActivityPage() {
       fetchUsers();
       fetchData();
       
-      // Auto-refresh every 30 seconds to catch new URLs
+      // Auto-refresh every 2 minutes to reduce server load  
       const interval = setInterval(() => {
-        console.log('🔄 Auto-refreshing URL data...');
+        // Auto-refresh reduced frequency for performance
         fetchData();
-      }, 30000);
+      }, 120000);
       
       return () => clearInterval(interval);
     }
@@ -126,22 +126,10 @@ export default function UrlActivityPage() {
         query = query.eq('user_id', selectedUser);
       }
 
-      console.log('🔍 [URL-FETCH] Query details:', {
-        dateRange: { start: start.toISOString(), end: end.toISOString() },
-        selectedUser,
-        isToday: format(start, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-      });
+      // Query details and raw data logging disabled for performance
 
       const { data, error } = await query;
       if (error) throw error;
-
-      console.log('🌐 Raw URL data retrieved:', {
-        totalRecords: data?.length || 0,
-        dateRange: `${start.toISOString()} to ${end.toISOString()}`,
-        latestRecord: data && data.length > 0 ? data[0].started_at : 'NONE',
-        oldestRecord: data && data.length > 0 ? data[data.length - 1].started_at : 'NONE',
-        sampleUrls: data?.slice(0, 3).map(d => ({ url: d.site_url, time: d.started_at })) || []
-      });
 
       // Process URL data with better domain extraction and duration handling
       const urlStats = (data || []).reduce((acc: any, log: any) => {
@@ -180,11 +168,7 @@ export default function UrlActivityPage() {
         .sort((a: any, b: any) => b.total_duration - a.total_duration)
         .slice(0, 20); // Top 20 domains
 
-      console.log('📊 Processed URL data:', {
-        uniqueDomains: processedUrls.length,
-        totalProcessedDuration: totalDuration,
-        topDomains: processedUrls.slice(0, 3).map(u => ({ domain: u.domain, visits: u.total_visits }))
-      });
+      // Processed URL data logging disabled for performance
       
       setUrlData(processedUrls);
     } catch (error) {

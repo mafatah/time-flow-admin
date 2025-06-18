@@ -89,11 +89,11 @@ export default function ScreenshotsViewer() {
     const isToday = selectedDate === format(new Date(), 'yyyy-MM-dd');
     
     if (isToday) {
-      // Auto-refresh every 30 seconds when viewing today's screenshots
-      const refreshInterval = setInterval(() => {
-        console.log('🔄 Auto-refreshing screenshots for real-time updates...');
-        fetchData();
-      }, 30000); // 30 seconds
+              // Auto-refresh every 2 minutes when viewing today's screenshots  
+        const refreshInterval = setInterval(() => {
+          // Auto-refresh reduced frequency for performance
+          fetchData();
+        }, 120000); // 2 minutes
       
       return () => clearInterval(refreshInterval);
     }
@@ -101,7 +101,7 @@ export default function ScreenshotsViewer() {
 
   useEffect(() => {
     if (screenshots.length > 0) {
-      console.log('🔄 Filters changed, recalculating views...');
+      // Filter change logging disabled for performance
     }
   }, [userFilter, projectFilter, categoryFilter, searchTerm]);
 
@@ -113,11 +113,7 @@ export default function ScreenshotsViewer() {
       const startDate = startOfDay(selectedDateTime);
       const endDate = endOfDay(selectedDateTime);
 
-      console.log('🔍 Fetching screenshots for date range:', {
-        selectedDate,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString()
-      });
+      // Screenshot fetch details logging disabled for performance
 
       const isToday = selectedDate === format(new Date(), 'yyyy-MM-dd');
       let query = supabase
@@ -369,7 +365,7 @@ export default function ScreenshotsViewer() {
           <Button
             variant="outline"
             onClick={() => {
-              console.log('🔄 Manual refresh triggered');
+              // Manual refresh logging disabled for performance
               fetchData();
             }}
             size="sm"

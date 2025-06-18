@@ -106,7 +106,7 @@ export default function AppActivityPage() {
       const { data, error } = await query;
       if (error) throw error;
 
-      console.log('📱 Raw app data:', data?.length, 'records');
+      // Raw app data logging disabled for performance
 
       // Process app data with better duration handling
       const appStats = (data || []).reduce((acc: any, log: any) => {
@@ -142,7 +142,7 @@ export default function AppActivityPage() {
         .sort((a: any, b: any) => b.total_duration - a.total_duration)
         .slice(0, 20); // Top 20 apps
 
-      console.log('📊 Processed app data:', processedApps.slice(0, 3));
+      // Processed app data logging disabled for performance
       setAppData(processedApps);
     } catch (error) {
       console.error('Error fetching app data:', error);

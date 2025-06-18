@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           async (event: AuthChangeEvent, session: Session | null) => {
             if (!mounted) return;
             
-            console.log('Auth state change:', event, session?.user?.email);
+            // Auth state change logging disabled for performance
             setSession(session);
             setUser(session?.user ?? null);
             
@@ -131,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      console.log('Fetching user details for:', validUserId);
+      // User details fetch logging disabled for performance
       const { data, error } = await supabase
         .from("users")
         .select(`
@@ -153,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
-      console.log('User details fetched:', data);
+              // User details logging disabled for performance
       setUserDetails(data);
       setError(null);
     } catch (error) {
