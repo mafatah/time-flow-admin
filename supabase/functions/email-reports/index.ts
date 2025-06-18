@@ -34,6 +34,12 @@ interface AppUsageStats {
   percentage: number;
 }
 
+interface UrlUsageStats {
+  domain: string;
+  total_time: string;
+  percentage: number;
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -254,6 +260,9 @@ async function generateDailyReport(supabase: any) {
   
   // Get app usage stats for today
   const appUsageStats = await getAppUsageStatsForPeriod(supabase, startOfDay, endOfDay);
+  
+  // Get URL usage stats for today
+  const urlUsageStats = await getUrlUsageStatsForPeriod(supabase, startOfDay, endOfDay);
 
   // Get low activity alerts
   const lowActivityAlerts = employeeStats.filter(emp => emp.activity_percentage < 30);
@@ -276,6 +285,7 @@ async function generateDailyReport(supabase: any) {
     employees: employeeStats.slice(0, 10), // Top 10 employees
     projects: projectStats.slice(0, 10), // Top 10 projects
     app_usage: appUsageStats.slice(0, 10), // Top 10 apps
+    url_usage: urlUsageStats.slice(0, 10), // Top 10 URLs
     low_activity_alerts: lowActivityAlerts
   };
 }
@@ -291,16 +301,25 @@ async function generateWeeklyReport(supabase: any) {
   // Get employee stats for this week
   const employeeStats = await getEmployeeStatsForPeriod(supabase, startOfWeek, endOfWeek);
   
-  // Calculate badges and achievements
-  const achievements = calculateWeeklyAchievements(employeeStats);
+  // Get project stats for this week
+  const projectStats = await getProjectStatsForPeriod(supabase, startOfWeek, endOfWeek);
+  
+  // Get app usage stats for this week
+  const appUsageStats = await getAppUsageStatsForPeriod(supabase, startOfWeek, endOfWeek);
+
+  // Calculate summary statistics
+  const totalHours = employeeStats.reduce((sum, emp) => sum + emp.total_hours, 0);
+  const avgActivity = employeeStats.length > 0 ? 
+    employeeStats.reduce((sum, emp) => sum + emp.activity_percentage, 0) / employeeStats.length : 0;
 
   return {
-    week_period: `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${endOfWeek.getFullYear()}`,
+    week_period: `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+    total_hours: Math.floor(totalHours) + ':' + Math.floor((totalHours % 1) * 60).toString().padStart(2, '0'),
+    members_worked: employeeStats.length,
+    activity_percentage: Math.round(avgActivity),
     employees: employeeStats,
-    achievements,
-    efficiency_pro_percentage: Math.round((achievements.efficiency_pros.length / employeeStats.length) * 100),
-    time_hero_percentage: Math.round((achievements.time_heroes.length / employeeStats.length) * 100),
-    hot_streaks: achievements.hot_streaks.slice(0, 3) // Top 3 hot streaks
+    projects: projectStats,
+    app_usage: appUsageStats
   };
 }
 
@@ -501,25 +520,37 @@ async function getAppUsageStatsForPeriod(supabase: any, startDate: Date, endDate
     .sort((a, b) => b.percentage - a.percentage);
 }
 
-// Calculate weekly achievements and badges
-function calculateWeeklyAchievements(employees: EmployeeStats[]) {
-  const efficiency_pros = employees.filter(emp => emp.activity_percentage >= 65);
-  const time_heroes = employees.filter(emp => emp.total_hours >= 35);
-  const productivity_champs = employees.filter(emp => emp.activity_percentage >= 85 && emp.total_hours >= 40);
+// Get URL usage statistics for a time period
+async function getUrlUsageStatsForPeriod(supabase: any, startDate: Date, endDate: Date): Promise<UrlUsageStats[]> {
+  const { data: urlLogs, error } = await supabase
+    .from('url_logs')
+    .select('domain, duration_seconds')
+    .gte('started_at', startDate.toISOString())
+    .lte('started_at', endDate.toISOString())
+    .not('duration_seconds', 'is', null);
 
-  // Generate hot streaks (mock data for now)
-  const hot_streaks = employees.slice(0, 3).map((emp, index) => ({
-    name: emp.full_name,
-    days: [1411, 748, 656][index] || Math.floor(Math.random() * 500 + 100),
-    activity_threshold: [65, 63, 60][index] || Math.floor(Math.random() * 10 + 60)
-  }));
+  if (error) {
+    console.error('Error fetching URL logs:', error);
+    return [];
+  }
 
-  return {
-    efficiency_pros,
-    time_heroes,
-    productivity_champs,
-    hot_streaks
-  };
+  const urlStats = new Map<string, number>();
+
+  urlLogs?.forEach((log: any) => {
+    const domain = log.domain;
+    const duration = log.duration_seconds || 0;
+    urlStats.set(domain, (urlStats.get(domain) || 0) + duration);
+  });
+
+  const totalTime = Array.from(urlStats.values()).reduce((sum, time) => sum + time, 0);
+
+  return Array.from(urlStats.entries())
+    .map(([domain, seconds]) => ({
+      domain,
+      total_time: formatDuration(seconds),
+      percentage: totalTime > 0 ? Math.round((seconds / totalTime) * 100) : 0
+    }))
+    .sort((a, b) => b.percentage - a.percentage);
 }
 
 // Format duration from seconds to human readable
@@ -643,6 +674,12 @@ function generateDailyReportHTML(data: any): string {
                     <div>${app.total_time}</div>
                 </div>
                 `).join('')}
+                ${data.url_usage.map((url: any) => `
+                <div class="app-item">
+                    <div style="font-weight: 500;">${url.domain}</div>
+                    <div>${url.total_time}</div>
+                </div>
+                `).join('')}
             </div>
         </div>
         
@@ -670,25 +707,20 @@ function generateWeeklyReportHTML(data: any): string {
         .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
         .header p { margin: 10px 0 0 0; opacity: 0.9; }
         .content { padding: 30px; }
-        .badge-section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
-        .badge-grid { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .badge-item { text-align: center; }
-        .badge-percentage { font-size: 24px; font-weight: bold; color: #2563eb; }
-        .badge-label { font-size: 12px; color: #6b7280; margin-top: 5px; }
+        .summary-stats { display: flex; margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 8px; }
+        .stat { flex: 1; text-align: center; }
+        .stat-value { font-size: 24px; font-weight: bold; color: #10b981; }
+        .stat-label { font-size: 12px; color: #6b7280; margin-top: 5px; }
         .section { margin-bottom: 30px; }
         .section h2 { font-size: 16px; font-weight: 600; margin-bottom: 15px; color: #1f2937; }
-        .podium { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .podium-item { text-align: center; flex: 1; }
-        .podium-position { font-size: 12px; color: #6b7280; margin-bottom: 5px; }
-        .podium-name { font-weight: 600; margin-bottom: 3px; }
-        .podium-badges { font-size: 12px; color: #10b981; }
-        .streak-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
-        .streak-info { }
-        .streak-name { font-weight: 600; margin-bottom: 3px; }
-        .streak-days { font-size: 24px; font-weight: bold; color: #2563eb; }
-        .streak-label { font-size: 12px; color: #6b7280; }
-        .member-achievements { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
-        .achievement-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f9fa; border-radius: 6px; }
+        .employee-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+        .employee-info { }
+        .employee-name { font-weight: 600; margin-bottom: 3px; }
+        .employee-stats { font-size: 12px; color: #6b7280; }
+        .project-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+        .project-name { font-weight: 500; }
+        .project-stats { font-size: 12px; color: #6b7280; }
+        .app-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
         .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #6b7280; font-size: 12px; }
     </style>
 </head>
@@ -700,72 +732,57 @@ function generateWeeklyReportHTML(data: any): string {
         </div>
         
         <div class="content">
-            <div class="badge-section">
-                <h2 style="margin-top: 0;">🏆 Badges Earned</h2>
-                <p style="color: #6b7280; margin-bottom: 20px;">Percent of team members who earned each badge this week.</p>
-                
-                <div class="badge-grid">
-                    <div class="badge-item">
-                        <div class="badge-percentage">${data.efficiency_pro_percentage}%</div>
-                        <div class="badge-label">Efficiency Pro</div>
-                    </div>
-                    <div class="badge-item">
-                        <div class="badge-percentage">0%</div>
-                        <div class="badge-label">Productivity Champ</div>
-                    </div>
-                    <div class="badge-item">
-                        <div class="badge-percentage">${data.time_hero_percentage}%</div>
-                        <div class="badge-label">Time Hero</div>
-                    </div>
+            <div class="summary-stats">
+                <div class="stat">
+                    <div class="stat-value">${data.total_hours}</div>
+                    <div class="stat-label">Total Hours</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${data.members_worked}</div>
+                    <div class="stat-label">Active Members</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${data.activity_percentage}%</div>
+                    <div class="stat-label">Avg Activity</div>
                 </div>
             </div>
 
             <div class="section">
-                <h2>🥇 Most Badges</h2>
-                <p style="color: #6b7280; margin-bottom: 15px;">Top 3 team members who earned the most badges this week.</p>
-                
-                <div class="podium">
-                    ${data.achievements.efficiency_pros.slice(0, 3).map((emp: any, index: number) => `
-                    <div class="podium-item">
-                        <div class="podium-position">${['1st', '2nd', '3rd'][index]}</div>
-                        <div class="podium-name">${emp.full_name}</div>
-                        <div class="podium-badges">${7 - index} badges</div>
+                <h2>👥 Team Performance</h2>
+                ${data.employees.slice(0, 15).map((emp: any) => `
+                <div class="employee-item">
+                    <div class="employee-info">
+                        <div class="employee-name">${emp.full_name}</div>
+                        <div class="employee-stats">${emp.total_hours.toFixed(1)}h • ${Math.round(emp.activity_percentage)}% active</div>
                     </div>
-                    `).join('')}
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>🔥 Longest Hot Streaks</h2>
-                <p style="color: #6b7280; margin-bottom: 15px;">Top 3 team members who currently have the longest hot streaks.</p>
-                
-                ${data.hot_streaks.map((streak: any) => `
-                <div class="streak-item">
-                    <div class="streak-info">
-                        <div class="streak-name">${streak.name}</div>
-                        <div class="streak-label">with over ${streak.activity_threshold}% activity</div>
-                    </div>
-                    <div>
-                        <div class="streak-days">${streak.days}</div>
-                        <div class="streak-label">days</div>
+                    <div style="color: ${emp.activity_percentage >= 70 ? '#10b981' : emp.activity_percentage >= 50 ? '#f59e0b' : '#ef4444'}; font-weight: 600;">
+                        ${emp.activity_percentage >= 70 ? '🟢 Excellent' : emp.activity_percentage >= 50 ? '🟡 Good' : '🔴 Needs Attention'}
                     </div>
                 </div>
                 `).join('')}
             </div>
 
             <div class="section">
-                <h2>🎯 All Member Achievements</h2>
-                <div class="member-achievements">
-                    ${data.employees.slice(0, 20).map((emp: any, index: number) => `
-                    <div class="achievement-item">
-                        <div>
-                            <div style="font-weight: 600;">${emp.full_name}</div>
-                            <div style="font-size: 12px; color: #6b7280;">${emp.total_hours.toFixed(1)}h • ${Math.round(emp.activity_percentage)}% active</div>
-                        </div>
-                        <div style="color: #10b981; font-weight: 600;">${Math.max(1, 8 - index)} badges</div>
+                <h2>📊 Project Performance</h2>
+                ${data.projects.slice(0, 10).map((project: any) => `
+                <div class="project-item">
+                    <div>
+                        <div class="project-name">${project.name}</div>
+                        <div class="project-stats">${project.member_count} members</div>
                     </div>
-                    `).join('')}
+                    <div style="font-weight: 600;">${project.total_hours.toFixed(1)}h</div>
                 </div>
+                `).join('')}
+            </div>
+
+            <div class="section">
+                <h2>💻 Most Used Apps This Week</h2>
+                ${data.app_usage.slice(0, 10).map((app: any) => `
+                <div class="app-item">
+                    <div style="font-weight: 500;">${app.app_name}</div>
+                    <div>${app.total_time}</div>
+                </div>
+                `).join('')}
             </div>
         </div>
         
