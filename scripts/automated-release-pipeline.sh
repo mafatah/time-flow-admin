@@ -40,13 +40,19 @@ validate_prerequisites() {
     print_status "🔍 Validating prerequisites..."
     
     # Check required tools
-    local tools=("npm" "gh" "security" "codesign" "notarytool" "shasum")
+    local tools=("npm" "gh" "security" "codesign" "shasum")
     for tool in "${tools[@]}"; do
         if ! command -v "$tool" &> /dev/null; then
             print_error "Required tool '$tool' is not installed"
             exit 1
         fi
     done
+    
+    # Check notarytool through xcrun
+    if ! xcrun notarytool --version &> /dev/null; then
+        print_error "notarytool is not available through xcrun"
+        exit 1
+    fi
     
     # Check environment variables
     if [[ -z "$APPLE_ID" ]]; then
@@ -99,6 +105,7 @@ setup_environment() {
     # Set electron-builder environment variables for notarization
     export APPLEID="$APPLE_ID"
     export APPLEIDPASS="$APPLE_APP_SPECIFIC_PASSWORD"
+    export APPLE_TEAM_ID="$APPLE_TEAM_ID"
     
     print_success "Environment configured from Vercel variables"
 }
@@ -106,13 +113,13 @@ setup_environment() {
 # Bump version
 bump_version() {
     local version_type="${1:-patch}"
-    print_status "📈 Bumping version ($version_type)..."
+    print_status "📈 Bumping version ($version_type)..." >&2
     
     # Bump version in package.json
     NEW_VERSION=$(npm version "$version_type" --no-git-tag-version)
     NEW_VERSION=${NEW_VERSION#v} # Remove 'v' prefix
     
-    print_success "Version bumped to $NEW_VERSION"
+    print_success "Version bumped to $NEW_VERSION" >&2
     echo "$NEW_VERSION"
 }
 
@@ -158,18 +165,18 @@ build_desktop() {
 # Generate file information for auto-updater
 generate_file_info() {
     local version="$1"
-    print_status "📊 Generating file information..."
+    print_status "📊 Generating file information..." >&2
     
     local intel_dmg="dist/Ebdaa Work Time-${version}.dmg"
     local arm_dmg="dist/Ebdaa Work Time-${version}-arm64.dmg"
     
     if [[ ! -f "$intel_dmg" ]]; then
-        print_error "Intel DMG not found: $intel_dmg"
+        print_error "Intel DMG not found: $intel_dmg" >&2
         exit 1
     fi
     
     if [[ ! -f "$arm_dmg" ]]; then
-        print_error "ARM64 DMG not found: $arm_dmg"
+        print_error "ARM64 DMG not found: $arm_dmg" >&2
         exit 1
     fi
     
@@ -181,7 +188,7 @@ generate_file_info() {
     local intel_sha512=$(shasum -a 512 "$intel_dmg" | awk '{print $1}')
     local arm_sha512=$(shasum -a 512 "$arm_dmg" | awk '{print $1}')
     
-    print_success "File information generated"
+    print_success "File information generated" >&2
     
     echo "INTEL_SIZE=$intel_size"
     echo "ARM_SIZE=$arm_size"

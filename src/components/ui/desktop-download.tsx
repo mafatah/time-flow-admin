@@ -121,7 +121,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     setDownloading(platform);
     
     // Use GitHub releases for reliable downloads - Updated automatically by release pipeline
-    const currentVersion = "1.0.28"; // This will be updated automatically by release scripts
+    const currentVersion = "1.0.30"; // This will be updated automatically by release scripts
     const downloadFiles = {
       windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`,
       'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED
