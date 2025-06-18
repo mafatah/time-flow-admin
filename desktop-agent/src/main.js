@@ -113,6 +113,9 @@ let systemSleepStart = null;
 let lastIdleLogTime = 0;
 let lastDuplicateAppLogTime = 0;
 let lastDuplicateUrlLogTime = 0;
+let lastActiveApp = null;
+let lastBrowserUrls = new Map(); // Cache URLs per browser
+let lastUrlCheckTime = 0;
 let lastMouseLogTime = 0;
 let lastKeyboardLogTime = 0;
 let lastAppCaptureLogTime = 0;
@@ -1115,7 +1118,7 @@ async function getLinuxActiveApplication() {
 function startAppCapture() {
   if (appCaptureInterval) clearInterval(appCaptureInterval);
   
-  console.log('🖥️ Starting enhanced cross-platform app capture every 5s');
+  console.log('🖥️ Starting smart cross-platform app capture every 15s');
   
   appCaptureInterval = setInterval(async () => {
     // App capture logging disabled for performance
@@ -1179,7 +1182,7 @@ function startAppCapture() {
         }
       }
     }
-  }, 5000); // Every 5 seconds (increased frequency)
+  }, 15000); // Every 15 seconds (reduced from 5 seconds for performance)
 }
 
 // === ITEM 5: REVAMPED URL/DOMAIN CAPTURE ===
@@ -1402,86 +1405,29 @@ async function getLinuxBrowserUrl(windowTitle) {
 }
 
 // Track last URL per browser to only capture changes
-let lastBrowserUrls = new Map(); // browser -> last_captured_url
+// Using global lastBrowserUrls map declared at top of file
 
 function startUrlCapture() {
   if (urlCaptureInterval) clearInterval(urlCaptureInterval);
   
-  console.log('🌐 Starting enhanced URL capture every 5s - will check ALL running browsers');
+  console.log('🌐 Starting SMART URL capture - only checks when browser becomes active or URL changes');
   
   urlCaptureInterval = setInterval(async () => {
-    // URL capture logging disabled for performance
-    // console.log('🔍 [URL-CAPTURE] Running interval...'); // Disabled
-    if (!isTracking) {
-      console.log('🔍 [URL-CAPTURE] Skipping - tracking not active');
-      return;
-    }
+    if (!isTracking) return;
     
     try {
-              // Browser URLs checking logging disabled for performance
-      
-      // Get all running browsers and try to extract URLs from each
-      const runningBrowsers = await getAllRunningBrowsers();
-      // Running browsers count logging disabled for performance
-      
-      if (runningBrowsers.length === 0) {
-        console.log('🔍 [URL-CAPTURE] No running browsers detected');
-        return;
-      }
-      
-      let urlsFound = [];
-      
-      // Get the currently active app to mark which browser is active
-      const activeApp = await detectActiveApplication();
-      const activeBrowserName = (activeApp && isBrowserApp(activeApp.name)) ? activeApp.name : null;
-      
-      console.log(`🔍 [URL-CAPTURE] Active app: ${activeApp?.name || 'none'}, Active browser: ${activeBrowserName || 'none'}`);
-      
-      // Check ALL running browsers (remove skip logic to capture multiple browsers)
-      for (const browser of runningBrowsers) {
-        // Browser checking logging disabled for performance
-        
-        const url = await extractUrlFromBrowser(browser.name, browser.title);
-        if (url) {
-          const isActiveBrowser = activeBrowserName === browser.name;
-          urlsFound.push({
-            url: url,
-            title: activeApp?.title || browser.title,
-            browser: browser.name,
-            domain: extractDomain(url),
-            isActive: isActiveBrowser
-          });
-          
-          // URL capture success logging disabled for performance
-        } else {
-          console.log(`⚠️ [URL-CAPTURE] No URL found from ${browser.name}`);
-        }
-      }
-      
-      console.log(`🔍 [URL-CAPTURE] Found ${urlsFound.length} URLs from browsers`);
-      
-      // Process all found URLs
-      for (const urlData of urlsFound) {
-        await processFoundUrl(urlData);
-      }
-      
-      if (urlsFound.length === 0) {
-        console.log('🔍 [URL-CAPTURE] No URLs detected from any running browsers');
-      }
-      
+      await smartUrlCapture();
     } catch (error) {
       urlCaptureFailureCount++;
-      
       if (urlCaptureFailureCount <= MAX_URL_CAPTURE_FAILURES) {
-        console.log(`❌ URL capture failed (${urlCaptureFailureCount}/${MAX_URL_CAPTURE_FAILURES}):`, error.message);
-        
+        console.log(`❌ Smart URL capture failed (${urlCaptureFailureCount}/${MAX_URL_CAPTURE_FAILURES}):`, error.message);
         if (urlCaptureFailureCount === MAX_URL_CAPTURE_FAILURES) {
           console.log('⚠️ Disabling URL capture due to repeated failures');
           urlCaptureEnabled = false;
         }
       }
     }
-  }, 5000); // Every 5 seconds (increased frequency)
+  }, 30000); // Every 30 seconds (reduced from 5 seconds)
 }
 
 async function processFoundUrl(urlData) {
@@ -1531,6 +1477,93 @@ async function processFoundUrl(urlData) {
     
   } catch (error) {
     console.log('❌ Failed to process URL:', urlData.url, error.message);
+  }
+}
+
+// Smart URL capture - only checks when needed
+async function smartUrlCapture() {
+  try {
+    // Get the currently active app
+    const activeApp = await detectActiveApplication();
+    const currentActiveApp = activeApp?.name;
+    
+    // Only check URLs when:
+    // 1. Active app changed to a browser
+    // 2. It's been more than 2 minutes since last check (fallback)
+    const shouldCheckUrls = 
+      (currentActiveApp !== lastActiveApp && isBrowserApp(currentActiveApp)) ||
+      (Date.now() - lastUrlCheckTime > 120000); // 2 minutes fallback
+    
+    if (!shouldCheckUrls) {
+      // No need to check URLs - active app hasn't changed to a browser
+      return;
+    }
+    
+    lastActiveApp = currentActiveApp;
+    lastUrlCheckTime = Date.now();
+    
+    // If active app is a browser, get its URL immediately
+    if (isBrowserApp(currentActiveApp)) {
+      console.log(`🔍 [SMART-URL] Browser became active: ${currentActiveApp} - extracting URL`);
+      
+      const url = await extractUrlFromBrowser(currentActiveApp, activeApp?.title);
+      if (url) {
+        const urlData = {
+          url: url,
+          title: activeApp?.title || 'Untitled',
+          browser: currentActiveApp,
+          domain: extractDomain(url),
+          isActive: true
+        };
+        
+        await processFoundUrl(urlData);
+        console.log(`✅ [SMART-URL] Captured URL from active browser: ${urlData.domain}`);
+      }
+    } else {
+      // Active app is not a browser - check background browsers only if needed
+      console.log(`🔍 [SMART-URL] Non-browser app active (${currentActiveApp}) - checking background browsers`);
+      await checkBackgroundBrowsers();
+    }
+    
+  } catch (error) {
+    console.log('❌ Smart URL capture error:', error.message);
+  }
+}
+
+// Check background browsers less frequently
+async function checkBackgroundBrowsers() {
+  try {
+    const runningBrowsers = await getAllRunningBrowsers();
+    
+    if (runningBrowsers.length === 0) {
+      return;
+    }
+    
+    // Only check browsers that haven't been checked recently
+    for (const browser of runningBrowsers) {
+      const lastUrl = lastBrowserUrls.get(browser.name);
+      
+      // Skip if we already have a recent URL for this browser
+      if (lastUrl) {
+        continue;
+      }
+      
+      const url = await extractUrlFromBrowser(browser.name, browser.title);
+      if (url) {
+        const urlData = {
+          url: url,
+          title: browser.title || 'Untitled',
+          browser: browser.name,
+          domain: extractDomain(url),
+          isActive: false
+        };
+        
+        await processFoundUrl(urlData);
+        console.log(`✅ [SMART-URL] Captured URL from background browser: ${urlData.domain}`);
+      }
+    }
+  } catch (error) {
+    console.log('❌ Background browser check error:', error.message);
   }
 }
 
