@@ -115,6 +115,7 @@ let lastDuplicateAppLogTime = 0;
 let lastDuplicateUrlLogTime = 0;
 let lastActiveApp = null;
 let lastBrowserUrls = new Map(); // Cache URLs per browser
+let lastUrlCapturesByBrowser = new Map(); // Track capture times per browser+URL
 let lastUrlCheckTime = 0;
 let lastMouseLogTime = 0;
 let lastKeyboardLogTime = 0;
@@ -1410,7 +1411,7 @@ async function getLinuxBrowserUrl(windowTitle) {
 function startUrlCapture() {
   if (urlCaptureInterval) clearInterval(urlCaptureInterval);
   
-  console.log('🌐 Starting SMART URL capture - only checks when browser becomes active or URL changes');
+  console.log('🌐 Starting SMART URL capture - checks browsers every 5 seconds for comprehensive coverage');
   
   urlCaptureInterval = setInterval(async () => {
     if (!isTracking) return;
@@ -1427,7 +1428,7 @@ function startUrlCapture() {
         }
       }
     }
-  }, 30000); // Every 30 seconds (reduced from 5 seconds)
+  }, 5000); // Every 5 seconds for faster detection of URL changes
 }
 
 async function processFoundUrl(urlData) {
@@ -1438,20 +1439,43 @@ async function processFoundUrl(urlData) {
       return;
     }
     
-    // Check if this URL is different from the last one captured for this browser
+    // ENHANCED SESSION-AWARE DUPLICATE DETECTION
     const lastUrl = lastBrowserUrls.get(urlData.browser);
     
-    if (lastUrl === urlData.url) {
-      // Same URL as last time - don't log duplicate
-            // Duplicate URL logging disabled for performance
-      // console.log(`🔍 [URL-CAPTURE] Skipping duplicate URL: ${urlData.domain}`); // Disabled
+    // Create a per-browser URL timing tracking
+    const captureKey = `${urlData.browser}_${urlData.url}`;
+    const lastCaptureTime = lastUrlCapturesByBrowser?.get(captureKey) || 0;
+    const now = Date.now();
+    const timeSinceLastCapture = now - lastCaptureTime;
+    
+    // Enhanced duplicate detection for tab switching patterns:
+    // 1. Skip if EXACT same URL was captured within last 30 seconds (immediate duplicates)
+    // 2. Skip if URL was captured within last 10 minutes and this appears to be tab switching
+    const isRecentDuplicate = lastUrl === urlData.url && timeSinceLastCapture < 30000;
+    const isTabSwitchingPattern = timeSinceLastCapture < 600000 && // Within 10 minutes
+                                  lastUrl !== urlData.url && // Different from immediately previous URL  
+                                  lastUrlCapturesByBrowser.has(captureKey); // URL was captured before in this session
+    
+    if (isRecentDuplicate) {
+      console.log(`🔍 [URL-CAPTURE] Skipping recent duplicate: ${urlData.url} from ${urlData.browser} (captured ${Math.round(timeSinceLastCapture/1000)}s ago)`);
       return;
     }
     
-    console.log(`🔗 [URL-CAPTURE] NEW URL DETECTED: "${urlData.url}" | Browser: "${urlData.browser}" | Domain: "${urlData.domain}" | Previous: "${lastUrl || 'none'}"`);
+    if (isTabSwitchingPattern) {
+      console.log(`🔄 [URL-CAPTURE] Skipping tab switch pattern: ${urlData.url} from ${urlData.browser} (already captured ${Math.round(timeSinceLastCapture/1000)}s ago, likely tab switching)`);
+      return;
+    }
     
-    // Update last URL for this browser
+    // If different URL or enough time passed, capture it
+    if (lastUrl !== urlData.url) {
+      console.log(`🔗 [URL-CAPTURE] NEW URL DETECTED: "${urlData.url}" | Browser: "${urlData.browser}" | Domain: "${urlData.domain}" | Previous: "${lastUrl || 'none'}"`);
+    } else {
+      console.log(`🔗 [URL-CAPTURE] RE-VISITING URL: "${urlData.url}" | Browser: "${urlData.browser}" | Time since last: ${Math.round(timeSinceLastCapture/1000)}s`);
+    }
+    
+    // Update last URL for this browser and timing tracking
     lastBrowserUrls.set(urlData.browser, urlData.url);
+    lastUrlCapturesByBrowser.set(captureKey, now);
     lastUrlCapture = urlData.url;
     lastUrlCaptureTime = new Date().toISOString();
 
@@ -1480,22 +1504,24 @@ async function processFoundUrl(urlData) {
   }
 }
 
-// Smart URL capture - only checks when needed
+// Smart URL capture - checks when browser is active or URLs change
 async function smartUrlCapture() {
   try {
     // Get the currently active app
     const activeApp = await detectActiveApplication();
     const currentActiveApp = activeApp?.name;
     
-    // Only check URLs when:
-    // 1. Active app changed to a browser
-    // 2. It's been more than 2 minutes since last check (fallback)
+    // Enhanced URL checking logic:
+    // 1. Browser became active (immediate check)
+    // 2. Browser is currently active (check every 5 seconds for URL changes)
+    // 3. Background browser check every 30 seconds
+    // 4. Always check if we haven't checked recently
     const shouldCheckUrls = 
       (currentActiveApp !== lastActiveApp && isBrowserApp(currentActiveApp)) ||
-      (Date.now() - lastUrlCheckTime > 120000); // 2 minutes fallback
+             (isBrowserApp(currentActiveApp) && Date.now() - lastUrlCheckTime > 5000) || // 5 seconds if browser active
+      (Date.now() - lastUrlCheckTime > 30000); // 30 seconds fallback for comprehensive coverage
     
     if (!shouldCheckUrls) {
-      // No need to check URLs - active app hasn't changed to a browser
       return;
     }
     
@@ -1504,7 +1530,7 @@ async function smartUrlCapture() {
     
     // If active app is a browser, get its URL immediately
     if (isBrowserApp(currentActiveApp)) {
-      console.log(`🔍 [SMART-URL] Browser became active: ${currentActiveApp} - extracting URL`);
+      console.log(`🔍 [SMART-URL] Browser active: ${currentActiveApp} - checking for URL changes`);
       
       const url = await extractUrlFromBrowser(currentActiveApp, activeApp?.title);
       if (url) {
@@ -1519,11 +1545,12 @@ async function smartUrlCapture() {
         await processFoundUrl(urlData);
         console.log(`✅ [SMART-URL] Captured URL from active browser: ${urlData.domain}`);
       }
-    } else {
-      // Active app is not a browser - check background browsers only if needed
-      console.log(`🔍 [SMART-URL] Non-browser app active (${currentActiveApp}) - checking background browsers`);
-      await checkBackgroundBrowsers();
     }
+    
+    // ALWAYS check background browsers for comprehensive URL coverage
+    // This ensures we capture URLs from all running browsers, not just the active one
+    console.log(`🔍 [SMART-URL] Checking all running browsers for URL changes`);
+    await checkBackgroundBrowsers();
     
   } catch (error) {
     console.log('❌ Smart URL capture error:', error.message);
@@ -1539,15 +1566,8 @@ async function checkBackgroundBrowsers() {
       return;
     }
     
-    // Only check browsers that haven't been checked recently
+    // Check all running browsers for URL changes (don't skip based on cache)
     for (const browser of runningBrowsers) {
-      const lastUrl = lastBrowserUrls.get(browser.name);
-      
-      // Skip if we already have a recent URL for this browser
-      if (lastUrl) {
-        continue;
-      }
-      
       const url = await extractUrlFromBrowser(browser.name, browser.title);
       if (url) {
         const urlData = {
