@@ -685,6 +685,188 @@ export type Database = {
         }
         Relationships: []
       }
+      report_configurations: {
+        Row: {
+          alert_settings: Json | null
+          created_at: string | null
+          description: string | null
+          filters: Json | null
+          id: string
+          include_alerts: boolean | null
+          include_employee_details: boolean | null
+          include_projects: boolean | null
+          include_summary: boolean | null
+          is_active: boolean | null
+          name: string
+          report_type_id: string | null
+          schedule_cron: string | null
+          schedule_description: string | null
+          subject_template: string
+          updated_at: string | null
+        }
+        Insert: {
+          alert_settings?: Json | null
+          created_at?: string | null
+          description?: string | null
+          filters?: Json | null
+          id?: string
+          include_alerts?: boolean | null
+          include_employee_details?: boolean | null
+          include_projects?: boolean | null
+          include_summary?: boolean | null
+          is_active?: boolean | null
+          name: string
+          report_type_id?: string | null
+          schedule_cron?: string | null
+          schedule_description?: string | null
+          subject_template: string
+          updated_at?: string | null
+        }
+        Update: {
+          alert_settings?: Json | null
+          created_at?: string | null
+          description?: string | null
+          filters?: Json | null
+          id?: string
+          include_alerts?: boolean | null
+          include_employee_details?: boolean | null
+          include_projects?: boolean | null
+          include_summary?: boolean | null
+          is_active?: boolean | null
+          name?: string
+          report_type_id?: string | null
+          schedule_cron?: string | null
+          schedule_description?: string | null
+          subject_template?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_configurations_report_type_id_fkey"
+            columns: ["report_type_id"]
+            isOneToOne: false
+            referencedRelation: "report_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_history: {
+        Row: {
+          email_service_id: string | null
+          error_message: string | null
+          id: string
+          recipient_count: number | null
+          report_config_id: string | null
+          report_data: Json | null
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          email_service_id?: string | null
+          error_message?: string | null
+          id?: string
+          recipient_count?: number | null
+          report_config_id?: string | null
+          report_data?: Json | null
+          sent_at?: string | null
+          status: string
+        }
+        Update: {
+          email_service_id?: string | null
+          error_message?: string | null
+          id?: string
+          recipient_count?: number | null
+          report_config_id?: string | null
+          report_data?: Json | null
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_history_report_config_id_fkey"
+            columns: ["report_config_id"]
+            isOneToOne: false
+            referencedRelation: "report_configurations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_recipients: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          is_active: boolean | null
+          report_config_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          is_active?: boolean | null
+          report_config_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          report_config_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_recipients_report_config_id_fkey"
+            columns: ["report_config_id"]
+            isOneToOne: false
+            referencedRelation: "report_configurations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_recipients_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_recipients_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_types: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          template_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          template_type: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          template_type?: string
+        }
+        Relationships: []
+      }
       screenshot_categorization: {
         Row: {
           assigned_by: string | null

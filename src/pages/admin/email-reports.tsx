@@ -25,7 +25,9 @@ import {
   CheckCircle,
   Clock,
   RefreshCw,
-  Loader2
+  Loader2,
+  BarChart3,
+  TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,6 +50,8 @@ const EmailReportsPage: React.FC = () => {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [testingEmail, setTestingEmail] = useState(false);
+  const [sendingDaily, setSendingDaily] = useState(false);
+  const [sendingWeekly, setSendingWeekly] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -142,6 +146,70 @@ const EmailReportsPage: React.FC = () => {
     }
   };
 
+  const handleSendDailyReport = async () => {
+    try {
+      setSendingDaily(true);
+      console.log('📊 Sending daily report...');
+      
+      const { data, error } = await supabase.functions.invoke('email-reports/send-daily-report', {
+        method: 'POST'
+      });
+      
+      console.log('📧 Daily report response:', { data, error });
+      
+      if (error) {
+        console.error('Daily report error:', error);
+        toast.error(`Daily report failed: ${error.message}`);
+        return;
+      }
+      
+      if (data?.success) {
+        toast.success(data.message);
+        console.log('✅ Daily report sent successfully');
+      } else {
+        toast.error(data?.message || 'Daily report failed');
+        console.error('❌ Daily report failed:', data);
+      }
+    } catch (error) {
+      console.error('Error sending daily report:', error);
+      toast.error('Failed to send daily report');
+    } finally {
+      setSendingDaily(false);
+    }
+  };
+
+  const handleSendWeeklyReport = async () => {
+    try {
+      setSendingWeekly(true);
+      console.log('📊 Sending weekly report...');
+      
+      const { data, error } = await supabase.functions.invoke('email-reports/send-weekly-report', {
+        method: 'POST'
+      });
+      
+      console.log('📧 Weekly report response:', { data, error });
+      
+      if (error) {
+        console.error('Weekly report error:', error);
+        toast.error(`Weekly report failed: ${error.message}`);
+        return;
+      }
+      
+      if (data?.success) {
+        toast.success(data.message);
+        console.log('✅ Weekly report sent successfully');
+      } else {
+        toast.error(data?.message || 'Weekly report failed');
+        console.error('❌ Weekly report failed:', data);
+      }
+    } catch (error) {
+      console.error('Error sending weekly report:', error);
+      toast.error('Failed to send weekly report');
+    } finally {
+      setSendingWeekly(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -217,12 +285,77 @@ const EmailReportsPage: React.FC = () => {
         </Card>
       </div>
 
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            Quick Report Actions
+          </CardTitle>
+          <CardDescription>
+            Send reports manually or test the email system
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 border rounded-lg">
+              <div className="flex items-center gap-3 mb-3">
+                <BarChart3 className="h-6 w-6 text-blue-600" />
+                <div>
+                  <h3 className="font-semibold">Daily Work Summary</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Comprehensive daily team performance report
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={handleSendDailyReport}
+                disabled={sendingDaily}
+                className="w-full"
+              >
+                {sendingDaily ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                {sendingDaily ? 'Sending...' : 'Send Daily Report'}
+              </Button>
+            </div>
+
+            <div className="p-4 border rounded-lg">
+              <div className="flex items-center gap-3 mb-3">
+                <TrendingUp className="h-6 w-6 text-green-600" />
+                <div>
+                  <h3 className="font-semibold">Weekly Performance Report</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Weekly achievements, badges, and productivity analysis
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={handleSendWeeklyReport}
+                disabled={sendingWeekly}
+                className="w-full"
+              >
+                {sendingWeekly ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                {sendingWeekly ? 'Sending...' : 'Send Weekly Report'}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Instructions */}
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
           Click "Test Email Setup" to verify your email configuration is working correctly. 
           You should receive a test email at your admin email address.
+          Use the quick actions above to send daily or weekly reports immediately.
         </AlertDescription>
       </Alert>
 
