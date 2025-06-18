@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Card, 
@@ -27,7 +26,8 @@ import {
   RefreshCw,
   Loader2,
   BarChart3,
-  TrendingUp
+  TrendingUp,
+  Timer
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -243,6 +243,56 @@ const EmailReportsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Automation Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Timer className="h-5 w-5 text-green-600" />
+            Automation Status
+          </CardTitle>
+          <CardDescription>
+            Your email reports are configured to send automatically
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 border rounded-lg bg-green-50">
+              <div className="flex items-center gap-3 mb-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <div>
+                  <h3 className="font-semibold text-green-800">Daily Reports</h3>
+                  <p className="text-sm text-green-700">Automated • Every day at 7:00 PM</p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                Active
+              </Badge>
+            </div>
+
+            <div className="p-4 border rounded-lg bg-blue-50">
+              <div className="flex items-center gap-3 mb-2">
+                <CheckCircle className="h-5 w-5 text-blue-600" />
+                <div>
+                  <h3 className="font-semibold text-blue-800">Weekly Reports</h3>
+                  <p className="text-sm text-blue-700">Automated • Every Monday at 9:00 AM</p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                Active
+              </Badge>
+            </div>
+          </div>
+          
+          <Alert>
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>✅ Automation Configured:</strong> Daily and weekly email reports are set up with Supabase Cron Jobs. 
+              No manual intervention required - reports will be sent automatically to all admin users.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+
       {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -290,10 +340,10 @@ const EmailReportsPage: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Send className="h-5 w-5" />
-            Quick Report Actions
+            Manual Report Actions
           </CardTitle>
           <CardDescription>
-            Send reports manually or test the email system
+            Send reports manually for testing or immediate delivery
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -318,7 +368,7 @@ const EmailReportsPage: React.FC = () => {
                 ) : (
                   <Send className="w-4 h-4 mr-2" />
                 )}
-                {sendingDaily ? 'Sending...' : 'Send Daily Report'}
+                {sendingDaily ? 'Sending...' : 'Send Daily Report Now'}
               </Button>
             </div>
 
@@ -342,7 +392,7 @@ const EmailReportsPage: React.FC = () => {
                 ) : (
                   <Send className="w-4 h-4 mr-2" />
                 )}
-                {sendingWeekly ? 'Sending...' : 'Send Weekly Report'}
+                {sendingWeekly ? 'Sending...' : 'Send Weekly Report Now'}
               </Button>
             </div>
           </div>
@@ -353,9 +403,10 @@ const EmailReportsPage: React.FC = () => {
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Click "Test Email Setup" to verify your email configuration is working correctly. 
-          You should receive a test email at your admin email address.
-          Use the quick actions above to send daily or weekly reports immediately.
+          <strong>📧 Automation Setup Complete:</strong> Your email reports are now fully automated!
+          <br />• Daily reports are sent every day at 7 PM
+          <br />• Weekly reports are sent every Monday at 9 AM
+          <br />• Use the manual buttons above to send reports immediately for testing
         </AlertDescription>
       </Alert>
 
