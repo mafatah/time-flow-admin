@@ -280,14 +280,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '112MB'; // TimeFlow-v1.0.28-ARM64.dmg (UPDATED for v1.0.28)
+        return '112MB'; // TimeFlow-v1.0.30-ARM64.dmg (UPDATED for v1.0.30)
       case 'mac-intel':
       case 'mac':
-        return '118MB'; // TimeFlow-v1.0.28-Intel.dmg (UPDATED for v1.0.28)
+        return '118MB'; // TimeFlow-v1.0.30-Intel.dmg (UPDATED for v1.0.30)
       case 'windows':
-        return '86MB'; // TimeFlow-v1.0.28-Setup.exe (UPDATED for v1.0.28)
+        return '86MB'; // TimeFlow-v1.0.30-Setup.exe (UPDATED for v1.0.30)
       case 'linux':
-        return '132MB'; // TimeFlow-v1.0.28-Linux.AppImage (UPDATED for v1.0.28)
+        return '132MB'; // TimeFlow-v1.0.30-Linux.AppImage (UPDATED for v1.0.30)
       default:
         return '';
     }
@@ -296,14 +296,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 117065990; // TimeFlow-v1.0.28-ARM64.dmg (UPDATED for v1.0.28)
+        return 117065990; // TimeFlow-v1.0.30-ARM64.dmg (UPDATED for v1.0.30)
       case 'mac-intel':
       case 'mac':
-        return 123550066; // TimeFlow-v1.0.28-Intel.dmg (UPDATED for v1.0.28)
+        return 123550066; // TimeFlow-v1.0.30-Intel.dmg (UPDATED for v1.0.30)
       case 'windows':
-        return 89747951; // TimeFlow-v1.0.28-Setup.exe (UPDATED for v1.0.28)
+        return 89747951; // TimeFlow-v1.0.30-Setup.exe (UPDATED for v1.0.30)
       case 'linux':
-        return 137960059; // TimeFlow-v1.0.28-Linux.AppImage (UPDATED for v1.0.28)
+        return 137960059; // TimeFlow-v1.0.30-Linux.AppImage (UPDATED for v1.0.30)
       default:
         return 0;
     }
@@ -570,7 +570,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
                 </div>
               </Button>
 
-              {/* Linux Download - Disabled temporarily as AppImage not available in v1.0.28 */}
+              {/* Linux Download - Disabled temporarily as AppImage not available in v1.0.30 */}
               <Button
                 variant="outline"
                 disabled={true}
