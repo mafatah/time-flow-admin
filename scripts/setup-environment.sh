@@ -8,6 +8,7 @@
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 print_info() {
@@ -22,32 +23,53 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
 print_info "🔐 Setting up TimeFlow release environment..."
 
-# Apple Developer Credentials
-export APPLE_ID="alshqawe66@gmail.com"
-export APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi"
-export APPLE_TEAM_ID="6GW49LK9V9"
+# Validate required environment variables
+if [[ -z "$APPLE_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+    print_error "Missing required Apple Developer credentials!"
+    print_error "Please ensure the following environment variables are set:"
+    print_error "  - APPLE_ID"
+    print_error "  - APPLE_APP_SPECIFIC_PASSWORD" 
+    print_error "  - APPLE_TEAM_ID"
+    print_warning "These should be configured in Vercel environment variables"
+    return 1
+fi
 
-# GitHub Credentials  
-export GITHUB_TOKEN="${GITHUB_TOKEN:-your_github_token_here}"
+# Apple Developer Credentials (use from environment)
+export APPLE_ID
+export APPLE_APP_SPECIFIC_PASSWORD
+export APPLE_TEAM_ID
+
+# GitHub Credentials (optional for web-only deployments)
+if [[ -n "$GITHUB_TOKEN" ]]; then
+    export GITHUB_TOKEN
+else
+    print_warning "GITHUB_TOKEN not set (optional for web deployments)"
+fi
 
 # Electron Builder Configuration
 export CSC_IDENTITY_AUTO_DISCOVERY=false
-export CSC_NAME="Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)"
+export CSC_NAME="Developer ID Application: Ebdaa Digital Technology ($APPLE_TEAM_ID)"
 
 # Notarization Configuration
 export APPLEID="$APPLE_ID"
 export APPLEIDPASS="$APPLE_APP_SPECIFIC_PASSWORD"
 
-print_success "Environment variables set:"
-print_info "  ✅ APPLE_ID: $APPLE_ID"
+print_success "Environment variables configured:"
+print_info "  ✅ APPLE_ID: ${APPLE_ID:0:8}...@gmail.com"
 print_info "  ✅ APPLE_TEAM_ID: $APPLE_TEAM_ID"
-print_info "  ✅ GITHUB_TOKEN: ${GITHUB_TOKEN:0:8}..."
+if [[ -n "$GITHUB_TOKEN" ]]; then
+    print_info "  ✅ GITHUB_TOKEN: ${GITHUB_TOKEN:0:8}..."
+fi
 print_info "  ✅ Signing identity configured"
 
-print_warning "💡 Usage:"
-print_warning "  source scripts/setup-environment.sh"
-print_warning "  ./scripts/automated-release-pipeline.sh patch"
+print_success "🚀 Ready for release!"
 
-print_info "🚀 Ready for release!" 
+print_info "💡 Usage:"
+print_info "  source scripts/setup-environment.sh"
+print_info "  ./scripts/automated-release-pipeline.sh patch" 

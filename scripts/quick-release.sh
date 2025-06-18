@@ -9,6 +9,7 @@ set -e
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 print_info() {
@@ -21,6 +22,10 @@ print_success() {
 
 print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
 }
 
 print_info "🚀 TimeFlow Quick Release (Patch Version)"
@@ -37,11 +42,20 @@ if [[ -f "scripts/setup-environment.sh" ]]; then
     print_info "🔐 Loading environment variables..."
     source scripts/setup-environment.sh
 else
-    print_warning "⚠️ Environment setup script not found. Setting defaults..."
-    export APPLE_ID="${APPLE_ID:-alshqawe66@gmail.com}"
-    export APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD:-icmi-tdzi-ydvi-lszi}"
-    export APPLE_TEAM_ID="${APPLE_TEAM_ID:-6GW49LK9V9}"
-    export GITHUB_TOKEN="${GITHUB_TOKEN:-your_github_token_here}"
+    print_warning "⚠️ Environment setup script not found. Checking Vercel environment..."
+    
+    # Validate required environment variables
+    if [[ -z "$APPLE_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+        print_error "Missing required Apple Developer credentials!"
+        print_error "Please ensure environment variables are set in Vercel"
+        exit 1
+    fi
+    
+    # Use environment variables directly
+    export APPLE_ID
+    export APPLE_APP_SPECIFIC_PASSWORD
+    export APPLE_TEAM_ID
+    export GITHUB_TOKEN
 fi
 
 # Get current version

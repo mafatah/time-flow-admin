@@ -83,17 +83,24 @@ validate_prerequisites() {
 setup_environment() {
     print_status "🔧 Setting up environment..."
     
-    export APPLE_ID="${APPLE_ID:-alshqawe66@gmail.com}"
-    export APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD:-icmi-tdzi-ydvi-lszi}"
-    export APPLE_TEAM_ID="${APPLE_TEAM_ID:-6GW49LK9V9}"
-    export GITHUB_TOKEN="${GITHUB_TOKEN:-your_github_token_here}"
+    # Validate required environment variables
+    if [[ -z "$APPLE_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+        print_error "Missing required Apple Developer credentials!"
+        print_error "Please ensure environment variables are set in Vercel"
+        exit 1
+    fi
     
-    # Set electron-builder environment variables for notarization
+    # Use environment variables directly (no fallbacks needed since they're in Vercel)
     export APPLE_ID
     export APPLE_APP_SPECIFIC_PASSWORD
     export APPLE_TEAM_ID
+    export GITHUB_TOKEN
     
-    print_success "Environment configured"
+    # Set electron-builder environment variables for notarization
+    export APPLEID="$APPLE_ID"
+    export APPLEIDPASS="$APPLE_APP_SPECIFIC_PASSWORD"
+    
+    print_success "Environment configured from Vercel variables"
 }
 
 # Bump version
