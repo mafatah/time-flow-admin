@@ -157,7 +157,8 @@ build_desktop() {
     rm -rf dist
     
     # Build with electron-builder (includes signing and notarization)
-    npx electron-builder --mac --publish=never
+    # Build for all platforms: macOS, Windows, and Linux
+    npx electron-builder --mac --win --linux --publish=never
     
     print_success "Desktop applications built and signed"
 }
@@ -169,7 +170,10 @@ generate_file_info() {
     
     local intel_dmg="dist/Ebdaa Work Time-${version}.dmg"
     local arm_dmg="dist/Ebdaa Work Time-${version}-arm64.dmg"
+    local win_exe="dist/Ebdaa Work Time Setup ${version}.exe"
+    local linux_appimage="dist/Ebdaa Work Time-${version}.AppImage"
     
+    # Check macOS files (required)
     if [[ ! -f "$intel_dmg" ]]; then
         print_error "Intel DMG not found: $intel_dmg" >&2
         exit 1
@@ -180,20 +184,42 @@ generate_file_info() {
         exit 1
     fi
     
-    # Get file sizes
+    # Get macOS file sizes and hashes
     local intel_size=$(stat -f%z "$intel_dmg")
     local arm_size=$(stat -f%z "$arm_dmg")
-    
-    # Get SHA512 hashes
     local intel_sha512=$(shasum -a 512 "$intel_dmg" | awk '{print $1}')
     local arm_sha512=$(shasum -a 512 "$arm_dmg" | awk '{print $1}')
-    
-    print_success "File information generated" >&2
     
     echo "INTEL_SIZE=$intel_size"
     echo "ARM_SIZE=$arm_size"
     echo "INTEL_SHA512=$intel_sha512"
     echo "ARM_SHA512=$arm_sha512"
+    
+    # Check for Windows build (optional)
+    if [[ -f "$win_exe" ]]; then
+        local win_size=$(stat -f%z "$win_exe")
+        local win_sha512=$(shasum -a 512 "$win_exe" | awk '{print $1}')
+        echo "WIN_SIZE=$win_size"
+        echo "WIN_SHA512=$win_sha512"
+        echo "WIN_AVAILABLE=true"
+    else
+        print_warning "Windows build not found: $win_exe" >&2
+        echo "WIN_AVAILABLE=false"
+    fi
+    
+    # Check for Linux build (optional)
+    if [[ -f "$linux_appimage" ]]; then
+        local linux_size=$(stat -f%z "$linux_appimage")
+        local linux_sha512=$(shasum -a 512 "$linux_appimage" | awk '{print $1}')
+        echo "LINUX_SIZE=$linux_size"
+        echo "LINUX_SHA512=$linux_sha512"
+        echo "LINUX_AVAILABLE=true"
+    else
+        print_warning "Linux build not found: $linux_appimage" >&2
+        echo "LINUX_AVAILABLE=false"
+    fi
+    
+    print_success "File information generated" >&2
 }
 
 # Update auto-updater configuration
@@ -254,10 +280,28 @@ copy_to_downloads() {
 # Create GitHub release
 create_github_release() {
     local version="$1"
+    local win_available="$2"
+    local linux_available="$3"
     print_status "🐙 Creating GitHub release..."
     
     local intel_dmg="dist/Ebdaa Work Time-${version}.dmg"
     local arm_dmg="dist/Ebdaa Work Time-${version}-arm64.dmg"
+    local win_exe="dist/Ebdaa Work Time Setup ${version}.exe"
+    local linux_appimage="dist/Ebdaa Work Time-${version}.AppImage"
+    
+    # Build download links based on available platforms
+    local download_links="- **macOS (Apple Silicon)**: [TimeFlow-v${version}-ARM64.dmg](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/TimeFlow-v${version}-ARM64.dmg)
+- **macOS (Intel)**: [TimeFlow-v${version}-Intel.dmg](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/TimeFlow-v${version}-Intel.dmg)"
+    
+    if [[ "$win_available" == "true" ]]; then
+        download_links="${download_links}
+- **Windows**: [TimeFlow-v${version}-Setup.exe](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/TimeFlow-v${version}-Setup.exe)"
+    fi
+    
+    if [[ "$linux_available" == "true" ]]; then
+        download_links="${download_links}
+- **Linux**: [TimeFlow-v${version}-Linux.AppImage](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/TimeFlow-v${version}-Linux.AppImage)"
+    fi
     
     # Generate release notes
     local release_notes="## TimeFlow v${version}
@@ -275,8 +319,7 @@ create_github_release() {
 - Security enhancements
 
 ### 📱 **Downloads**
-- **macOS (Apple Silicon)**: [TimeFlow-v${version}-ARM64.dmg](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/TimeFlow-v${version}-ARM64.dmg)
-- **macOS (Intel)**: [TimeFlow-v${version}-Intel.dmg](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/TimeFlow-v${version}-Intel.dmg)
+${download_links}
 
 ### 🔄 **Auto-Update**
 Existing users will be automatically notified of this update.
@@ -284,11 +327,20 @@ Existing users will be automatically notified of this update.
 ---
 *Built with signing and notarization for enhanced security*"
 
+    # Build asset list for gh release create
+    local assets=("$intel_dmg#TimeFlow-v${version}-Intel.dmg" "$arm_dmg#TimeFlow-v${version}-ARM64.dmg" "latest-mac.yml")
+    
+    if [[ "$win_available" == "true" ]]; then
+        assets+=("$win_exe#TimeFlow-v${version}-Setup.exe")
+    fi
+    
+    if [[ "$linux_available" == "true" ]]; then
+        assets+=("$linux_appimage#TimeFlow-v${version}-Linux.AppImage")
+    fi
+    
     # Create release with assets
     gh release create "v${version}" \
-        "$intel_dmg#TimeFlow-v${version}-Intel.dmg" \
-        "$arm_dmg#TimeFlow-v${version}-ARM64.dmg" \
-        "latest-mac.yml" \
+        "${assets[@]}" \
         --title "TimeFlow v${version} - Enhanced Productivity Tracking" \
         --notes "$release_notes" \
         --latest
@@ -372,11 +424,13 @@ main() {
     file_info=$(generate_file_info "$new_version")
     
     # Parse file information
-    local intel_size arm_size intel_sha512 arm_sha512
+    local intel_size arm_size intel_sha512 arm_sha512 win_available linux_available
     intel_size=$(echo "$file_info" | grep "INTEL_SIZE=" | cut -d'=' -f2)
     arm_size=$(echo "$file_info" | grep "ARM_SIZE=" | cut -d'=' -f2)
     intel_sha512=$(echo "$file_info" | grep "INTEL_SHA512=" | cut -d'=' -f2)
     arm_sha512=$(echo "$file_info" | grep "ARM_SHA512=" | cut -d'=' -f2)
+    win_available=$(echo "$file_info" | grep "WIN_AVAILABLE=" | cut -d'=' -f2)
+    linux_available=$(echo "$file_info" | grep "LINUX_AVAILABLE=" | cut -d'=' -f2)
     
     # Update auto-updater configuration
     update_auto_updater_config "$new_version" "$intel_size" "$arm_size" "$intel_sha512" "$arm_sha512"
@@ -385,7 +439,7 @@ main() {
     copy_to_downloads "$new_version"
     
     # Create GitHub release
-    create_github_release "$new_version"
+    create_github_release "$new_version" "$win_available" "$linux_available"
     
     # Commit and push changes
     commit_and_push "$new_version"

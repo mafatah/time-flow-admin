@@ -51,12 +51,13 @@ const DownloadPage = () => {
     {
       platform: "Windows",
       icon: <Monitor className="h-6 w-6" />,
-      description: "For Windows 10/11",
+      description: "For Windows 10/11 (Coming Soon)",
       filename: `TimeFlow-${version}-Setup.exe`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Setup.exe`,
       size: "~86 MB",
       requirements: "Windows 10/11 (64-bit)",
-      verified: true
+      verified: false,
+      disabled: true
     },
     {
       platform: "Linux",
