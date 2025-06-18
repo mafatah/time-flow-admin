@@ -29,8 +29,8 @@ export APPLE_ID="alshqawe66@gmail.com"
 export APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi"
 export APPLE_TEAM_ID="6GW49LK9V9"
 
-# GitHub Credentials
-export GITHUB_TOKEN="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"
+# GitHub Credentials  
+export GITHUB_TOKEN="${GITHUB_TOKEN:-your_github_token_here}"
 
 # Electron Builder Configuration
 export CSC_IDENTITY_AUTO_DISCOVERY=false

@@ -14,7 +14,7 @@ echo "
 APPLE_ID="alshqawe66@gmail.com"
 APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi"
 APPLE_TEAM_ID="6GW49LK9V9"
-GITHUB_TOKEN="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"
+GITHUB_TOKEN="your_github_token_here"
 SIGNING_IDENTITY="Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)"
 
 # Functions

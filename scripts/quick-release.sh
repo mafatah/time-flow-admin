@@ -41,7 +41,7 @@ else
     export APPLE_ID="${APPLE_ID:-alshqawe66@gmail.com}"
     export APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD:-icmi-tdzi-ydvi-lszi}"
     export APPLE_TEAM_ID="${APPLE_TEAM_ID:-6GW49LK9V9}"
-    export GITHUB_TOKEN="${GITHUB_TOKEN:-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}"
+    export GITHUB_TOKEN="${GITHUB_TOKEN:-your_github_token_here}"
 fi
 
 # Get current version
