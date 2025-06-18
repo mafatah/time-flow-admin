@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,19 +15,19 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 interface URLLog {
   id: string;
   site_url: string;
-  url?: string;
-  title?: string;
+  url?: string | null;
+  title?: string | null;
   user_id: string;
   started_at: string;
-  ended_at?: string;
-  duration_seconds?: number;
-  domain?: string;
-  category?: string;
-  browser?: string;
+  ended_at?: string | null;
+  duration_seconds?: number | null;
+  domain?: string | null;
+  category?: string | null;
+  browser?: string | null;
   users?: {
     full_name: string;
     email: string;
-  };
+  } | null;
 }
 
 interface URLStats {
@@ -94,8 +93,7 @@ export default function URLActivity() {
           duration_seconds,
           domain,
           category,
-          browser,
-          users!inner(full_name, email)
+          browser
         `)
         .gte('started_at', dateRange.from.toISOString())
         .lte('started_at', dateRange.to.toISOString())
@@ -109,7 +107,19 @@ export default function URLActivity() {
 
       if (error) throw error;
 
-      const logs = data || [];
+      // Get user details separately
+      const userIds = [...new Set(data?.map(log => log.user_id) || [])];
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .in('id', userIds);
+
+      // Combine the data
+      const logs: URLLog[] = (data || []).map(log => ({
+        ...log,
+        users: userData?.find(user => user.id === log.user_id) || null
+      }));
+
       setUrlLogs(logs);
 
       // Calculate stats
