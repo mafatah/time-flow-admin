@@ -1,101 +1,74 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Globe, Clock, TrendingUp, Users, Filter, Calendar, Download, BarChart3, PieChart } from 'lucide-react';
+
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
-import { PieChart as RechartsPieChart, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon, Download, Filter, Search, TrendingUp, Clock, Globe, User } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface URLLog {
   id: string;
   site_url: string;
-  started_at: string;
-  ended_at: string | null;
-  duration: number;
+  url?: string;
+  title?: string;
   user_id: string;
+  started_at: string;
+  ended_at?: string;
+  duration_seconds?: number;
+  domain?: string;
+  category?: string;
+  browser?: string;
   users?: {
+    full_name: string;
     email: string;
-    first_name: string;
-    last_name: string;
   };
 }
 
-interface URLStat {
-  site_url: string;
-  total_duration: number;
-  visit_count: number;
-  unique_users: number;
-  avg_duration: number;
-  last_visit: string;
-  category: string;
+interface URLStats {
+  totalTime: number;
+  totalSites: number;
+  topSites: Array<{ site: string; time: number; visits: number }>;
+  categoryBreakdown: Array<{ category: string; time: number }>;
+  userActivity: Array<{ user: string; time: number }>;
 }
 
-interface CategoryData {
-  name: string;
-  value: number;
-  color: string;
-}
-
-const URLActivity: React.FC = () => {
+export default function URLActivity() {
   const [urlLogs, setUrlLogs] = useState<URLLog[]>([]);
-  const [urlStats, setUrlStats] = useState<URLStat[]>([]);
+  const [stats, setStats] = useState<URLStats>({
+    totalTime: 0,
+    totalSites: 0,
+    topSites: [],
+    categoryBreakdown: [],
+    userActivity: []
+  });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUser, setSelectedUser] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [dateRange, setDateRange] = useState<string>('7');
-  const [users, setUsers] = useState<any[]>([]);
-
-  // Category mapping for websites
-  const getCategoryForURL = (url: string): string => {
-    const domain = url.toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
-    
-    if (domain.includes('github') || domain.includes('stackoverflow') || domain.includes('developer') || domain.includes('docs.')) {
-      return 'Development';
-    } else if (domain.includes('gmail') || domain.includes('outlook') || domain.includes('mail')) {
-      return 'Email';
-    } else if (domain.includes('slack') || domain.includes('teams') || domain.includes('zoom') || domain.includes('discord')) {
-      return 'Communication';
-    } else if (domain.includes('youtube') || domain.includes('netflix') || domain.includes('twitch')) {
-      return 'Entertainment';
-    } else if (domain.includes('facebook') || domain.includes('twitter') || domain.includes('linkedin') || domain.includes('instagram')) {
-      return 'Social Media';
-    } else if (domain.includes('news') || domain.includes('bbc') || domain.includes('cnn')) {
-      return 'News';
-    } else if (domain.includes('shop') || domain.includes('amazon') || domain.includes('ebay')) {
-      return 'Shopping';
-    } else {
-      return 'Other';
-    }
-  };
-
-  const categoryColors = {
-    'Development': '#3b82f6',
-    'Email': '#ef4444',
-    'Communication': '#10b981',
-    'Entertainment': '#f59e0b',
-    'Social Media': '#8b5cf6',
-    'News': '#06b6d4',
-    'Shopping': '#ec4899',
-    'Other': '#6b7280'
-  };
+  const [selectedUser, setSelectedUser] = useState<string>('');
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
+    to: new Date()
+  });
+  const [users, setUsers] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
 
   useEffect(() => {
     fetchUsers();
-    fetchURLData();
-  }, [selectedUser, dateRange]);
+    fetchURLLogs();
+  }, [dateRange, selectedUser]);
 
   const fetchUsers = async () => {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, email, first_name, last_name')
-        .order('first_name');
+        .select('id, full_name, email')
+        .eq('role', 'employee')
+        .order('full_name');
 
       if (error) throw error;
       setUsers(data || []);
@@ -104,33 +77,31 @@ const URLActivity: React.FC = () => {
     }
   };
 
-  const fetchURLData = async () => {
-    setLoading(true);
+  const fetchURLLogs = async () => {
     try {
-      const daysAgo = parseInt(dateRange);
-      const startDate = startOfDay(subDays(new Date(), daysAgo));
-      const endDate = endOfDay(new Date());
-
+      setLoading(true);
+      
       let query = supabase
         .from('url_logs')
         .select(`
           id,
           site_url,
+          url,
+          title,
+          user_id,
           started_at,
           ended_at,
-          duration,
-          user_id,
-          users (
-            email,
-            first_name,
-            last_name
-          )
+          duration_seconds,
+          domain,
+          category,
+          browser,
+          users!inner(full_name, email)
         `)
-        .gte('started_at', startDate.toISOString())
-        .lte('started_at', endDate.toISOString())
+        .gte('started_at', dateRange.from.toISOString())
+        .lte('started_at', dateRange.to.toISOString())
         .order('started_at', { ascending: false });
 
-      if (selectedUser !== 'all') {
+      if (selectedUser) {
         query = query.eq('user_id', selectedUser);
       }
 
@@ -141,71 +112,64 @@ const URLActivity: React.FC = () => {
       const logs = data || [];
       setUrlLogs(logs);
 
-      // Calculate statistics
-      const statsMap = new Map<string, URLStat>();
-      
-      logs.forEach((log: URLLog) => {
-        const url = log.site_url;
-        const existing = statsMap.get(url);
-        
-        if (existing) {
-          existing.total_duration += log.duration || 0;
-          existing.visit_count += 1;
-          existing.last_visit = log.started_at > existing.last_visit ? log.started_at : existing.last_visit;
-        } else {
-          statsMap.set(url, {
-            site_url: url,
-            total_duration: log.duration || 0,
-            visit_count: 1,
-            unique_users: 1,
-            avg_duration: log.duration || 0,
-            last_visit: log.started_at,
-            category: getCategoryForURL(url)
-          });
-        }
+      // Calculate stats
+      const totalTime = logs.reduce((sum, log) => sum + (log.duration_seconds || 0), 0);
+      const uniqueSites = new Set(logs.map(log => log.site_url)).size;
+
+      // Top sites
+      const siteStats = new Map<string, { time: number; visits: number }>();
+      logs.forEach(log => {
+        const site = log.site_url;
+        const current = siteStats.get(site) || { time: 0, visits: 0 };
+        siteStats.set(site, {
+          time: current.time + (log.duration_seconds || 0),
+          visits: current.visits + 1
+        });
       });
 
-      // Calculate unique users and average duration
-      const stats = Array.from(statsMap.values()).map(stat => ({
-        ...stat,
-        avg_duration: stat.total_duration / stat.visit_count,
-        unique_users: logs.filter(log => log.site_url === stat.site_url)
-          .map(log => log.user_id)
-          .filter((userId, index, arr) => arr.indexOf(userId) === index).length
-      }));
+      const topSites = Array.from(siteStats.entries())
+        .map(([site, data]) => ({ site, ...data }))
+        .sort((a, b) => b.time - a.time)
+        .slice(0, 10);
 
-      setUrlStats(stats.sort((a, b) => b.total_duration - a.total_duration));
+      // Category breakdown
+      const categoryStats = new Map<string, number>();
+      logs.forEach(log => {
+        const category = log.category || 'Uncategorized';
+        categoryStats.set(category, (categoryStats.get(category) || 0) + (log.duration_seconds || 0));
+      });
+
+      const categoryBreakdown = Array.from(categoryStats.entries())
+        .map(([category, time]) => ({ category, time }))
+        .sort((a, b) => b.time - a.time);
+
+      // User activity
+      const userStats = new Map<string, number>();
+      logs.forEach(log => {
+        const userName = log.users?.full_name || 'Unknown';
+        userStats.set(userName, (userStats.get(userName) || 0) + (log.duration_seconds || 0));
+      });
+
+      const userActivity = Array.from(userStats.entries())
+        .map(([user, time]) => ({ user, time }))
+        .sort((a, b) => b.time - a.time);
+
+      setStats({
+        totalTime,
+        totalSites: uniqueSites,
+        topSites,
+        categoryBreakdown,
+        userActivity
+      });
+
     } catch (error) {
-      console.error('Error fetching URL data:', error);
+      console.error('Error fetching URL logs:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredStats = urlStats.filter(stat => {
-    const matchesSearch = stat.site_url.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || stat.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  const categoryData: CategoryData[] = Object.entries(
-    filteredStats.reduce((acc, stat) => {
-      acc[stat.category] = (acc[stat.category] || 0) + stat.total_duration;
-      return acc;
-    }, {} as Record<string, number>)
-  ).map(([name, value]) => ({
-    name,
-    value,
-    color: categoryColors[name as keyof typeof categoryColors] || '#6b7280'
-  }));
-
-  const topSitesData = filteredStats.slice(0, 10).map(stat => ({
-    name: stat.site_url.length > 30 ? stat.site_url.substring(0, 30) + '...' : stat.site_url,
-    duration: Math.round(stat.total_duration / 60), // Convert to minutes
-    visits: stat.visit_count
-  }));
-
-  const formatDuration = (seconds: number): string => {
+  const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     
@@ -215,165 +179,185 @@ const URLActivity: React.FC = () => {
     return `${minutes}m`;
   };
 
-  const exportToCSV = () => {
-    const headers = ['Website', 'Category', 'Total Time', 'Visits', 'Unique Users', 'Avg Duration', 'Last Visit'];
-    const csvData = [
-      headers.join(','),
-      ...filteredStats.map(stat => [
-        `"${stat.site_url}"`,
-        stat.category,
-        formatDuration(stat.total_duration),
-        stat.visit_count,
-        stat.unique_users,
-        formatDuration(stat.avg_duration),
-        format(new Date(stat.last_visit), 'yyyy-MM-dd HH:mm')
-      ].join(','))
+  const exportData = () => {
+    const csvContent = [
+      ['User', 'Site', 'URL', 'Title', 'Started', 'Duration', 'Category'].join(','),
+      ...urlLogs.map(log => [
+        log.users?.full_name || 'Unknown',
+        log.site_url,
+        log.url || '',
+        log.title || '',
+        log.started_at,
+        formatDuration(log.duration_seconds || 0),
+        log.category || 'Uncategorized'
+      ].map(field => `"${field}"`).join(','))
     ].join('\n');
 
-    const blob = new Blob([csvData], { type: 'text/csv' });
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `url-activity-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.download = `url-activity-${format(dateRange.from, 'yyyy-MM-dd')}-to-${format(dateRange.to, 'yyyy-MM-dd')}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
 
-  const totalDuration = filteredStats.reduce((sum, stat) => sum + stat.total_duration, 0);
-  const totalVisits = filteredStats.reduce((sum, stat) => sum + stat.visit_count, 0);
-  const uniqueWebsites = filteredStats.length;
+  const filteredLogs = urlLogs.filter(log => 
+    log.site_url.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (log.title && log.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (log.users?.full_name && log.users.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
+  const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">URL Activity</h1>
-          <p className="text-muted-foreground">
-            Track and analyze website usage across your organization
-          </p>
+          <h1 className="text-3xl font-bold">URL Activity Monitoring</h1>
+          <p className="text-muted-foreground">Monitor and analyze website usage across your team</p>
         </div>
-        <Button onClick={exportToCSV} variant="outline" className="flex items-center gap-2">
+        <Button onClick={exportData} className="flex items-center gap-2">
           <Download className="h-4 w-4" />
-          Export CSV
+          Export Data
         </Button>
       </div>
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Search Websites</label>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-4">
+          <div className="flex flex-col space-y-2">
+            <Label>Date Range</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="date"
+                  variant="outline"
+                  className={cn(
+                    "w-[300px] justify-start text-left font-normal",
+                    !dateRange && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "LLL dd, y")} -{" "}
+                        {format(dateRange.to, "LLL dd, y")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "LLL dd, y")
+                    )
+                  ) : (
+                    <span>Pick a date</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    if (range?.from && range?.to) {
+                      setDateRange({ from: range.from, to: range.to });
+                    }
+                  }}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="flex flex-col space-y-2">
+            <Label>Employee Filter</Label>
+            <select
+              value={selectedUser}
+              onChange={(e) => setSelectedUser(e.target.value)}
+              className="px-3 py-2 border border-input rounded-md"
+            >
+              <option value="">All Employees</option>
+              {users.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col space-y-2">
+            <Label>Search</Label>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by URL..."
+                placeholder="Search sites, titles, or users..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
+                className="pl-8"
               />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Category</label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {Object.keys(categoryColors).map(category => (
-                    <SelectItem key={category} value={category}>{category}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">User</label>
-              <Select value={selectedUser} onValueChange={setSelectedUser}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Users" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  {users.map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.first_name} {user.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Date Range</label>
-              <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Last 24 hours</SelectItem>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Overview Stats */}
+      {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <Globe className="h-4 w-4 text-muted-foreground" />
-              <div className="ml-4">
-                <p className="text-sm font-medium">Unique Websites</p>
-                <p className="text-2xl font-bold">{uniqueWebsites}</p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Time</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatDuration(stats.totalTime)}</div>
+            <p className="text-xs text-muted-foreground">
+              Time spent on websites
+            </p>
           </CardContent>
         </Card>
+
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <div className="ml-4">
-                <p className="text-sm font-medium">Total Time</p>
-                <p className="text-2xl font-bold">{formatDuration(totalDuration)}</p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unique Sites</CardTitle>
+            <Globe className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalSites}</div>
+            <p className="text-xs text-muted-foreground">
+              Different websites visited
+            </p>
           </CardContent>
         </Card>
+
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <div className="ml-4">
-                <p className="text-sm font-medium">Total Visits</p>
-                <p className="text-2xl font-bold">{totalVisits.toLocaleString()}</p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{urlLogs.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Website sessions recorded
+            </p>
           </CardContent>
         </Card>
+
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <div className="ml-4">
-                <p className="text-sm font-medium">Avg Duration</p>
-                <p className="text-2xl font-bold">
-                  {totalVisits > 0 ? formatDuration(totalDuration / totalVisits) : '0m'}
-                </p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+            <User className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.userActivity.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Users with recorded activity
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -382,120 +366,112 @@ const URLActivity: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PieChart className="h-5 w-5" />
-              Activity by Category
-            </CardTitle>
-            <CardDescription>Time spent across different website categories</CardDescription>
+            <CardTitle>Top Websites by Time</CardTitle>
+            <CardDescription>Most visited websites by total time spent</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatDuration(value as number)} />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={stats.topSites.slice(0, 8)}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="site" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  interval={0}
+                />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value: number) => [formatDuration(value), 'Time Spent']}
+                />
+                <Bar dataKey="time" fill="#8884d8" />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Top Websites
-            </CardTitle>
-            <CardDescription>Most visited websites by time spent</CardDescription>
+            <CardTitle>Category Breakdown</CardTitle>
+            <CardDescription>Time distribution across website categories</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topSitesData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="name" 
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                    fontSize={12}
-                  />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="duration" fill="#3b82f6" name="Duration (minutes)" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={stats.categoryBreakdown}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="time"
+                  label={({ category, percent }: { category: string; percent: number }) => 
+                    `${category} (${(percent * 100).toFixed(0)}%)`
+                  }
+                >
+                  {stats.categoryBreakdown.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => [formatDuration(value), 'Time']} />
+              </PieChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      {/* Detailed Table */}
+      {/* Recent Activity */}
       <Card>
         <CardHeader>
-          <CardTitle>Website Details</CardTitle>
+          <CardTitle>Recent URL Activity</CardTitle>
           <CardDescription>
-            Detailed breakdown of website usage statistics
+            Latest website visits ({filteredLogs.length} of {urlLogs.length} sessions)
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Website</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Total Time</TableHead>
-                <TableHead>Visits</TableHead>
-                <TableHead>Unique Users</TableHead>
-                <TableHead>Avg Duration</TableHead>
-                <TableHead>Last Visit</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStats.map((stat) => (
-                <TableRow key={stat.site_url}>
-                  <TableCell className="font-medium max-w-xs truncate">
-                    {stat.site_url}
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant="outline" 
-                      style={{ 
-                        borderColor: categoryColors[stat.category as keyof typeof categoryColors],
-                        color: categoryColors[stat.category as keyof typeof categoryColors]
-                      }}
-                    >
-                      {stat.category}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{formatDuration(stat.total_duration)}</TableCell>
-                  <TableCell>{stat.visit_count}</TableCell>
-                  <TableCell>{stat.unique_users}</TableCell>
-                  <TableCell>{formatDuration(stat.avg_duration)}</TableCell>
-                  <TableCell>
-                    {format(new Date(stat.last_visit), 'MMM d, yyyy HH:mm')}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {filteredLogs.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No URL activity found for the selected criteria.
+                </p>
+              ) : (
+                filteredLogs.map((log) => (
+                  <div key={log.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium">{log.site_url}</span>
+                        {log.category && (
+                          <Badge variant="secondary" className="text-xs">
+                            {log.category}
+                          </Badge>
+                        )}
+                      </div>
+                      {log.title && (
+                        <p className="text-sm text-muted-foreground mb-1">{log.title}</p>
+                      )}
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>{log.users?.full_name || 'Unknown User'}</span>
+                        <span>{format(new Date(log.started_at), 'PPp')}</span>
+                        {log.browser && <span>{log.browser}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">
+                        {formatDuration(log.duration_seconds || 0)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
-};
-
-export default URLActivity; 
+}
