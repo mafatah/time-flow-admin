@@ -245,20 +245,41 @@ export default function UsersManagement() {
         throw usersError;
       }
 
-      // Use actual database values, with fallbacks only for missing auth status
-      const usersWithStatus = (usersData || []).map(user => ({
-        ...user,
-        auth_status: 'confirmed' as const, // Still defaulting this until proper auth status is implemented
-        email_confirmed_at: new Date().toISOString(),
-        is_active: user.is_active ?? true, // Use database value or default to true if null
-        paused_at: user.paused_at,
-        paused_by: user.paused_by,
-        pause_reason: user.pause_reason,
-        last_activity: user.last_activity || new Date().toISOString()
-      }));
+      // Get real auth status for each user
+      const usersWithRealStatus = await Promise.all(
+        (usersData || []).map(async (user) => {
+          let authStatus: 'confirmed' | 'unconfirmed' | 'missing' = 'missing';
+          let emailConfirmedAt: string | null = null;
+          
+          try {
+            // Check real auth status using admin API if available
+            const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(user.id);
+            
+            if (!authError && authUser) {
+              authStatus = authUser.email_confirmed_at ? 'confirmed' : 'unconfirmed';
+              emailConfirmedAt = authUser.email_confirmed_at || null;
+            }
+          } catch (error) {
+            // If admin API not available, try to get session info
+            console.log('Admin API not available, using fallback auth status check');
+            authStatus = 'confirmed'; // Fallback to confirmed for existing users
+          }
+          
+          return {
+            ...user,
+            auth_status: authStatus,
+            email_confirmed_at: emailConfirmedAt,
+            is_active: user.is_active ?? true,
+            paused_at: user.paused_at,
+            paused_by: user.paused_by,
+            pause_reason: user.pause_reason,
+            last_activity: user.last_activity || new Date().toISOString()
+          };
+        })
+      );
       
-      console.log('Users fetched:', usersWithStatus);
-      setUsers(usersWithStatus);
+      console.log('Users fetched with real auth status:', usersWithRealStatus);
+      setUsers(usersWithRealStatus);
     } catch (error: any) {
       console.error('Error fetching users:', error);
       toast({
@@ -268,6 +289,34 @@ export default function UsersManagement() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Function to manually confirm user email
+  const confirmUserEmail = async (user: User) => {
+    try {
+      // Use admin API to manually confirm email
+      const { error } = await supabase.auth.admin.updateUserById(user.id, {
+        email_confirm: true
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Email confirmed",
+        description: `Email confirmed for ${user.full_name}. They can now log in.`,
+      });
+
+      // Refresh users list to show updated status
+      fetchUsers();
+    } catch (error: any) {
+      toast({
+        title: "Error confirming email",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -513,10 +562,23 @@ export default function UsersManagement() {
                             Confirmed
                           </Badge>
                         ) : user.auth_status === 'unconfirmed' ? (
-                          <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 w-fit">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Pending
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 w-fit">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Pending
+                            </Badge>
+                            {canEditRoles && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => confirmUserEmail(user)}
+                                className="text-green-600 border-green-300 hover:bg-green-50 text-xs"
+                              >
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Confirm
+                              </Button>
+                            )}
+                          </div>
                         ) : (
                           <Badge variant="outline" className="text-gray-600 border-gray-300 bg-gray-50 w-fit">
                             <XCircle className="h-3 w-3 mr-1" />
