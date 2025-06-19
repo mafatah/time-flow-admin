@@ -434,24 +434,31 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
             {getOSIcon(os)}
             <span className="ml-1">{getOSName(os)} Detected</span>
           </Badge>
-          <Button
-            size="sm"
-            onClick={() => handleDownload(normalizedOS)}
-            disabled={downloading === normalizedOS}
-            className="flex items-center gap-2"
-          >
-            {downloading === normalizedOS ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-background border-t-transparent" />
-                <span>Downloading...</span>
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4" />
-                <span>Download Desktop App</span>
-              </>
-            )}
-          </Button>
+          {os === 'linux' ? (
+            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground bg-muted/50 rounded-md">
+              <Laptop className="h-4 w-4" />
+              <span>Linux support coming soon for v1.0.31</span>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              onClick={() => handleDownload(normalizedOS)}
+              disabled={downloading === normalizedOS}
+              className="flex items-center gap-2"
+            >
+              {downloading === normalizedOS ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-background border-t-transparent" />
+                  <span>Downloading...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  <span>Download Desktop App</span>
+                </>
+              )}
+            </Button>
+          )}
         </div>
         
         {/* Download notification */}
@@ -570,7 +577,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
                 </div>
               </Button>
 
-              {/* Linux Download - Disabled temporarily as AppImage not available in v1.0.30 */}
+              {/* Linux Download - Linux AppImage coming soon for v1.0.31 */}
               <Button
                 variant="outline"
                 disabled={true}
@@ -579,7 +586,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
                 <Laptop className="h-5 w-5" />
                 <div className="text-center">
                   <div className="font-medium">Linux</div>
-                  <div className="text-xs opacity-70">Coming Soon</div>
+                  <div className="text-xs opacity-70">Coming Soon for v1.0.31</div>
                 </div>
               </Button>
             </div>

@@ -29,33 +29,34 @@ const DownloadPage = () => {
   
   const downloads: DownloadItem[] = [
     {
+      platform: "Windows",
+      icon: <Monitor className="h-6 w-6" />,
+      description: "For Windows 10/11 (64-bit)",
+      filename: `TimeFlow-${version}-Setup.exe`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Setup.exe`,
+      size: "~94 MB",
+      requirements: "Windows 10/11 (64-bit)",
+      verified: true
+    },
+    {
       platform: "macOS (Apple Silicon)",
       icon: <Apple className="h-6 w-6" />,
-      description: "For M1, M2, M3 Macs",
+      description: "For M1, M2, M3 Macs (Coming Soon)",
       filename: `TimeFlow-${version}-ARM64.dmg`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-ARM64.dmg`,
       size: "~112 MB",
       requirements: "macOS 11.0+",
-      verified: true
+      verified: false,
+      disabled: true
     },
     {
       platform: "macOS (Intel)",
       icon: <Apple className="h-6 w-6" />,
-      description: "For Intel-based Macs",
+      description: "For Intel-based Macs (Coming Soon)",
       filename: `TimeFlow-${version}-Intel.dmg`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Intel.dmg`,
       size: "~118 MB",
       requirements: "macOS 10.14+",
-      verified: true
-    },
-    {
-      platform: "Windows",
-      icon: <Monitor className="h-6 w-6" />,
-      description: "For Windows 10/11 (Coming Soon)",
-      filename: `TimeFlow-${version}-Setup.exe`,
-      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Setup.exe`,
-      size: "~86 MB",
-      requirements: "Windows 10/11 (64-bit)",
       verified: false,
       disabled: true
     },

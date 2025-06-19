@@ -11,15 +11,19 @@
 - Cross-platform compatibility improvements
 - Security enhancements
 
-### � **Downloads**
-- **Windows**: TimeFlow-v1.0.31-Setup.exe
-- **macOS builds**: Coming soon (currently being prepared)
+### 📱 **Downloads**
+- **Windows**: TimeFlow-v1.0.31-Setup.exe (94 MB) ✅ Available
+- **macOS (Apple Silicon)**: Coming soon
+- **macOS (Intel)**: Coming soon
+- **Linux**: Coming soon
 
 ### 🔄 **Auto-Update**
 Existing users will be automatically notified of this update.
 
-### ⚠️ **Note**
-This release includes the Windows version. macOS builds will be added shortly.
+### ⚠️ **Platform Availability**
+- ✅ **Windows 10/11**: Fully available and tested
+- 🔄 **macOS**: Builds in preparation (signed and notarized versions coming soon)
+- 🔄 **Linux**: AppImage build in development
 
 ---
 *Built with enhanced security and performance optimizations* 
