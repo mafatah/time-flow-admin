@@ -1,21 +1,25 @@
 ## TimeFlow v1.0.31
 
-### 🚀 What's New
-- Enhanced performance improvements
-- Bug fixes and stability improvements
-- Updated dependencies for better security
+### 🚀 **New Features & Improvements**
+- Enhanced screenshot capture (3 per 10 minutes)
+- Improved idle detection system
+- Production-ready configurations
+- Performance optimizations
 
-### 📥 Downloads
-- **macOS (Apple Silicon)**: TimeFlow-v1.0.31-ARM64.dmg
-- **macOS (Intel)**: TimeFlow-v1.0.31-Intel.dmg
+### 🔧 **Technical Updates**
+- Updated auto-updater configuration
+- Cross-platform compatibility improvements
+- Security enhancements
 
-### 🔄 Auto-Update
+### � **Downloads**
+- **Windows**: TimeFlow-v1.0.31-Setup.exe
+- **macOS builds**: Coming soon (currently being prepared)
+
+### 🔄 **Auto-Update**
 Existing users will be automatically notified of this update.
 
-### 📋 Installation
-1. Download the appropriate file for your platform
-2. Install as usual - no security warnings as DMG files are signed and notarized
-3. Existing settings and data will be preserved
+### ⚠️ **Note**
+This release includes the Windows version. macOS builds will be added shortly.
 
 ---
-*This release includes signed and notarized applications for enhanced security.* 
+*Built with enhanced security and performance optimizations* 
