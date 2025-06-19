@@ -24,7 +24,7 @@ interface DownloadItem {
 }
 
 const DownloadPage = () => {
-  const version = "v1.0.30"; // Updated automatically by release pipeline
+  const version = "v1.0.31"; // Updated automatically by release pipeline
   const releaseDate = new Date().toLocaleDateString();
   
   const downloads: DownloadItem[] = [

@@ -121,7 +121,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     setDownloading(platform);
     
     // Use GitHub releases for reliable downloads - Updated automatically by release pipeline
-    const currentVersion = "1.0.30"; // This will be updated automatically by release scripts
+    const currentVersion = "1.0.31"; // This will be updated automatically by release scripts
     const downloadFiles = {
       windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`,
       'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED
@@ -280,14 +280,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '112MB'; // TimeFlow-v1.0.30-ARM64.dmg (UPDATED for v1.0.30)
+        return '112MB'; // TimeFlow-v1.0.31-ARM64.dmg (UPDATED for v1.0.31)
       case 'mac-intel':
       case 'mac':
-        return '118MB'; // TimeFlow-v1.0.30-Intel.dmg (UPDATED for v1.0.30)
+        return '118MB'; // TimeFlow-v1.0.31-Intel.dmg (UPDATED for v1.0.31)
       case 'windows':
-        return '86MB'; // TimeFlow-v1.0.30-Setup.exe (UPDATED for v1.0.30)
+        return '86MB'; // TimeFlow-v1.0.31-Setup.exe (UPDATED for v1.0.31)
       case 'linux':
-        return '132MB'; // TimeFlow-v1.0.30-Linux.AppImage (UPDATED for v1.0.30)
+        return '132MB'; // TimeFlow-v1.0.31-Linux.AppImage (UPDATED for v1.0.31)
       default:
         return '';
     }
@@ -296,14 +296,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 117065990; // TimeFlow-v1.0.30-ARM64.dmg (UPDATED for v1.0.30)
+        return 117065990; // TimeFlow-v1.0.31-ARM64.dmg (UPDATED for v1.0.31)
       case 'mac-intel':
       case 'mac':
-        return 123550066; // TimeFlow-v1.0.30-Intel.dmg (UPDATED for v1.0.30)
+        return 123550066; // TimeFlow-v1.0.31-Intel.dmg (UPDATED for v1.0.31)
       case 'windows':
-        return 89747951; // TimeFlow-v1.0.30-Setup.exe (UPDATED for v1.0.30)
+        return 89747951; // TimeFlow-v1.0.31-Setup.exe (UPDATED for v1.0.31)
       case 'linux':
-        return 137960059; // TimeFlow-v1.0.30-Linux.AppImage (UPDATED for v1.0.30)
+        return 137960059; // TimeFlow-v1.0.31-Linux.AppImage (UPDATED for v1.0.31)
       default:
         return 0;
     }

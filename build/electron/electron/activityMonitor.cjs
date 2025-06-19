@@ -69,9 +69,9 @@ const ACTIVITY_MONITORING_TASK_ID = '00000000-0000-0000-0000-000000000001';
 let appSettings = {
     blur_screenshots: false,
     screenshot_interval_seconds: 60,
-    idle_threshold_seconds: 10, // TEMPORARILY REDUCED TO 10 SECONDS FOR TESTING
-    max_laptop_closed_hours: 1, // Stop tracking after 1 hour of laptop being closed (reduced from 15)
-    mandatory_screenshot_interval_minutes: 15 // Screenshots are mandatory every 15 minutes (reduced from 30)
+    idle_threshold_seconds: 300, // 5 minutes (removed testing mode)
+    max_laptop_closed_hours: 1,
+    mandatory_screenshot_interval_minutes: 15
 };
 // === ACTIVITY METRICS ===
 let activityMetrics = {
@@ -137,7 +137,7 @@ async function startActivityMonitoring(userId) {
     };
     // Save session to database
     saveActivitySession();
-    // Start random screenshot capture (2 per 10-minute period)
+    // Start random screenshot capture (3 per 10-minute period)
     startRandomScreenshotCapture();
     // Start app activity tracking every 5 seconds - DON'T reset activity timer!
     appTrackingInterval = setInterval(async () => {
@@ -169,7 +169,7 @@ async function startActivityMonitoring(userId) {
     activityResetInterval = setInterval(() => {
         resetActivityMetrics();
     }, 10 * 60 * 1000); // 10 minutes
-    safeLog(`✅ Activity monitoring started - Random screenshots (2 per 10 min), App tracking every 5s, Activity metrics every 1s, Reset every 10min`);
+    safeLog(`✅ Activity monitoring started - Random screenshots (3 per 10 min), App tracking every 5s, Activity metrics every 1s, Reset every 10min`);
 }
 function stopActivityMonitoring() {
     if (!isMonitoring)
@@ -225,23 +225,23 @@ function stopActivityMonitoring() {
     currentUserId = null;
 }
 function isUserActive() {
-    // Use improved idle detection instead of corrupted activity tracking
+    // Use improved idle detection 
     const currentIdleTime = calculateIdleTimeSeconds();
-    const testingIdleThreshold = 10; // Force 10 seconds for testing
+    const idleThreshold = appSettings.idle_threshold_seconds; // Use normal threshold (300 seconds)
     // Only stop monitoring if we have consecutive technical failures, not just lack of screenshots
     if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
         safeLog(`❌ Too many consecutive screenshot failures (${consecutiveScreenshotFailures}), stopping monitoring due to technical issues`);
         return false;
     }
     // Check actual user activity using improved detection
-    const isActive = currentIdleTime < testingIdleThreshold;
-    // Log for debugging user activity detection
-    if (currentIdleTime > 5) { // Log more frequently for testing
+    const isActive = currentIdleTime < idleThreshold;
+    // Log for debugging user activity detection (reduced frequency)
+    if (currentIdleTime > 240) { // Log only when approaching idle (4+ minutes)
         safeLog('👤 USER ACTIVITY CHECK:', {
             current_idle_seconds: currentIdleTime,
-            idle_threshold: testingIdleThreshold,
+            idle_threshold: idleThreshold,
             is_active: isActive,
-            detection_method: 'IMPROVED_SYSTEM_IDLE_TESTING'
+            detection_method: 'PRODUCTION_SYSTEM_IDLE'
         });
     }
     return isActive;
@@ -311,19 +311,16 @@ async function trackActivityMetrics() {
         // === IMPROVED IDLE DETECTION ===
         // Use system idle time instead of corrupted activity tracking
         const currentIdleTime = calculateIdleTimeSeconds();
-        const idleThreshold = appSettings.idle_threshold_seconds; // Already in seconds
-        // === FORCE TESTING THRESHOLD ===
-        const testingIdleThreshold = 10; // Force 10 seconds for testing
-        const isCurrentlyIdle = currentIdleTime >= testingIdleThreshold;
+        const idleThreshold = appSettings.idle_threshold_seconds; // Use production threshold (300 seconds)
+        const isCurrentlyIdle = currentIdleTime >= idleThreshold;
         // === ENHANCED DEBUGGING FOR DECAY LOGIC ===
         safeLog('🔍 DECAY LOGIC DEBUG:', {
             function_called: 'trackActivityMetrics',
             timestamp: new Date().toISOString(),
             currentIdleTime: currentIdleTime,
-            idleThreshold: testingIdleThreshold,
-            idleThreshold_original: idleThreshold,
+            idleThreshold: idleThreshold,
             isCurrentlyIdle: isCurrentlyIdle,
-            idle_comparison: `${currentIdleTime} >= ${testingIdleThreshold} = ${currentIdleTime >= testingIdleThreshold}`,
+            idle_comparison: `${currentIdleTime} >= ${idleThreshold} = ${currentIdleTime >= idleThreshold}`,
             current_activity_score: activityMetrics.activity_score,
             will_decay: isCurrentlyIdle && activityMetrics.activity_score > 0
         });
@@ -352,14 +349,14 @@ async function trackActivityMetrics() {
                 decayAmount: oldScore - activityMetrics.activity_score
             });
             // Always log decay attempts, even if score doesn't change
-            safeLog('💤 ELECTRON ACTIVITY DECAY ATTEMPT:', {
+            safeLog('💤 ELECTRON ACTIVITY DECAY:', {
                 idle_duration_seconds: currentIdleTime,
-                idle_threshold: testingIdleThreshold,
+                idle_threshold: idleThreshold,
                 decay_rate: decayRate,
                 activity_score_before: oldScore,
                 activity_score_after: activityMetrics.activity_score,
                 score_changed: oldScore !== activityMetrics.activity_score,
-                user_status: 'ELECTRON_IDLE_DECAY',
+                user_status: 'PRODUCTION_IDLE_DECAY',
                 using_system_idle: true
             });
             if (oldScore !== activityMetrics.activity_score) {
@@ -369,36 +366,18 @@ async function trackActivityMetrics() {
                 safeLog('⚠️ DECAY SKIPPED - SCORE ALREADY AT MINIMUM');
             }
         }
-        else if (currentIdleTime > 0) {
+        else if (currentIdleTime > 240) { // Log when approaching idle (4 minutes)
             // Log when approaching idle but not there yet
             safeLog('🎯 ENTERING APPROACHING IDLE BRANCH - User not yet idle');
             safeLog('⏰ ELECTRON APPROACHING IDLE:', {
                 idle_duration_seconds: currentIdleTime,
-                idle_threshold: testingIdleThreshold,
-                seconds_until_decay: testingIdleThreshold - currentIdleTime,
+                idle_threshold: idleThreshold,
+                seconds_until_decay: idleThreshold - currentIdleTime,
                 current_activity_score: activityMetrics.activity_score,
-                debug_calculation: `${testingIdleThreshold} - ${currentIdleTime} = ${testingIdleThreshold - currentIdleTime}`,
-                should_be_idle: currentIdleTime >= testingIdleThreshold ? 'YES_BUT_NOT_DETECTED' : 'NO'
+                debug_calculation: `${idleThreshold} - ${currentIdleTime} = ${idleThreshold - currentIdleTime}`,
+                should_be_idle: currentIdleTime >= idleThreshold ? 'YES_BUT_NOT_DETECTED' : 'NO'
             });
         }
-        // === DETAILED IDLE DETECTION LOGGING ===
-        // Commented out to reduce log noise during debugging
-        /*
-        console.log('🕰️ ACTIVITY METRICS:', {
-          timestamp: new Date().toISOString(),
-          timeSinceLastActivity_ms: timeSinceLastActivity,
-          timeSinceLastActivity_seconds: Math.round(timeSinceLastActivity / 1000),
-          idleThreshold_seconds: appSettings.idle_threshold_seconds,
-          isCurrentlyIdle: isCurrentlyIdle,
-          currentActivity: {
-            mouse_clicks: activityMetrics.mouse_clicks,
-            keystrokes: activityMetrics.keystrokes,
-            mouse_movements: activityMetrics.mouse_movements,
-            current_activity_score: activityMetrics.activity_score
-          },
-          detection_method: 'REAL_INPUT_WITH_DECAY'
-        });
-        */
         // Update current session metrics
         if (currentActivitySession) {
             currentActivitySession.total_mouse_clicks = activityMetrics.mouse_clicks;
@@ -1708,7 +1687,7 @@ function startRandomScreenshotCapture() {
     if (activityInterval) {
         clearTimeout(activityInterval);
     }
-    console.log('📸 Starting random screenshots - 2 per 10 minute period');
+    console.log('📸 Starting random screenshots - 3 per 10 minute period');
     scheduleRandomScreenshot();
 }
 function scheduleRandomScreenshot() {
@@ -1716,7 +1695,7 @@ function scheduleRandomScreenshot() {
         clearTimeout(activityInterval);
     }
     // Generate random interval between 2-8 minutes (120-480 seconds)
-    // This ensures 2 screenshots within each 10-minute window at random times
+    // This ensures 3 screenshots within each 10-minute window at random times
     const minInterval = 120; // 2 minutes 
     const maxInterval = 480; // 8 minutes
     const randomInterval = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
