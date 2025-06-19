@@ -62,13 +62,12 @@ const DownloadPage = () => {
     {
       platform: "Linux",
       icon: <Smartphone className="h-6 w-6" />,
-      description: "AppImage for Linux (Coming Soon)",
+      description: "AppImage for Linux",
       filename: `TimeFlow-${version}-Linux.AppImage`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Linux.AppImage`,
       size: "~132 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
-      verified: false,
-      disabled: true
+      verified: true
     }
   ];
 
