@@ -10,6 +10,7 @@ import MainLayout from '@/components/layout/main-layout';
 
 // Lazy load pages for better performance
 import LoginPage from '@/pages/auth/login';
+import ResetPassword from '@/pages/auth/reset-password';
 import DownloadPage from '@/pages/download';
 import DashboardPage from '@/pages/dashboard';
 import EmployeeDashboard from '@/pages/employee/dashboard';
@@ -295,6 +296,16 @@ function AppRoutes() {
               <LoginPage />
             </RouteWrapper>
           )
+        } 
+      />
+      
+      {/* Password Reset Route - Public */}
+      <Route 
+        path="/auth/reset-password" 
+        element={
+          <RouteWrapper routeName="reset-password">
+            <ResetPassword />
+          </RouteWrapper>
         } 
       />
       
