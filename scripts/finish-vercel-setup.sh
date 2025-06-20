@@ -20,13 +20,13 @@ add_env_var() {
     return 0
 }
 
-# Development Database Credentials
-DEV_SUPABASE_URL="https://clypxuffvpqgmczbsblj.supabase.co"
-DEV_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseXB4dWZmdnBxZ21jemJzYmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAzMjc2NjcsImV4cCI6MjA2NTkwMzY2N30._h0BlKG10Ri4yf2W-BH7yGf_WCNArqRkXCtSuYTkVQ8"
+# Development Database Credentials - SET THESE FROM ENVIRONMENT VARIABLES
+DEV_SUPABASE_URL="${DEV_SUPABASE_URL:-[SET_DEV_SUPABASE_URL]}"
+DEV_SUPABASE_ANON_KEY="${DEV_SUPABASE_ANON_KEY:-[SET_DEV_ANON_KEY]}"
 
-# Production Database Credentials  
-PROD_SUPABASE_URL="https://fkpiqcxkmrtaetvfgcli.supabase.co"
-PROD_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4"
+# Production Database Credentials - SET THESE FROM ENVIRONMENT VARIABLES
+PROD_SUPABASE_URL="${PROD_SUPABASE_URL:-[SET_PROD_SUPABASE_URL]}"
+PROD_SUPABASE_ANON_KEY="${PROD_SUPABASE_ANON_KEY:-[SET_PROD_ANON_KEY]}"
 
 echo "🔄 Adding Production Environment Variables..."
 add_env_var "VITE_SUPABASE_URL" "$PROD_SUPABASE_URL" "production"
@@ -63,6 +63,8 @@ echo "  Production:  https://worktime.ebdaadt.com"
 echo "  Development: https://time-flow-admin-git-development-m-afatah-hotmailcoms-projects.vercel.app"
 echo ""
 echo "🔧 Each environment now uses its own database:"
+# ⚠️  WARNING: Update the hardcoded database URLs in the echo statements below
+#     These should also use environment variables for full security
 echo "  Production:  fkpiqcxkmrtaetvfgcli.supabase.co"
 echo "  Development: clypxuffvpqgmczbsblj.supabase.co"
 echo "" 

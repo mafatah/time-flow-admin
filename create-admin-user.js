@@ -7,9 +7,13 @@ const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
 // Admin credentials from environment
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@timeflow.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'SecureAdmin123!';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (() => {
+  throw new Error('ADMIN_PASSWORD environment variable is required');
+})();
 const EMPLOYEE_EMAIL = process.env.EMPLOYEE_EMAIL || 'employee@timeflow.com';
-const EMPLOYEE_PASSWORD = process.env.EMPLOYEE_PASSWORD || 'SecureEmployee123!';
+const EMPLOYEE_PASSWORD = process.env.EMPLOYEE_PASSWORD || (() => {
+  throw new Error('EMPLOYEE_PASSWORD environment variable is required');
+})();
 
 // Enhanced validation
 if (!SUPABASE_URL || !SUPABASE_KEY) {

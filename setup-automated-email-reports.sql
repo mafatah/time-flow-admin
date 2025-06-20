@@ -14,8 +14,8 @@ SELECT cron.schedule(
   $$
   SELECT
     net.http_post(
-        url := 'https://fkpiqcxkmrtaetvfgcli.supabase.co/functions/v1/email-reports/send-daily-report',
-        headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyOTgxNzU3NSwiZXhwIjoyMDQ1MzkzNTc1fQ.vgzKVWKfxYlDfHhSV9Fn8DMQXW3BXD6UZR-4A3pJ5DQ"}'::jsonb,
+        url := '[SET_SUPABASE_URL]/functions/v1/email-reports/send-daily-report',
+        headers := '{"Content-Type": "application/json", "Authorization": "Bearer [SET_SERVICE_ROLE_KEY]"}'::jsonb,
         body := '{"automated": true}'::jsonb
     ) as request_id;
   $$
@@ -28,8 +28,8 @@ SELECT cron.schedule(
   $$
   SELECT
     net.http_post(
-        url := 'https://fkpiqcxkmrtaetvfgcli.supabase.co/functions/v1/email-reports/send-weekly-report',
-        headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyOTgxNzU3NSwiZXhwIjoyMDQ1MzkzNTc1fQ.vgzKVWKfxYlDfHhSV9Fn8DMQXW3BXD6UZR-4A3pJ5DQ"}'::jsonb,
+        url := '[SET_SUPABASE_URL]/functions/v1/email-reports/send-weekly-report',
+        headers := '{"Content-Type": "application/json", "Authorization": "Bearer [SET_SERVICE_ROLE_KEY]"}'::jsonb,
         body := '{"automated": true}'::jsonb
     ) as request_id;
   $$

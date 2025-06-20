@@ -33,9 +33,9 @@ gh release create v1.0.31 \
 ### Option 2: Run Automated Release Script
 ```bash
 # Set required environment variables
-export APPLE_ID="alshqawe66@gmail.com"
-export APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi"
-export APPLE_TEAM_ID="6GW49LK9V9"
+export APPLE_ID="${APPLE_ID}" # Set from secure environment
+export APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD}" # Set from secure environment  
+export APPLE_TEAM_ID="${APPLE_TEAM_ID}" # Set from secure environment
 export GITHUB_TOKEN="your_github_token_here"
 
 # Run the automated release pipeline

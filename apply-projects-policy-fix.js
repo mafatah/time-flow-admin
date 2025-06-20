@@ -65,8 +65,10 @@ async function applyPolicyFix() {
     console.log('\n🧪 Testing employee access...');
     
     const { error: empAuthError } = await supabase.auth.signInWithPassword({
-      email: 'employee@timeflow.com',
-      password: 'employee123456'
+              email: process.env.EMPLOYEE_EMAIL || 'employee@timeflow.com',
+        password: process.env.EMPLOYEE_PASSWORD || (() => {
+          throw new Error('EMPLOYEE_PASSWORD environment variable is required');
+        })()
     });
     
     if (empAuthError) {

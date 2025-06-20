@@ -5,13 +5,13 @@ echo "🔧 Setting up Vercel Environment Variables"
 echo "=========================================="
 echo ""
 
-# Development Database Credentials
-DEV_SUPABASE_URL="https://clypxuffvpqgmczbsblj.supabase.co"
-DEV_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseXB4dWZmdnBxZ21jemJzYmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAzMjc2NjcsImV4cCI6MjA2NTkwMzY2N30._h0BlKG10Ri4yf2W-BH7yGf_WCNArqRkXCtSuYTkVQ8"
+# Development Database Credentials - SET FROM ENVIRONMENT VARIABLES
+DEV_SUPABASE_URL="${DEV_SUPABASE_URL:-[SET_DEV_SUPABASE_URL]}"
+DEV_SUPABASE_ANON_KEY="${DEV_SUPABASE_ANON_KEY:-[SET_DEV_ANON_KEY]}"
 
-# Production Database Credentials  
-PROD_SUPABASE_URL="https://fkpiqcxkmrtaetvfgcli.supabase.co"
-PROD_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcGlxY3hrbXJ0YWV0dmZnY2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4Mzg4ODIsImV4cCI6MjA2MzQxNDg4Mn0._ustFmxZXyDBQTEUidr5Qy88vLkDAKmQKg2QCNVvxE4"
+# Production Database Credentials - SET FROM ENVIRONMENT VARIABLES  
+PROD_SUPABASE_URL="${PROD_SUPABASE_URL:-[SET_PROD_SUPABASE_URL]}"
+PROD_SUPABASE_ANON_KEY="${PROD_SUPABASE_ANON_KEY:-[SET_PROD_ANON_KEY]}"
 
 echo "📋 Environment Variables to Set:"
 echo ""

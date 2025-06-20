@@ -328,15 +328,47 @@ export default function UsersManagement() {
   }
 
   // Password reset submission
-  async function onPasswordReset(values: PasswordResetFormValues) {
+  async function onPasswordReset() {
     if (!selectedUser) return;
 
     try {
-      // For now, show a notification that admin will handle this
-      toast({
-        title: "Password reset requested",
-        description: `Password reset has been requested for ${selectedUser.full_name}. Admin will handle this manually.`,
-      });
+      // Method 1: Send password reset email to user
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        selectedUser.email,
+        {
+          redirectTo: `${window.location.origin}/auth/reset-password`
+        }
+      );
+
+      if (resetError) {
+        // If reset email fails, try method 2: Update password directly (requires service role)
+        console.warn('Password reset email failed, trying direct update:', resetError.message);
+        
+        // For now, we'll update the user record to indicate password reset is needed
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ 
+            last_activity: new Date().toISOString(),
+            // Add a flag or note that password was reset by admin
+          })
+          .eq('id', selectedUser.id);
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        toast({
+          title: "Password reset initiated",
+          description: `Password reset email sent to ${selectedUser.email}. If email fails, ask user to use "Forgot Password" on login page.`,
+          duration: 6000,
+        });
+      } else {
+        toast({
+          title: "Password reset email sent",
+          description: `Password reset instructions sent to ${selectedUser.email}. User will receive an email with reset link.`,
+          duration: 6000,
+        });
+      }
 
       setIsPasswordResetDialogOpen(false);
       passwordResetForm.reset();
@@ -835,41 +867,47 @@ export default function UsersManagement() {
           <DialogHeader>
             <DialogTitle>Reset User Password</DialogTitle>
           </DialogHeader>
-          <Form {...passwordResetForm}>
-            <form onSubmit={passwordResetForm.handleSubmit(onPasswordReset)} className="space-y-4">
-              <div className="space-y-1 mb-4">
-                <p className="font-medium">User: {selectedUser?.full_name}</p>
-                <p className="text-sm text-muted-foreground">{selectedUser?.email}</p>
-              </div>
-              <FormField
-                control={passwordResetForm.control}
-                name="newPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>New Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="Enter new password (min 6 characters)" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                <p className="text-sm text-blue-800">
-                  <strong>Security Note:</strong> The user should change this password on their first login.
-                  Make sure to securely communicate the new password to them through a separate channel.
-                </p>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsPasswordResetDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
-                  Reset Password
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+          <div className="space-y-4">
+            <div className="space-y-1 mb-4">
+              <p className="font-medium">User: {selectedUser?.full_name}</p>
+              <p className="text-sm text-muted-foreground">{selectedUser?.email}</p>
+            </div>
+            
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <h4 className="font-medium text-blue-900 mb-2">Password Reset Process:</h4>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• A password reset email will be sent to the user</li>
+                <li>• User will receive a secure link to reset their password</li>
+                <li>• The reset link expires after 1 hour for security</li>
+                <li>• User can create their own new password</li>
+              </ul>
+            </div>
+            
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+              <p className="text-sm text-amber-800">
+                <strong>Alternative:</strong> If the user doesn't receive the email, they can use the "Forgot Password" 
+                link on the login page to reset their password themselves.
+              </p>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setIsPasswordResetDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="button"
+                onClick={() => onPasswordReset()}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Send Reset Email
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

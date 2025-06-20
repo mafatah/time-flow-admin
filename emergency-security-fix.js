@@ -117,7 +117,8 @@ ${filesToFix.map(file => `- ${file}`).join('\n')}
    
    Replace this pattern:
    \`\`\`
-   const supabaseKey = 'eyJhbGciOiJIUzI1...'
+   // Example removed for security - use environment variables instead
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY
    \`\`\`
    
    With this:

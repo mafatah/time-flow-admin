@@ -473,7 +473,7 @@ async function handleQuickLogin() {
 
     // Set demo credentials and enable remember me by default for quick login
     emailInput.value = 'employee@timeflow.com';
-    passwordInput.value = 'employee123456';
+                    // Auto-fill removed for security
     if (rememberMeCheckbox) {
         rememberMeCheckbox.checked = true;
     }
@@ -487,7 +487,7 @@ async function handleQuickLogin() {
         // Authenticate with Supabase using demo credentials
         const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
             email: 'employee@timeflow.com',
-            password: 'employee123456'
+            password: '' // Password removed for security
         });
 
         if (authError) {
