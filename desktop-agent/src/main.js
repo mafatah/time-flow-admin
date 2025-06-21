@@ -32,18 +32,40 @@ const fallbackSystemMonitor = {
   initSystemMonitor: () => {
     console.log('🎯 Using fallback input detection system');
     
-    // Simple power event monitoring
+    // Enhanced power event monitoring with laptop closure detection
     powerMonitor.on('suspend', () => {
-      console.log('💤 System suspended');
-      if (isTracking && !isPaused) {
-        pauseTracking('system_suspend');
-      }
+      console.log('💤 System suspended (laptop closed/sleep mode)');
+      handleSystemSuspend();
     });
     
     powerMonitor.on('resume', () => {
-      console.log('⚡ System resumed');
-      if (isPaused && currentSession) {
-        resumeTracking();
+      console.log('⚡ System resumed (laptop opened/wake up)');
+      handleSystemResume();
+    });
+    
+    // Additional power monitoring events
+    powerMonitor.on('shutdown', () => {
+      console.log('🔴 System shutdown detected');
+      handleSystemShutdown();
+    });
+    
+    // Screen lock/unlock handlers removed - handled in main power management section
+    
+    // Monitor thermal state for performance issues
+    powerMonitor.on('thermal-state-change', (state) => {
+      console.log('🌡️ Thermal state changed:', state);
+      if (state === 'critical') {
+        console.log('⚠️ Critical thermal state - may affect screenshot capture');
+        // Reduce screenshot frequency during thermal stress
+        if (screenshotInterval) {
+          clearTimeout(screenshotInterval);
+          // Increase interval to 10 minutes during thermal stress
+          setTimeout(() => {
+            if (isTracking && currentSession) {
+              scheduleRandomScreenshot();
+            }
+          }, 600000); // 10 minutes
+        }
       }
     });
   }
@@ -142,6 +164,59 @@ let settingsInterval = null;
 let notificationInterval = null;
 let mouseTrackingInterval = null;
 let keyboardTrackingInterval = null;
+let screenshotTimeout = null; // For screenshot scheduling
+
+// Load saved system state on startup
+function loadSystemState() {
+  try {
+    const stateFile = path.join(__dirname, '../system-state.json');
+    if (fs.existsSync(stateFile)) {
+      const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+      
+      // Restore relevant state
+      if (state.activityStats) {
+        activityStats = { ...activityStats, ...state.activityStats };
+        console.log('💾 Activity stats restored from saved state');
+      }
+      
+      // Check if we were tracking before shutdown/suspend
+      if (state.isTracking && state.currentSession) {
+        console.log('🔄 Detected previous tracking session, will prompt for resume');
+        showResumeFromShutdownDialog(state);
+      }
+      
+      // Clean up state file
+      fs.unlinkSync(stateFile);
+      console.log('✅ System state loaded and cleaned up');
+    }
+  } catch (error) {
+    console.log('⚠️ Could not load system state:', error.message);
+  }
+}
+
+// Load saved offline queue on startup
+function loadOfflineQueue() {
+  try {
+    const queueFile = path.join(__dirname, '../offline-queue.json');
+    if (fs.existsSync(queueFile)) {
+      const queue = JSON.parse(fs.readFileSync(queueFile, 'utf8'));
+      offlineQueue = { ...offlineQueue, ...queue };
+      console.log(`💾 Offline queue restored: ${offlineQueue.screenshots.length} screenshots, ${offlineQueue.appLogs.length} app logs`);
+    }
+  } catch (error) {
+    console.log('⚠️ Could not load offline queue:', error.message);
+  }
+}
+
+// Show resume dialog after shutdown/restart
+function showResumeFromShutdownDialog(state) {
+  if (mainWindow) {
+    mainWindow.webContents.send('show-shutdown-resume-dialog', {
+      message: 'It looks like you were tracking time before the system was shut down. Would you like to resume tracking?',
+      previousSession: state.currentSession
+    });
+  }
+}
 
 // === SETTINGS (Items 6 - Settings Pull) ===
 let appSettings = {
@@ -1797,6 +1872,17 @@ async function captureScreenshot() {
   try {
     console.log('📸 Capturing screenshot...');
     
+    // Check if system is suspended or screen is locked
+    if (systemSuspended) {
+      console.log('⏭️ Skipping screenshot - system is suspended');
+      return false;
+    }
+    
+    if (screenshotsPaused) {
+      console.log('⏭️ Skipping screenshot - screenshots are paused (screen locked)');
+      return false;
+    }
+    
     // Check platform-specific permissions
     const hasPermission = await checkPlatformPermissions();
     if (!hasPermission) {
@@ -2189,6 +2275,12 @@ function startScreenshotCapture() {
 
 function scheduleRandomScreenshot() {
   try {
+    // Check if system is suspended or screenshots are paused
+    if (systemSuspended || screenshotsPaused) {
+      console.log('⏭️ Skipping screenshot scheduling - system suspended or screenshots paused');
+      return;
+    }
+    
     if (!isTracking || !currentSession) {
       console.log('⏭️ Skipping screenshot scheduling - tracking not active or no session');
       return;
@@ -2204,18 +2296,31 @@ function scheduleRandomScreenshot() {
     
     console.log(`📸 Next random screenshot scheduled in ${randomInterval} seconds (${Math.round(randomInterval/60)} minutes) at ${nextScreenshotTime.toLocaleTimeString()}`);
     
-    screenshotTimeout = setTimeout(async () => {
+    screenshotInterval = setTimeout(async () => {
       try {
-        if (isTracking && currentSession) {
-          await captureScreenshot();
+        // Double check system state before capturing
+        if (isTracking && currentSession && !systemSuspended && !screenshotsPaused) {
+          const success = await captureScreenshot();
+          
+          if (success) {
+            console.log('✅ Screenshot captured successfully');
+          } else {
+            console.log('❌ Screenshot capture failed');
+          }
+        } else {
+          console.log('⏭️ Skipping screenshot - system state changed');
         }
         
-        // Schedule the next screenshot
-        scheduleRandomScreenshot();
+        // Schedule the next screenshot if still tracking
+        if (isTracking && currentSession && !systemSuspended) {
+          scheduleRandomScreenshot();
+        }
       } catch (error) {
         console.error('❌ Random screenshot capture failed:', error);
         // Still schedule next screenshot even if this one failed
-        scheduleRandomScreenshot();
+        if (isTracking && currentSession && !systemSuspended) {
+          scheduleRandomScreenshot();
+        }
       }
     }, randomInterval * 1000);
     
@@ -3114,20 +3219,19 @@ powerMonitor.on('resume', () => {
 
 powerMonitor.on('lock-screen', () => {
   console.log('🔒 Screen locked');
+  // Treat screen lock the same as laptop closure - stop tracking completely
   if (isTracking && !isPaused) {
-    pauseTracking('screen_locked');
-    showTrayNotification('Screen locked - tracking paused', 'info');
+    console.log('🛑 Screen locked - stopping tracking (same as laptop closure)');
+    stopTracking();
+    showTrayNotification('Screen locked - tracking stopped', 'info');
   }
 });
 
 powerMonitor.on('unlock-screen', () => {
   console.log('🔓 Screen unlocked');
-  if (isPaused && currentSession) {
-    setTimeout(() => {
-      resumeTracking();
-      showTrayNotification('Screen unlocked - tracking resumed', 'success');
-    }, 2000); // Wait 2 seconds after unlock
-  }
+  // Don't auto-resume tracking on unlock - user must manually start
+  console.log('⏸️ Screen unlocked - tracking remains stopped (manual restart required)');
+  showTrayNotification('Screen unlocked - click to resume tracking', 'info');
 });
 
 console.log('📱 Ebdaa Time Desktop Agent initialized');
@@ -3136,6 +3240,10 @@ console.log('📱 Ebdaa Time Desktop Agent initialized');
 function initializeComponents() {
   syncManager = new SyncManager(config);
   console.log('📱 TimeFlow Desktop Agent initialized');
+  
+  // Load saved system state and offline queue on startup
+  loadSystemState();
+  loadOfflineQueue();
   
   // Check for permission requirements without blocking
   if (process.platform === 'darwin') {
@@ -3850,4 +3958,188 @@ ipcMain.handle('get-stats', () => {
     };
   }
 });
+
+// Enhanced system state tracking
+let systemSuspended = false;
+let suspendTime = null;
+let screenshotsPaused = false;
+let lastScreenshotBeforeSuspend = null;
+
+// System suspend handler
+function handleSystemSuspend() {
+  systemSuspended = true;
+  suspendTime = Date.now();
+  
+  if (isTracking && !isPaused) {
+    console.log('🛑 System suspended (laptop closed) - stopping tracking completely');
+    stopTracking();
+  }
+  
+  // Clear all intervals and timeouts to prevent background activity
+  clearAllIntervals();
+  
+  // Save current state
+  saveSystemState();
+  
+  showTrayNotification('Tracking stopped - laptop closed/system suspended', 'info');
+}
+
+// System resume handler
+function handleSystemResume() {
+  const suspendDuration = suspendTime ? Date.now() - suspendTime : 0;
+  const suspendMinutes = Math.round(suspendDuration / 60000);
+  
+  console.log(`⏱️ System was suspended for ${suspendMinutes} minutes`);
+  
+  systemSuspended = false;
+  suspendTime = null;
+  
+  // Check if we should resume tracking
+  if (isPaused && currentSession) {
+    // Auto-resume if suspended for less than 30 minutes
+    if (suspendMinutes < 30) {
+      console.log('🔄 Auto-resuming tracking after short suspend');
+      setTimeout(() => {
+        resumeTracking();
+      }, 2000); // Give system time to fully wake up
+    } else {
+      console.log('❓ Long suspend detected, showing resume confirmation');
+      showResumeConfirmation(suspendMinutes);
+    }
+  }
+  
+  showTrayNotification(`System resumed after ${suspendMinutes} minutes`, 'info');
+}
+
+// System shutdown handler
+function handleSystemShutdown() {
+  if (isTracking) {
+    console.log('🛑 Stopping tracking due to system shutdown');
+    stopTracking();
+  }
+  
+  // Save all pending data
+  savePendingData();
+  
+  // Clear all intervals
+  clearAllIntervals();
+}
+
+// Clear all intervals and timeouts
+function clearAllIntervals() {
+  console.log('🧹 Clearing all intervals and timeouts');
+  
+  if (screenshotInterval) {
+    clearTimeout(screenshotInterval);
+    screenshotInterval = null;
+  }
+  
+  if (activityInterval) {
+    clearInterval(activityInterval);
+    activityInterval = null;
+  }
+  
+  if (idleCheckInterval) {
+    clearInterval(idleCheckInterval);
+    idleCheckInterval = null;
+  }
+  
+  if (appCaptureInterval) {
+    clearInterval(appCaptureInterval);
+    appCaptureInterval = null;
+  }
+  
+  if (urlCaptureInterval) {
+    clearInterval(urlCaptureInterval);
+    urlCaptureInterval = null;
+  }
+  
+  if (settingsInterval) {
+    clearInterval(settingsInterval);
+    settingsInterval = null;
+  }
+  
+  if (notificationInterval) {
+    clearInterval(notificationInterval);
+    notificationInterval = null;
+  }
+  
+  if (mouseTrackingInterval) {
+    clearInterval(mouseTrackingInterval);
+    mouseTrackingInterval = null;
+  }
+  
+  if (keyboardTrackingInterval) {
+    clearInterval(keyboardTrackingInterval);
+    keyboardTrackingInterval = null;
+  }
+}
+
+// Pause only screenshots (for screen lock)
+function pauseScreenshotsOnly() {
+  console.log('📸 Pausing screenshots only (screen locked)');
+  screenshotsPaused = true;
+  
+  if (screenshotInterval) {
+    clearTimeout(screenshotInterval);
+    screenshotInterval = null;
+  }
+}
+
+// Resume only screenshots (for screen unlock)
+function resumeScreenshotsOnly() {
+  console.log('📸 Resuming screenshots (screen unlocked)');
+  screenshotsPaused = false;
+  
+  if (isTracking && currentSession) {
+    scheduleRandomScreenshot();
+  }
+}
+
+// Save system state
+function saveSystemState() {
+  const state = {
+    isTracking,
+    isPaused,
+    currentSession,
+    currentTimeLogId,
+    suspendTime,
+    activityStats,
+    lastActivity
+  };
+  
+  try {
+    fs.writeFileSync(path.join(__dirname, '../system-state.json'), JSON.stringify(state, null, 2));
+    console.log('💾 System state saved');
+  } catch (error) {
+    console.error('❌ Failed to save system state:', error);
+  }
+}
+
+// Save pending data
+function savePendingData() {
+  try {
+    // Save offline queue
+    const queueFile = path.join(__dirname, '../offline-queue.json');
+    fs.writeFileSync(queueFile, JSON.stringify(offlineQueue, null, 2));
+    
+    // Save activity stats
+    const statsFile = path.join(__dirname, '../activity-stats.json');
+    fs.writeFileSync(statsFile, JSON.stringify(activityStats, null, 2));
+    
+    console.log('💾 Pending data saved');
+  } catch (error) {
+    console.error('❌ Failed to save pending data:', error);
+  }
+}
+
+// Show resume confirmation dialog
+function showResumeConfirmation(suspendMinutes) {
+  if (mainWindow) {
+    mainWindow.webContents.send('show-resume-confirmation', {
+      suspendMinutes,
+      message: `Your laptop was closed for ${suspendMinutes} minutes. Would you like to resume time tracking?`
+    });
+  }
+}
 

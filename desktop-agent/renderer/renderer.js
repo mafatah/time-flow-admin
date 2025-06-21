@@ -277,6 +277,62 @@ function setupIpcListeners() {
         }
     });
     
+    // Tracking state events from main process
+    ipcRenderer.on('tracking-stopped', (event, data) => {
+        console.log('🛑 [RENDERER] Tracking stopped event received from main process');
+        isTracking = false;
+        trackingStatus = 'stopped';
+        sessionStartTime = null;
+        
+        // Update UI immediately
+        updateTrackingButtons();
+        updateTrackingStatus();
+        updateSessionTime('--:--:--');
+        
+        // Stop session timer
+        if (sessionTimer) {
+            clearInterval(sessionTimer);
+            sessionTimer = null;
+            console.log('⏰ [RENDERER] Session timer stopped');
+        }
+        
+        showNotification('Time tracking stopped', 'info');
+    });
+    
+    ipcRenderer.on('tracking-paused', (event, data) => {
+        console.log('⏸️ [RENDERER] Tracking paused event received from main process');
+        isTracking = false;
+        trackingStatus = 'paused';
+        
+        // Update UI
+        updateTrackingButtons();
+        updateTrackingStatus();
+        
+        // Stop session timer but keep start time
+        if (sessionTimer) {
+            clearInterval(sessionTimer);
+            sessionTimer = null;
+            console.log('⏰ [RENDERER] Session timer paused');
+        }
+        
+        showNotification(`Time tracking paused${data?.reason ? ` (${data.reason})` : ''}`, 'info');
+    });
+    
+    ipcRenderer.on('tracking-resumed', (event, data) => {
+        console.log('▶️ [RENDERER] Tracking resumed event received from main process');
+        isTracking = true;
+        trackingStatus = 'active';
+        
+        // Update UI
+        updateTrackingButtons();
+        updateTrackingStatus();
+        
+        // Restart session timer
+        startSessionTimer();
+        
+        showNotification('Time tracking resumed', 'success');
+    });
+    
     console.log('✅ IPC listeners set up successfully');
 }
 
