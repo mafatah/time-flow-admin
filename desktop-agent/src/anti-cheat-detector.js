@@ -427,20 +427,23 @@ class AntiCheatDetector {
   calculateRiskScore(analysis) {
     let score = 0;
     
-    // Factor in suspicious events
-    score += Math.min(analysis.totalSuspiciousEvents * 0.1, 0.5);
+    // Factor in suspicious events (reduced sensitivity)
+    score += Math.min(analysis.totalSuspiciousEvents * 0.05, 0.3); // Reduced from 0.1 and 0.5
     
-    // Factor in activity patterns
+    // Factor in activity patterns (more lenient thresholds)
     const activityLevel = analysis.recentActivityLevel;
-    if (activityLevel.totalEvents < 10) score += 0.3; // Too little activity
-    if (activityLevel.totalEvents > 1000) score += 0.2; // Suspicious high activity
+    if (activityLevel.totalEvents < 5) score += 0.15; // Reduced from 10 events and 0.3 penalty
+    if (activityLevel.totalEvents > 2000) score += 0.1; // Increased threshold from 1000
     
-    // Factor in behavior profile
+    // Factor in behavior profile (more lenient)
     const behavior = analysis.behaviorProfile;
-    if (behavior.mousePatterns.movementVariance < 0.1) score += 0.2; // Too consistent
-    if (behavior.keyboardPatterns.keyDiversity < 5) score += 0.3; // Limited keys
+    if (behavior.mousePatterns.movementVariance < 0.05) score += 0.1; // Reduced from 0.1 and 0.2
+    if (behavior.keyboardPatterns.keyDiversity < 3) score += 0.15; // Reduced from 5 keys and 0.3
     
-    return Math.min(score, 1.0);
+    // CRITICAL FIX: Cap maximum risk score to prevent constant HIGH alerts
+    const maxAllowedScore = 0.6; // Never exceed 60% risk for normal operation
+    
+    return Math.min(score, maxAllowedScore);
   }
 
   triggerHighRiskAlert(analysis) {

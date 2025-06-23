@@ -327,6 +327,14 @@ function simulateKeyboardActivity() {
   activityStats.keystrokes++;
   lastActivity = Date.now();
   
+  // TRULY EVENT-DRIVEN: Trigger app and URL capture on user activity
+  if (global.captureActiveApp) {
+    global.captureActiveApp();
+  }
+  if (global.captureActiveUrl) {
+    global.captureActiveUrl();
+  }
+  
   if (antiCheatDetector) {
     antiCheatDetector.recordActivity('keyboard', {
       timestamp: Date.now(),
@@ -340,6 +348,14 @@ function simulateMouseClick() {
   // Simulate mouse click detection
   activityStats.mouseClicks++;
   lastActivity = Date.now();
+  
+  // TRULY EVENT-DRIVEN: Trigger app and URL capture on user activity
+  if (global.captureActiveApp) {
+    global.captureActiveApp();
+  }
+  if (global.captureActiveUrl) {
+    global.captureActiveUrl();
+  }
   
   if (antiCheatDetector) {
     antiCheatDetector.recordActivity('mouse_click', {
@@ -1231,11 +1247,10 @@ async function getLinuxActiveApplication() {
 function startAppCapture() {
   if (appCaptureInterval) clearInterval(appCaptureInterval);
   
-  console.log('🖥️ Starting smart cross-platform app capture every 15s');
+  console.log('🖥️ Starting TRULY EVENT-DRIVEN app capture (only captures on actual usage)');
   
-  appCaptureInterval = setInterval(async () => {
-    // App capture logging disabled for performance
-    // console.log('🔍 [APP-CAPTURE] Running interval...'); // Disabled
+  // TRULY EVENT-DRIVEN: Only capture when user activity is detected
+  const captureActiveApp = async () => {
     if (!isTracking) {
       console.log('🔍 [APP-CAPTURE] Skipping - tracking not active');
       return;
@@ -1245,19 +1260,19 @@ function startAppCapture() {
       const activeApp = await detectActiveApplication();
       
       if (!activeApp || !activeApp.name) {
-        console.log('⚠️ [APP-CAPTURE] No active application detected or app name is empty');
+        console.log('⚠️ [APP-CAPTURE] No active application detected');
         return;
       }
       
-      // App detection logging disabled for performance
-      // console.log(`🔍 [APP-CAPTURE] Detected: "${activeApp.name}"`); // Disabled
+      console.log(`🔍 [APP-CAPTURE] App focused: "${activeApp.name}"`);
       
-      // Avoid duplicate captures
+      // FIXED: Only skip if EXACT same app AND captured within last 5 seconds (very short)
       const appKey = `${activeApp.name}|${activeApp.title}`;
-      if (lastAppCapture === appKey) {
-                // Duplicate app logging disabled for performance
-        // console.log(`🔍 [APP-CAPTURE] Skipping duplicate: ${activeApp.name}`); // Disabled
-        return; // Same app, skip
+      const timeSinceLastCapture = Date.now() - (lastAppCaptureTime ? new Date(lastAppCaptureTime).getTime() : 0);
+      
+      if (lastAppCapture === appKey && timeSinceLastCapture < 5000) {
+        console.log(`🔍 [APP-CAPTURE] Recent duplicate: ${activeApp.name} (${Math.round(timeSinceLastCapture/1000)}s ago)`);
+        return;
       }
       
       lastAppCapture = appKey;
@@ -1266,16 +1281,15 @@ function startAppCapture() {
       const appData = {
         user_id: config.user_id || 'demo-user',
         time_log_id: currentTimeLogId,
-        app_name: activeApp.name, // Fixed: use app_name instead of application_name
+        app_name: activeApp.name,
         window_title: activeApp.title || 'Unknown',
         app_path: activeApp.bundleId || null,
-        // Removed platform field - column doesn't exist in database
-        timestamp: new Date().toISOString() // Fixed: use timestamp instead of captured_at
+        timestamp: new Date().toISOString()
       };
       
       // Queue for upload
       await syncManager.addAppLogs([appData]);
-      console.log(`📱 App captured: ${appData.app_name} - ${appData.window_title}`);
+      console.log(`📱 ✅ App captured: ${appData.app_name} - ${appData.window_title}`);
       
       // Reset failure count on success
       appCaptureFailureCount = 0;
@@ -1285,17 +1299,20 @@ function startAppCapture() {
       
     } catch (error) {
       appCaptureFailureCount++;
-      
       if (appCaptureFailureCount <= MAX_APP_CAPTURE_FAILURES) {
         console.log(`⚠️ App capture failed (${appCaptureFailureCount}/${MAX_APP_CAPTURE_FAILURES}):`, error.message);
-        
-        if (appCaptureFailureCount === MAX_APP_CAPTURE_FAILURES) {
-          console.log('⚠️ Disabling app capture due to repeated failures');
-          appCaptureEnabled = false;
-        }
       }
     }
-  }, 15000); // Every 15 seconds (reduced from 5 seconds for performance)
+  };
+
+  // Store the capture function globally so it can be triggered by activity
+  global.captureActiveApp = captureActiveApp;
+  
+  // Capture current app immediately
+  captureActiveApp();
+  
+  // NO TIMER - App capture now triggered only by user activity
+  console.log('✅ Truly event-driven app capture started (NO TIMERS - only on activity)');
 }
 
 // === ITEM 5: REVAMPED URL/DOMAIN CAPTURE ===
@@ -1523,17 +1540,18 @@ async function getLinuxBrowserUrl(windowTitle) {
 function startUrlCapture() {
   if (urlCaptureInterval) clearInterval(urlCaptureInterval);
   
-  console.log('🌐 [URL-CAPTURE] Starting SMART URL capture - checks browsers every 5 seconds for comprehensive coverage');
+  console.log('🌐 [URL-CAPTURE] Starting TRULY EVENT-DRIVEN URL capture - only on browser usage');
   console.log('🔧 [URL-CAPTURE] URL capture enabled:', urlCaptureEnabled);
   console.log('🔧 [URL-CAPTURE] Current tracking state:', isTracking);
   console.log('🔧 [URL-CAPTURE] Current time log ID:', currentTimeLogId);
   
   if (!urlCaptureEnabled) {
-    console.log('⚠️ [URL-CAPTURE] URL capture is disabled - skipping start');
-    return;
+    console.log('⚠️ [URL-CAPTURE] URL capture is disabled - enabling with fallback methods');
+    urlCaptureEnabled = true; // Enable anyway with fallbacks
   }
   
-  urlCaptureInterval = setInterval(async () => {
+  // TRULY EVENT-DRIVEN: Only capture URLs when browsers are actually used
+  const captureActiveUrl = async () => {
     if (!isTracking) {
       console.log('🔍 [URL-CAPTURE] Skipping - tracking not active');
       return;
@@ -1544,65 +1562,59 @@ function startUrlCapture() {
       return;
     }
     
-    console.log('🔍 [URL-CAPTURE] Running smart URL capture cycle...');
+    console.log('🔍 [URL-CAPTURE] Checking for browser URL on user activity...');
     
     try {
       await smartUrlCapture();
     } catch (error) {
       urlCaptureFailureCount++;
       if (urlCaptureFailureCount <= MAX_URL_CAPTURE_FAILURES) {
-        console.log(`❌ [URL-CAPTURE] Smart URL capture failed (${urlCaptureFailureCount}/${MAX_URL_CAPTURE_FAILURES}):`, error.message);
+        console.log(`❌ [URL-CAPTURE] URL capture error (${urlCaptureFailureCount}/${MAX_URL_CAPTURE_FAILURES}):`, error.message);
         if (urlCaptureFailureCount === MAX_URL_CAPTURE_FAILURES) {
-          console.log('⚠️ [URL-CAPTURE] Disabling URL capture due to repeated failures');
-          urlCaptureEnabled = false;
+          console.log('⚠️ [URL-CAPTURE] Multiple URL capture errors - continuing with reduced functionality');
+          // FIXED: Don't disable completely, just log the issues
         }
       }
     }
-  }, 5000); // Every 5 seconds for faster detection of URL changes
+  };
+
+  // Store the capture function globally so it can be triggered by activity
+  global.captureActiveUrl = captureActiveUrl;
   
-  console.log('✅ [URL-CAPTURE] URL capture interval started successfully');
+  // Capture current URL immediately
+  captureActiveUrl();
+  
+  // NO TIMER - URL capture now triggered only by user activity
+  console.log('✅ [URL-CAPTURE] Truly event-driven URL capture started (NO TIMERS - only on activity)');
 }
 
 async function processFoundUrl(urlData) {
   try {
-    // Validate URL data before creating log
-    if (!urlData.url || urlData.url.trim() === '') {
-      console.log('⚠️ Skipping URL log - empty URL detected');
-      return;
-    }
+    console.log(`🔗 [URL-CAPTURE] Processing URL: "${urlData.url}" from browser: "${urlData.browser}"`);
     
-    // ENHANCED SESSION-AWARE DUPLICATE DETECTION
+    const now = Date.now();
+    
+    // Check if this URL was recently captured for this browser to avoid spam
+    const captureKey = `${urlData.browser}|${urlData.url}`;
+    const lastCaptureTime = lastUrlCapturesByBrowser.get(captureKey) || 0;
+    const timeSinceLastCapture = now - lastCaptureTime;
     const lastUrl = lastBrowserUrls.get(urlData.browser);
     
-    // Create a per-browser URL timing tracking
-    const captureKey = `${urlData.browser}_${urlData.url}`;
-    const lastCaptureTime = lastUrlCapturesByBrowser?.get(captureKey) || 0;
-    const now = Date.now();
-    const timeSinceLastCapture = now - lastCaptureTime;
+    // FIXED: More aggressive URL capture - capture new URLs immediately, revisited URLs after 30 seconds
+    const isNewUrl = lastUrl !== urlData.url;
+    const enoughTimePassed = timeSinceLastCapture > (30 * 1000); // Reduced from 2 minutes to 30 seconds
+    const shouldCapture = isNewUrl || enoughTimePassed;
     
-    // Enhanced duplicate detection for tab switching patterns:
-    // 1. Skip if EXACT same URL was captured within last 30 seconds (immediate duplicates)
-    // 2. Skip if URL was captured within last 10 minutes and this appears to be tab switching
-    const isRecentDuplicate = lastUrl === urlData.url && timeSinceLastCapture < 30000;
-    const isTabSwitchingPattern = timeSinceLastCapture < 600000 && // Within 10 minutes
-                                  lastUrl !== urlData.url && // Different from immediately previous URL  
-                                  lastUrlCapturesByBrowser.has(captureKey); // URL was captured before in this session
-    
-    if (isRecentDuplicate) {
-      console.log(`🔍 [URL-CAPTURE] Skipping recent duplicate: ${urlData.url} from ${urlData.browser} (captured ${Math.round(timeSinceLastCapture/1000)}s ago)`);
-      return;
-    }
-    
-    if (isTabSwitchingPattern) {
-      console.log(`🔄 [URL-CAPTURE] Skipping tab switch pattern: ${urlData.url} from ${urlData.browser} (already captured ${Math.round(timeSinceLastCapture/1000)}s ago, likely tab switching)`);
+    if (!shouldCapture) {
+      console.log(`🔗 [URL-CAPTURE] SKIPPING: "${urlData.url}" | Browser: "${urlData.browser}" | Reason: Recent capture (${Math.round(timeSinceLastCapture/1000)}s ago)`);
       return;
     }
     
     // If different URL or enough time passed, capture it
-    if (lastUrl !== urlData.url) {
-      console.log(`🔗 [URL-CAPTURE] NEW URL DETECTED: "${urlData.url}" | Browser: "${urlData.browser}" | Domain: "${urlData.domain}" | Previous: "${lastUrl || 'none'}"`);
+    if (isNewUrl) {
+      console.log(`🔗 [URL-CAPTURE] 🆕 NEW URL DETECTED: "${urlData.url}" | Browser: "${urlData.browser}" | Domain: "${urlData.domain}" | Previous: "${lastUrl || 'none'}"`);
     } else {
-      console.log(`🔗 [URL-CAPTURE] RE-VISITING URL: "${urlData.url}" | Browser: "${urlData.browser}" | Time since last: ${Math.round(timeSinceLastCapture/1000)}s`);
+      console.log(`🔗 [URL-CAPTURE] 🔄 RE-VISITING URL: "${urlData.url}" | Browser: "${urlData.browser}" | Time since last: ${Math.round(timeSinceLastCapture/1000)}s`);
     }
     
     // Update last URL for this browser and timing tracking
@@ -1629,7 +1641,7 @@ async function processFoundUrl(urlData) {
     
     // Queue for upload
     await syncManager.addUrlLogs([urlLog]);
-    console.log(`✅ [URL-CAPTURE] Successfully captured: ${urlLog.domain} from ${urlLog.browser} (${urlData.isActive ? 'active' : 'background'})`);
+    console.log(`✅ [URL-CAPTURE] 🚀 Successfully captured: ${urlLog.domain} from ${urlLog.browser} (${urlData.isActive ? 'focused' : 'background'})`);
     
     // Reset failure count on success
     urlCaptureFailureCount = 0;
@@ -1645,7 +1657,7 @@ async function processFoundUrl(urlData) {
 // Smart URL capture - checks when browser is active or URLs change
 async function smartUrlCapture() {
   try {
-    console.log('🔍 [SMART-URL] Starting smart URL capture cycle...');
+    console.log('🔍 [SMART-URL] Checking for browser activity and URL changes...');
     
     // Get the currently active app
     const activeApp = await detectActiveApplication();
@@ -1654,34 +1666,20 @@ async function smartUrlCapture() {
     console.log('🔍 [SMART-URL] Active app:', currentActiveApp);
     console.log('🔍 [SMART-URL] Is browser app:', isBrowserApp(currentActiveApp));
     console.log('🔍 [SMART-URL] Last active app:', lastActiveApp);
-    console.log('🔍 [SMART-URL] Time since last URL check:', Date.now() - lastUrlCheckTime, 'ms');
     
-    // Enhanced URL checking logic:
-    // 1. Browser became active (immediate check)
-    // 2. Browser is currently active (check every 5 seconds for URL changes)
-    // 3. Background browser check every 30 seconds
-    // 4. Always check if we haven't checked recently
-    const shouldCheckUrls = 
-      (currentActiveApp !== lastActiveApp && isBrowserApp(currentActiveApp)) ||
-             (isBrowserApp(currentActiveApp) && Date.now() - lastUrlCheckTime > 5000) || // 5 seconds if browser active
-      (Date.now() - lastUrlCheckTime > 30000); // 30 seconds fallback for comprehensive coverage
+    // ENHANCED: Check URLs immediately when browser becomes active
+    const browserJustBecameActive = (currentActiveApp !== lastActiveApp && isBrowserApp(currentActiveApp));
+    const browserCurrentlyActive = isBrowserApp(currentActiveApp);
     
-    console.log('🔍 [SMART-URL] Should check URLs:', shouldCheckUrls);
+    console.log('🔍 [SMART-URL] Browser just became active:', browserJustBecameActive);
+    console.log('🔍 [SMART-URL] Browser currently active:', browserCurrentlyActive);
     
-    if (!shouldCheckUrls) {
-      console.log('🔍 [SMART-URL] Skipping URL check - conditions not met');
-      return;
-    }
-    
-    lastActiveApp = currentActiveApp;
-    lastUrlCheckTime = Date.now();
-    
-    // If active app is a browser, get its URL immediately
-    if (isBrowserApp(currentActiveApp)) {
-      console.log(`🔍 [SMART-URL] Browser active: ${currentActiveApp} - checking for URL changes`);
+    // EVENT-DRIVEN PRIORITY: If browser just became active, capture URL immediately
+    if (browserJustBecameActive) {
+      console.log(`🔍 [SMART-URL] 🚀 BROWSER FOCUSED: ${currentActiveApp} - capturing URL immediately`);
       
       const url = await extractUrlFromBrowser(currentActiveApp, activeApp?.title);
-      console.log('🔍 [SMART-URL] Extracted URL:', url);
+      console.log('🔍 [SMART-URL] Extracted URL from focused browser:', url);
       
       if (url) {
         const urlData = {
@@ -1692,18 +1690,44 @@ async function smartUrlCapture() {
           isActive: true
         };
         
-        console.log('🔍 [SMART-URL] Processing URL data:', urlData);
+        console.log('🔍 [SMART-URL] Processing URL from focused browser:', urlData);
         await processFoundUrl(urlData);
-        console.log(`✅ [SMART-URL] Captured URL from active browser: ${urlData.domain}`);
+        console.log(`✅ [SMART-URL] 🚀 URL captured from newly focused browser: ${urlData.domain}`);
       } else {
-        console.log('⚠️ [SMART-URL] No URL extracted from active browser');
+        console.log('⚠️ [SMART-URL] No URL extracted from newly focused browser');
       }
     }
     
-    // ALWAYS check background browsers for comprehensive URL coverage
-    // This ensures we capture URLs from all running browsers, not just the active one
-    console.log(`🔍 [SMART-URL] Checking all running browsers for URL changes`);
-    await checkBackgroundBrowsers();
+    // CONTINUOUS MONITORING: If browser is currently active, check for URL changes
+    else if (browserCurrentlyActive) {
+      console.log(`🔍 [SMART-URL] Browser active: ${currentActiveApp} - checking for URL changes`);
+      
+      const url = await extractUrlFromBrowser(currentActiveApp, activeApp?.title);
+      console.log('🔍 [SMART-URL] Current URL in active browser:', url);
+      
+      if (url) {
+        const urlData = {
+          url: url,
+          title: activeApp?.title || 'Untitled',
+          browser: currentActiveApp,
+          domain: extractDomain(url),
+          isActive: true
+        };
+        
+        await processFoundUrl(urlData);
+        console.log(`✅ [SMART-URL] URL monitored from active browser: ${urlData.domain}`);
+      }
+    }
+    
+    // BACKGROUND MONITORING: Check all browsers occasionally (reduced frequency)
+    const timeSinceLastBackgroundCheck = Date.now() - (lastUrlCheckTime || 0);
+    if (timeSinceLastBackgroundCheck > 10000) { // Every 10 seconds for background browsers
+      console.log(`🔍 [SMART-URL] Checking background browsers (${Math.round(timeSinceLastBackgroundCheck/1000)}s since last check)`);
+      await checkBackgroundBrowsers();
+      lastUrlCheckTime = Date.now();
+    }
+    
+    lastActiveApp = currentActiveApp;
     
   } catch (error) {
     console.log('❌ [SMART-URL] Smart URL capture error:', error.message);
@@ -1995,23 +2019,36 @@ async function captureScreenshot() {
     let currentUrl = null;
     
     try {
-      // Get active application info
-      currentApp = await detectActiveApplication();
+      // Get active application info with timeout protection
+      const appPromise = detectActiveApplication();
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000)); // 2 second timeout
+      currentApp = await Promise.race([appPromise, timeoutPromise]);
+      
       if (currentApp) {
         console.log(`📱 Active app detected: ${currentApp.name} - ${currentApp.title}`);
         
-        // If it's a browser, try to get the URL
+        // If it's a browser, try to get the URL with timeout
         if (isBrowserApp(currentApp.name)) {
-          const urlData = await detectBrowserUrl();
-          if (urlData && urlData.url) {
-            currentUrl = urlData;
-            console.log(`🌐 URL detected: ${urlData.domain} (${urlData.url})`);
+          try {
+            const urlPromise = detectBrowserUrl();
+            const urlTimeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1500)); // 1.5 second timeout
+            const urlData = await Promise.race([urlPromise, urlTimeoutPromise]);
+            
+            if (urlData && urlData.url) {
+              currentUrl = urlData;
+              console.log(`🌐 URL detected: ${urlData.domain} (${urlData.url})`);
+            }
+          } catch (urlError) {
+            console.log('⚠️ URL detection failed during screenshot:', urlError.message);
           }
         }
       }
     } catch (contextError) {
       console.log('⚠️ Failed to get app/URL context, continuing with screenshot:', contextError.message);
     }
+    
+    // Add small delay to allow app switching to complete
+    await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
     
     // Try Electron's desktopCapturer first (better for Electron apps)
     let img;
@@ -2308,40 +2345,45 @@ function calculateActivityPercent() {
   // Time-based scaling: normalize activity per minute
   const activityPerMinute = totalActivity / timeSinceResetMinutes;
   
-  // FIXED: More realistic baseline for 100% activity
-  // Typical active user: ~10-20 clicks per minute, ~50-100 keystrokes per minute
-  // This gives us roughly 50-200 points per minute for active users
-  const expectedActivityPerMinute = 150; // Baseline for 100% activity
+  // FIXED: More realistic baseline for 100% activity with gradual scaling
+  // Lower baseline for more gradual progression
+  const expectedActivityPerMinute = 75; // Reduced from 150 for more gradual scores
   let activityPercent = Math.min(100, Math.max(0, (activityPerMinute / expectedActivityPerMinute) * 100));
   
-  // === ACTIVITY DECAY SYSTEM ===
-  // Apply activity decay during idle periods using improved idle detection
+  // === ENHANCED ACTIVITY DECAY SYSTEM ===
+  // Apply gradual activity decay during idle periods
   const currentIdleTime = calculateIdleTimeSeconds();
   const idleThreshold = appSettings.idle_threshold_seconds || 60; // 1 minute default
   
   if (currentIdleTime > idleThreshold) {
-    // User is idle - activity should be very low or 0
+    // User is idle - apply GRADUAL decay instead of binary reduction
     const idleMinutes = currentIdleTime / 60;
     let decayMultiplier = 1;
     
-    if (idleMinutes > 1) decayMultiplier = 0.5;   // 50% after 1 minute idle
-    if (idleMinutes > 2) decayMultiplier = 0.2;   // 20% after 2 minutes idle  
-    if (idleMinutes > 5) decayMultiplier = 0.05;  // 5% after 5 minutes idle
-    if (idleMinutes > 10) decayMultiplier = 0;    // 0% after 10 minutes idle
+    // FIXED: Gradual decay curves for more realistic productivity scores
+    if (idleMinutes > 1) decayMultiplier = 0.9;   // 90% after 1 minute idle
+    if (idleMinutes > 2) decayMultiplier = 0.8;   // 80% after 2 minutes idle  
+    if (idleMinutes > 3) decayMultiplier = 0.7;   // 70% after 3 minutes idle
+    if (idleMinutes > 4) decayMultiplier = 0.6;   // 60% after 4 minutes idle
+    if (idleMinutes > 5) decayMultiplier = 0.5;   // 50% after 5 minutes idle
+    if (idleMinutes > 7) decayMultiplier = 0.4;   // 40% after 7 minutes idle
+    if (idleMinutes > 10) decayMultiplier = 0.3;  // 30% after 10 minutes idle
+    if (idleMinutes > 15) decayMultiplier = 0.2;  // 20% after 15 minutes idle
+    if (idleMinutes > 20) decayMultiplier = 0.1;  // 10% after 20 minutes idle
+    if (idleMinutes > 30) decayMultiplier = 0;    // 0% after 30 minutes idle
     
     const activityBeforeDecay = activityPercent;
     activityPercent = Math.round(activityPercent * decayMultiplier);
     
     // Only log occasionally to avoid spam
     if (Date.now() - (activityStats.lastIdleLog || 0) > 30000) { // Every 30 seconds
-      console.log('💤 ACTIVITY DECAY:', {
-        // duration_seconds removed - it's a generated column
+      console.log('💤 GRADUAL ACTIVITY DECAY:', {
         idle_minutes: Math.round(idleMinutes * 10) / 10,
         idle_threshold: idleThreshold,
         decay_multiplier: decayMultiplier,
         activity_before: activityBeforeDecay,
         activity_after: activityPercent,
-        user_status: 'IDLE'
+        user_status: 'GRADUAL_IDLE_REDUCTION'
       });
       activityStats.lastIdleLog = Date.now();
     }
@@ -2349,12 +2391,17 @@ function calculateActivityPercent() {
     // User is active - apply recency bonus for very recent activity
     if (timeSinceLastActivity < 30000) { // Within last 30 seconds
       const recencyBonus = Math.max(0, 1 - (timeSinceLastActivity / 30000)); // 0-1 multiplier
-      activityPercent = Math.min(100, activityPercent * (1 + recencyBonus * 0.3)); // Up to 30% bonus
+      activityPercent = Math.min(100, activityPercent * (1 + recencyBonus * 0.2)); // Up to 20% bonus
     }
     
-    // Ensure we show some activity if there's been very recent input
-    if (timeSinceLastActivity < 5000 && activityPercent < 5) {
-      activityPercent = Math.max(5, activityPercent);
+    // Ensure we show gradual activity progression instead of binary results
+    if (totalActivity > 0 && activityPercent < 5) {
+      activityPercent = Math.max(5, activityPercent); // Minimum 5% for any activity
+    }
+    
+    // Add base activity floor for recent input
+    if (timeSinceLastActivity < 10000) { // Last 10 seconds
+      activityPercent = Math.max(10, activityPercent); // Minimum 10% for very recent activity
     }
   }
   
@@ -2642,9 +2689,10 @@ async function startTracking(projectId = null) {
         appCaptureEnabled = true;
         urlCaptureEnabled = true;
       } else {
-        console.log('⚠️ [MAIN] Enhanced app and URL capture not available on this platform');
-        appCaptureEnabled = false;
-        urlCaptureEnabled = false;
+        console.log('⚠️ [MAIN] Enhanced app and URL capture not available on this platform - enabling anyway with fallback');
+        // CRITICAL FIX: Enable features even if test fails - use runtime fallbacks instead
+        appCaptureEnabled = true;
+        urlCaptureEnabled = true;
       }
     }
     

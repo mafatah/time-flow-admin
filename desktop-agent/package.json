@@ -1,23 +1,43 @@
 {
-  "name": "desktop-agent",
-  "version": "1.0.21",
+  "name": "timeflow-desktop-agent",
+  "version": "1.0.31",
+  "description": "TimeFlow Desktop Agent - Employee time tracking and productivity monitoring",
   "main": "src/main.js",
+  "author": "TimeFlow Team",
   "scripts": {
     "start": "electron .",
     "electron": "electron .",
     "test-mac": "electron test-mac-permissions.js",
-    "test-screenshot": "node test-screenshot.js"
+    "test-screenshot": "node test-screenshot.js",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
     "active-win": "^8.2.1",
     "axios": "^1.9.0",
     "dotenv": "^16.5.0",
-    "electron": "^28.3.3",
     "node-cron": "^4.0.7",
     "screenshot-desktop": "^1.14.0"
   },
   "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
     "electron-rebuild": "^3.2.9"
+  },
+  "build": {
+    "appId": "com.timeflow.desktop-agent",
+    "productName": "TimeFlow",
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        }
+      ]
+    }
   }
 }
