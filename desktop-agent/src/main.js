@@ -1,4 +1,34 @@
-const { app, BrowserWindow, powerMonitor, screen, ipcMain, Notification, Tray, Menu, desktopCapturer, systemPreferences, globalShortcut } = require('electron');
+// Check if we're running in Electron context
+const isElectronContext = typeof process !== 'undefined' && process.versions && process.versions.electron;
+
+let app, BrowserWindow, powerMonitor, screen, ipcMain, Notification, Tray, Menu, desktopCapturer, systemPreferences, globalShortcut;
+
+if (isElectronContext) {
+  // We're in Electron - import all modules
+  const electronModules = require('electron');
+  ({ app, BrowserWindow, powerMonitor, screen, ipcMain, Notification, Tray, Menu, desktopCapturer, systemPreferences, globalShortcut } = electronModules);
+} else {
+  // We're in Node.js - create mock objects
+  console.log('🔧 Running in Node.js mode - Electron features disabled');
+  app = null;
+  BrowserWindow = null;
+  powerMonitor = {
+    on: () => {},
+    getSystemIdleTime: () => 0
+  };
+  screen = null;
+  ipcMain = {
+    on: () => {},
+    handle: () => {}
+  };
+  Notification = null;
+  Tray = null;
+  Menu = null;
+  desktopCapturer = null;
+  systemPreferences = null;
+  globalShortcut = null;
+}
+
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -88,19 +118,26 @@ try {
 } catch (error) {
   console.error('❌ Failed to load configuration:', error);
   
-  // Show error dialog and exit
-  const { dialog } = require('electron');
-  if (app) {
-    app.whenReady().then(() => {
-      dialog.showErrorBox(
-        'Configuration Error',
-        `Failed to load Supabase configuration:\n\n${error.message}\n\nPlease ensure the app has proper environment variables or contact support.`
-      );
-      app.quit();
-    });
+  if (isElectronContext) {
+    // Show error dialog and exit in Electron context
+    const { dialog } = require('electron');
+    if (app) {
+      app.whenReady().then(() => {
+        dialog.showErrorBox(
+          'Configuration Error',
+          `Failed to load Supabase configuration:\n\n${error.message}\n\nPlease ensure the app has proper environment variables or contact support.`
+        );
+        app.quit();
+      });
+    }
+  } else {
+    // In Node.js context, just log and continue with fallback
+    console.log('⚠️ Configuration error in Node.js mode - will try to continue with fallbacks');
   }
   
-  process.exit(1);
+  if (isElectronContext) {
+    process.exit(1);
+  }
 }
 
 // Initialize Supabase client - prioritize service key for admin operations
@@ -1370,8 +1407,7 @@ async function extractUrlFromBrowser(browserName, windowTitle) {
 
 async function getMacBrowserUrl(browserName) {
   try {
-    // URL extraction logging disabled for performance
-  // console.log(`🔍 [URL-EXTRACT] Attempting to extract from "${browserName}"...`); // Disabled
+    console.log(`🔍 [URL-EXTRACT] Attempting to extract URL from "${browserName}"...`);
     const { execSync } = require('child_process');
     const lowerBrowser = browserName.toLowerCase();
     let script = '';
@@ -1421,17 +1457,17 @@ async function getMacBrowserUrl(browserName) {
       return null;
     }
     
-            // AppleScript execution logging disabled for performance
+    console.log(`🔍 [URL-EXTRACT] Executing AppleScript for ${browserName}...`);
     const result = execSync(`osascript -e '${script}'`, { 
       encoding: 'utf8',
       timeout: 5000  // Standard timeout
     }).trim();
     
-            // Raw AppleScript result logging disabled for performance
+    console.log(`🔍 [URL-EXTRACT] Raw AppleScript result for ${browserName}: "${result}"`);
     
     if (result && result !== '') {
       if (result.startsWith('http')) {
-        // URL extraction success logging disabled for performance
+        console.log(`✅ [URL-EXTRACT] Successfully extracted URL from ${browserName}: ${result}`);
         return result;
       } else if (lowerBrowser.includes('firefox') && result.includes('http')) {
         // Firefox window title - try to extract URL
@@ -1441,14 +1477,15 @@ async function getMacBrowserUrl(browserName) {
           return urlMatch[1];
         }
       }
-      console.log(`⚠️ [URL-EXTRACT] No valid URL found (result: "${result}")`);
+      console.log(`⚠️ [URL-EXTRACT] No valid URL found in result: "${result}"`);
       return null;
     } else {
-      console.log(`⚠️ [URL-EXTRACT] No URL found (empty result)`);
+      console.log(`⚠️ [URL-EXTRACT] Empty result from ${browserName} AppleScript`);
       return null;
     }
   } catch (error) {
     console.log(`❌ [URL-EXTRACT] Failed to extract URL from ${browserName}: ${error.message}`);
+    console.log(`❌ [URL-EXTRACT] Error details:`, error);
     return null;
   }
 }
@@ -1486,24 +1523,44 @@ async function getLinuxBrowserUrl(windowTitle) {
 function startUrlCapture() {
   if (urlCaptureInterval) clearInterval(urlCaptureInterval);
   
-  console.log('🌐 Starting SMART URL capture - checks browsers every 5 seconds for comprehensive coverage');
+  console.log('🌐 [URL-CAPTURE] Starting SMART URL capture - checks browsers every 5 seconds for comprehensive coverage');
+  console.log('🔧 [URL-CAPTURE] URL capture enabled:', urlCaptureEnabled);
+  console.log('🔧 [URL-CAPTURE] Current tracking state:', isTracking);
+  console.log('🔧 [URL-CAPTURE] Current time log ID:', currentTimeLogId);
+  
+  if (!urlCaptureEnabled) {
+    console.log('⚠️ [URL-CAPTURE] URL capture is disabled - skipping start');
+    return;
+  }
   
   urlCaptureInterval = setInterval(async () => {
-    if (!isTracking) return;
+    if (!isTracking) {
+      console.log('🔍 [URL-CAPTURE] Skipping - tracking not active');
+      return;
+    }
+    
+    if (!currentTimeLogId) {
+      console.log('⚠️ [URL-CAPTURE] Skipping - no active time log session');
+      return;
+    }
+    
+    console.log('🔍 [URL-CAPTURE] Running smart URL capture cycle...');
     
     try {
       await smartUrlCapture();
     } catch (error) {
       urlCaptureFailureCount++;
       if (urlCaptureFailureCount <= MAX_URL_CAPTURE_FAILURES) {
-        console.log(`❌ Smart URL capture failed (${urlCaptureFailureCount}/${MAX_URL_CAPTURE_FAILURES}):`, error.message);
+        console.log(`❌ [URL-CAPTURE] Smart URL capture failed (${urlCaptureFailureCount}/${MAX_URL_CAPTURE_FAILURES}):`, error.message);
         if (urlCaptureFailureCount === MAX_URL_CAPTURE_FAILURES) {
-          console.log('⚠️ Disabling URL capture due to repeated failures');
+          console.log('⚠️ [URL-CAPTURE] Disabling URL capture due to repeated failures');
           urlCaptureEnabled = false;
         }
       }
     }
   }, 5000); // Every 5 seconds for faster detection of URL changes
+  
+  console.log('✅ [URL-CAPTURE] URL capture interval started successfully');
 }
 
 async function processFoundUrl(urlData) {
@@ -1554,6 +1611,12 @@ async function processFoundUrl(urlData) {
     lastUrlCapture = urlData.url;
     lastUrlCaptureTime = new Date().toISOString();
 
+    // Ensure we have a valid time_log_id
+    if (!currentTimeLogId) {
+      console.log('⚠️ No active time log session - URL capture requires active tracking');
+      return;
+    }
+
     const urlLog = {
       user_id: config.user_id,
       time_log_id: currentTimeLogId,
@@ -1582,9 +1645,16 @@ async function processFoundUrl(urlData) {
 // Smart URL capture - checks when browser is active or URLs change
 async function smartUrlCapture() {
   try {
+    console.log('🔍 [SMART-URL] Starting smart URL capture cycle...');
+    
     // Get the currently active app
     const activeApp = await detectActiveApplication();
     const currentActiveApp = activeApp?.name;
+    
+    console.log('🔍 [SMART-URL] Active app:', currentActiveApp);
+    console.log('🔍 [SMART-URL] Is browser app:', isBrowserApp(currentActiveApp));
+    console.log('🔍 [SMART-URL] Last active app:', lastActiveApp);
+    console.log('🔍 [SMART-URL] Time since last URL check:', Date.now() - lastUrlCheckTime, 'ms');
     
     // Enhanced URL checking logic:
     // 1. Browser became active (immediate check)
@@ -1596,7 +1666,10 @@ async function smartUrlCapture() {
              (isBrowserApp(currentActiveApp) && Date.now() - lastUrlCheckTime > 5000) || // 5 seconds if browser active
       (Date.now() - lastUrlCheckTime > 30000); // 30 seconds fallback for comprehensive coverage
     
+    console.log('🔍 [SMART-URL] Should check URLs:', shouldCheckUrls);
+    
     if (!shouldCheckUrls) {
+      console.log('🔍 [SMART-URL] Skipping URL check - conditions not met');
       return;
     }
     
@@ -1608,6 +1681,8 @@ async function smartUrlCapture() {
       console.log(`🔍 [SMART-URL] Browser active: ${currentActiveApp} - checking for URL changes`);
       
       const url = await extractUrlFromBrowser(currentActiveApp, activeApp?.title);
+      console.log('🔍 [SMART-URL] Extracted URL:', url);
+      
       if (url) {
         const urlData = {
           url: url,
@@ -1617,8 +1692,11 @@ async function smartUrlCapture() {
           isActive: true
         };
         
+        console.log('🔍 [SMART-URL] Processing URL data:', urlData);
         await processFoundUrl(urlData);
         console.log(`✅ [SMART-URL] Captured URL from active browser: ${urlData.domain}`);
+      } else {
+        console.log('⚠️ [SMART-URL] No URL extracted from active browser');
       }
     }
     
@@ -1628,7 +1706,8 @@ async function smartUrlCapture() {
     await checkBackgroundBrowsers();
     
   } catch (error) {
-    console.log('❌ Smart URL capture error:', error.message);
+    console.log('❌ [SMART-URL] Smart URL capture error:', error.message);
+    console.log('❌ [SMART-URL] Error stack:', error.stack);
   }
 }
 
@@ -1687,40 +1766,62 @@ function extractDomain(url) {
 
 // Enhanced testing function
 async function testPlatformAppCapture() {
+  console.log('🔍 [PLATFORM-TEST] Testing platform app and URL capture capabilities...');
+  
   try {
-    console.log('🔍 Testing enhanced app/URL detection...');
+    // Test basic AppleScript access
+    const { execSync } = require('child_process');
     
-    // Test app detection
-    const activeApp = await detectActiveApplication(); 
-    if (activeApp && activeApp.name) {
-      console.log('✅ App detection test passed:', activeApp.name);
-      appCaptureEnabled = true;
+    // Test Safari URL extraction (most reliable browser for AppleScript)
+    try {
+      const safariTest = execSync(`osascript -e 'tell application "System Events" to get name of processes'`, { 
+        encoding: 'utf8',
+        timeout: 3000
+      }).trim();
       
-      // Test URL detection if it's a browser
-      if (isBrowserApp(activeApp.name)) {
-        const urlData = await detectBrowserUrl();
-        if (urlData && urlData.url) {
-          console.log('✅ URL detection test passed:', urlData.domain);
+      if (safariTest.includes('Safari') || safariTest.includes('Chrome') || safariTest.includes('Firefox')) {
+        console.log('✅ [PLATFORM-TEST] AppleScript access working, browsers detected');
+        
+        // Test actual URL extraction
+        try {
+          const safariUrlTest = execSync(`osascript -e 'tell application "Safari" to if (count of windows) > 0 then get URL of current tab of front window'`, { 
+            encoding: 'utf8',
+            timeout: 3000
+          }).trim();
+          
+          console.log('✅ [PLATFORM-TEST] Safari URL extraction test successful');
           urlCaptureEnabled = true;
-        } else {
-          console.log('⚠️ URL detection test failed, but app detection works');
-          urlCaptureEnabled = false;
+          return true;
+        } catch (urlError) {
+          console.log('⚠️ [PLATFORM-TEST] Safari URL test failed, trying Chrome...');
+          
+          try {
+            const chromeUrlTest = execSync(`osascript -e 'tell application "Google Chrome" to if (count of windows) > 0 then get URL of active tab of front window'`, { 
+              encoding: 'utf8',
+              timeout: 3000
+            }).trim();
+            
+            console.log('✅ [PLATFORM-TEST] Chrome URL extraction test successful');
+            urlCaptureEnabled = true;
+            return true;
+          } catch (chromeError) {
+            console.log('⚠️ [PLATFORM-TEST] Chrome URL test failed, but AppleScript access works - enabling URL capture anyway');
+            urlCaptureEnabled = true; // Enable for when browsers are used
+            return true;
+          }
         }
       } else {
-        console.log('ℹ️ Active app is not a browser, URL capture will activate when needed');
-        urlCaptureEnabled = true; // Enable for when browsers are used
+        console.log('⚠️ [PLATFORM-TEST] No browsers detected in process list');
+        urlCaptureEnabled = false;
+        return false;
       }
-      
-      return true;
-    } else {
-      console.log('⚠️ App detection test failed');
-      appCaptureEnabled = false;
+    } catch (error) {
+      console.log('❌ [PLATFORM-TEST] AppleScript access failed:', error.message);
       urlCaptureEnabled = false;
       return false;
     }
   } catch (error) {
-    console.log('⚠️ App/URL capture test failed:', error.message);
-    appCaptureEnabled = false;
+    console.log('❌ [PLATFORM-TEST] Platform test failed:', error.message);
     urlCaptureEnabled = false;
     return false;
   }
@@ -1888,6 +1989,29 @@ async function captureScreenshot() {
     if (!hasPermission) {
       throw new Error(`Screen capture permission not available on ${process.platform}`);
     }
+
+    // CRITICAL FIX: Get current app and URL context BEFORE taking screenshot
+    let currentApp = null;
+    let currentUrl = null;
+    
+    try {
+      // Get active application info
+      currentApp = await detectActiveApplication();
+      if (currentApp) {
+        console.log(`📱 Active app detected: ${currentApp.name} - ${currentApp.title}`);
+        
+        // If it's a browser, try to get the URL
+        if (isBrowserApp(currentApp.name)) {
+          const urlData = await detectBrowserUrl();
+          if (urlData && urlData.url) {
+            currentUrl = urlData;
+            console.log(`🌐 URL detected: ${urlData.domain} (${urlData.url})`);
+          }
+        }
+      }
+    } catch (contextError) {
+      console.log('⚠️ Failed to get app/URL context, continuing with screenshot:', contextError.message);
+    }
     
     // Try Electron's desktopCapturer first (better for Electron apps)
     let img;
@@ -1928,9 +2052,9 @@ async function captureScreenshot() {
     activityStats.screenshotsCaptured++;
     activityStats.lastScreenshotTime = Date.now();
     
-    // Create screenshot metadata
+    // CRITICAL FIX: Create screenshot metadata WITH app and URL context
     const screenshotMeta = {
-      user_id: config.user_id || 'demo-user', // Ensure user_id is set
+      user_id: config.user_id || 'demo-user',
       project_id: '00000000-0000-0000-0000-000000000001',
       time_log_id: currentTimeLogId || 'no-session',
       timestamp: new Date().toISOString(),
@@ -1943,8 +2067,20 @@ async function captureScreenshot() {
       mouse_movements: activityStats.mouseMovements,
       captured_at: new Date().toISOString(),
       platform: process.platform,
-      is_blurred: appSettings.blur_screenshots || false
+      is_blurred: appSettings.blur_screenshots || false,
+      // FIXED: Include app context data
+      app_name: currentApp ? currentApp.name : null,
+      window_title: currentApp ? currentApp.title : null,
+      url: currentUrl ? currentUrl.url : null
     };
+    
+    console.log('📊 Screenshot metadata created:', {
+      activity_percent: screenshotMeta.activity_percent,
+      app_name: screenshotMeta.app_name,
+      window_title: screenshotMeta.window_title ? screenshotMeta.window_title.substring(0, 50) + '...' : null,
+      url: screenshotMeta.url ? screenshotMeta.url.substring(0, 80) + '...' : null,
+      has_context: !!(screenshotMeta.app_name || screenshotMeta.url)
+    });
     
     // Add to offline queue and attempt sync
     try {
@@ -1968,7 +2104,10 @@ async function captureScreenshot() {
         activityPercent: Math.round(activityPercent),
         focusPercent: Math.round(focusPercent),
         timestamp: screenshotMeta.timestamp,
-        platform: process.platform
+        platform: process.platform,
+        appName: screenshotMeta.app_name,
+        windowTitle: screenshotMeta.window_title,
+        url: screenshotMeta.url
       });
       
       mainWindow.webContents.send('activity-update', {
@@ -2146,27 +2285,33 @@ function getScreenshotStopReason() {
 }
 
 function calculateActivityPercent() {
-  // Enhanced activity calculation that considers multiple factors
+  // FIXED: Enhanced activity calculation with proper scaling
   const now = Date.now();
   const timeSinceReset = now - activityStats.lastReset;
   const timeSinceResetMinutes = timeSinceReset / (1000 * 60);
   const timeSinceLastActivity = now - lastActivity;
   
-  // Base activity calculation
-  const mouseClickWeight = 15; // Each click is worth 15 points
-  const keystrokeWeight = 10;  // Each keystroke is worth 10 points
-  const movementWeight = 0.5;  // Each movement is worth 0.5 points
+  // If no time has passed since reset, return 0
+  if (timeSinceResetMinutes <= 0) {
+    return 0;
+  }
+  
+  // Base activity calculation with more realistic weights
+  const mouseClickWeight = 5;   // Each click is worth 5 points
+  const keystrokeWeight = 3;    // Each keystroke is worth 3 points  
+  const movementWeight = 0.1;   // Each movement is worth 0.1 points
   
   const totalActivity = (activityStats.mouseClicks * mouseClickWeight) + 
                        (activityStats.keystrokes * keystrokeWeight) + 
                        (activityStats.mouseMovements * movementWeight);
   
   // Time-based scaling: normalize activity per minute
-  const activityPerMinute = timeSinceResetMinutes > 0 ? totalActivity / timeSinceResetMinutes : totalActivity;
+  const activityPerMinute = totalActivity / timeSinceResetMinutes;
   
-  // Calculate percentage based on expected activity levels
-  // Typical user: ~20-50 clicks per minute, ~100-200 keystrokes per minute
-  const expectedActivityPerMinute = 500; // Baseline for 100% activity
+  // FIXED: More realistic baseline for 100% activity
+  // Typical active user: ~10-20 clicks per minute, ~50-100 keystrokes per minute
+  // This gives us roughly 50-200 points per minute for active users
+  const expectedActivityPerMinute = 150; // Baseline for 100% activity
   let activityPercent = Math.min(100, Math.max(0, (activityPerMinute / expectedActivityPerMinute) * 100));
   
   // === ACTIVITY DECAY SYSTEM ===
@@ -2175,43 +2320,41 @@ function calculateActivityPercent() {
   const idleThreshold = appSettings.idle_threshold_seconds || 60; // 1 minute default
   
   if (currentIdleTime > idleThreshold) {
-    // Progressive decay rates
-    let decayRate = 1; // 1% per second base rate
-    if (currentIdleTime > 60) decayRate = 2; // 2% per second after 1 minute
-    if (currentIdleTime > 300) decayRate = 5; // 5% per second after 5 minutes
+    // User is idle - activity should be very low or 0
+    const idleMinutes = currentIdleTime / 60;
+    let decayMultiplier = 1;
     
-    const totalDecay = Math.min(50, currentIdleTime * decayRate); // Cap at 50% total decay
+    if (idleMinutes > 1) decayMultiplier = 0.5;   // 50% after 1 minute idle
+    if (idleMinutes > 2) decayMultiplier = 0.2;   // 20% after 2 minutes idle  
+    if (idleMinutes > 5) decayMultiplier = 0.05;  // 5% after 5 minutes idle
+    if (idleMinutes > 10) decayMultiplier = 0;    // 0% after 10 minutes idle
+    
     const activityBeforeDecay = activityPercent;
-    activityPercent = Math.max(0, activityPercent - totalDecay);
+    activityPercent = Math.round(activityPercent * decayMultiplier);
     
-    console.log('💤 ACTIVITY DECAY:', {
-      idle_duration_seconds: currentIdleTime,
-      idle_threshold: idleThreshold,
-      decay_rate: decayRate,
-      total_decay: totalDecay,
-      activity_score_before: activityBeforeDecay,
-      activity_score_after: activityPercent,
-      user_status: 'IDLE_DECAY',
-      using_system_idle: true
-    });
-  } else if (currentIdleTime > 0) {
-    // Log when we're approaching idle but not there yet
-    console.log('⏰ APPROACHING IDLE:', {
-      idle_duration_seconds: currentIdleTime,
-      idle_threshold: idleThreshold,
-      seconds_until_decay: idleThreshold - currentIdleTime,
-      current_activity_score: activityPercent
-    });
+    // Only log occasionally to avoid spam
+    if (Date.now() - (activityStats.lastIdleLog || 0) > 30000) { // Every 30 seconds
+      console.log('💤 ACTIVITY DECAY:', {
+        // duration_seconds removed - it's a generated column
+        idle_minutes: Math.round(idleMinutes * 10) / 10,
+        idle_threshold: idleThreshold,
+        decay_multiplier: decayMultiplier,
+        activity_before: activityBeforeDecay,
+        activity_after: activityPercent,
+        user_status: 'IDLE'
+      });
+      activityStats.lastIdleLog = Date.now();
+    }
   } else {
-    // Apply recency bonus: more recent activity gets higher weight
+    // User is active - apply recency bonus for very recent activity
     if (timeSinceLastActivity < 30000) { // Within last 30 seconds
       const recencyBonus = Math.max(0, 1 - (timeSinceLastActivity / 30000)); // 0-1 multiplier
-      activityPercent = Math.min(100, activityPercent * (1 + recencyBonus * 0.5)); // Up to 50% bonus
+      activityPercent = Math.min(100, activityPercent * (1 + recencyBonus * 0.3)); // Up to 30% bonus
     }
     
-    // Ensure we always show some activity if there's been recent input
-    if (timeSinceLastActivity < 10000 && activityPercent < 10) {
-      activityPercent = Math.max(10, activityPercent);
+    // Ensure we show some activity if there's been very recent input
+    if (timeSinceLastActivity < 5000 && activityPercent < 5) {
+      activityPercent = Math.max(5, activityPercent);
     }
   }
   
@@ -2786,7 +2929,7 @@ async function resumeTracking() {
 }
 
 // === ENHANCED IPC HANDLERS ===
-
+if (isElectronContext && ipcMain) {
 // Employee login/logout handlers
 ipcMain.on('user-logged-in', (event, user) => {
   console.log('👤 User logged in:', user.email);
@@ -2994,6 +3137,8 @@ ipcMain.handle('is-tracking', () => {
   };
 });
 
+} // End of Electron IPC handlers
+
 // Removed duplicate handler - using comprehensive handler below
 
 // === FIXED CAPTURE FUNCTIONS ===
@@ -3047,7 +3192,8 @@ async function captureActiveUrl() {
 }
 
 // === APP LIFECYCLE ===
-app.whenReady().then(async () => {
+if (isElectronContext && app) {
+  app.whenReady().then(async () => {
   console.log('🚀 TimeFlow Desktop Agent starting...');
   
   // Initialize components
@@ -3235,6 +3381,7 @@ powerMonitor.on('unlock-screen', () => {
 });
 
 console.log('📱 Ebdaa Time Desktop Agent initialized');
+} // End of Electron context check
 
 // Initialize components
 function initializeComponents() {
@@ -4141,5 +4288,111 @@ function showResumeConfirmation(suspendMinutes) {
       message: `Your laptop was closed for ${suspendMinutes} minutes. Would you like to resume time tracking?`
     });
   }
+}
+
+// === NODE.JS STANDALONE MODE ===
+if (!isElectronContext) {
+  console.log('🚀 Starting TimeFlow Desktop Agent in Node.js mode...');
+  
+  // Initialize components for Node.js mode
+  async function initNodeJsMode() {
+    try {
+      // Initialize basic components
+      if (global.systemMonitorModule) {
+        global.systemMonitorModule.initSystemMonitor();
+      }
+      
+      // Initialize sync manager
+      if (config && config.supabase_url && config.supabase_key) {
+        try {
+          syncManager = new SyncManager(config);
+          console.log('✅ Sync manager initialized');
+        } catch (error) {
+          console.log('⚠️ Sync manager initialization failed:', error.message);
+          syncManager = null;
+        }
+      } else {
+        console.log('⚠️ Skipping sync manager - incomplete config');
+      }
+      
+      // Initialize anti-cheat detector
+      try {
+        antiCheatDetector = new AntiCheatDetector(appSettings);
+        console.log('✅ Anti-cheat detector initialized');
+      } catch (error) {
+        console.log('⚠️ Anti-cheat detector initialization failed:', error.message);
+        antiCheatDetector = null;
+      }
+      
+      // Load system state
+      loadSystemState();
+      loadOfflineQueue();
+      
+      // Start basic monitoring without Electron features
+      console.log('🔍 Starting basic monitoring in Node.js mode...');
+      
+      // Start app capture for testing
+      startAppCapture();
+      
+      // Start URL capture for testing  
+      startUrlCapture();
+      
+      // In Node.js mode, create a real tracking session for URL/app capture to work
+      if (config && config.user_id) {
+        try {
+          isTracking = true;
+          // Create a real time log entry for testing
+          const { createClient } = require('@supabase/supabase-js');
+          const supabase = createClient(config.supabase_url, config.supabase_key);
+          
+          const timeLogData = {
+            user_id: config.user_id,
+            project_id: null, // No project for testing
+            start_time: new Date().toISOString(),
+            is_idle: false,
+            status: 'active',
+            description: 'Node.js Testing Session'
+          };
+          
+          const { data, error } = await supabase
+            .from('time_logs')
+            .insert([timeLogData])
+            .select()
+            .single();
+            
+          if (error) {
+            console.log('⚠️ Failed to create time log entry:', error.message);
+            // Fallback to mock UUID
+            const crypto = require('crypto');
+            currentTimeLogId = crypto.randomUUID();
+            console.log(`⚠️ Using mock session ID: ${currentTimeLogId}`);
+          } else {
+            currentTimeLogId = data.id;
+            console.log(`✅ Real tracking session created for Node.js mode: ${currentTimeLogId}`);
+          }
+        } catch (error) {
+          console.log('⚠️ Error creating tracking session:', error.message);
+          isTracking = false;
+        }
+      } else {
+        console.log('⚠️ No user_id found - URL capture may not work properly');
+      }
+      
+      console.log('✅ TimeFlow Desktop Agent running in Node.js mode');
+      console.log('📊 Monitoring app and URL activity...');
+      
+      // Keep the process alive
+      setInterval(() => {
+        // Just keep alive, monitoring happens in background
+      }, 30000);
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize Node.js mode:', error);
+      process.exit(1);
+    }
+  }
+  
+  // Start Node.js mode
+  initNodeJsMode();
 }
 

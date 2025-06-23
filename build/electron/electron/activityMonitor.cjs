@@ -142,16 +142,33 @@ async function startActivityMonitoring(userId) {
     // Start app activity tracking every 5 seconds - DON'T reset activity timer!
     appTrackingInterval = setInterval(async () => {
         const userActive = isUserActive();
+        // Check if current app is a browser for URL detection
+        let shouldTrackForBrowser = false;
+        if (currentUserId && !userActive) {
+            try {
+                const currentAppName = await getCurrentAppName();
+                const browsers = ['Safari', 'Google Chrome', 'Firefox', 'Microsoft Edge', 'Arc', 'chrome', 'firefox', 'msedge'];
+                shouldTrackForBrowser = browsers.some(browser => currentAppName.toLowerCase().includes(browser.toLowerCase()));
+                if (shouldTrackForBrowser) {
+                    safeLog('🌐 [BROWSER-TRACKING] Tracking browser during idle for URL detection:', currentAppName);
+                }
+            }
+            catch (error) {
+                // If app name detection fails, don't track during idle
+                shouldTrackForBrowser = false;
+            }
+        }
         safeLog('🔍 [APP-TRACKING] Interval check:', {
             currentUserId: !!currentUserId,
             isUserActive: userActive,
-            will_track_app: currentUserId && userActive
+            shouldTrackForBrowser: shouldTrackForBrowser,
+            will_track_app: currentUserId && (userActive || shouldTrackForBrowser)
         });
-        if (currentUserId && userActive) {
+        if (currentUserId && (userActive || shouldTrackForBrowser)) {
             await trackCurrentApp();
         }
-        else if (currentUserId && !userActive) {
-            safeLog('⚠️ [APP-TRACKING] Skipped - user not active');
+        else if (currentUserId && !userActive && !shouldTrackForBrowser) {
+            safeLog('⚠️ [APP-TRACKING] Skipped - user not active and not a browser');
         }
         else if (!currentUserId) {
             safeLog('⚠️ [APP-TRACKING] Skipped - no user ID');
@@ -844,10 +861,33 @@ async function getCurrentAppName() {
                 return appName || 'System Application';
             }
             else if (process.platform === 'darwin') {
-                // macOS implementation using AppleScript - improved version
-                const { stdout } = await execAsync(`osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || echo "System Application"`);
-                const appName = stdout.trim();
-                return appName || 'System Application';
+                // macOS implementation using AppleScript - enhanced with timeout and multiple methods
+                try {
+                    // Method 1: Direct AppleScript (removed timeout for macOS compatibility)
+                    const { stdout, stderr } = await execAsync(`osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true'`);
+                    if (stderr) {
+                        safeLog('🔧 [APP-NAME] AppleScript stderr:', stderr.substring(0, 100));
+                    }
+                    const appName = stdout && typeof stdout === 'string' ? stdout.trim() : '';
+                    if (appName && appName !== '' && !appName.includes('error') && !appName.includes('timeout')) {
+                        safeLog('✅ [APP-NAME] Success:', appName);
+                        return appName;
+                    }
+                    // Method 2: Alternative AppleScript syntax
+                    const { stdout: stdout2 } = await execAsync(`osascript -e 'tell application "System Events" to name of (first process whose frontmost is true)'`);
+                    const appName2 = stdout2 && typeof stdout2 === 'string' ? stdout2.trim() : '';
+                    if (appName2 && appName2 !== '' && !appName2.includes('error')) {
+                        safeLog('✅ [APP-NAME] Alternative method success:', appName2);
+                        return appName2;
+                    }
+                    // Method 3: Use lsappinfo as fallback (correct path) - skip for now since it doesn't provide app names
+                    // const { stdout: stdout3 } = await execAsync(`lsappinfo front`);
+                    // lsappinfo doesn't actually return app names, so skip this method
+                }
+                catch (appleScriptError) {
+                    safeLog('⚠️ [APP-NAME] All AppleScript methods failed:', appleScriptError.message?.substring(0, 200));
+                }
+                return 'System Application';
             }
             else if (process.platform === 'linux') {
                 // Linux implementation using xdotool or wmctrl
@@ -889,10 +929,30 @@ async function getCurrentWindowTitle() {
                 return windowTitle || 'Unknown Window';
             }
             else if (process.platform === 'darwin') {
-                // macOS implementation using corrected AppleScript
-                const { stdout } = await execAsync(`osascript -e 'tell application "System Events" to get title of front window of (first application process whose frontmost is true)'`);
-                const windowTitle = stdout.trim();
-                return windowTitle || 'Unknown Window';
+                // macOS implementation using enhanced AppleScript with multiple fallbacks
+                try {
+                    // Method 1: Direct window title detection (removed timeout for macOS compatibility)
+                    const { stdout, stderr } = await execAsync(`osascript -e 'tell application "System Events" to get title of front window of (first application process whose frontmost is true)'`);
+                    if (stderr) {
+                        safeLog('🔧 [WINDOW-TITLE] AppleScript stderr:', stderr.substring(0, 100));
+                    }
+                    const windowTitle = stdout && typeof stdout === 'string' ? stdout.trim() : '';
+                    if (windowTitle && windowTitle !== '' && !windowTitle.includes('error') && !windowTitle.includes('timeout')) {
+                        safeLog('✅ [WINDOW-TITLE] Success:', windowTitle.substring(0, 100) + '...');
+                        return windowTitle;
+                    }
+                    // Method 2: Alternative syntax
+                    const { stdout: stdout2 } = await execAsync(`osascript -e 'tell application "System Events" to title of window 1 of (first process whose frontmost is true)'`);
+                    const windowTitle2 = stdout2 && typeof stdout2 === 'string' ? stdout2.trim() : '';
+                    if (windowTitle2 && windowTitle2 !== '' && !windowTitle2.includes('error')) {
+                        safeLog('✅ [WINDOW-TITLE] Alternative method success:', windowTitle2.substring(0, 100) + '...');
+                        return windowTitle2;
+                    }
+                }
+                catch (windowError) {
+                    safeLog('⚠️ [WINDOW-TITLE] All methods failed:', windowError.message?.substring(0, 200));
+                }
+                return 'Unknown Window';
             }
             else if (process.platform === 'linux') {
                 // Linux implementation
@@ -925,10 +985,19 @@ async function getCurrentURL() {
         // Only try to get URLs from actual browser applications
         const appName = await getCurrentAppName();
         const windowTitle = await getCurrentWindowTitle();
-        // Check if it's actually a browser
+        // Check if it's actually a browser - improved detection
         const browsers = ['Google Chrome', 'Safari', 'Firefox', 'Microsoft Edge', 'Arc', 'chrome', 'firefox', 'msedge'];
         const isBrowser = browsers.some(browser => appName.toLowerCase().includes(browser.toLowerCase()));
-        if (!isBrowser) {
+        // Also check window title for browser indicators if app name is generic
+        const browserTitleIndicators = ['google', 'youtube', 'github', 'stackoverflow', 'facebook', 'twitter', 'instagram', 'www.', 'https://', 'http://'];
+        const titleIndicatesBrowser = windowTitle && browserTitleIndicators.some(indicator => windowTitle.toLowerCase().includes(indicator.toLowerCase()));
+        safeLog('🔍 [BROWSER-CHECK] Detection:', {
+            appName,
+            isBrowser,
+            titleIndicatesBrowser,
+            willProceed: isBrowser || titleIndicatesBrowser
+        });
+        if (!isBrowser && !titleIndicatesBrowser) {
             return undefined;
         }
         safeLog('🌐 [URL-EXTRACTION] Attempting URL extraction:', {
@@ -963,6 +1032,29 @@ async function getCurrentURL() {
                 }
                 else if (appName.includes('Firefox')) {
                     // Firefox doesn't support AppleScript for URL access - use window title
+                    return extractURLFromWindowTitle(windowTitle);
+                }
+                else if (titleIndicatesBrowser) {
+                    // If title indicates browser but app name is generic, try both Chrome and Safari
+                    safeLog('🔄 [FALLBACK] App name is generic but title suggests browser, trying multiple scripts');
+                    try {
+                        const chromeResult = await execAsync(`osascript -e 'tell application "Google Chrome" to get URL of active tab of front window'`);
+                        if (chromeResult.stdout && chromeResult.stdout.trim().startsWith('http')) {
+                            return chromeResult.stdout.trim();
+                        }
+                    }
+                    catch (e) {
+                        safeLog('🔄 Chrome fallback failed, trying Safari');
+                    }
+                    try {
+                        const safariResult = await execAsync(`osascript -e 'tell application "Safari" to get URL of front document'`);
+                        if (safariResult.stdout && safariResult.stdout.trim().startsWith('http')) {
+                            return safariResult.stdout.trim();
+                        }
+                    }
+                    catch (e) {
+                        safeLog('🔄 Safari fallback failed, using title extraction');
+                    }
                     return extractURLFromWindowTitle(windowTitle);
                 }
                 else {
@@ -1141,11 +1233,36 @@ async function trackCurrentApp() {
             currentActivitySession.total_apps++;
             saveActivitySession();
             safeLog('📱 App activity:', appName, '-', windowTitle, currentURL ? `(${currentURL})` : '');
+            // Enhanced URL detection with fallbacks for browsers
+            let finalURL = currentURL;
+            if (!finalURL && appName.includes('Chrome')) {
+                // If AppleScript failed but we know it's Chrome, try to extract URL manually
+                safeLog('🔄 [URL-FALLBACK] Chrome detected but no URL, trying external script...');
+                try {
+                    const { exec } = require('child_process');
+                    const { promisify } = require('util');
+                    const execAsync = promisify(exec);
+                    const result = await execAsync(`osascript -e 'tell application "Google Chrome" to get URL of active tab of front window'`);
+                    if (result.stdout && result.stdout.trim().startsWith('http')) {
+                        finalURL = result.stdout.trim();
+                        safeLog('✅ [URL-FALLBACK] Successfully retrieved Chrome URL:', finalURL);
+                    }
+                }
+                catch (error) {
+                    safeLog('❌ [URL-FALLBACK] External Chrome script failed:', error.message);
+                }
+            }
+            // Update currentApp with the fallback URL
+            if (finalURL && !currentURL) {
+                currentApp.url = finalURL;
+                safeLog('🔄 [URL-FALLBACK] Updated currentApp with fallback URL');
+            }
             // Log URL detection specifically
-            if (currentURL) {
+            if (finalURL) {
                 safeLog('🌐 [URL-DETECTED]:', {
-                    url: currentURL,
+                    url: finalURL,
                     app: appName,
+                    source: currentURL ? 'primary' : 'fallback',
                     will_save_url: true
                 });
             }
@@ -1168,45 +1285,64 @@ async function trackCurrentApp() {
 async function saveAppActivity() {
     // Add comprehensive null checks to prevent the error
     if (!currentApp) {
-        safeLog('⚠️ No current app to save - skipping saveAppActivity');
+        safeLog('⚠️ [SAVE-APP] No current app to save - skipping saveAppActivity');
         return;
     }
     if (!currentUserId) {
-        safeLog('⚠️ No current user ID - skipping saveAppActivity');
+        safeLog('⚠️ [SAVE-APP] No current user ID - skipping saveAppActivity');
         return;
     }
     if (!currentActivitySession) {
-        safeLog('⚠️ No current activity session - skipping saveAppActivity');
+        safeLog('⚠️ [SAVE-APP] No current activity session - skipping saveAppActivity');
         return;
     }
     // Additional validation to ensure currentApp has required properties
     if (!currentApp.app_name) {
-        safeLog('⚠️ Current app missing app_name - skipping saveAppActivity');
+        safeLog('⚠️ [SAVE-APP] Current app missing app_name - skipping saveAppActivity');
+        safeLog('🔍 [SAVE-APP] currentApp object:', JSON.stringify(currentApp, null, 2));
         return;
     }
     try {
-        // Use minimal app_logs schema - only basic columns that definitely exist
+        // Enhanced validation before database insert
         const appLogData = {
             user_id: currentUserId,
             project_id: '00000000-0000-0000-0000-000000000001', // Use default project UUID
-            app_name: currentApp.app_name,
-            window_title: currentApp.window_title || 'Unknown Window'
+            app_name: String(currentApp.app_name).trim() || 'Unknown App',
+            window_title: String(currentApp.window_title || 'Unknown Window').trim(),
+            started_at: currentApp.start_time || new Date().toISOString(),
+            duration_seconds: Math.max(0, currentApp.duration_seconds || 0)
         };
+        // Final validation before insert
+        if (!appLogData.app_name || appLogData.app_name === 'Unknown App') {
+            safeLog('⚠️ [SAVE-APP] Invalid app_name after processing, skipping database insert');
+            return;
+        }
+        safeLog('🔍 [SAVE-APP] Inserting app log:', {
+            app_name: appLogData.app_name,
+            window_title: appLogData.window_title.substring(0, 50) + '...',
+            duration: appLogData.duration_seconds
+        });
         const { error } = await supabase_1.supabase
             .from('app_logs')
             .insert(appLogData);
         if (error) {
+            safeError('❌ [SAVE-APP] Database error:', error);
             // Queue for later upload if database fails
             (0, unsyncedManager_1.queueAppLog)(appLogData);
             throw error;
         }
-        safeLog('✅ App activity saved:', currentApp.app_name);
+        safeLog('✅ [SAVE-APP] App activity saved successfully:', appLogData.app_name);
     }
     catch (error) {
-        safeError('❌ Failed to save app activity:', error);
+        safeError('❌ [SAVE-APP] Failed to save app activity:', error);
+        safeLog('🔍 [SAVE-APP] Error context - currentApp:', currentApp ? 'EXISTS' : 'NULL');
+        if (currentApp) {
+            safeLog('🔍 [SAVE-APP] currentApp.app_name:', typeof currentApp.app_name, currentApp.app_name);
+        }
         (0, errorHandler_1.logError)('saveAppActivity', error);
     }
 }
+// Note: queueAppLog is imported from ./unsyncedManager
 function getAppCategory(appName) {
     const categories = {
         // Development tools
@@ -1307,11 +1443,16 @@ async function saveURLActivity(appActivity) {
         return;
     }
     try {
-        // Use minimal url_logs schema
+        // Use complete url_logs schema with required fields
         const urlLogData = {
             user_id: currentUserId,
             site_url: appActivity.url,
-            category: getURLCategory(appActivity.url)
+            started_at: appActivity.start_time || new Date().toISOString(),
+            duration_seconds: Math.max(0, appActivity.duration_seconds || 0),
+            category: getURLCategory(appActivity.url),
+            title: appActivity.window_title || null,
+            browser: appActivity.app_name || null,
+            url: appActivity.url // Also populate the url field
         };
         safeLog('🔍 [SAVE-URL] Inserting URL data:', urlLogData);
         const { error } = await supabase_1.supabase

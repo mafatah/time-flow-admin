@@ -24,9 +24,13 @@
     <key>com.apple.security.files.downloads.read-write</key>
     <true/>
     
-    <!-- For screenshot functionality -->
+    <!-- For screenshot and screen recording functionality -->
     <key>com.apple.security.device.camera</key>
-    <false/>
+    <true/>
+    <key>com.apple.security.device.screen-recording</key>
+    <true/>
+    <key>com.apple.security.personal-information.screen-capture</key>
+    <true/>
     <key>com.apple.security.personal-information.location</key>
     <false/>
     
