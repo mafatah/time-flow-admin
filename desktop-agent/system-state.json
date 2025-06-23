@@ -1,0 +1,21 @@
+{
+  "isTracking": false,
+  "isPaused": false,
+  "currentSession": null,
+  "currentTimeLogId": null,
+  "suspendTime": 1750681825148,
+  "activityStats": {
+    "mouseClicks": 4034,
+    "keystrokes": 420,
+    "mouseMovements": 6838,
+    "idleSeconds": 891,
+    "activeSeconds": 2688,
+    "lastReset": 1750674608011,
+    "suspiciousEvents": 0,
+    "riskScore": 0.2,
+    "screenshotsCaptured": 7,
+    "lastScreenshotTime": 1750678047223,
+    "lastIdleLog": 1750674779201
+  },
+  "lastActivity": 1750678819247
+}

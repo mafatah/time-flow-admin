@@ -280,14 +280,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '112MB'; // TimeFlow-v1.0.31-ARM64.dmg (UPDATED for v1.0.31)
+        return '116MB'; // TimeFlow-v1.0.33-ARM64.dmg (UPDATED for v1.0.33)
       case 'mac-intel':
       case 'mac':
-        return '118MB'; // TimeFlow-v1.0.31-Intel.dmg (UPDATED for v1.0.31)
+        return '122MB'; // TimeFlow-v1.0.33-Intel.dmg (UPDATED for v1.0.33)
       case 'windows':
-        return '86MB'; // TimeFlow-v1.0.31-Setup.exe (UPDATED for v1.0.31)
+        return '89MB'; // TimeFlow-v1.0.33-Setup.exe (UPDATED for v1.0.33)
       case 'linux':
-        return '132MB'; // TimeFlow-v1.0.31-Linux.AppImage (UPDATED for v1.0.31)
+        return '126MB'; // TimeFlow-v1.0.33-Linux.AppImage (UPDATED for v1.0.33)
       default:
         return '';
     }
