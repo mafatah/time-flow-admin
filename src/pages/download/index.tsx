@@ -54,10 +54,10 @@ const DownloadPage = () => {
       description: "For Windows 10/11",
       filename: `TimeFlow-${version}-Setup.exe`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Setup.exe`,
-      size: "~89 MB",
+      size: "~91 MB",
       requirements: "Windows 10/11 (64-bit)",
-      verified: false,
-      disabled: true
+      verified: true,
+      disabled: false
     },
     {
       platform: "Linux",
@@ -65,10 +65,10 @@ const DownloadPage = () => {
       description: "AppImage for Linux",
       filename: `TimeFlow-${version}-Linux.AppImage`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Linux.AppImage`,
-      size: "~132 MB", 
+      size: "~129 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
-      verified: false,
-      disabled: true
+      verified: true,
+      disabled: false
     }
   ];
 
