@@ -97,11 +97,13 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
           confidence = 70;
         }
         
-        console.log('Apple Silicon Detection:', {
-          result: isAppleSilicon,
-          confidence: confidence,
-          reason: isAppleSilicon ? 'Detected as Apple Silicon' : 'Detected as Intel'
-        });
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Apple Silicon Detection:', {
+            result: isAppleSilicon,
+            confidence: confidence,
+            reason: isAppleSilicon ? 'Detected as Apple Silicon' : 'Detected as Intel'
+          });
+        }
         
         setOs(isAppleSilicon ? 'mac-arm' : 'mac-intel');
         
@@ -121,7 +123,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     setDownloading(platform);
     
     // Use GitHub releases for reliable downloads - Updated automatically by release pipeline
-    const currentVersion = "1.0.33"; // v1.0.33 - Cache bust: 202506232000
+    const currentVersion = "1.0.34"; // v1.0.34 - Cache bust: 202506242000
     const downloadFiles = {
       windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`,
       'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED
@@ -135,30 +137,34 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     const fileSize = getFileSize(platform);
     const expectedBytes = getExpectedBytes(platform);
     
-    console.log('Download Debug:', {
-      platform,
-      detectedOS: os,
-      filePath,
-      expectedSize: expectedBytes,
-      userAgent: navigator.userAgent,
-      isLocalDownload: true
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Download Debug:', {
+        platform,
+        detectedOS: os,
+        filePath,
+        expectedSize: expectedBytes,
+        userAgent: navigator.userAgent,
+        isLocalDownload: true
+      });
+    }
     
     if (filePath) {
       try {
         // Verify file integrity before download
         if (expectedBytes > 0 && ENABLE_FILE_VERIFICATION) {
-          console.log('🔍 Verifying file integrity...');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('🔍 Verifying file integrity...');
+          }
           const isValid = await verifyDownload(filePath, expectedBytes);
           
           if (!isValid) {
             console.warn('⚠️ File verification failed, but proceeding with download...');
             // Don't throw error, just warn and proceed
             // throw new Error('File size mismatch - file may be corrupted');
-          } else {
+          } else if (process.env.NODE_ENV !== 'production') {
             console.log('✅ File verification passed');
           }
-        } else if (!ENABLE_FILE_VERIFICATION) {
+        } else if (!ENABLE_FILE_VERIFICATION && process.env.NODE_ENV !== 'production') {
           console.log('⚠️ File verification is disabled - proceeding without validation');
         }
         
@@ -174,7 +180,9 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
         // const downloadUrl = `${filePath}?v=${cacheBuster}`;
         
         // Use simple direct link method for binary files (most reliable)
-        console.log('🚀 Starting download with direct link method...');
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('🚀 Starting download with direct link method...');
+        }
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -312,7 +320,9 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   // Add file verification function
   const verifyDownload = async (url: string, expectedSize: number): Promise<boolean> => {
     try {
-      console.log('🔍 Verifying file at:', url);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔍 Verifying file at:', url);
+      }
       
       // Try HEAD request first
       const response = await fetch(url, { 

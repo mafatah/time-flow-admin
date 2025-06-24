@@ -24,7 +24,7 @@ interface DownloadItem {
 }
 
 const DownloadPage = () => {
-  const version = "v1.0.33"; // Updated automatically by release pipeline
+  const version = "v1.0.34"; // Updated automatically by release pipeline
   const releaseDate = new Date().toLocaleDateString(); // Force deploy v1.0.33
   
   const downloads: DownloadItem[] = [
@@ -73,7 +73,9 @@ const DownloadPage = () => {
 
   const handleDownload = (url: string, filename: string) => {
     // Track download analytics if needed
-    console.log(`Download started: ${filename}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`Download started: ${filename}`);
+    }
     window.open(url, '_blank');
   };
 

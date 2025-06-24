@@ -33,6 +33,16 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
+// Import centralized intervals configuration
+const { 
+  getInterval, 
+  setPerformanceMode, 
+  getCurrentMode,
+  getAllIntervals,
+  autoDetectPerformanceMode,
+  getEnvironmentOverrides 
+} = require('../config/intervals');
+
 // Safe console logging to prevent EPIPE errors
 function safeLog(...args) {
   try {
@@ -140,6 +150,59 @@ try {
   }
 }
 
+// === DATABASE STATUS REPORTING ===
+function startDatabaseStatusReporting() {
+  // Show database status every 30 seconds
+  setInterval(async () => {
+    try {
+      // Query last app detected and saved
+      const { data: lastApp } = await supabase
+        .from('app_logs')
+        .select('app_name, window_title, timestamp')
+        .order('timestamp', { ascending: false })
+        .limit(1);
+      
+      // Query last URL detected and saved  
+      const { data: lastUrl } = await supabase
+        .from('url_logs')
+        .select('site_url, domain, browser, title, timestamp')
+        .order('timestamp', { ascending: false })
+        .limit(1);
+      
+      console.log('📊 [DATABASE STATUS REPORT] ==========================================');
+      
+      if (lastApp && lastApp.length > 0) {
+        const app = lastApp[0];
+        const timeAgo = Math.round((Date.now() - new Date(app.timestamp).getTime()) / 1000);
+        console.log(`📱 [LAST APP IN DATABASE]: "${app.app_name}" | Window: "${app.window_title}" | ${timeAgo}s ago`);
+      } else {
+        console.log('📱 [LAST APP IN DATABASE]: No app data found');
+      }
+      
+      if (lastUrl && lastUrl.length > 0) {
+        const url = lastUrl[0];
+        const timeAgo = Math.round((Date.now() - new Date(url.timestamp).getTime()) / 1000);
+        console.log(`🌐 [LAST URL IN DATABASE]: "${url.site_url || 'null'}" | Domain: "${url.domain}" | Browser: "${url.browser}" | ${timeAgo}s ago`);
+      } else {
+        console.log('🌐 [LAST URL IN DATABASE]: No URL data found');
+      }
+      
+      console.log('📊 ================================================================');
+      
+    } catch (error) {
+      console.log('❌ [DATABASE STATUS] Error querying last detected data:', error.message);
+    }
+  }, 30000); // Every 30 seconds
+  
+  console.log('📊 [DATABASE STATUS] Periodic status reporting started (every 30s)');
+}
+
+// Initialize performance mode based on system capabilities
+console.log('🎛️ Initializing performance optimization...');
+autoDetectPerformanceMode();
+console.log(`📊 Performance mode: ${getCurrentMode()}`);
+console.log('📋 Current intervals:', getAllIntervals());
+
 // Initialize Supabase client - prioritize service key for admin operations
 const supabase = config.supabase_service_key ? 
   createClient(config.supabase_url, config.supabase_service_key) :
@@ -180,6 +243,10 @@ let lastMouseLogTime = 0;
 let lastKeyboardLogTime = 0;
 let lastAppCaptureLogTime = 0;
 let lastUrlCaptureLogTime = 0;
+
+// CRITICAL FIX: Add memory safety mutex for timer operations
+let timerMutex = false;
+let screenshotBuffer = null; // Track screenshot buffer for cleanup
 
 // Permission dialog tracking
 let permissionDialogShown = false;
@@ -327,11 +394,16 @@ function simulateKeyboardActivity() {
   activityStats.keystrokes++;
   lastActivity = Date.now();
   
-  // TRULY EVENT-DRIVEN: Trigger app and URL capture on user activity
-  if (global.captureActiveApp) {
+  // PERFORMANCE-OPTIMIZED EVENT-DRIVEN: Throttle app and URL capture to avoid excessive calls
+  const now = Date.now();
+  
+  // Only trigger captures if enough time has passed (centralized throttling)
+  if (global.captureActiveApp && (now - lastAppCaptureLogTime) > getInterval('APP_CAPTURE_THROTTLE')) {
+    lastAppCaptureLogTime = now;
     global.captureActiveApp();
   }
-  if (global.captureActiveUrl) {
+  if (global.captureActiveUrl && (now - lastUrlCaptureLogTime) > getInterval('URL_CAPTURE_THROTTLE')) {
+    lastUrlCaptureLogTime = now;
     global.captureActiveUrl();
   }
   
@@ -349,11 +421,16 @@ function simulateMouseClick() {
   activityStats.mouseClicks++;
   lastActivity = Date.now();
   
-  // TRULY EVENT-DRIVEN: Trigger app and URL capture on user activity
-  if (global.captureActiveApp) {
+  // PERFORMANCE-OPTIMIZED EVENT-DRIVEN: Throttle app and URL capture to avoid excessive calls
+  const now = Date.now();
+  
+  // Only trigger captures if enough time has passed (centralized throttling)
+  if (global.captureActiveApp && (now - lastAppCaptureLogTime) > getInterval('APP_CAPTURE_THROTTLE')) {
+    lastAppCaptureLogTime = now;
     global.captureActiveApp();
   }
-  if (global.captureActiveUrl) {
+  if (global.captureActiveUrl && (now - lastUrlCaptureLogTime) > getInterval('URL_CAPTURE_THROTTLE')) {
+    lastUrlCaptureLogTime = now;
     global.captureActiveUrl();
   }
   
@@ -715,10 +792,9 @@ function startIdleMonitoring() {
         idleSince: new Date(idleStart)
       });
       
-      // ITEM 3: Auto-pause timer and captures
-      if (isTracking && !isPaused) {
-        pauseTracking('idle_detected');
-      }
+      // ITEM 3: Continue tracking during idle - don't pause completely
+      // Just log the idle state, activity score will naturally decrease
+      console.log('💤 [IDLE] User is idle, but continuing to track apps/URLs. Activity score will decrease gradually.');
       
       // Update UI with idle status
       mainWindow?.webContents.send('idle-status-changed', { 
@@ -729,7 +805,7 @@ function startIdleMonitoring() {
       });
       
       // Show notification
-      showTrayNotification(`Idle detected - tracking paused (${idleTimeSeconds}s idle)`, 'warning');
+      showTrayNotification(`Idle detected - activity score decreasing (${idleTimeSeconds}s idle)`, 'info');
     }
 
     // User became active (stricter detection)
@@ -748,11 +824,8 @@ function startIdleMonitoring() {
       
       idleStart = null;
       
-      // ITEM 3: Auto-resume tracking without asking employee
-      if (isPaused && currentSession) {
-        // Always auto-resume regardless of idle duration - don't interrupt employee
-        resumeTracking();
-      }
+      // ITEM 3: No need to resume tracking since we never paused it
+      console.log('⚡ [ACTIVE] User is active again, activity score will naturally increase to 100%.');
       
       // Update UI
       mainWindow?.webContents.send('idle-status-changed', { 
@@ -762,7 +835,7 @@ function startIdleMonitoring() {
       });
       
       // Show notification
-      showTrayNotification(`Activity resumed after ${Math.floor(idleDurationSeconds/60)}m ${idleDurationSeconds%60}s`, 'success');
+      showTrayNotification(`Activity resumed - score back to 100% after ${Math.floor(idleDurationSeconds/60)}m ${idleDurationSeconds%60}s`, 'success');
     }
 
     // Update idle accumulator for current session
@@ -785,7 +858,7 @@ function startIdleMonitoring() {
     // Send activity stats to UI
     mainWindow?.webContents.send('activity-stats-updated', activityStats);
 
-  }, 1000); // Check every second for precise tracking
+  }, getInterval('IDLE_CHECK')); // Centralized interval configuration
 }
 
 function startMouseTracking() {
@@ -814,7 +887,7 @@ function startMouseTracking() {
         );
         
         // Only count significant movements (> 5 pixels)
-        if (distance > 5) {
+                  if (distance > 5) {
           activityStats.mouseMovements++;
           movementThisSession++;
           lastActivity = now;
@@ -829,6 +902,9 @@ function startMouseTracking() {
             activityStats.mouseClicks++;
             // Mouse activity logging disabled for performance
         // console.log('🖱️ Mouse activity detected'); // Disabled
+            
+            // Call simulateMouseClick for event-driven capture (with throttling)
+            simulateMouseClick();
             
             if (antiCheatDetector) {
               antiCheatDetector.recordActivity('mouse_click', {
@@ -846,7 +922,8 @@ function startMouseTracking() {
           if (distance < 20 && consecutiveMovements >= 1) {
             // Small movements might indicate clicking
             activityStats.mouseClicks++;
-            // Reduced logging - already handled above
+            // Call simulateMouseClick for event-driven capture (with throttling)
+            simulateMouseClick();
             consecutiveMovements = 0;
           }
         }
@@ -892,7 +969,7 @@ function startMouseTracking() {
     } catch (error) {
       console.log('⚠️ Mouse tracking error:', error);
     }
-  }, 50); // Check every 50ms for responsive tracking
+  }, getInterval('MOUSE_TRACKING')); // Centralized interval configuration
 }
 
 function startKeyboardTracking() {
@@ -920,6 +997,9 @@ function startKeyboardTracking() {
           // Keyboard activity logging disabled for performance
       // console.log('⌨️ Keyboard activity detected'); // Disabled
           
+          // Call simulateKeyboardActivity for event-driven capture (with throttling)
+          simulateKeyboardActivity();
+          
           if (antiCheatDetector) {
             antiCheatDetector.recordActivity('keyboard', {
               timestamp: now,
@@ -934,14 +1014,15 @@ function startKeyboardTracking() {
       if (currentIdle < 500 && now - lastKeyboardActivity > 3000) {
         activityStats.keystrokes++;
         lastKeyboardActivity = now;
-        // Reduced logging - already handled above
+        // Call simulateKeyboardActivity for event-driven capture (with throttling)
+        simulateKeyboardActivity();
       }
       
       lastIdleCheck = currentIdle;
     } catch (error) {
       // Ignore keyboard tracking errors
     }
-  }, 1000); // Check every second
+  }, getInterval('KEYBOARD_TRACKING')); // Centralized interval configuration
   
   /* COMMENTED OUT - OLD LOGIC CAUSING CROSS-CONTAMINATION
   if (keyboardTrackingInterval) clearInterval(keyboardTrackingInterval);
@@ -1290,6 +1371,10 @@ function startAppCapture() {
       // Queue for upload
       await syncManager.addAppLogs([appData]);
       console.log(`📱 ✅ App captured: ${appData.app_name} - ${appData.window_title}`);
+      
+      // Enhanced database save confirmation for debug console
+      console.log(`✅ [APP-CAPTURE] 🗄️ SAVED TO DATABASE: "${appData.app_name}" | Window: "${appData.window_title}" | Time: ${new Date().toLocaleTimeString()}`);
+      console.log(`📊 [LAST APP DETECTED & SAVED]: App="${appData.app_name}" | Category="${appData.category || 'core'}" | User: ${appData.user_id} | TimeLog: ${appData.time_log_id}`);
       
       // Reset failure count on success
       appCaptureFailureCount = 0;
@@ -1642,6 +1727,10 @@ async function processFoundUrl(urlData) {
     // Queue for upload
     await syncManager.addUrlLogs([urlLog]);
     console.log(`✅ [URL-CAPTURE] 🚀 Successfully captured: ${urlLog.domain} from ${urlLog.browser} (${urlData.isActive ? 'focused' : 'background'})`);
+    
+    // Enhanced database save confirmation for debug console
+    console.log(`✅ [URL-CAPTURE] 🗄️ SAVED TO DATABASE: "${urlLog.site_url}" | Domain: "${urlLog.domain}" | Browser: "${urlLog.browser}" | Time: ${new Date().toLocaleTimeString()}`);
+    console.log(`📊 [LAST URL DETECTED & SAVED]: URL="${urlLog.site_url}" | Title="${urlLog.title}" | User: ${urlLog.user_id} | TimeLog: ${urlLog.time_log_id}`);
     
     // Reset failure count on success
     urlCaptureFailureCount = 0;
@@ -2050,6 +2139,11 @@ async function captureScreenshot() {
     // Add small delay to allow app switching to complete
     await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
     
+    // CRITICAL FIX: Clean up previous screenshot buffer
+    if (screenshotBuffer) {
+      screenshotBuffer = null;
+    }
+    
     // Try Electron's desktopCapturer first (better for Electron apps)
     let img;
     try {
@@ -2062,7 +2156,10 @@ async function captureScreenshot() {
         // Get the primary screen
         const primarySource = sources[0];
         img = primarySource.thumbnail.toPNG();
-        console.log(`✅ Screenshot captured using Electron desktopCapturer (${process.platform})`);
+        
+        // CRITICAL FIX: Track buffer for cleanup
+        screenshotBuffer = img;
+        console.log(`✅ Screenshot captured using Electron desktopCapturer (${process.platform}), size: ${img.length} bytes`);
       } else {
         throw new Error('No screen sources available');
       }
@@ -2078,7 +2175,20 @@ async function captureScreenshot() {
         quality: appSettings.screenshot_quality,
         ...platformOptions
       });
-      console.log(`✅ Screenshot captured using screenshot-desktop (${process.platform})`);
+      
+      // CRITICAL FIX: Track buffer for cleanup
+      screenshotBuffer = img;
+      console.log(`✅ Screenshot captured using screenshot-desktop (${process.platform}), size: ${img.length} bytes`);
+    }
+    
+    // CRITICAL FIX: Validate buffer before proceeding
+    if (!img || img.length === 0) {
+      throw new Error('Invalid screenshot buffer');
+    }
+    
+    // CRITICAL FIX: Check for excessive memory usage
+    if (img.length > 50 * 1024 * 1024) { // 50MB limit
+      console.warn(`⚠️ Large screenshot detected: ${Math.round(img.length / 1024 / 1024)}MB`);
     }
     
     // Calculate activity metrics from recent activity
@@ -2295,7 +2405,7 @@ function getScreenshotStopReason() {
   if (consecutiveScreenshotFailures >= MAX_SCREENSHOT_FAILURES) {
     return {
       reason: 'consecutive_failures',
-      message: `Screenshots are mandatory for time tracking. ${consecutiveScreenshotFailures} consecutive failures detected. Please ensure your laptop is open and screen recording permissions are granted.`
+      message: `Screenshot capture failed 3 consecutive times. Screenshots disabled, but app/URL tracking continues. Please check screen recording permissions.`
     };
   }
   
@@ -2322,90 +2432,46 @@ function getScreenshotStopReason() {
 }
 
 function calculateActivityPercent() {
-  // FIXED: Enhanced activity calculation with proper scaling
   const now = Date.now();
-  const timeSinceReset = now - activityStats.lastReset;
-  const timeSinceResetMinutes = timeSinceReset / (1000 * 60);
   const timeSinceLastActivity = now - lastActivity;
-  
-  // If no time has passed since reset, return 0
-  if (timeSinceResetMinutes <= 0) {
-    return 0;
-  }
-  
-  // Base activity calculation with more realistic weights
-  const mouseClickWeight = 5;   // Each click is worth 5 points
-  const keystrokeWeight = 3;    // Each keystroke is worth 3 points  
-  const movementWeight = 0.1;   // Each movement is worth 0.1 points
-  
-  const totalActivity = (activityStats.mouseClicks * mouseClickWeight) + 
-                       (activityStats.keystrokes * keystrokeWeight) + 
-                       (activityStats.mouseMovements * movementWeight);
-  
-  // Time-based scaling: normalize activity per minute
-  const activityPerMinute = totalActivity / timeSinceResetMinutes;
-  
-  // FIXED: More realistic baseline for 100% activity with gradual scaling
-  // Lower baseline for more gradual progression
-  const expectedActivityPerMinute = 75; // Reduced from 150 for more gradual scores
-  let activityPercent = Math.min(100, Math.max(0, (activityPerMinute / expectedActivityPerMinute) * 100));
-  
-  // === ENHANCED ACTIVITY DECAY SYSTEM ===
-  // Apply gradual activity decay during idle periods
   const currentIdleTime = calculateIdleTimeSeconds();
   const idleThreshold = appSettings.idle_threshold_seconds || 60; // 1 minute default
   
+  // ✅ IMMEDIATE 100% ON ACTIVITY - User requested this behavior
+  // If user has been active within the last 10 seconds, immediately show 100%
+  if (timeSinceLastActivity < 10000) { // Last 10 seconds
+    return 100;
+  }
+  
+  // ✅ GRADUAL DECREASE ON IDLE - User requested this behavior
+  // Apply gradual decay during idle periods  
   if (currentIdleTime > idleThreshold) {
-    // User is idle - apply GRADUAL decay instead of binary reduction
     const idleMinutes = currentIdleTime / 60;
-    let decayMultiplier = 1;
+    let activityPercent = 100; // Start from 100%
     
-    // FIXED: Gradual decay curves for more realistic productivity scores
-    if (idleMinutes > 1) decayMultiplier = 0.9;   // 90% after 1 minute idle
-    if (idleMinutes > 2) decayMultiplier = 0.8;   // 80% after 2 minutes idle  
-    if (idleMinutes > 3) decayMultiplier = 0.7;   // 70% after 3 minutes idle
-    if (idleMinutes > 4) decayMultiplier = 0.6;   // 60% after 4 minutes idle
-    if (idleMinutes > 5) decayMultiplier = 0.5;   // 50% after 5 minutes idle
-    if (idleMinutes > 7) decayMultiplier = 0.4;   // 40% after 7 minutes idle
-    if (idleMinutes > 10) decayMultiplier = 0.3;  // 30% after 10 minutes idle
-    if (idleMinutes > 15) decayMultiplier = 0.2;  // 20% after 15 minutes idle
-    if (idleMinutes > 20) decayMultiplier = 0.1;  // 10% after 20 minutes idle
-    if (idleMinutes > 30) decayMultiplier = 0;    // 0% after 30 minutes idle
-    
-    const activityBeforeDecay = activityPercent;
-    activityPercent = Math.round(activityPercent * decayMultiplier);
+    // GRADUAL decay curves - exactly as user requested
+    if (idleMinutes > 1) activityPercent = 90;   // 90% after 1 minute idle
+    if (idleMinutes > 2) activityPercent = 80;   // 80% after 2 minutes idle  
+    if (idleMinutes > 3) activityPercent = 70;   // 70% after 3 minutes idle
+    if (idleMinutes > 4) activityPercent = 60;   // 60% after 4 minutes idle
+    if (idleMinutes > 5) activityPercent = 50;   // 50% after 5 minutes idle
+    if (idleMinutes > 7) activityPercent = 40;   // 40% after 7 minutes idle
+    if (idleMinutes > 10) activityPercent = 30;  // 30% after 10 minutes idle
+    if (idleMinutes > 15) activityPercent = 20;  // 20% after 15 minutes idle
+    if (idleMinutes > 20) activityPercent = 10;  // 10% after 20 minutes idle
+    if (idleMinutes > 30) activityPercent = 0;   // 0% after 30 minutes idle
     
     // Only log occasionally to avoid spam
     if (Date.now() - (activityStats.lastIdleLog || 0) > 30000) { // Every 30 seconds
-      console.log('💤 GRADUAL ACTIVITY DECAY:', {
-        idle_minutes: Math.round(idleMinutes * 10) / 10,
-        idle_threshold: idleThreshold,
-        decay_multiplier: decayMultiplier,
-        activity_before: activityBeforeDecay,
-        activity_after: activityPercent,
-        user_status: 'GRADUAL_IDLE_REDUCTION'
-      });
+      console.log(`💤 ACTIVITY DECAY: ${Math.round(idleMinutes * 10) / 10}min idle → ${activityPercent}%`);
       activityStats.lastIdleLog = Date.now();
     }
-  } else {
-    // User is active - apply recency bonus for very recent activity
-    if (timeSinceLastActivity < 30000) { // Within last 30 seconds
-      const recencyBonus = Math.max(0, 1 - (timeSinceLastActivity / 30000)); // 0-1 multiplier
-      activityPercent = Math.min(100, activityPercent * (1 + recencyBonus * 0.2)); // Up to 20% bonus
-    }
     
-    // Ensure we show gradual activity progression instead of binary results
-    if (totalActivity > 0 && activityPercent < 5) {
-      activityPercent = Math.max(5, activityPercent); // Minimum 5% for any activity
-    }
-    
-    // Add base activity floor for recent input
-    if (timeSinceLastActivity < 10000) { // Last 10 seconds
-      activityPercent = Math.max(10, activityPercent); // Minimum 10% for very recent activity
-    }
+    return activityPercent;
   }
   
-  return Math.round(activityPercent);
+  // Default to 100% for any recent activity (within idle threshold)
+  return 100;
 }
 
 function calculateIdleTimeSeconds() {
@@ -2534,7 +2600,7 @@ function startNotificationChecking() {
   
   notificationInterval = setInterval(async () => {
     await checkNotifications();
-  }, appSettings.notification_frequency_seconds * 1000);
+  }, getInterval('NOTIFICATIONS'));
 }
 
 function stopNotificationChecking() {
@@ -2805,27 +2871,19 @@ function startMandatoryScreenshotMonitoring() {
       isTracking: isTracking
     });
     
-    // Check if we should stop tracking due to screenshot failures
+    // Check if we should stop screenshots (but continue tracking) due to screenshot failures
     const shouldStop = checkScreenshotStopConditions();
     if (shouldStop) {
       const { reason, message } = getScreenshotStopReason();
-      console.log(`🛑 [MANDATORY-CHECK] STOPPING TRACKING: ${reason}`);
+      console.log(`🛑 [MANDATORY-CHECK] STOPPING SCREENSHOTS AFTER 3 ATTEMPTS: ${reason}`);
       
-      // Force stop tracking
-      await stopTracking();
+      // Only stop screenshot capture after 3 consecutive failures, keep tracking apps/URLs
+      stopScreenshotCapture();
       
-      showTrayNotification(message, 'error');
+      showTrayNotification(`Screenshots disabled after 3 failed attempts. App/URL tracking continues.`, 'warning');
       
-      // Show detailed notification
-      try {
-        new Notification({
-          title: 'TimeFlow - Screenshot Requirement Failed',
-          body: message
-        }).show();
-      } catch (e) {
-        console.log('⚠️ Could not show screenshot failure notification:', e);
-      }
-      return; // Exit after stopping
+      console.log('✅ [MANDATORY-CHECK] App and URL tracking continues normally after screenshot failures');
+      return; // Exit after stopping screenshots only
     }
     
     // Warn at 12 minutes (3 minutes before mandatory stop at 15 minutes)
@@ -2837,7 +2895,7 @@ function startMandatoryScreenshotMonitoring() {
       );
     }
     
-  }, 30 * 1000); // Check every 30 seconds for faster response
+  }, getInterval('SCREENSHOT_MONITORING')); // Centralized interval configuration
   
   console.log('✅ [MANDATORY] Enhanced screenshot monitoring started (checking every 30 seconds)');
 }
@@ -4071,14 +4129,14 @@ ipcMain.handle('get-stats', () => {
         info: `Last activity: ${Math.floor((now - lastActivity) / 1000)}s ago`
       },
       apps: {
-        status: isTracking ? 'active' : 'inactive',
+        status: isTracking && lastAppCaptureTime ? 'active' : (isTracking ? 'inactive' : 'stopped'),
         lastUpdate: lastAppCaptureTime ? new Date(lastAppCaptureTime).getTime() : now,
-        info: isTracking ? (lastAppCaptureTime ? `Last: ${new Date(lastAppCaptureTime).toLocaleTimeString()}` : 'Running every 15s') : 'Stopped'
+        info: isTracking ? (lastAppCaptureTime ? `Last: ${new Date(lastAppCaptureTime).toLocaleTimeString()} (Event-driven)` : 'Event-driven - triggers on user activity') : 'Stopped'
       },
       urls: {
-        status: isTracking ? 'active' : 'inactive', 
+        status: isTracking && lastUrlCaptureTime ? 'active' : (isTracking ? 'inactive' : 'stopped'), 
         lastUpdate: lastUrlCaptureTime ? new Date(lastUrlCaptureTime).getTime() : now,
-        info: isTracking ? (lastUrlCaptureTime ? `Last: ${new Date(lastUrlCaptureTime).toLocaleTimeString()}` : 'Running every 15s') : 'Stopped'
+        info: isTracking ? (lastUrlCaptureTime ? `Last: ${new Date(lastUrlCaptureTime).toLocaleTimeString()} (Event-driven)` : 'Event-driven - triggers on browser usage') : 'Stopped'
       },
       anticheat: {
         status: antiCheatDetector ? 'active' : 'error',
@@ -4208,6 +4266,11 @@ function handleSystemResume() {
 
 // System shutdown handler
 function handleSystemShutdown() {
+  console.log('🔴 System shutdown detected');
+  
+  // CRITICAL FIX: Force memory cleanup before shutdown
+  emergencyMemoryCleanup();
+  
   if (isTracking) {
     console.log('🛑 Stopping tracking due to system shutdown');
     stopTracking();
@@ -4220,53 +4283,123 @@ function handleSystemShutdown() {
   clearAllIntervals();
 }
 
+// CRITICAL FIX: Emergency memory cleanup function
+function emergencyMemoryCleanup() {
+  console.log('🚨 Emergency memory cleanup started');
+  
+  try {
+    // Clean up screenshot buffer
+    if (screenshotBuffer) {
+      console.log(`🧹 Cleaning up screenshot buffer (${screenshotBuffer.length} bytes)`);
+      screenshotBuffer = null;
+    }
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+      console.log('🗑️ Forced garbage collection');
+    }
+    
+    // Clear large objects
+    if (typeof lastBrowserUrls !== 'undefined') {
+      lastBrowserUrls.clear();
+    }
+    if (typeof lastUrlCapturesByBrowser !== 'undefined') {
+      lastUrlCapturesByBrowser.clear();
+    }
+    
+    // Clear activity stats if large
+    if (activityStats && Object.keys(activityStats).length > 1000) {
+      activityStats = {
+        mouseClicks: 0,
+        keystrokes: 0,
+        mouseMovements: 0,
+        screenshotsCaptured: 0,
+        lastScreenshotTime: 0,
+        suspiciousEvents: 0
+      };
+    }
+    
+    console.log('✅ Emergency memory cleanup completed');
+  } catch (error) {
+    console.error('❌ Emergency cleanup failed:', error);
+  }
+}
+
 // Clear all intervals and timeouts
 function clearAllIntervals() {
+  // CRITICAL FIX: Prevent race conditions with mutex
+  if (timerMutex) {
+    console.log('⚠️ Timer operations in progress, deferring cleanup');
+    setTimeout(() => clearAllIntervals(), 100);
+    return;
+  }
+  
+  timerMutex = true;
   console.log('🧹 Clearing all intervals and timeouts');
   
-  if (screenshotInterval) {
-    clearTimeout(screenshotInterval);
-    screenshotInterval = null;
-  }
-  
-  if (activityInterval) {
-    clearInterval(activityInterval);
-    activityInterval = null;
-  }
-  
-  if (idleCheckInterval) {
-    clearInterval(idleCheckInterval);
-    idleCheckInterval = null;
-  }
-  
-  if (appCaptureInterval) {
-    clearInterval(appCaptureInterval);
-    appCaptureInterval = null;
-  }
-  
-  if (urlCaptureInterval) {
-    clearInterval(urlCaptureInterval);
-    urlCaptureInterval = null;
-  }
-  
-  if (settingsInterval) {
-    clearInterval(settingsInterval);
-    settingsInterval = null;
-  }
-  
-  if (notificationInterval) {
-    clearInterval(notificationInterval);
-    notificationInterval = null;
-  }
-  
-  if (mouseTrackingInterval) {
-    clearInterval(mouseTrackingInterval);
-    mouseTrackingInterval = null;
-  }
-  
-  if (keyboardTrackingInterval) {
-    clearInterval(keyboardTrackingInterval);
-    keyboardTrackingInterval = null;
+  try {
+    if (screenshotInterval) {
+      clearTimeout(screenshotInterval);
+      screenshotInterval = null;
+    }
+    
+    if (activityInterval) {
+      clearInterval(activityInterval);
+      activityInterval = null;
+    }
+    
+    if (idleCheckInterval) {
+      clearInterval(idleCheckInterval);
+      idleCheckInterval = null;
+    }
+    
+    if (appCaptureInterval) {
+      clearInterval(appCaptureInterval);
+      appCaptureInterval = null;
+    }
+    
+    if (urlCaptureInterval) {
+      clearInterval(urlCaptureInterval);
+      urlCaptureInterval = null;
+    }
+    
+    if (settingsInterval) {
+      clearInterval(settingsInterval);
+      settingsInterval = null;
+    }
+    
+    if (notificationInterval) {
+      clearInterval(notificationInterval);
+      notificationInterval = null;
+    }
+    
+    if (mouseTrackingInterval) {
+      clearInterval(mouseTrackingInterval);
+      mouseTrackingInterval = null;
+    }
+    
+    if (keyboardTrackingInterval) {
+      clearInterval(keyboardTrackingInterval);
+      keyboardTrackingInterval = null;
+    }
+    
+    // CRITICAL FIX: Missing mandatory screenshot interval cleanup
+    if (mandatoryScreenshotInterval) {
+      clearInterval(mandatoryScreenshotInterval);
+      mandatoryScreenshotInterval = null;
+    }
+    
+    // CRITICAL FIX: Clean up screenshot buffer
+    if (screenshotBuffer) {
+      screenshotBuffer = null;
+    }
+    
+    console.log('✅ All intervals cleared safely');
+  } catch (error) {
+    console.error('❌ Error clearing intervals:', error);
+  } finally {
+    timerMutex = false;
   }
 }
 
@@ -4426,13 +4559,16 @@ if (!isElectronContext) {
         console.log('⚠️ No user_id found - URL capture may not work properly');
       }
       
-      console.log('✅ TimeFlow Desktop Agent running in Node.js mode');
-      console.log('📊 Monitoring app and URL activity...');
+        console.log('✅ TimeFlow Desktop Agent running in Node.js mode');
+  console.log('📊 Monitoring app and URL activity...');
+  
+  // Start periodic database status reporting
+  startDatabaseStatusReporting();
       
       // Keep the process alive
       setInterval(() => {
         // Just keep alive, monitoring happens in background
-      }, 30000);
+      }, getInterval('NODEJS_KEEPALIVE'));
       
     } catch (error) {
       console.error('❌ Failed to initialize Node.js mode:', error);
