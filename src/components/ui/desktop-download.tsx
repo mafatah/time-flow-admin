@@ -125,11 +125,11 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     // Use GitHub releases for reliable downloads - Updated automatically by release pipeline
     const currentVersion = "1.0.34"; // v1.0.34 - Cache bust: 202506242000
     const downloadFiles = {
-      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`,
+      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`, // NOT AVAILABLE in v1.0.34
       'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED
       'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-ARM64.dmg`, // SIGNED & NOTARIZED
       'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-ARM64.dmg`, // Default to ARM64 for modern Macs
-      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Linux.AppImage`
+      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Linux.AppImage` // NOT AVAILABLE in v1.0.34
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];
@@ -148,6 +148,22 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       });
     }
     
+    // Check if platform is available in v1.0.34
+    if (platform === 'windows' || platform === 'linux') {
+      setNotification({
+        platform: getOSName(platform),
+        filename: `${getOSName(platform)} version coming soon in next release`,
+        size: '',
+        show: true
+      });
+      setDownloading(null);
+      
+      setTimeout(() => {
+        setNotification(prev => prev ? { ...prev, show: false } : null);
+      }, 5000);
+      return;
+    }
+
     if (filePath) {
       try {
         // Verify file integrity before download
