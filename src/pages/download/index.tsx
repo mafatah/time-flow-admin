@@ -24,7 +24,7 @@ interface DownloadItem {
 }
 
 const DownloadPage = () => {
-  const version = "v1.0.34"; // Updated automatically by release pipeline
+  const version = "v1.0.36"; // Updated automatically by release pipeline
   const releaseDate = new Date().toLocaleDateString(); // Force deploy v1.0.34
   
   const downloads: DownloadItem[] = [
@@ -34,7 +34,7 @@ const DownloadPage = () => {
       description: "For M1, M2, M3 Macs",
       filename: `TimeFlow-${version}-ARM64.dmg`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-ARM64.dmg`,
-      size: "~112 MB",
+      size: "~121 MB",
       requirements: "macOS 11.0+",
       verified: true
     },
@@ -44,7 +44,7 @@ const DownloadPage = () => {
       description: "For Intel-based Macs",
       filename: `TimeFlow-${version}-Intel.dmg`,
       url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Intel.dmg`,
-      size: "~118 MB",
+      size: "~127 MB",
       requirements: "macOS 10.14+",
       verified: true
     },

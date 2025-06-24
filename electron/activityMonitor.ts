@@ -152,7 +152,7 @@ export async function startActivityMonitoring(userId: string) {
     keystrokes: 0,
     mouse_movements: 0,
     last_activity_time: Date.now(),
-    activity_score: 100  // Start with 100% activity score that can decay
+    activity_score: 0  // Start with 0% activity score that increases with activity
   };
 
   // Fetch settings from server first
@@ -398,6 +398,18 @@ async function trackActivityMetrics() {
     const currentIdleTime = calculateIdleTimeSeconds();
     const idleThreshold = appSettings.idle_threshold_seconds; // Use production threshold (300 seconds)
     const isCurrentlyIdle = currentIdleTime >= idleThreshold;
+    
+    // PRODUCTION FIX: Proper activity scoring based on real idle time
+    if (!isCurrentlyIdle) {
+      // User is active - increase activity score
+      const activityBoost = Math.min(10, 100 - activityMetrics.activity_score);
+      activityMetrics.activity_score = Math.min(100, activityMetrics.activity_score + activityBoost);
+      safeLog('✅ ACTIVITY BOOST:', {
+        idle_time: currentIdleTime,
+        boost: activityBoost,
+        new_score: activityMetrics.activity_score
+      });
+    }
   
     // === ENHANCED DEBUGGING FOR DECAY LOGIC ===
     safeLog('🔍 DECAY LOGIC DEBUG:', {
@@ -986,74 +998,53 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
   }
 }
 
+// PRODUCTION FIX: Enhanced app detection for macOS
 async function getCurrentAppName(): Promise<string> {
   try {
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    
-    try {
-      if (process.platform === 'win32') {
-        // Windows implementation using PowerShell
-        const { stdout } = await execAsync(`powershell "Get-Process | Where-Object {$_.MainWindowTitle -ne ''} | Select-Object -First 1 ProcessName | ForEach-Object {$_.ProcessName}"`);
-        const appName = stdout.trim();
-        return appName || 'System Application';
-      } else if (process.platform === 'darwin') {
-        // macOS implementation using AppleScript - enhanced with timeout and multiple methods
+    if (process.platform === 'darwin') {
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      
+      // Use multiple detection methods
+      const methods = [
+        'osascript -e "tell application \"System Events\" to get name of first application process whose frontmost is true"',
+        'osascript -e "tell application \"System Events\" to get displayed name of first application process whose frontmost is true"'
+      ];
+      
+      for (const method of methods) {
         try {
-          // Method 1: Direct AppleScript (removed timeout for macOS compatibility)
-          const { stdout, stderr } = await execAsync(`osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true'`);
-          
-          if (stderr) {
-            safeLog('🔧 [APP-NAME] AppleScript stderr:', stderr.substring(0, 100));
-          }
-          
-          const appName = stdout && typeof stdout === 'string' ? stdout.trim() : '';
-          
-          if (appName && appName !== '' && !appName.includes('error') && !appName.includes('timeout')) {
-            safeLog('✅ [APP-NAME] Success:', appName);
+          const { stdout } = await execAsync(method);
+          const appName = stdout.trim();
+          if (appName && appName !== 'Ebdaa Work Time' && appName !== 'TimeFlow') {
+            safeLog('✅ App detected:', appName);
             return appName;
           }
-          
-          // Method 2: Alternative AppleScript syntax
-          const { stdout: stdout2 } = await execAsync(`osascript -e 'tell application "System Events" to name of (first process whose frontmost is true)'`);
-          const appName2 = stdout2 && typeof stdout2 === 'string' ? stdout2.trim() : '';
-          
-          if (appName2 && appName2 !== '' && !appName2.includes('error')) {
-            safeLog('✅ [APP-NAME] Alternative method success:', appName2);
-            return appName2;
+        } catch (e) {
+          continue;
+        }
+      }
+      
+      // Fallback to active-win library
+      try {
+        const activeWin = require('active-win');
+        const activeWindow = await activeWin();
+        if (activeWindow && activeWindow.owner && activeWindow.owner.name) {
+          const appName = activeWindow.owner.name;
+          if (appName !== 'Ebdaa Work Time' && appName !== 'TimeFlow') {
+            safeLog('✅ App detected via active-win:', appName);
+            return appName;
           }
-          
-          // Method 3: Use lsappinfo as fallback (correct path) - skip for now since it doesn't provide app names
-          // const { stdout: stdout3 } = await execAsync(`lsappinfo front`);
-          // lsappinfo doesn't actually return app names, so skip this method
-          
-        } catch (appleScriptError) {
-          safeLog('⚠️ [APP-NAME] All AppleScript methods failed:', (appleScriptError as Error).message?.substring(0, 200));
         }
-        
-        return 'System Application';
-      } else if (process.platform === 'linux') {
-        // Linux implementation using xdotool or wmctrl
-        try {
-          const { stdout } = await execAsync(`xdotool getactivewindow getwindowname 2>/dev/null || wmctrl -a $(wmctrl -l | head -1 | cut -d' ' -f1) 2>/dev/null || echo "System Application"`);
-          const appName = stdout.trim();
-          return appName || 'System Application';
-        } catch {
-          return 'System Application';
-        }
-      } else {
-        return 'System Application';
+      } catch (e) {
+        safeLog('❌ Active-win fallback failed:', e);
       }
-    } catch (error) {
-      // Only log occasionally to reduce spam
-      if (Math.random() < 0.01) { // Log only 1% of the time
-        safeLog('⚠️ App detection failed occasionally, using System Application');
-      }
-      return 'System Application';
     }
+    
+    return 'Unknown Application';
   } catch (error) {
-    return 'System Application';
+    safeLog('❌ App detection failed:', error);
+    return 'Unknown Application';
   }
 }
 
@@ -1129,6 +1120,11 @@ async function getCurrentURL(): Promise<string | undefined> {
     const appName = await getCurrentAppName();
     const windowTitle = await getCurrentWindowTitle();
     
+    // Declare exec utilities at the top to avoid scoping issues
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    
     // Check if it's actually a browser - improved detection
     const browsers = ['Google Chrome', 'Safari', 'Firefox', 'Microsoft Edge', 'Arc', 'chrome', 'firefox', 'msedge'];
     const isBrowser = browsers.some(browser => appName.toLowerCase().includes(browser.toLowerCase()));
@@ -1150,15 +1146,40 @@ async function getCurrentURL(): Promise<string | undefined> {
       return undefined;
     }
 
+    // PRODUCTION FIX: Enhanced URL detection for macOS
+    if (process.platform === 'darwin') {
+      try {
+        // Try multiple AppleScript approaches
+        const scripts = [
+          'tell application "System Events" to get name of first application process whose frontmost is true',
+          'tell application "Google Chrome" to get URL of active tab of front window',
+          'tell application "Safari" to get URL of front document'
+        ];
+        
+        for (const script of scripts) {
+          try {
+            const result = await execAsync(`osascript -e '${script}'`);
+            if (result.stdout && result.stdout.trim()) {
+              const output = result.stdout.trim();
+              if (output.startsWith('http')) {
+                safeLog('✅ URL detected via AppleScript:', output);
+                return output;
+              }
+            }
+          } catch (e) {
+            // Continue to next script
+          }
+        }
+      } catch (error) {
+        safeLog('❌ AppleScript URL detection failed:', error);
+      }
+    }
+    
     safeLog('🌐 [URL-EXTRACTION] Attempting URL extraction:', {
       appName,
       windowTitle: windowTitle?.substring(0, 100) + '...',
       isBrowser
     });
-
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
     
     try {
       let script = '';
@@ -1337,6 +1358,11 @@ async function trackCurrentApp() {
   try {
     safeLog('🔍 [TRACK-APP] Starting app detection...');
     
+    // Declare exec utilities for URL fallback
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    
     // Get current active application with timeout and error handling
     const appName = await getCurrentAppName();
     const windowTitle = await getCurrentWindowTitle();
@@ -1414,9 +1440,7 @@ async function trackCurrentApp() {
       // If AppleScript failed but we know it's Chrome, try to extract URL manually
       safeLog('🔄 [URL-FALLBACK] Chrome detected but no URL, trying external script...');
       try {
-        const { exec } = require('child_process');
-        const { promisify } = require('util');
-        const execAsync = promisify(exec);
+        // execAsync already declared at function scope
         const result = await execAsync(`osascript -e 'tell application "Google Chrome" to get URL of active tab of front window'`);
         if (result.stdout && result.stdout.trim().startsWith('http')) {
           finalURL = result.stdout.trim();

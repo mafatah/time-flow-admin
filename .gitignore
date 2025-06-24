@@ -121,4 +121,10 @@ build/**/env-config.js
 # Development Scripts with Credentials
 temp_env_source.js
 setup-idle-logs-remote.js
-create-idle-logs-table.js
+create-idle-logs-table.js# Exclude release binaries from git
+TimeFlow-v*.dmg
+TimeFlow-v*.exe
+TimeFlow-v*.AppImage
+*.dmg
+*.exe
+*.AppImage

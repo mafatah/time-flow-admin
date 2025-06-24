@@ -123,7 +123,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     setDownloading(platform);
     
     // Use GitHub releases for reliable downloads - Updated automatically by release pipeline
-    const currentVersion = "1.0.34"; // v1.0.34 - Cache bust: 202506242000
+          const currentVersion = "1.0.36"; // v1.0.36 - Production fixes: 202506242100
     const downloadFiles = {
       windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`,
       'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED
@@ -290,10 +290,10 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '119MB'; // TimeFlow-v1.0.34-ARM64.dmg (UPDATED for v1.0.34)
+        return '121MB'; // TimeFlow-v1.0.36-ARM64.dmg (UPDATED for v1.0.36)
       case 'mac-intel':
       case 'mac':
-        return '125MB'; // TimeFlow-v1.0.34-Intel.dmg (UPDATED for v1.0.34)
+        return '127MB'; // TimeFlow-v1.0.36-Intel.dmg (UPDATED for v1.0.36)
       case 'windows':
         return '91MB'; // TimeFlow-v1.0.34-Setup.exe (UPDATED for v1.0.34)
       case 'linux':

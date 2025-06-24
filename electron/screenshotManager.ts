@@ -59,10 +59,34 @@ export async function captureAndUpload(userId: string, projectId: string) {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
   
+  // PRODUCTION FIX: Enhanced screenshot capture
   const sources = await desktopCapturer.getSources({ 
-    types: ['screen'], 
-    thumbnailSize: { width, height } 
+    types: ['screen', 'window'], // Capture both screen and individual windows
+    thumbnailSize: { width, height },
+    fetchWindowIcons: false // Optimize performance
   });
+
+  // If we have window sources, prefer the active window over screen
+  let selectedSource = sources[0]; // Default to first source
+  if (sources.length > 1) {
+    // Try to find the active window that's not TimeFlow
+    const activeWindow = sources.find(source => 
+      source.name && 
+      !source.name.includes('Ebdaa Work Time') &&
+      !source.name.includes('TimeFlow') &&
+      source.name !== 'Entire Screen'
+    );
+    
+    if (activeWindow) {
+      selectedSource = activeWindow;
+      console.log('📸 Using active window:', activeWindow.name);
+    } else {
+      // Fall back to screen capture
+      const screenSource = sources.find(source => source.name === 'Entire Screen');
+      selectedSource = screenSource || sources[0];
+      console.log('📸 Using screen capture');
+    }
+  }
   
   if (sources.length === 0) {
     const platform = process.platform;
@@ -81,7 +105,7 @@ export async function captureAndUpload(userId: string, projectId: string) {
     return;
   }
 
-  const buffer = sources[0].thumbnail.toPNG();
+  const buffer = selectedSource.thumbnail.toPNG();
   
   // Windows-specific validation for screenshot data
   if (process.platform === 'win32') {
