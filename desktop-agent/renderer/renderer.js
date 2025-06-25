@@ -803,33 +803,24 @@ async function startTracking() {
     }
     
     console.log('🎯 [RENDERER] Final selected project ID:', selectedProjectId);
-    console.log('▶️ [RENDERER] Starting time tracking with project:', selectedProjectId);
+    console.log('🔄 [RENDERER] Calling main process to start tracking...');
     
     try {
-        isTracking = true;
-        trackingStatus = 'active';
-        sessionStartTime = new Date();
-        
-        console.log('🔄 [RENDERER] Local state updated, calling main process...');
-        
-        // Update UI immediately
-        updateTrackingButtons();
-        updateTrackingStatus();
-        
-        // Start session timer
-        startSessionTimer();
-        
-        console.log('📡 [RENDERER] About to call ipcRenderer.invoke with:', {
-            method: 'start-tracking',
-            projectId: selectedProjectId
-        });
-        
         // Notify main process with the selected project ID
         const result = await ipcRenderer.invoke('start-tracking', selectedProjectId);
         
         console.log('✅ [RENDERER] IPC call completed, result:', result);
         
         if (result && result.success) {
+            // ✅ Only mark tracking active after success
+            isTracking = true;
+            trackingStatus = 'active';
+            sessionStartTime = new Date();
+
+            // Update UI
+            updateTrackingButtons();
+            updateTrackingStatus();
+            startSessionTimer();
             console.log('🎉 [RENDERER] Tracking started successfully!');
             showNotification('⏱️ Time tracking started!', 'success');
         } else {
