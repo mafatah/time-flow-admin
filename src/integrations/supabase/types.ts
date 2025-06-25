@@ -1110,6 +1110,42 @@ export type Database = {
           },
         ]
       }
+      system_checks: {
+        Row: {
+          check_type: string
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          status: string | null
+          test_data: Json | null
+          timestamp: string
+          user_agent: string | null
+        }
+        Insert: {
+          check_type: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          status?: string | null
+          test_data?: Json | null
+          timestamp?: string
+          user_agent?: string | null
+        }
+        Update: {
+          check_type?: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          status?: string | null
+          test_data?: Json | null
+          timestamp?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           created_at: string

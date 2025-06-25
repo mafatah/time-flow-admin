@@ -1,11 +1,77 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.checkAccessibilityPermission = checkAccessibilityPermission;
+exports.requestAccessibilityPermission = requestAccessibilityPermission;
 exports.checkScreenRecordingPermission = checkScreenRecordingPermission;
 exports.requestScreenRecordingPermission = requestScreenRecordingPermission;
 exports.ensureScreenRecordingPermission = ensureScreenRecordingPermission;
 exports.testScreenCapture = testScreenCapture;
 const electron_1 = require("electron");
 const errorHandler_1 = require("./errorHandler.cjs");
+async function checkAccessibilityPermission() {
+    if (process.platform !== 'darwin') {
+        console.log('🟢 Not macOS, accessibility permission not required');
+        return true;
+    }
+    console.log('🔍 Checking macOS Accessibility permission...');
+    try {
+        // Check if we have accessibility permission
+        const hasPermission = electron_1.systemPreferences.isTrustedAccessibilityClient(false);
+        if (hasPermission) {
+            console.log('✅ Accessibility permission already granted');
+            return true;
+        }
+        else {
+            console.log('❌ Accessibility permission not granted');
+            return false;
+        }
+    }
+    catch (error) {
+        console.error('❌ Failed to check accessibility permission:', error);
+        (0, errorHandler_1.logError)('checkAccessibilityPermission', error);
+        return false;
+    }
+}
+async function requestAccessibilityPermission() {
+    if (process.platform !== 'darwin') {
+        return true;
+    }
+    console.log('📱 Requesting macOS Accessibility permission...');
+    try {
+        // Request accessibility permission (this will prompt the user)
+        const hasPermission = electron_1.systemPreferences.isTrustedAccessibilityClient(true);
+        if (hasPermission) {
+            console.log('✅ Accessibility permission granted');
+            return true;
+        }
+        else {
+            console.log('❌ Accessibility permission denied or pending');
+            await showAccessibilityPermissionDialog();
+            return false;
+        }
+    }
+    catch (error) {
+        console.error('❌ Failed to request accessibility permission:', error);
+        (0, errorHandler_1.logError)('requestAccessibilityPermission', error);
+        await showAccessibilityPermissionDialog();
+        return false;
+    }
+}
+async function showAccessibilityPermissionDialog() {
+    const result = await electron_1.dialog.showMessageBox({
+        type: 'warning',
+        title: 'Accessibility Permission Required',
+        message: 'TimeFlow needs Accessibility permission to monitor mouse and keyboard activity.',
+        detail: 'Please grant Accessibility permission in System Preferences:\n\n1. Go to System Preferences > Security & Privacy\n2. Click on Privacy tab\n3. Select Accessibility from the list\n4. Check the box next to TimeFlow\n5. You may need to restart the application',
+        buttons: ['Open System Preferences', 'Skip for Now'],
+        defaultId: 0,
+        cancelId: 1
+    });
+    if (result.response === 0) {
+        console.log('🔧 Opening System Preferences for accessibility...');
+        electron_1.shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+    }
+}
 async function checkScreenRecordingPermission() {
     if (process.platform === 'win32') {
         console.log('🔍 Checking Windows Screen Capture capability...');
@@ -69,7 +135,7 @@ async function showPermissionDialog() {
         defaultId: 0,
         cancelId: 1
     });
-    if (result === 0) {
+    if (result.response === 0) {
         console.log('🔧 Opening System Preferences for user...');
         electron_1.shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
     }

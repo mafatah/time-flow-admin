@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startActivityMonitoring = startActivityMonitoring;
 exports.stopActivityMonitoring = stopActivityMonitoring;
+exports.getSystemIdleTime = getSystemIdleTime;
 exports.fetchSettings = fetchSettings;
 exports.triggerActivityCapture = triggerActivityCapture;
 exports.triggerDirectScreenshot = triggerDirectScreenshot;
@@ -16,6 +17,8 @@ exports.setupAppEventHandlers = setupAppEventHandlers;
 exports.getCurrentActivityMetrics = getCurrentActivityMetrics;
 exports.testActivity = testActivity;
 exports.demonstrateEnhancedLogging = demonstrateEnhancedLogging;
+exports.getCurrentAppName = getCurrentAppName;
+exports.getCurrentURL = getCurrentURL;
 const electron_1 = require("electron");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -106,10 +109,10 @@ const MANDATORY_SCREENSHOT_INTERVAL = 15 * 60 * 1000; // 15 minutes in milliseco
 // Always-on activity monitoring - starts when app launches
 async function startActivityMonitoring(userId) {
     if (isMonitoring) {
-        safeLog('🔄 Activity monitoring already running');
+        debugLog('SYSTEM', 'Activity monitoring already running');
         return;
     }
-    safeLog('🚀 Starting always-on activity monitoring for user:', userId);
+    debugLog('SYSTEM', `Starting activity monitoring for user: ${userId}`);
     currentUserId = userId;
     isMonitoring = true;
     lastActivityTime = Date.now();
@@ -487,12 +490,8 @@ async function captureActivityScreenshot() {
     if (!currentUserId || !currentActivitySession)
         return;
     try {
-        safeLog('📸 Capturing activity screenshot...');
-        safeLog('🔍 Screenshot attempt details:', {
-            userId: currentUserId,
-            sessionId: currentActivitySession.id,
-            timestamp: new Date().toISOString()
-        });
+        debugLog('SCREENSHOT', 'Starting screenshot capture...');
+        debugLog('SCREENSHOT', `Session: ${currentActivitySession.id}`);
         // Reduce timeout to 5 seconds and add more detailed error handling
         const screenshotPromise = new Promise(async (resolve, reject) => {
             try {
@@ -555,14 +554,12 @@ async function captureActivityScreenshot() {
             safeLog('✅ Laptop appears to be open again - successful screenshot captured');
             laptopClosedStart = null;
         }
-        // Skip event emission to avoid circular dependency issues with main.ts
-        safeLog('📸 Screenshot capture and upload completed successfully!');
-        safeLog(`📊 Total screenshots this session: ${currentActivitySession?.total_screenshots || 0}`);
+        debugLog('SCREENSHOT', `Screenshot captured successfully! Total: ${currentActivitySession?.total_screenshots || 0}`);
         // Calculate next screenshot time for user information
         const nextScreenshotSeconds = (0, config_1.screenshotIntervalSeconds)();
         const nextMinutes = Math.floor(nextScreenshotSeconds / 60);
         const nextSecondsRemainder = nextScreenshotSeconds % 60;
-        safeLog(`📸 Next screenshot in ${nextMinutes} minutes ${nextSecondsRemainder} seconds`);
+        debugLog('SCREENSHOT', `Next screenshot in ${nextMinutes}m ${nextSecondsRemainder}s`);
     }
     catch (error) {
         consecutiveScreenshotFailures++;
@@ -986,12 +983,7 @@ async function getCurrentURL() {
         // Also check window title for browser indicators if app name is generic
         const browserTitleIndicators = ['google', 'youtube', 'github', 'stackoverflow', 'facebook', 'twitter', 'instagram', 'www.', 'https://', 'http://'];
         const titleIndicatesBrowser = windowTitle && browserTitleIndicators.some(indicator => windowTitle.toLowerCase().includes(indicator.toLowerCase()));
-        safeLog('🔍 [BROWSER-CHECK] Detection:', {
-            appName,
-            isBrowser,
-            titleIndicatesBrowser,
-            willProceed: isBrowser || titleIndicatesBrowser
-        });
+        debugLog('URL', `Browser check: ${appName} | Browser: ${isBrowser} | Title indicates: ${titleIndicatesBrowser}`);
         if (!isBrowser && !titleIndicatesBrowser) {
             return undefined;
         }
@@ -1010,7 +1002,8 @@ async function getCurrentURL() {
                         if (result.stdout && result.stdout.trim()) {
                             const output = result.stdout.trim();
                             if (output.startsWith('http')) {
-                                safeLog('✅ URL detected via AppleScript:', output);
+                                urlCount++;
+                                debugLog('URL', `URL detected via AppleScript: ${output}`);
                                 return output;
                             }
                         }
@@ -1094,11 +1087,12 @@ async function getCurrentURL() {
                 });
                 // Only return valid URLs
                 if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-                    safeLog('✅ [URL-APPLESCRIPT] Successfully extracted:', url);
+                    urlCount++;
+                    debugLog('URL', `URL extracted successfully: ${url}`);
                     return url;
                 }
                 else {
-                    safeLog('⚠️ [APPLESCRIPT] Invalid URL result, trying window title fallback');
+                    debugLog('URL', 'AppleScript failed, trying window title fallback');
                     return extractURLFromWindowTitle(windowTitle);
                 }
             }
@@ -1200,12 +1194,7 @@ async function trackCurrentApp() {
         const appName = await getCurrentAppName();
         const windowTitle = await getCurrentWindowTitle();
         const currentURL = await getCurrentURL();
-        safeLog('🔍 [TRACK-APP] Detection results:', {
-            appName: appName || 'NOT_DETECTED',
-            windowTitle: windowTitle || 'NOT_DETECTED',
-            currentURL: currentURL || 'NO_URL',
-            hasURL: !!currentURL
-        });
+        debugLog('APP', `Detected: ${appName || 'UNKNOWN'} | Title: ${(windowTitle || 'UNKNOWN').substring(0, 50)}${(windowTitle || '').length > 50 ? '...' : ''} | URL: ${currentURL ? 'YES' : 'NO'}`);
         // Validate that we got valid data
         if (!appName || appName === 'Unknown Application') {
             safeLog('⚠️ Could not detect valid app name, skipping app tracking');
@@ -1257,7 +1246,7 @@ async function trackCurrentApp() {
             }
             currentActivitySession.total_apps++;
             saveActivitySession();
-            safeLog('📱 App activity:', appName, '-', windowTitle, currentURL ? `(${currentURL})` : '');
+            debugLog('APP', `New app activity: ${appName} - ${(windowTitle || '').substring(0, 30)}${currentURL ? ` (${currentURL.substring(0, 50)})` : ''}`);
             // Enhanced URL detection with fallbacks for browsers
             let finalURL = currentURL;
             if (!finalURL && appName.includes('Chrome')) {
@@ -1980,3 +1969,30 @@ function demonstrateEnhancedLogging() {
         });
     }, 3000);
 }
+// Debug logging system for the debug console
+function debugLog(type, message, stats) {
+    safeLog(`[${type}] ${message}`);
+    // Send to debug console if available
+    try {
+        if (appEvents) {
+            appEvents.emit('debug-log', {
+                type,
+                message,
+                stats: stats || getCurrentDebugStats(),
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+    catch (error) {
+        // Silent fail - don't break main functionality
+    }
+}
+function getCurrentDebugStats() {
+    return {
+        screenshots: currentActivitySession?.total_screenshots || 0,
+        apps: currentActivitySession?.total_apps || 0,
+        urls: urlCount,
+        activity: Math.round(activityMetrics.activity_score)
+    };
+}
+let urlCount = 0; // Track URL detections

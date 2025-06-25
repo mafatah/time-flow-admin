@@ -124,12 +124,10 @@ export function initSystemMonitor() {
     
     const session = loadSession();
     if (session) {
-      // Always auto-resume regardless of suspend duration - don't ask employee
-      console.log('🔄 Auto-resuming tracking after system suspend');
-      startTracking();
-      if (session.user_id) {
-        startActivityMonitoring(session.user_id);
-      }
+      console.log('🔄 System resumed - tracking will need to be manually restarted with proper validation');
+      console.log('⚠️  Auto-resume disabled to ensure all components are validated before tracking starts');
+      // NOTE: User must manually start tracking to ensure system validation
+      // This prevents bypassing permission checks and system validation
     }
   });
 

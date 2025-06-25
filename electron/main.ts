@@ -9,7 +9,7 @@ import { setupAutoLaunch } from './autoLaunch';
 import { initSystemMonitor } from './systemMonitor';
 import { startSyncLoop } from './unsyncedManager';
 import { startActivityMonitoring, stopActivityMonitoring, triggerActivityCapture, triggerDirectScreenshot, recordRealActivity, demonstrateEnhancedLogging } from './activityMonitor';
-import { ensureScreenRecordingPermission, testScreenCapture } from './permissionManager';
+import { ensureScreenRecordingPermission, checkScreenRecordingPermission, testScreenCapture } from './permissionManager';
 import { initializeConfig, screenshotIntervalSeconds } from './config';
 // Linux dependency checking is handled in linuxDependencyChecker.ts automatically
 import { EventEmitter } from 'events';
@@ -344,16 +344,16 @@ app.whenReady().then(async () => {
   // Create system tray
   createTray();
   
-  // Request screen recording permission on startup
+  // Check permissions quietly on startup (don't request yet)
   console.log('🚀 App ready, checking permissions...');
-  const hasPermission = await ensureScreenRecordingPermission();
+  const hasPermission = await checkScreenRecordingPermission();
   
   if (hasPermission) {
     // Test screen capture capability
     await testScreenCapture();
     console.log('✅ App ready with screen recording permission');
   } else {
-    console.log('⚠️  App ready but screen recording permission missing');
+    console.log('⚠️ App ready but screen recording permission missing - will request when tracking starts');
   }
   
   // Don't auto-load any config or start any tracking
@@ -458,38 +458,382 @@ ipcMain.handle('user-logged-out', () => {
   return { success: true, message: 'User logged out successfully' };
 });
 
-// Handle tracking start with better response
-ipcMain.handle('start-tracking', (event, projectId) => {
+// Comprehensive system check before starting tracking
+async function performSystemCheck(): Promise<{ success: boolean; issues: string[]; details: any }> {
+  const issues: string[] = [];
+  const details: any = {
+    permissions: {},
+    capabilities: {},
+    tests: {}
+  };
+
+  console.log('🔍 Starting comprehensive system check...');
+
+  try {
+    // 1. Check Screen Recording Permission (both Electron API and actual binary test)
+    console.log('📺 Checking screen recording permission...');
+    const electronAPIPermission = await checkScreenRecordingPermission();
+    
+    // Also test the actual binary that needs permission
+    let binaryCanAccess = false;
+    try {
+      const { spawn } = require('child_process');
+      const path = require('path');
+      const activeWinPath = path.join(__dirname, '../node_modules/active-win/main');
+      
+      const binaryTest = await new Promise((resolve) => {
+        const child = spawn(activeWinPath, [], { timeout: 3000 });
+        let stdout = '';
+        
+        child.stdout?.on('data', (data: any) => {
+          stdout += data.toString();
+        });
+        
+        child.on('close', (code: number | null) => {
+          if (code === 0 && !stdout.includes('screen recording permission')) {
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+        });
+        
+        child.on('error', () => resolve(false));
+      });
+      
+      binaryCanAccess = binaryTest as boolean;
+    } catch (error) {
+      console.log('⚠️ Could not test binary permission:', error);
+    }
+    
+    const actualPermission = electronAPIPermission && binaryCanAccess;
+    details.permissions.screenRecording = actualPermission;
+    details.permissions.electronAPI = electronAPIPermission;
+    details.permissions.binaryAccess = binaryCanAccess;
+    
+    if (!actualPermission) {
+      if (electronAPIPermission && !binaryCanAccess) {
+        issues.push('Screen Recording permission granted to Electron but not accessible to child processes - restart app or re-grant permission');
+      } else {
+        issues.push('Screen Recording permission required for screenshots and app detection');
+      }
+    }
+
+    // 2. Check Accessibility Permission (for app/URL detection)
+    console.log('♿ Checking accessibility permission...');
+    let hasAccessibilityPermission = false;
+    try {
+      if (process.platform === 'darwin') {
+        const { systemPreferences } = require('electron');
+        hasAccessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
+      } else {
+        hasAccessibilityPermission = true; // Not required on other platforms
+      }
+    } catch (error) {
+      console.log('⚠️ Could not check accessibility permission:', error);
+    }
+    details.permissions.accessibility = hasAccessibilityPermission;
+    if (!hasAccessibilityPermission && process.platform === 'darwin') {
+      issues.push('Accessibility permission required for app and URL detection');
+    }
+
+    // 3. Test Screenshot Capability
+    console.log('📸 Testing screenshot capability...');
+    let screenshotWorks = false;
+    try {
+      const { testScreenCapture } = require('./permissionManager');
+      screenshotWorks = await testScreenCapture();
+    } catch (error) {
+      console.log('❌ Screenshot test failed:', error);
+    }
+    details.capabilities.screenshot = screenshotWorks;
+    if (!screenshotWorks) {
+      issues.push('Screenshot capture not working - check permissions and system settings');
+    }
+
+    // 4. Test App Detection (test active-win binary directly)
+    console.log('🖥️ Testing app detection...');
+    let appDetectionWorks = false;
+    try {
+      // Test the actual active-win binary that's failing
+      const { spawn } = require('child_process');
+      const path = require('path');
+      const activeWinPath = path.join(__dirname, '../node_modules/active-win/main');
+      
+      const testResult = await new Promise((resolve) => {
+        const child = spawn(activeWinPath, [], { timeout: 5000 });
+        let stdout = '';
+        let stderr = '';
+        
+                 child.stdout?.on('data', (data: any) => {
+           stdout += data.toString();
+         });
+         
+         child.stderr?.on('data', (data: any) => {
+           stderr += data.toString();
+         });
+         
+         child.on('close', (code: number | null) => {
+          if (code === 0 && stdout.trim() !== '') {
+            resolve({ success: true, app: stdout.trim() });
+          } else if (stdout.includes('screen recording permission')) {
+            resolve({ success: false, reason: 'PERMISSION_DENIED', output: stdout });
+          } else {
+            resolve({ success: false, reason: 'OTHER_ERROR', output: stdout || stderr });
+          }
+        });
+        
+                 child.on('error', (error: any) => {
+           resolve({ success: false, reason: 'SPAWN_ERROR', error: error.message });
+         });
+      });
+      
+      appDetectionWorks = (testResult as any).success;
+      details.tests.currentApp = appDetectionWorks ? (testResult as any).app : (testResult as any).output || 'PERMISSION_ERROR';
+      
+      if (!(testResult as any).success) {
+        console.log('❌ Active-win binary test failed:', testResult);
+        if ((testResult as any).reason === 'PERMISSION_DENIED') {
+          details.tests.appDetectionError = 'SCREEN_RECORDING_PERMISSION_REQUIRED';
+        }
+      }
+    } catch (error) {
+      console.log('❌ App detection test failed:', error);
+      details.tests.currentApp = 'ERROR';
+    }
+    details.capabilities.appDetection = appDetectionWorks;
+    if (!appDetectionWorks) {
+      issues.push('App detection not working - Screen Recording permission required for active-win binary');
+    }
+
+    // 5. Test URL Detection
+    console.log('🌐 Testing URL detection...');
+    let urlDetectionWorks = false;
+    try {
+      const { getCurrentURL } = require('./activityMonitor.cjs');
+      const currentURL = await getCurrentURL();
+      urlDetectionWorks = !!currentURL;
+      details.tests.currentURL = currentURL || 'NO_URL_DETECTED';
+    } catch (error) {
+      console.log('❌ URL detection test failed:', error);
+      details.tests.currentURL = 'ERROR';
+    }
+    details.capabilities.urlDetection = urlDetectionWorks;
+    // URL detection is optional, don't add to issues if it fails
+
+    // 6. Test Input Monitoring
+    console.log('⌨️ Testing input monitoring capability...');
+    let inputMonitoringWorks = false;
+    try {
+      // Test if we can start input monitoring
+      startGlobalInputMonitoring();
+      inputMonitoringWorks = globalInputMonitoring;
+      if (inputMonitoringWorks) {
+        stopGlobalInputMonitoring(); // Stop it for now
+      }
+    } catch (error) {
+      console.log('❌ Input monitoring test failed:', error);
+    }
+    details.capabilities.inputMonitoring = inputMonitoringWorks;
+    if (!inputMonitoringWorks) {
+      issues.push('Input monitoring not available - activity detection may be limited');
+    }
+
+    // 7. Test Idle Detection
+    console.log('😴 Testing idle detection...');
+    let idleDetectionWorks = false;
+    try {
+      const { getSystemIdleTime } = require('./activityMonitor.cjs');
+      const idleTime = getSystemIdleTime();
+      idleDetectionWorks = typeof idleTime === 'number' && idleTime >= 0;
+      details.tests.currentIdleTime = idleTime;
+    } catch (error) {
+      console.log('❌ Idle detection test failed:', error);
+      details.tests.currentIdleTime = 'ERROR';
+    }
+    details.capabilities.idleDetection = idleDetectionWorks;
+    if (!idleDetectionWorks) {
+      issues.push('Idle detection not working');
+    }
+
+    const success = issues.length === 0;
+    console.log(`🔍 System check completed: ${success ? 'PASSED' : 'ISSUES FOUND'}`);
+    if (issues.length > 0) {
+      console.log('❌ Issues found:', issues);
+    }
+
+    return { success, issues, details };
+  } catch (error) {
+    console.error('❌ System check failed:', error);
+    return {
+      success: false,
+      issues: ['System check failed: ' + (error as Error).message],
+      details: { error: (error as Error).message }
+    };
+  }
+}
+
+// Handle tracking start with comprehensive system check
+ipcMain.handle('start-tracking', async (event, projectId) => {
   try {
     console.log('▶️ Manual tracking start requested with project ID:', projectId);
     
     // Ensure user ID is set before starting tracking
     const currentUserId = getUserId();
     if (!currentUserId) {
-      // Try to get user ID from the session or use a fallback
-      const userId = '0c3d3092-913e-436f-a352-3378e558c34f'; // This should come from the logged-in user
-      setUserId(userId);
-      console.log('⚠️ User ID was missing, set to:', userId);
+      return { 
+        success: false, 
+        message: 'User not logged in. Please log in first.',
+        requiresLogin: true
+      };
     }
+
+    // 1. First, automatically request permissions if not already granted
+    console.log('🔐 Requesting required permissions...');
     
+    // Check if we need to request Screen Recording permission
+    const currentScreenPermission = await checkScreenRecordingPermission();
+    if (!currentScreenPermission) {
+      console.log('📱 Automatically requesting Screen Recording permission...');
+      const requestResult = await dialog.showMessageBox({
+        type: 'question',
+        title: 'Screen Recording Permission Required',
+        message: 'TimeFlow needs Screen Recording permission to function properly.',
+        detail: 'This permission allows TimeFlow to:\n• Capture screenshots for activity monitoring\n• Detect which applications you use\n• Track URLs in browsers\n\nWould you like to grant this permission now?',
+        buttons: ['Open System Preferences', 'Cancel'],
+        defaultId: 0,
+        cancelId: 1
+      });
+
+      if (requestResult.response === 0) {
+        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+      }
+      
+      return {
+        success: false,
+        message: 'Please grant Screen Recording permission in System Preferences, then restart TimeFlow and try again.',
+        requiresPermission: true,
+        permissionType: 'screen_recording'
+      };
+    }
+
+    // Check accessibility permission for macOS
+    if (process.platform === 'darwin') {
+      const { systemPreferences } = require('electron');
+      const hasAccessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
+      
+      if (!hasAccessibilityPermission) {
+        // Request accessibility permission
+        const requestResult = await dialog.showMessageBox({
+          type: 'question',
+          title: 'Accessibility Permission Required',
+          message: 'TimeFlow needs Accessibility permission to detect apps and URLs.',
+          detail: 'This permission allows TimeFlow to:\n• Track which applications you use\n• Detect URLs in browsers\n• Provide accurate activity monitoring\n\nWould you like to grant this permission now?',
+          buttons: ['Open System Preferences', 'Skip for Now'],
+          defaultId: 0,
+          cancelId: 1
+        });
+
+        if (requestResult.response === 0) {
+          shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+          return {
+            success: false,
+            message: 'Please grant Accessibility permission in System Preferences, then restart TimeFlow and try again.',
+            requiresPermission: true,
+            permissionType: 'accessibility'
+          };
+        }
+        // If they skip, continue but with limited functionality
+      }
+    }
+
+    // 2. Perform comprehensive system check
+    console.log('🔍 Performing comprehensive system check...');
+    const systemCheck = await performSystemCheck();
+    
+    // 3. STRICT VALIDATION: ALL critical components must pass
+    const requiredChecks = [
+      { name: 'Screen Recording Permission', check: systemCheck.details.permissions.screenRecording },
+      { name: 'App Detection', check: systemCheck.details.capabilities.appDetection },
+      { name: 'Screenshot Capability', check: systemCheck.details.capabilities.screenshot },
+      { name: 'Input Monitoring', check: systemCheck.details.capabilities.inputMonitoring },
+      { name: 'Idle Detection', check: systemCheck.details.capabilities.idleDetection }
+    ];
+
+    const failedChecks = requiredChecks.filter(check => !check.check);
+    
+    if (failedChecks.length > 0) {
+      const failedNames = failedChecks.map(check => check.name);
+      console.log('❌ TRACKING BLOCKED: Critical components failed:', failedNames);
+      
+      return {
+        success: false,
+        message: `TRACKING BLOCKED: Critical system components failed validation.\n\nFailed components:\n${failedNames.map(name => `• ${name}`).join('\n')}\n\nAll components must pass before tracking can start. Please resolve these issues and try again.`,
+        issues: failedNames,
+        systemCheck: systemCheck,
+        requiresSystemFix: true,
+        criticalFailure: true
+      };
+    }
+
+    // Additional check: Verify accessibility permission on macOS
+    if (process.platform === 'darwin' && !systemCheck.details.permissions.accessibility) {
+      console.log('❌ TRACKING BLOCKED: Accessibility permission required on macOS');
+      return {
+        success: false,
+        message: 'TRACKING BLOCKED: Accessibility permission is required on macOS for app and URL detection. Please grant permission in System Preferences and restart the app.',
+        issues: ['Accessibility Permission Required'],
+        systemCheck: systemCheck,
+        requiresSystemFix: true,
+        criticalFailure: true
+      };
+    }
+
+    console.log('✅ ALL CRITICAL CHECKS PASSED - Tracking approved to start');
+
+    // 4. Start tracking with all systems verified
     if (projectId) {
       setProjectId(projectId);
     }
     
     startTracking();
     startTrackingTimer();
-    startActivityMonitoring(getUserId() || '0c3d3092-913e-436f-a352-3378e558c34f');
+    await startActivityMonitoring(currentUserId);
     
     // Start input monitoring for real activity detection
     startGlobalInputMonitoring();
     
     isTracking = true;
     updateTrayMenu();
-    console.log('✅ Tracking started successfully with input monitoring');
-    return { success: true, message: 'Time tracking started!' };
+    
+    console.log('✅ Tracking started successfully with all systems verified');
+    
+         // Send system check results to debug console
+     if (appEvents) {
+       appEvents.emit('debug-log', {
+         type: 'SYSTEM',
+         message: `Tracking started successfully! System check: ${systemCheck.success ? 'PASSED' : 'PARTIAL'}`,
+         stats: {
+           screenshots: 0,
+           apps: 0,
+           urls: 0,
+           activity: 0
+         },
+         systemCheck: systemCheck
+       });
+     }
+    
+    return { 
+      success: true, 
+      message: 'Time tracking started successfully!',
+      systemCheck: systemCheck
+    };
   } catch (error) {
     console.error('❌ Error starting tracking:', error);
-    return { success: false, message: 'Failed to start tracking' };
+    return { 
+      success: false, 
+      message: 'Failed to start tracking: ' + (error as Error).message,
+      error: (error as Error).message
+    };
   }
 });
 
@@ -542,14 +886,8 @@ ipcMain.handle('force-screenshot', async () => {
   }
 });
 
-// Handle activity monitoring start from desktop-agent UI
-ipcMain.on('start-activity-monitoring', (event, userId) => {
-  console.log('🚀 Starting activity monitoring for user:', userId);
-  setUserId(userId);
-  startActivityMonitoring(userId);
-  startTrackingTimer();
-  console.log('✅ Activity monitoring started from UI');
-});
+// Legacy handler removed - use ipcMain.handle('start-tracking') instead
+// This ensures all activity monitoring starts go through proper permission and system checks
 
 // Keep existing deprecated handlers for backward compatibility
 ipcMain.on('set-user-id', (_e, id) => {
@@ -563,17 +901,11 @@ ipcMain.handle('set-project-id', async (_e, id) => {
   return { success: true, projectId: id };
 });
 
-ipcMain.on('start-tracking', () => {
-  console.log('▶️ Manual tracking start requested (legacy)');
-  startTracking();
-  startTrackingTimer();
-});
+// Legacy handler removed - use ipcMain.handle('start-tracking') instead
+// This ensures all tracking starts go through proper permission and system checks
 
-ipcMain.on('stop-tracking', () => {
-  console.log('⏸️ Manual tracking stop requested (legacy)');
-  stopTracking();
-  stopTrackingTimer();
-});
+// Legacy stop-tracking handler removed - use ipcMain.handle('stop-tracking') instead
+// This ensures all tracking stops go through proper cleanup
 
 ipcMain.on('logout', () => {
   console.log('🚪 Logout requested from UI (legacy)');
@@ -958,15 +1290,98 @@ function updateTrayMenu() {
   const contextMenu = Menu.buildFromTemplate([
             {
             label: isTracking ? '⏸ Stop Tracking' : '▶️ Start Tracking',
-            click: () => {
+            click: async () => {
                 if (isTracking) {
                     console.log('⏸️ Manual tracking stop requested from tray');
                     stopTracking();
                     stopTrackingTimer();
+                    stopActivityMonitoring();
+                    stopGlobalInputMonitoring();
+                    isTracking = false;
+                    updateTrayMenu();
                 } else {
-                    console.log('▶️ Manual tracking start requested from tray');
-                    startTracking();
-                    startTrackingTimer();
+                    console.log('▶️ Manual tracking start requested from tray - checking permissions...');
+                    
+                    // Check if user is logged in
+                    const currentUserId = getUserId();
+                    if (!currentUserId) {
+                        dialog.showErrorBox(
+                            'Login Required',
+                            'Please open the TimeFlow app and log in before starting tracking.'
+                        );
+                        return;
+                    }
+
+                    // Use the same strict validation as the main start-tracking handler
+                    try {
+                        // Request permissions first
+                        const hasScreenPermission = await ensureScreenRecordingPermission();
+                        if (!hasScreenPermission) {
+                            dialog.showErrorBox(
+                                'Permission Required',
+                                'Screen Recording permission is required. Please grant permission in System Preferences and try again.'
+                            );
+                            return;
+                        }
+
+                        // Check accessibility permission for macOS
+                        if (process.platform === 'darwin') {
+                            const { systemPreferences } = require('electron');
+                            const hasAccessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
+                            
+                            if (!hasAccessibilityPermission) {
+                                dialog.showErrorBox(
+                                    'Accessibility Permission Required',
+                                    'Accessibility permission is required on macOS for app and URL detection. Please grant permission in System Preferences and restart the app.'
+                                );
+                                return;
+                            }
+                        }
+
+                        // Perform comprehensive system check with STRICT validation
+                        const systemCheck = await performSystemCheck();
+                        
+                        // Same strict validation as main handler
+                        const requiredChecks = [
+                            { name: 'Screen Recording Permission', check: systemCheck.details.permissions.screenRecording },
+                            { name: 'App Detection', check: systemCheck.details.capabilities.appDetection },
+                            { name: 'Screenshot Capability', check: systemCheck.details.capabilities.screenshot },
+                            { name: 'Input Monitoring', check: systemCheck.details.capabilities.inputMonitoring },
+                            { name: 'Idle Detection', check: systemCheck.details.capabilities.idleDetection }
+                        ];
+
+                        const failedChecks = requiredChecks.filter(check => !check.check);
+                        
+                        if (failedChecks.length > 0) {
+                            const failedNames = failedChecks.map(check => check.name);
+                            console.log('❌ TRAY TRACKING BLOCKED: Critical components failed:', failedNames);
+                            
+                            dialog.showErrorBox(
+                                'Tracking Blocked - System Issues',
+                                `Critical system components failed validation:\n\n${failedNames.map(name => `• ${name}`).join('\n')}\n\nAll components must pass before tracking can start. Please resolve these issues and try again.`
+                            );
+                            return;
+                        }
+
+                        console.log('✅ TRAY: ALL CRITICAL CHECKS PASSED - Starting tracking');
+
+                        // Start tracking with all checks passed
+                        startTracking();
+                        startTrackingTimer();
+                        await startActivityMonitoring(currentUserId);
+                        startGlobalInputMonitoring();
+                        isTracking = true;
+                        updateTrayMenu();
+                        
+                        console.log('✅ Tracking started from tray with strict validation passed');
+                        
+                    } catch (error) {
+                        console.error('❌ Error starting tracking from tray:', error);
+                        dialog.showErrorBox(
+                            'Tracking Failed',
+                            'Failed to start tracking: ' + (error as Error).message
+                        );
+                    }
                 }
             }
         },
@@ -1336,5 +1751,407 @@ ipcMain.handle('get-anti-cheat-report', () => {
       message: 'Anti-cheat monitoring active in desktop agent'
     }
   };
+});
+
+// Debug console handlers for the new debug window
+ipcMain.handle('debug-get-status', () => {
+  try {
+    const { getCurrentActivityMetrics } = require('./activityMonitor.cjs');
+    const metrics = getCurrentActivityMetrics();
+    
+    return {
+      success: true,
+      monitoring: isTracking,
+      userId: getUserId(),
+      stats: {
+        screenshots: (globalThis as any).totalScreenshots || 0,
+        apps: (globalThis as any).totalApps || 0,
+        urls: 0, // Will be updated by activity monitor
+        activity: Math.round(metrics?.activity_score || 0)
+      }
+    };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('debug-test-screenshot', async () => {
+  try {
+    const { triggerDirectScreenshot } = require('./activityMonitor.cjs');
+    await triggerDirectScreenshot();
+    return { success: true, message: 'Screenshot test triggered' };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('debug-test-activity', () => {
+  try {
+    const { testActivity } = require('./activityMonitor.cjs');
+    testActivity('all', 5);
+    return { success: true, message: 'Activity test completed' };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// System check handler for UI
+ipcMain.handle('perform-system-check', async () => {
+  try {
+    const result = await performSystemCheck();
+    return result;
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// Forward debug logs to debug window
+appEvents.on('debug-log', (data) => {
+  if (debugWindow && !debugWindow.isDestroyed()) {
+    debugWindow.webContents.send('debug-log', data);
+  }
+});
+
+// === System Check IPC Handlers for Dialog Component ===
+
+// Check system permissions
+ipcMain.handle('system-check-permissions', async () => {
+  try {
+    console.log('🔍 System check: Testing permissions...');
+    
+    const screenPermission = await checkScreenRecordingPermission();
+    let accessibilityPermission = false;
+    
+    if (process.platform === 'darwin') {
+      try {
+        const { systemPreferences } = require('electron');
+        accessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
+      } catch (error) {
+        console.log('⚠️ Could not check accessibility permission:', error);
+      }
+    } else {
+      accessibilityPermission = true; // Not required on other platforms
+    }
+    
+    console.log(`✅ Permission check results: Screen=${screenPermission}, Accessibility=${accessibilityPermission}`);
+    
+    return {
+      success: true,
+      permissions: {
+        screen: screenPermission,
+        accessibility: accessibilityPermission
+      }
+    };
+  } catch (error) {
+    console.error('❌ System check permissions error:', error);
+    return {
+      success: false,
+      error: (error as Error).message
+    };
+  }
+});
+
+// Test screenshot capture
+ipcMain.handle('system-check-screenshot', async () => {
+  try {
+    console.log('🔍 System check: Testing screenshot capability...');
+    
+    const screenshotTest = await testScreenCapture();
+    
+    if (screenshotTest) {
+      console.log('✅ Screenshot test passed');
+      return {
+        success: true,
+        size: 'Test successful'
+      };
+    } else {
+      console.log('❌ Screenshot test failed');
+      return {
+        success: false,
+        error: 'Screenshot capture failed'
+      };
+    }
+  } catch (error) {
+    console.error('❌ System check screenshot error:', error);
+    return {
+      success: false,
+      error: (error as Error).message
+    };
+  }
+});
+
+// Test app detection
+ipcMain.handle('system-check-app-detection', async () => {
+  try {
+    console.log('🔍 System check: Testing app detection...');
+    
+    // Get current active app using the same method as activity monitor
+    const { getCurrentAppName } = require('./activityMonitor.cjs');
+    const appName = await getCurrentAppName();
+    
+    if (appName && appName !== 'Unknown Application') {
+      console.log(`✅ App detection test passed: ${appName}`);
+      return {
+        success: true,
+        appName: appName
+      };
+    } else {
+      console.log('❌ App detection test failed');
+      return {
+        success: false,
+        error: 'Could not detect current application'
+      };
+    }
+  } catch (error) {
+    console.error('❌ System check app detection error:', error);
+    return {
+      success: false,
+      error: (error as Error).message
+    };
+  }
+});
+
+// Test URL detection
+ipcMain.handle('system-check-url-detection', async () => {
+  try {
+    console.log('🔍 System check: Testing URL detection...');
+    
+    // Get current browser URL using the same method as activity monitor
+    const { getCurrentURL } = require('./activityMonitor.cjs');
+    const currentURL = await getCurrentURL();
+    
+    if (currentURL) {
+      console.log(`✅ URL detection test passed: ${currentURL}`);
+      return {
+        success: true,
+        url: currentURL
+      };
+    } else {
+      console.log('⚠️ URL detection test - no browser URL available (this is normal if no browser is open)');
+      return {
+        success: false,
+        error: 'No browser URL available'
+      };
+    }
+  } catch (error) {
+    console.error('❌ System check URL detection error:', error);
+    return {
+      success: false,
+      error: (error as Error).message
+    };
+  }
+});
+
+// Test input monitoring
+ipcMain.handle('system-check-input-monitoring', async () => {
+  try {
+    console.log('🔍 System check: Testing input monitoring...');
+    
+    if (ioHook) {
+      console.log('✅ Input monitoring test passed: ioHook available');
+      return {
+        success: true,
+        method: 'ioHook'
+      };
+    } else {
+      console.log('⚠️ Input monitoring test: ioHook not available, using fallback methods');
+      return {
+        success: true,
+        method: 'fallback'
+      };
+    }
+  } catch (error) {
+    console.error('❌ System check input monitoring error:', error);
+    return {
+      success: false,
+      error: (error as Error).message
+    };
+  }
+});
+
+// Test idle detection
+ipcMain.handle('system-check-idle-detection', async () => {
+  try {
+    console.log('🔍 System check: Testing idle detection...');
+    
+    // Get current idle time using powerMonitor
+    const idleTime = powerMonitor.getSystemIdleTime();
+    
+    console.log(`✅ Idle detection test passed: ${idleTime} seconds`);
+    return {
+      success: true,
+      idleTime: idleTime
+    };
+  } catch (error) {
+    console.error('❌ System check idle detection error:', error);
+    return {
+      success: false,
+      error: (error as Error).message
+    };
+  }
+});
+
+// === Debug Console Compatibility Handlers ===
+// Additional handlers that the debug console expects
+
+ipcMain.handle('debug-test-app-detection', async () => {
+  try {
+    console.log('🔍 Debug: Testing app detection...');
+    const { getCurrentAppName } = require('./activityMonitor.cjs');
+    const appName = await getCurrentAppName();
+    
+    if (appName && appName !== 'Unknown Application') {
+      return { 
+        success: true, 
+        appName: appName,
+        message: `Detected: ${appName}` 
+      };
+    } else {
+      return { success: false, error: 'No application detected' };
+    }
+  } catch (error) {
+    console.error('❌ Debug app detection test error:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('debug-test-url-detection', async () => {
+  try {
+    console.log('🔍 Debug: Testing URL detection...');
+    const { getCurrentURL } = require('./activityMonitor.cjs');
+    const currentURL = await getCurrentURL();
+    
+    if (currentURL) {
+      return { 
+        success: true, 
+        url: currentURL,
+        message: `URL detected: ${new URL(currentURL).hostname}` 
+      };
+    } else {
+      return { success: false, error: 'No browser URL available' };
+    }
+  } catch (error) {
+    console.error('❌ Debug URL detection test error:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('debug-test-database', async () => {
+  try {
+    console.log('🔍 Debug: Testing database connection...');
+    
+    // Test actual database connectivity with a simple query
+    const { getSupabaseCredentials } = await import('./secure-config');
+    const credentials = getSupabaseCredentials();
+    
+    if (!credentials.url || !credentials.key) {
+      console.log('❌ Database test failed: Missing credentials');
+      return { success: false, error: 'Missing database credentials' };
+    }
+    
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(credentials.url, credentials.key);
+    
+    // Test database connection with a simple query to check if users table exists
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .limit(1);
+    
+    if (error) {
+      console.log('❌ Database test failed:', error.message);
+      return { 
+        success: false, 
+        error: `Database query failed: ${error.message}` 
+      };
+    }
+    
+    console.log('✅ Database test passed - connection working');
+    return { 
+      success: true, 
+      message: `Database connection test passed` 
+    };
+  } catch (error) {
+    console.error('❌ Debug database test error:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('debug-test-screen-permission', async () => {
+  try {
+    console.log('🔍 Debug: Testing screen permission...');
+    const hasPermission = await checkScreenRecordingPermission();
+    return { 
+      success: hasPermission, 
+      message: hasPermission ? 'Screen recording permission granted' : 'Screen recording permission required' 
+    };
+  } catch (error) {
+    console.error('❌ Debug screen permission test error:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('debug-test-accessibility-permission', async () => {
+  try {
+    console.log('🔍 Debug: Testing accessibility permission...');
+    let hasPermission = false;
+    
+    if (process.platform === 'darwin') {
+      try {
+        const { systemPreferences } = require('electron');
+        hasPermission = systemPreferences.isTrustedAccessibilityClient(false);
+      } catch (error) {
+        console.log('⚠️ Could not check accessibility permission:', error);
+      }
+    } else {
+      hasPermission = true; // Not required on other platforms
+    }
+    
+    return { 
+      success: hasPermission, 
+      message: hasPermission ? 'Accessibility permission granted' : 'Accessibility permission required' 
+    };
+  } catch (error) {
+    console.error('❌ Debug accessibility permission test error:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('debug-test-input-monitoring', async () => {
+  try {
+    console.log('🔍 Debug: Testing input monitoring...');
+    
+    if (ioHook) {
+      return { 
+        success: true, 
+        method: 'ioHook',
+        message: 'Input monitoring available (ioHook)' 
+      };
+    } else {
+      return { 
+        success: true, 
+        method: 'fallback',
+        message: 'Input monitoring available (fallback methods)' 
+      };
+    }
+  } catch (error) {
+    console.error('❌ Debug input monitoring test error:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('debug-test-idle-detection', async () => {
+  try {
+    console.log('🔍 Debug: Testing idle detection...');
+    const idleTime = powerMonitor.getSystemIdleTime();
+    return { 
+      success: true, 
+      idleTime: idleTime,
+      message: `Idle detection working: ${idleTime} seconds` 
+    };
+  } catch (error) {
+    console.error('❌ Debug idle detection test error:', error);
+    return { success: false, error: (error as Error).message };
+  }
 });
 

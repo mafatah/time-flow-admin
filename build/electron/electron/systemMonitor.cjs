@@ -104,12 +104,10 @@ function initSystemMonitor() {
         startInputMonitoring();
         const session = (0, tracker_1.loadSession)();
         if (session) {
-            // Always auto-resume regardless of suspend duration - don't ask employee
-            console.log('🔄 Auto-resuming tracking after system suspend');
-            (0, tracker_1.startTracking)();
-            if (session.user_id) {
-                (0, activityMonitor_1.startActivityMonitoring)(session.user_id);
-            }
+            console.log('🔄 System resumed - tracking will need to be manually restarted with proper validation');
+            console.log('⚠️  Auto-resume disabled to ensure all components are validated before tracking starts');
+            // NOTE: User must manually start tracking to ensure system validation
+            // This prevents bypassing permission checks and system validation
         }
     });
     electron_1.powerMonitor.on('on-ac', () => {

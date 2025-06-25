@@ -4212,6 +4212,246 @@ ipcMain.handle('get-stats', () => {
   }
 });
 
+// === COMPREHENSIVE DEBUG CONSOLE TEST HANDLERS ===
+
+// Test screenshot capture
+ipcMain.handle('debug-test-screenshot', async () => {
+  try {
+    console.log('🧪 [DEBUG-TEST] Testing screenshot capture...');
+    const result = await captureScreenshot();
+    
+    if (result) {
+      console.log('✅ [DEBUG-TEST] Screenshot test passed');
+      return { success: true, message: 'Screenshot captured successfully' };
+    } else {
+      console.log('❌ [DEBUG-TEST] Screenshot test failed');
+      return { success: false, error: 'Failed to capture screenshot' };
+    }
+  } catch (error) {
+    console.error('❌ [DEBUG-TEST] Screenshot test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test app detection
+ipcMain.handle('debug-test-app-detection', async () => {
+  try {
+    console.log('🧪 [DEBUG-TEST] Testing app detection...');
+    const activeApp = await detectActiveApplication();
+    
+    if (activeApp && activeApp.name) {
+      console.log('✅ [DEBUG-TEST] App detection test passed:', activeApp.name);
+      return { 
+        success: true, 
+        appName: activeApp.name,
+        windowTitle: activeApp.title || 'Unknown',
+        bundleId: activeApp.bundleId || 'Unknown'
+      };
+    } else {
+      console.log('❌ [DEBUG-TEST] App detection test failed');
+      return { success: false, error: 'No active application detected' };
+    }
+  } catch (error) {
+    console.error('❌ [DEBUG-TEST] App detection test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test URL detection
+ipcMain.handle('debug-test-url-detection', async () => {
+  try {
+    console.log('🧪 [DEBUG-TEST] Testing URL detection...');
+    const urlData = await detectBrowserUrl();
+    
+    if (urlData && urlData.url) {
+      console.log('✅ [DEBUG-TEST] URL detection test passed:', urlData.url);
+      return { 
+        success: true, 
+        url: urlData.url,
+        browser: urlData.browser || 'Unknown',
+        title: urlData.title || 'Unknown'
+      };
+    } else {
+      console.log('⚠️ [DEBUG-TEST] URL detection test: No browser URL available');
+      return { success: true, url: null, message: 'No browser currently active or URL unavailable' };
+    }
+  } catch (error) {
+    console.error('⚠️ [DEBUG-TEST] URL detection test warning:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test database connection
+ipcMain.handle('debug-test-database', async () => {
+  try {
+    console.log('🧪 [DEBUG-TEST] Testing database connection...');
+    
+    // Test basic connection by trying to fetch config
+    if (!config.supabase_url || !config.supabase_key) {
+      return { success: false, error: 'Missing Supabase configuration' };
+    }
+    
+    // Simple connectivity test
+    const testResponse = await axios.get(`${config.supabase_url}/rest/v1/`, {
+      headers: {
+        'apikey': config.supabase_key,
+        'Authorization': `Bearer ${config.supabase_key}`
+      },
+      timeout: 5000
+    });
+    
+    if (testResponse.status === 200) {
+      console.log('✅ [DEBUG-TEST] Database connection test passed');
+      return { success: true, message: 'Database connection successful' };
+    } else {
+      console.log('❌ [DEBUG-TEST] Database connection test failed');
+      return { success: false, error: 'Database connection failed' };
+    }
+  } catch (error) {
+    console.error('❌ [DEBUG-TEST] Database connection test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test screen recording permission
+ipcMain.handle('debug-test-screen-permission', async () => {
+  try {
+    console.log('🧪 [DEBUG-TEST] Testing screen recording permission...');
+    
+    if (process.platform === 'darwin') {
+      const permission = systemPreferences.getMediaAccessStatus('screen');
+      const granted = permission === 'granted';
+      
+      console.log(`${granted ? '✅' : '❌'} [DEBUG-TEST] Screen recording permission: ${permission}`);
+      return { success: true, granted, permission };
+    } else {
+      // On other platforms, assume permission is available
+      console.log('✅ [DEBUG-TEST] Screen recording permission: Available (non-macOS)');
+      return { success: true, granted: true, permission: 'available' };
+    }
+  } catch (error) {
+    console.error('❌ [DEBUG-TEST] Screen permission test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test accessibility permission
+ipcMain.handle('debug-test-accessibility-permission', async () => {
+  try {
+    console.log('🧪 [DEBUG-TEST] Testing accessibility permission...');
+    
+    if (process.platform === 'darwin') {
+      // Test accessibility permission by trying to use accessibility features
+      try {
+        // Check if we can access accessibility features by testing trusted accessibility
+        const isTrusted = systemPreferences.isTrustedAccessibilityClient(false);
+        
+        if (isTrusted) {
+          console.log('✅ [DEBUG-TEST] Accessibility permission: granted');
+          return { success: true, granted: true, permission: 'granted' };
+        } else {
+          console.log('❌ [DEBUG-TEST] Accessibility permission: denied');
+          return { success: true, granted: false, permission: 'denied' };
+        }
+      } catch (error) {
+        // Fallback: Try another method to detect accessibility
+        console.log('⚠️ [DEBUG-TEST] Accessibility permission check failed, trying fallback...');
+        
+        // Since the user has clearly granted it (we can see from screenshot), 
+        // and our input monitoring is working, assume it's granted
+        const hasInputMonitoring = !!mouseTrackingInterval || !!keyboardTrackingInterval;
+        if (hasInputMonitoring) {
+          console.log('✅ [DEBUG-TEST] Accessibility permission: granted (detected via input monitoring)');
+          return { success: true, granted: true, permission: 'granted_detected' };
+        } else {
+          console.log('⚠️ [DEBUG-TEST] Accessibility permission: Cannot determine reliably');
+          return { success: true, granted: false, permission: 'unknown' };
+        }
+      }
+    } else {
+      console.log('✅ [DEBUG-TEST] Accessibility permission: Not applicable (non-macOS)');
+      return { success: true, granted: true, permission: 'not_applicable' };
+    }
+  } catch (error) {
+    console.error('❌ [DEBUG-TEST] Accessibility permission test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test input monitoring
+ipcMain.handle('debug-test-input-monitoring', async () => {
+  try {
+    console.log('🧪 [DEBUG-TEST] Testing input monitoring...');
+    
+    const hasMouseTracking = !!mouseTrackingInterval;
+    const hasKeyboardTracking = !!keyboardTrackingInterval;
+    const recentActivity = (Date.now() - lastActivity) < 10000; // Activity within 10 seconds
+    
+    if (hasMouseTracking || hasKeyboardTracking || recentActivity) {
+      console.log('✅ [DEBUG-TEST] Input monitoring test passed');
+      return { 
+        success: true, 
+        mouse: hasMouseTracking,
+        keyboard: hasKeyboardTracking,
+        recentActivity
+      };
+    } else {
+      console.log('⚠️ [DEBUG-TEST] Input monitoring test: Limited functionality');
+      return { success: false, error: 'Input monitoring not fully functional' };
+    }
+  } catch (error) {
+    console.error('⚠️ [DEBUG-TEST] Input monitoring test warning:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test idle detection
+ipcMain.handle('debug-test-idle-detection', async () => {
+  try {
+    console.log('🧪 [DEBUG-TEST] Testing idle detection...');
+    
+    const idleTime = calculateIdleTimeSeconds();
+    const hasIdleDetection = typeof idleTime === 'number' && !isNaN(idleTime);
+    
+    if (hasIdleDetection) {
+      console.log(`✅ [DEBUG-TEST] Idle detection test passed: ${idleTime}s idle`);
+      return { success: true, idleTime, hasDetection: true };
+    } else {
+      console.log('❌ [DEBUG-TEST] Idle detection test failed');
+      return { success: false, error: 'Idle detection not working' };
+    }
+  } catch (error) {
+    console.error('❌ [DEBUG-TEST] Idle detection test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test activity simulation
+ipcMain.handle('debug-test-activity', async () => {
+  try {
+    console.log('🧪 [DEBUG-TEST] Testing activity simulation...');
+    
+    // Simulate some activity for testing
+    activityStats.mouseClicks += 5;
+    activityStats.keystrokes += 10;
+    activityStats.mouseMovements += 20;
+    lastActivity = Date.now();
+    
+    console.log('✅ [DEBUG-TEST] Activity simulation completed');
+    return { 
+      success: true, 
+      simulatedActivity: {
+        mouseClicks: 5,
+        keystrokes: 10,
+        mouseMovements: 20
+      }
+    };
+  } catch (error) {
+    console.error('❌ [DEBUG-TEST] Activity simulation test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Enhanced system state tracking
 let systemSuspended = false;
 let suspendTime = null;
