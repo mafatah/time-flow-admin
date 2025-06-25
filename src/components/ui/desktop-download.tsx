@@ -290,14 +290,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '126MB'; // TimeFlow-v1.0.37-ARM64.dmg (UPDATED for v1.0.37)
+        return '126MB'; // TimeFlow-v1.0.38-ARM64.dmg (UPDATED for v1.0.38)
       case 'mac-intel':
       case 'mac':
-        return '132MB'; // TimeFlow-v1.0.37-Intel.dmg (UPDATED for v1.0.37)
+        return '132MB'; // TimeFlow-v1.0.38-Intel.dmg (UPDATED for v1.0.38)
       case 'windows':
-        return '97MB'; // TimeFlow-v1.0.37-Setup.exe (UPDATED for v1.0.37)
+        return '97MB'; // TimeFlow-v1.0.38-Setup.exe (UPDATED for v1.0.38)
       case 'linux':
-        return '136MB'; // TimeFlow-v1.0.37-Linux.AppImage (UPDATED for v1.0.37)
+        return '136MB'; // TimeFlow-v1.0.38-Linux.AppImage (UPDATED for v1.0.38)
       default:
         return '';
     }
@@ -306,14 +306,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 131664749; // TimeFlow-v1.0.37-ARM64.dmg (UPDATED for v1.0.37)
+        return 131664749; // TimeFlow-v1.0.38-ARM64.dmg (UPDATED for v1.0.38)
       case 'mac-intel':
       case 'mac':
-        return 138148580; // TimeFlow-v1.0.37-Intel.dmg (UPDATED for v1.0.37)
+        return 138148580; // TimeFlow-v1.0.38-Intel.dmg (UPDATED for v1.0.38)
       case 'windows':
-        return 101763530; // TimeFlow-v1.0.37-Setup.exe (UPDATED for v1.0.37)
+        return 101763530; // TimeFlow-v1.0.38-Setup.exe (UPDATED for v1.0.38)
       case 'linux':
-        return 142659550; // TimeFlow-v1.0.37-Linux.AppImage (UPDATED for v1.0.37)
+        return 142659550; // TimeFlow-v1.0.38-Linux.AppImage (UPDATED for v1.0.38)
       default:
         return 0;
     }
