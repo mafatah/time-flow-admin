@@ -21,6 +21,36 @@ export default function TimeTrackingPage() {
       setSystemCheckComplete(true);
       setSystemReady(true);
     }
+    
+    // Listen for system check request from main process (after login)
+    const handleShowSystemCheck = (data: any) => {
+      console.log('📋 System check requested from main process:', data);
+      
+      // Only show if not recently checked
+      const lastCheckTime = localStorage.getItem('timeflow_system_check');
+      if (lastCheckTime) {
+        const minutesSinceCheck = (Date.now() - parseInt(lastCheckTime)) / (1000 * 60);
+        
+        // Don't show if checked in last 5 minutes
+        if (minutesSinceCheck < 5) {
+          console.log('✅ System check recently completed, skipping auto-show');
+          return;
+        }
+      }
+      
+      // Show system check dialog
+      setShowSystemCheck(true);
+    };
+    
+    // Add listener if in Electron environment
+    if (window.electron && window.electron.on && window.electron.removeAllListeners) {
+      window.electron.on('show-system-check', handleShowSystemCheck);
+      
+      // Cleanup listener
+      return () => {
+        window.electron?.removeAllListeners?.('show-system-check');
+      };
+    }
   }, []);
 
   const handleSystemCheckComplete = (allSystemsReady: boolean) => {

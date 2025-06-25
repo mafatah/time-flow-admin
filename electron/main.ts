@@ -443,6 +443,22 @@ ipcMain.handle('user-logged-in', (event, userData) => {
   
   console.log('Set user ID:', userData.id);
   console.log('✅ User ID set, ready for manual tracking start');
+  
+  // Perform system check after login to inform user of any issues
+  setTimeout(async () => {
+    console.log('🔍 Performing post-login system check...');
+    const systemCheck = await performSystemCheck();
+    
+    // Send system check results to the renderer
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('show-system-check', {
+        systemCheck: systemCheck,
+        autoShow: true, // Show automatically after login
+        message: 'Welcome! Let\'s verify your system is ready for time tracking.'
+      });
+    }
+  }, 1000); // Small delay to ensure UI is ready
+  
   return { success: true, message: 'User logged in successfully' };
 });
 
@@ -2080,10 +2096,55 @@ ipcMain.handle('debug-test-database', async () => {
 ipcMain.handle('debug-test-screen-permission', async () => {
   try {
     console.log('🔍 Debug: Testing screen permission...');
-    const hasPermission = await checkScreenRecordingPermission();
+    const electronAPIPermission = await checkScreenRecordingPermission();
+    
+    // Also test the actual binary that needs permission (same as performSystemCheck)
+    let binaryCanAccess = false;
+    try {
+      const { spawn } = require('child_process');
+      const path = require('path');
+      const activeWinPath = path.join(__dirname, '../node_modules/active-win/main');
+      
+      const binaryTest = await new Promise((resolve) => {
+        const child = spawn(activeWinPath, [], { timeout: 3000 });
+        let stdout = '';
+        
+        child.stdout?.on('data', (data: any) => {
+          stdout += data.toString();
+        });
+        
+        child.on('close', (code: number | null) => {
+          if (code === 0 && !stdout.includes('screen recording permission')) {
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+        });
+        
+        child.on('error', () => resolve(false));
+      });
+      
+      binaryCanAccess = binaryTest as boolean;
+    } catch (error) {
+      console.log('⚠️ Could not test binary permission:', error);
+    }
+    
+    const actualPermission = electronAPIPermission && binaryCanAccess;
+    
+    let message = '';
+    if (actualPermission) {
+      message = 'Screen recording permission granted';
+    } else if (electronAPIPermission && !binaryCanAccess) {
+      message = 'Screen recording permission granted to Electron but not accessible to child processes - restart app or re-grant permission';
+    } else {
+      message = 'Screen recording permission required';
+    }
+    
     return { 
-      success: hasPermission, 
-      message: hasPermission ? 'Screen recording permission granted' : 'Screen recording permission required' 
+      success: actualPermission, 
+      message: message,
+      electronAPI: electronAPIPermission,
+      binaryAccess: binaryCanAccess
     };
   } catch (error) {
     console.error('❌ Debug screen permission test error:', error);
@@ -2094,22 +2155,12 @@ ipcMain.handle('debug-test-screen-permission', async () => {
 ipcMain.handle('debug-test-accessibility-permission', async () => {
   try {
     console.log('🔍 Debug: Testing accessibility permission...');
-    let hasPermission = false;
-    
-    if (process.platform === 'darwin') {
-      try {
-        const { systemPreferences } = require('electron');
-        hasPermission = systemPreferences.isTrustedAccessibilityClient(false);
-      } catch (error) {
-        console.log('⚠️ Could not check accessibility permission:', error);
-      }
-    } else {
-      hasPermission = true; // Not required on other platforms
-    }
+    const { checkAccessibilityPermission } = require('./permissionManager');
+    const hasPermission = await checkAccessibilityPermission();
     
     return { 
       success: hasPermission, 
-      message: hasPermission ? 'Accessibility permission granted' : 'Accessibility permission required' 
+      message: hasPermission ? 'Accessibility permission granted' : 'Accessibility permission required - MANDATORY for mouse and keyboard tracking' 
     };
   } catch (error) {
     console.error('❌ Debug accessibility permission test error:', error);

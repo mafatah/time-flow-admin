@@ -13,6 +13,11 @@ interface ElectronAPI {
     end_time?: string;
   } | null>;
   clearSavedSession: () => void;
+  // Add invoke method for IPC communication
+  invoke?: (channel: string, ...args: any[]) => Promise<any>;
+  // Add event listener methods
+  on?: (channel: string, listener: (event: any, ...args: any[]) => void) => void;
+  removeAllListeners?: (channel: string) => void;
 }
 
 interface Window {
