@@ -147,7 +147,7 @@
     "files": [
       "build/electron/**/*",
       "build/desktop-agent/**/*",
-      "!build/entitlements.mac.plist",
+      "build/entitlements.mac.plist",
       "!build/dist/**/*"
     ],
     "extraResources": [
@@ -177,8 +177,8 @@
       "identity": "Ebdaa Digital Technology (6GW49LK9V9)",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
       "icon": "electron/assets/icon.png",
       "notarize": {
         "teamId": "6GW49LK9V9"
