@@ -1,5 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.ensureAllPermissionsForDMG = ensureAllPermissionsForDMG;
+exports.ensureAccessibilityPermission = ensureAccessibilityPermission;
 exports.checkAccessibilityPermission = checkAccessibilityPermission;
 exports.requestAccessibilityPermission = requestAccessibilityPermission;
 exports.checkScreenRecordingPermission = checkScreenRecordingPermission;
@@ -8,6 +10,64 @@ exports.ensureScreenRecordingPermission = ensureScreenRecordingPermission;
 exports.testScreenCapture = testScreenCapture;
 const electron_1 = require("electron");
 const errorHandler_1 = require("./errorHandler.cjs");
+// === DMG-SPECIFIC PERMISSION HANDLING ===
+async function ensureAllPermissionsForDMG() {
+    if (process.platform !== 'darwin') {
+        return true;
+    }
+    console.log('🔧 DMG FIX: Ensuring all permissions for DMG installation...');
+    try {
+        // Check current status
+        const screenPermission = electron_1.systemPreferences.getMediaAccessStatus('screen');
+        const accessibilityPermission = electron_1.systemPreferences.isTrustedAccessibilityClient(false);
+        console.log('📊 Current permission status:', {
+            screen: screenPermission,
+            accessibility: accessibilityPermission
+        });
+        let allGranted = true;
+        // Handle Screen Recording Permission
+        if (screenPermission !== 'granted') {
+            console.log('🔧 Requesting Screen Recording permission...');
+            const screenGranted = await ensureScreenRecordingPermission();
+            allGranted = allGranted && screenGranted;
+        }
+        // Handle Accessibility Permission  
+        if (!accessibilityPermission) {
+            console.log('🔧 Requesting Accessibility permission...');
+            const accessibilityGranted = await ensureAccessibilityPermission();
+            allGranted = allGranted && accessibilityGranted;
+        }
+        if (allGranted) {
+            console.log('✅ DMG FIX: All permissions granted successfully');
+        }
+        else {
+            console.log('⚠️ DMG FIX: Some permissions still missing');
+        }
+        return allGranted;
+    }
+    catch (error) {
+        console.error('❌ DMG FIX: Permission check failed:', error);
+        return false;
+    }
+}
+// === ENHANCED ACCESSIBILITY PERMISSION HANDLING ===
+async function ensureAccessibilityPermission() {
+    if (process.platform !== 'darwin') {
+        return true;
+    }
+    console.log('🚀 Ensuring Accessibility permission...');
+    // First check if we already have permission
+    if (await checkAccessibilityPermission()) {
+        return true;
+    }
+    // Try to request permission
+    const granted = await requestAccessibilityPermission();
+    if (!granted) {
+        console.log('⚠️ Accessibility permission not granted. Input tracking will be limited.');
+        return false;
+    }
+    return true;
+}
 async function checkAccessibilityPermission() {
     if (process.platform !== 'darwin') {
         console.log('🟢 Not macOS, accessibility permission not required');
@@ -106,15 +166,25 @@ async function requestScreenRecordingPermission() {
     }
     console.log('📱 Requesting macOS Screen Recording permission...');
     try {
-        // Try to request permission (note: 'screen' may not be available in all Electron versions)
-        const hasPermission = await electron_1.systemPreferences.askForMediaAccess('camera'); // Fallback for now
-        if (hasPermission) {
+        // DMG FIX: Use a more direct approach for screen recording permission
+        // Show permission dialog first to explain what's happening
+        const userWantsToGrant = await showScreenRecordingExplanation();
+        if (!userWantsToGrant) {
+            console.log('❌ User declined to grant Screen Recording permission');
+            return false;
+        }
+        // Open System Settings directly
+        await electron_1.shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+        // Show instructions
+        await showScreenRecordingInstructions();
+        // Check if permission was granted (user needs to restart or we can check again)
+        const granted = await waitForPermissionGrant();
+        if (granted) {
             console.log('✅ Screen Recording permission granted');
             return true;
         }
         else {
-            console.log('❌ Screen Recording permission denied');
-            await showPermissionDialog();
+            console.log('❌ Screen Recording permission not granted within timeout');
             return false;
         }
     }
@@ -124,6 +194,49 @@ async function requestScreenRecordingPermission() {
         await showPermissionDialog();
         return false;
     }
+}
+// === DMG-SPECIFIC PERMISSION DIALOGS ===
+async function showScreenRecordingExplanation() {
+    const result = await electron_1.dialog.showMessageBox({
+        type: 'info',
+        title: 'Screen Recording Permission',
+        message: 'TimeFlow needs Screen Recording permission for app and URL detection.',
+        detail: 'This permission allows TimeFlow to:\n\n• Detect which applications you\'re using\n• Capture periodic screenshots for verification\n• Track browser URLs for web activity\n\nAll data stays private and secure on your device.',
+        buttons: ['Grant Permission', 'Skip for Now'],
+        defaultId: 0,
+        cancelId: 1
+    });
+    return result.response === 0;
+}
+async function showScreenRecordingInstructions() {
+    await electron_1.dialog.showMessageBox({
+        type: 'info',
+        title: 'Grant Screen Recording Permission',
+        message: 'System Settings is now opening...',
+        detail: 'In the System Settings window:\n\n1. Look for "TimeFlow" or "Electron" in the list\n2. Turn ON the toggle switch next to it\n3. If not in the list, click "+" and add TimeFlow from Applications\n4. After enabling, restart TimeFlow\n\nClick OK when you\'ve granted the permission.',
+        buttons: ['OK - Permission Granted', 'I\'ll Do This Later']
+    });
+}
+async function waitForPermissionGrant() {
+    // Give user 30 seconds to grant permission
+    const maxWaitTime = 30000;
+    const checkInterval = 2000;
+    let elapsedTime = 0;
+    while (elapsedTime < maxWaitTime) {
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+        elapsedTime += checkInterval;
+        // Check if permission was granted
+        try {
+            const hasPermission = electron_1.systemPreferences.getMediaAccessStatus('screen') === 'granted';
+            if (hasPermission) {
+                return true;
+            }
+        }
+        catch (error) {
+            // Continue waiting
+        }
+    }
+    return false;
 }
 async function showPermissionDialog() {
     const result = await electron_1.dialog.showMessageBox({

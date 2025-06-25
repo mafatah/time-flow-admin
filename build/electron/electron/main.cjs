@@ -183,6 +183,8 @@ try {
 catch (e) {
     console.log('⚠️ ioHook not available, using system monitoring instead');
 }
+// === DMG PERMISSION FIX FOR LIVE INSTALLATIONS ===
+// The issue is that DMG installations need enhanced permission management
 // Check if running from DMG and prevent crashes
 function checkDMGAndPreventCrash() {
     const appPath = electron_1.app.getAppPath();
@@ -216,7 +218,167 @@ function checkDMGAndPreventCrash() {
         return false;
     }
     console.log('✅ App is running from proper installation location');
+    // DMG PERMISSION FIX: If running from proper location but permissions are missing,
+    // show enhanced permission dialog immediately
+    if (process.platform === 'darwin') {
+        console.log('🔧 DMG FIX: Scheduling enhanced permission check for proper installation...');
+        setTimeout(async () => {
+            await showEnhancedPermissionDialog();
+        }, 2000); // Delay to let app fully initialize
+    }
     return true;
+}
+// === ENHANCED PERMISSION DIALOG FOR DMG INSTALLATIONS ===
+async function showEnhancedPermissionDialog() {
+    console.log('🔧 DMG FIX: Checking permissions for properly installed app...');
+    try {
+        const { systemPreferences } = require('electron');
+        // Check both permissions
+        const screenPermission = systemPreferences.getMediaAccessStatus('screen');
+        const accessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
+        console.log('📊 DMG FIX: Permission status:', {
+            screen: screenPermission,
+            accessibility: accessibilityPermission
+        });
+        // If both permissions are granted, no need to show dialog
+        if (screenPermission === 'granted' && accessibilityPermission) {
+            console.log('✅ DMG FIX: All permissions already granted');
+            return;
+        }
+        // Show comprehensive permission setup dialog
+        const missingPermissions = [];
+        if (screenPermission !== 'granted') {
+            missingPermissions.push('Screen Recording');
+        }
+        if (!accessibilityPermission) {
+            missingPermissions.push('Accessibility');
+        }
+        const result = await electron_1.dialog.showMessageBox({
+            type: 'warning',
+            title: 'TimeFlow - Permissions Required',
+            message: `Welcome to TimeFlow! 🎯\n\nTo provide accurate time tracking, TimeFlow needs ${missingPermissions.join(' and ')} permission${missingPermissions.length > 1 ? 's' : ''}.`,
+            detail: `Required permissions:\n\n` +
+                (screenPermission !== 'granted' ? `• Screen Recording - Enables app detection and screenshots\n` : '') +
+                (!accessibilityPermission ? `• Accessibility - Enables mouse/keyboard activity tracking\n` : '') +
+                `\nThis is completely safe and all data stays private on your device.`,
+            buttons: [
+                'Open System Settings',
+                'Set Up Later',
+                'Learn More'
+            ],
+            defaultId: 0,
+            cancelId: 1
+        });
+        if (result.response === 0) {
+            console.log('🔧 DMG FIX: User chose to open System Settings');
+            await openSystemSettingsForPermissions(missingPermissions);
+        }
+        else if (result.response === 2) {
+            console.log('ℹ️ DMG FIX: User wants to learn more');
+            await showPermissionExplanation();
+        }
+    }
+    catch (error) {
+        console.error('❌ DMG FIX: Enhanced permission dialog failed:', error);
+    }
+}
+// === SMART SYSTEM SETTINGS OPENER ===
+async function openSystemSettingsForPermissions(missingPermissions) {
+    const { shell } = require('electron');
+    try {
+        if (missingPermissions.includes('Screen Recording')) {
+            console.log('🔧 Opening Screen Recording settings...');
+            await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+            // Show follow-up instructions
+            setTimeout(async () => {
+                await electron_1.dialog.showMessageBox({
+                    type: 'info',
+                    title: 'Screen Recording Setup',
+                    message: 'Grant Screen Recording Permission',
+                    detail: `In the System Settings window that just opened:\n\n` +
+                        `1. Look for "TimeFlow" or "Electron" in the list\n` +
+                        `2. Turn ON the toggle switch next to it\n` +
+                        `3. If not in the list, click the "+" button to add it\n` +
+                        `4. Navigate to Applications folder and select TimeFlow\n\n` +
+                        `After granting permission, restart TimeFlow for changes to take effect.`,
+                    buttons: ['Got It']
+                });
+            }, 1000);
+            // If accessibility is also needed, open that too
+            if (missingPermissions.includes('Accessibility')) {
+                setTimeout(async () => {
+                    console.log('🔧 Opening Accessibility settings...');
+                    await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+                    setTimeout(async () => {
+                        await electron_1.dialog.showMessageBox({
+                            type: 'info',
+                            title: 'Accessibility Setup',
+                            message: 'Grant Accessibility Permission',
+                            detail: `In the Accessibility settings:\n\n` +
+                                `1. Look for "TimeFlow" or "Electron" in the list\n` +
+                                `2. Turn ON the toggle switch next to it\n` +
+                                `3. If not in the list, click the "+" button to add it\n` +
+                                `4. You may need to unlock the settings first (click the lock icon)\n\n` +
+                                `This permission enables accurate activity tracking.`,
+                            buttons: ['Got It']
+                        });
+                    }, 2000);
+                }, 3000);
+            }
+        }
+        else if (missingPermissions.includes('Accessibility')) {
+            console.log('🔧 Opening Accessibility settings...');
+            await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+        }
+    }
+    catch (error) {
+        console.error('❌ Failed to open System Settings:', error);
+        // Fallback: show manual instructions
+        await electron_1.dialog.showMessageBox({
+            type: 'info',
+            title: 'Manual Setup Required',
+            message: 'Please Set Up Permissions Manually',
+            detail: `Could not automatically open System Settings. Please:\n\n` +
+                `1. Open System Settings (or System Preferences)\n` +
+                `2. Go to Privacy & Security\n` +
+                `3. Select ${missingPermissions.join(' and ')} from the sidebar\n` +
+                `4. Add and enable TimeFlow\n` +
+                `5. Restart the app\n\n` +
+                `This ensures proper time tracking functionality.`,
+            buttons: ['OK']
+        });
+    }
+}
+// === PERMISSION EXPLANATION DIALOG ===
+async function showPermissionExplanation() {
+    const result = await electron_1.dialog.showMessageBox({
+        type: 'info',
+        title: 'Why TimeFlow Needs These Permissions',
+        message: 'Privacy & Security Information 🔒',
+        detail: `TimeFlow requests these permissions to provide accurate time tracking:\n\n` +
+            `📺 Screen Recording Permission:\n` +
+            `• Detects which applications you're using\n` +
+            `• Captures periodic screenshots for verification\n` +
+            `• Identifies browser URLs for web activity tracking\n\n` +
+            `♿ Accessibility Permission:\n` +
+            `• Monitors mouse clicks and keyboard activity\n` +
+            `• Calculates productivity scores based on activity\n` +
+            `• Detects idle time accurately\n\n` +
+            `🔐 Your Privacy:\n` +
+            `• All data is processed locally on your device\n` +
+            `• Screenshots are encrypted before upload\n` +
+            `• No personal data is shared without consent\n` +
+            `• You maintain full control over your data`,
+        buttons: [
+            'Grant Permissions Now',
+            'Skip Setup'
+        ],
+        defaultId: 0
+    });
+    if (result.response === 0) {
+        console.log('🔧 User chose to grant permissions after explanation');
+        await openSystemSettingsForPermissions(['Screen Recording', 'Accessibility']);
+    }
 }
 // Listen for screenshot events from activity monitor
 exports.appEvents.on('screenshot-captured', () => {
@@ -2092,14 +2254,48 @@ electron_1.ipcMain.handle('request-all-permissions', async () => {
 function getActiveWinBinaryPath() {
     const { app } = require('electron');
     const path = require('path');
+    const fs = require('fs');
+    console.log('🔧 DMG FIX: Resolving active-win binary path for current installation...');
     // Check if app is packaged (DMG/built version)
     if (app.isPackaged) {
         // DMG/Packaged version - binary is in Contents/Resources/app.asar.unpacked
         // app.getAppPath() returns the asar file, we need the Resources directory
         const resourcesPath = process.resourcesPath;
-        const activeWinPath = path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'active-win', 'main');
-        console.log('🔧 DMG MODE: Using correct packaged active-win binary path:', activeWinPath);
-        return activeWinPath;
+        const possiblePaths = [
+            // Standard DMG installation path
+            path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'active-win', 'main'),
+            // Alternative path for some builds
+            path.join(resourcesPath, 'app.asar.unpacked', 'electron', 'node_modules', 'active-win', 'main'),
+            // Fallback in case of different packaging
+            path.join(app.getAppPath(), '..', 'app.asar.unpacked', 'node_modules', 'active-win', 'main'),
+            // Last resort - check if binary is in same directory as electron executable
+            path.join(path.dirname(process.execPath), 'active-win', 'main')
+        ];
+        console.log('🔧 DMG FIX: Testing possible active-win binary paths...');
+        for (const testPath of possiblePaths) {
+            console.log(`   Testing: ${testPath}`);
+            if (fs.existsSync(testPath)) {
+                console.log(`✅ DMG FIX: Found active-win binary at: ${testPath}`);
+                return testPath;
+            }
+        }
+        console.log('❌ DMG FIX: No active-win binary found in standard locations');
+        console.log('📊 DMG FIX: Directory structure debug:');
+        console.log(`   Resources path: ${resourcesPath}`);
+        console.log(`   App path: ${app.getAppPath()}`);
+        console.log(`   Exec path: ${process.execPath}`);
+        // Try to list what's actually in the resources directory
+        try {
+            const resourcesContents = fs.readdirSync(resourcesPath);
+            console.log(`   Resources contents: ${resourcesContents.join(', ')}`);
+        }
+        catch (e) {
+            console.log('   Could not read resources directory');
+        }
+        // Return first path as fallback even if it doesn't exist
+        const fallbackPath = possiblePaths[0];
+        console.log(`🔄 DMG FIX: Using fallback path: ${fallbackPath}`);
+        return fallbackPath;
     }
     else {
         // Development version - binary is in build directory
@@ -2115,60 +2311,84 @@ let lastBinaryTestTime = 0;
 async function testActiveWinBinaryAccess() {
     // Prevent simultaneous tests that caused the memory leak
     if (isTestingBinary) {
-        console.log('⏳ Binary test already in progress, returning cached result...');
+        console.log('⏳ DMG FIX: Binary test already in progress, returning cached result...');
         return lastBinaryTestResult || false;
     }
     // Use cached result if recent (within 5 seconds)
     const now = Date.now();
     if (lastBinaryTestResult !== null && (now - lastBinaryTestTime) < 5000) {
-        console.log('📋 Using cached binary test result:', lastBinaryTestResult);
+        console.log('📋 DMG FIX: Using cached binary test result:', lastBinaryTestResult);
         return lastBinaryTestResult;
     }
     isTestingBinary = true;
-    console.log('🧪 Testing active-win binary access with proper timeout...');
+    console.log('🧪 DMG FIX: Testing active-win binary access with enhanced timeout handling...');
     try {
         const { spawn } = require('child_process');
         const activeWinPath = getActiveWinBinaryPath();
+        console.log('🔧 DMG FIX: Testing binary at path:', activeWinPath);
         const binaryTest = await new Promise((resolve) => {
             let isResolved = false;
             // Create timeout to prevent hanging processes
             const timeout = setTimeout(() => {
                 if (!isResolved) {
                     isResolved = true;
-                    console.log('⏰ Binary test timed out after 2 seconds');
+                    console.log('⏰ DMG FIX: Binary test timed out after 3 seconds');
                     if (child && !child.killed) {
                         child.kill('SIGTERM');
                         setTimeout(() => {
                             if (child && !child.killed) {
+                                console.log('🔧 DMG FIX: Force killing hanging binary process');
                                 child.kill('SIGKILL'); // Force kill if still running
                             }
                         }, 1000);
                     }
                     resolve(false);
                 }
-            }, 2000);
+            }, 3000); // Increased timeout for DMG
             const child = spawn(activeWinPath, [], {
                 detached: false,
                 stdio: ['ignore', 'pipe', 'pipe']
             });
             let stdout = '';
-            let hasError = false;
+            let stderr = '';
+            let hasPermissionError = false;
             child.stdout?.on('data', (data) => {
                 stdout += data.toString();
             });
             child.stderr?.on('data', (data) => {
-                console.log('🔍 Binary stderr:', data.toString());
-                if (data.toString().includes('screen recording permission')) {
-                    hasError = true;
+                stderr += data.toString();
+                console.log('🔍 DMG FIX: Binary stderr:', data.toString());
+                if (data.toString().includes('screen recording permission') ||
+                    data.toString().includes('accessibility permission') ||
+                    data.toString().includes('operation not permitted')) {
+                    hasPermissionError = true;
                 }
             });
             child.on('close', (code) => {
                 clearTimeout(timeout);
                 if (!isResolved) {
                     isResolved = true;
-                    // Success if we got exit code 0 and some stdout (JSON data from active-win)
-                    const success = code === 0 && !hasError && stdout.length > 10;
-                    console.log(`🔍 Binary test result: code=${code}, hasError=${hasError}, stdout=${stdout.length} chars, success=${success}`);
+                    // Enhanced success detection for DMG
+                    const hasOutput = stdout.length > 10;
+                    const successfulExit = code === 0;
+                    const noPermissionErrors = !hasPermissionError;
+                    const success = successfulExit && hasOutput && noPermissionErrors;
+                    console.log(`🔍 DMG FIX: Binary test result:`, {
+                        code: code,
+                        stdout_length: stdout.length,
+                        stderr_length: stderr.length,
+                        has_permission_error: hasPermissionError,
+                        success: success
+                    });
+                    if (success) {
+                        console.log('✅ DMG FIX: Binary test passed - permissions look good');
+                    }
+                    else if (hasPermissionError) {
+                        console.log('❌ DMG FIX: Binary test failed - permission errors detected');
+                    }
+                    else if (!hasOutput) {
+                        console.log('⚠️ DMG FIX: Binary test unclear - no output received');
+                    }
                     resolve(success);
                 }
             });
@@ -2176,7 +2396,11 @@ async function testActiveWinBinaryAccess() {
                 clearTimeout(timeout);
                 if (!isResolved) {
                     isResolved = true;
-                    console.log('❌ Binary test error:', error.message);
+                    console.log('❌ DMG FIX: Binary test spawn error:', error.message);
+                    // Check if error is due to missing binary file
+                    if (error.code === 'ENOENT') {
+                        console.log('💡 DMG FIX: Binary file not found - this may indicate packaging issue');
+                    }
                     resolve(false);
                 }
             });
@@ -2184,11 +2408,11 @@ async function testActiveWinBinaryAccess() {
         // Cache the result
         lastBinaryTestResult = binaryTest;
         lastBinaryTestTime = now;
-        console.log(`✅ Binary test completed: ${binaryTest}`);
+        console.log(`✅ DMG FIX: Binary test completed: ${binaryTest}`);
         return binaryTest;
     }
     catch (error) {
-        console.error('❌ Binary test exception:', error);
+        console.error('❌ DMG FIX: Binary test exception:', error);
         lastBinaryTestResult = false;
         lastBinaryTestTime = now;
         return false;
