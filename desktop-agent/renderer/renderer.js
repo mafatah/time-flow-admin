@@ -835,6 +835,18 @@ async function startTracking() {
         } else {
             console.log('❌ [RENDERER] Tracking start failed:', result);
             showNotification(result ? result.message : 'Failed to start tracking', 'error');
+
+            // 🔄 Revert UI/state because tracking actually failed
+            isTracking = false;
+            trackingStatus = 'stopped';
+            sessionStartTime = null;
+            if (sessionTimer) {
+              clearInterval(sessionTimer);
+              sessionTimer = null;
+            }
+            updateTrackingButtons();
+            updateTrackingStatus();
+            updateSessionTime('--:--:--');
         }
         
     } catch (error) {
