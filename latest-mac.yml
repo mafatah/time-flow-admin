@@ -1,11 +1,11 @@
-version: 1.0.37
+version: 1.0.39
 files:
-  - url: TimeFlow-v1.0.37-Intel.dmg
-    sha512: 7ac04ffa13b6615aa714e7c20cd4bdb6564419ab61f9c5fd9187ba5b37964aaf472c87533b2bda265aafea8b54f3a339d6a6a682d713d97126cc2ec8535be464
-    size: 138148580
-  - url: TimeFlow-v1.0.37-ARM64.dmg
-    sha512: ac2070503b5e672d1ae553869abc62afd2702e4f5bfd66bca755f42bf6be01a11450dfd3b6748f1215e07668484cfdb360e1aa19b2859ebe42fe4d04e036cbe2
-    size: 131664749
-path: TimeFlow-v1.0.37-Intel.dmg
-sha512: 7ac04ffa13b6615aa714e7c20cd4bdb6564419ab61f9c5fd9187ba5b37964aaf472c87533b2bda265aafea8b54f3a339d6a6a682d713d97126cc2ec8535be464
-releaseDate: '2025-06-25T00:00:00.000Z'
+  - url: TimeFlow-v1.0.39-Intel.dmg
+    sha512: [TO_BE_UPDATED_AFTER_BUILD]
+    size: [TO_BE_UPDATED_AFTER_BUILD]
+  - url: TimeFlow-v1.0.39-ARM64.dmg
+    sha512: [TO_BE_UPDATED_AFTER_BUILD]
+    size: [TO_BE_UPDATED_AFTER_BUILD]
+path: TimeFlow-v1.0.39-Intel.dmg
+sha512: [TO_BE_UPDATED_AFTER_BUILD]
+releaseDate: '2025-01-17T00:00:00.000Z'

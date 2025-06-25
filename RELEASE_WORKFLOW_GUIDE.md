@@ -1,368 +1,391 @@
-# 🚀 **TimeFlow Release Workflow Guide**
+# 🚀 TimeFlow Release Workflow Guide
 
-Complete guide for releasing TimeFlow with code signing, notarization, and cross-platform support.
+Complete guide for releasing TimeFlow with signing, notarization, and cross-platform support.
 
-## **🔧 Prerequisites**
+## 📋 Prerequisites
 
-### **Development Environment**
-- **macOS**: Required for building and signing macOS apps
-- **Node.js**: v18+ with npm
-- **GitHub CLI**: `brew install gh`
-- **Electron Builder**: Installed via npm
+### Required Tools
+- **Node.js** 18+ with npm
+- **Electron Builder** (installed via npm)
+- **GitHub CLI** (`brew install gh` on macOS)
+- **Xcode Command Line Tools** (macOS)
 
-### **Apple Developer Account**
-- **Apple ID**: `alshqawe66@gmail.com`
+### Required Credentials
+- **Apple Developer Account**: `alshqawe66@gmail.com`
 - **App-Specific Password**: `icmi-tdzi-ydvi-lszi`
 - **Team ID**: `6GW49LK9V9`
-- **Certificate**: Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)
-
-### **GitHub Configuration**
+- **GitHub Token**: `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`
 - **Repository**: `mafatah/time-flow-admin`
-- **Personal Access Token**: `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`
 
----
-
-## **📋 Release Scripts Overview**
-
-### **1. Ultimate Release Script** `scripts/ultimate-release.sh`
-- **Purpose**: Complete release for ALL platforms (macOS, Windows, Linux)
-- **Features**: Code signing, notarization, GitHub release, auto-updater
-- **Recommended**: Use this for major releases
-
-### **2. Complete Release Script** `scripts/complete-release.sh`  
-- **Purpose**: macOS-focused release with signing and notarization
-- **Features**: macOS DMG creation, GitHub release, web deployment
-- **Recommended**: Use for macOS-only updates
-
-### **3. Cross-Platform Build** `scripts/build-cross-platform.sh`
-- **Purpose**: Build Windows and Linux versions only
-- **Features**: EXE and AppImage creation
-- **Recommended**: Use for testing cross-platform compatibility
-
----
-
-## **🚀 Step-by-Step Release Process**
-
-### **Step 1: Prepare for Release**
-
-1. **Update Version Number** (done automatically by scripts)
-   ```bash
-   npm version patch --no-git-tag-version
-   ```
-
-2. **Verify Environment**
-   ```bash
-   # Check Apple Developer Certificate
-   security find-identity -v -p codesigning
-   
-   # Verify GitHub CLI
-   gh auth status
-   
-   # Check current version
-   grep '"version"' package.json
-   ```
-
-3. **Test Current Build**
-   ```bash
-   npm run build
-   npm run build:all
-   ```
-
-### **Step 2: Choose Release Type**
-
-#### **🌟 Full Cross-Platform Release** (Recommended)
+### Apple Developer Certificate
+Ensure the certificate from `CertificateSigningRequest.certSigningRequest` is installed in Keychain:
 ```bash
-# This builds ALL platforms and creates complete GitHub release
-./scripts/ultimate-release.sh
+# Verify certificate installation
+security find-identity -v -p codesigning
+# Should show: "Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)"
 ```
 
-#### **🍎 macOS-Only Release**
+---
+
+## 🎯 Quick Start
+
+Use the interactive menu for easy releases:
+
 ```bash
-# This builds only macOS with signing and notarization
-./scripts/complete-release.sh
+./quick-release.sh
 ```
 
-#### **🔧 Cross-Platform Build Only** (No Release)
-```bash
-# This builds Windows and Linux without creating release
-./scripts/build-cross-platform.sh
-```
-
-### **Step 3: Verify Release**
-
-1. **Check GitHub Release**
-   - Visit: `https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.XX`
-   - Verify all files are present
-   - Check download links work
-
-2. **Test Auto-Updater**
-   - macOS: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.XX/latest-mac.yml`
-   - Windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.XX/latest.yml`
-
-3. **Verify Web Deployment**
-   - Check: `https://time-flow-admin.vercel.app/download`
-   - Ensure version numbers are updated
-   - Test download buttons
+This will show you all available options with descriptions.
 
 ---
 
-## **🔐 Code Signing & Notarization**
+## 📦 Release Options
 
-### **macOS Certificate Setup**
+### 1. 🍎 Ultimate Release (Recommended)
+**Script**: `./scripts/ultimate-release.sh`
+**Time**: 10-15 minutes
+**Output**: All platforms + GitHub release
 
-1. **Install Certificate**
-   ```bash
-   # Import the Developer ID Application certificate
-   # Use the CertificateSigningRequest.certSigningRequest file
-   # Install via Keychain Access or Xcode
-   ```
+**What it does:**
+- Builds macOS (Intel + ARM64) with signing & notarization
+- Builds Windows EXE with signing
+- Builds Linux AppImage
+- Creates GitHub release with all files
+- Updates auto-update configurations
+- Deploys web interface
 
-2. **Verify Installation**
-   ```bash
-   security find-identity -v -p codesigning
-   # Should show: "Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)"
-   ```
+**When to use**: For major releases and production deployments
 
-3. **Environment Variables** (set automatically by scripts)
-   ```bash
-   export APPLE_ID="alshqawe66@gmail.com"
-   export APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi"
-   export APPLE_TEAM_ID="6GW49LK9V9"
-   ```
+### 2. 🍎 Complete Release (macOS Only)
+**Script**: `./scripts/complete-release.sh`
+**Time**: 5-10 minutes
+**Output**: macOS builds + GitHub release
 
-### **Entitlements Configuration**
-The `entitlements.mac.plist` file includes:
-- Screen recording permissions
-- Microphone and camera access
-- Automation permissions
-- Network access
-- File system access
+**What it does:**
+- Builds macOS (Intel + ARM64) with signing & notarization
+- Creates GitHub release
+- Updates macOS auto-update configuration
+- Faster than ultimate release
+
+**When to use**: For macOS-specific updates or faster iteration
+
+### 3. 🪟🐧 Cross-Platform Build
+**Script**: `./scripts/build-cross-platform.sh`
+**Time**: 2-5 minutes
+**Output**: Windows & Linux builds only
+
+**What it does:**
+- Builds Windows EXE
+- Builds Linux AppImage
+- No GitHub release (manual upload needed)
+
+**When to use**: For testing Windows/Linux builds or when macOS signing is unavailable
 
 ---
 
-## **⚙️ Auto-Update Configuration**
+## 🔧 Manual Release Process
 
-### **macOS Auto-Update** (`latest-mac.yml`)
+### Step 1: Version Management
+```bash
+# Increment version
+npm version patch --no-git-tag-version
+
+# Check new version
+grep '"version"' package.json
+```
+
+### Step 2: Update Download URLs
+Update version strings in these files:
+- `src/pages/download/index.tsx` (line ~23)
+- `src/components/ui/desktop-download.tsx` (line ~95)
+
+### Step 3: Set Environment Variables
+```bash
+export APPLE_ID="alshqawe66@gmail.com"
+export APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi"
+export APPLE_TEAM_ID="6GW49LK9V9"
+export GITHUB_TOKEN="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"
+```
+
+### Step 4: Build Applications
+```bash
+# Clean previous builds
+rm -rf dist build node_modules/.cache
+
+# Install dependencies
+npm ci
+
+# Build web application
+npm run build
+
+# Prepare entitlements
+mkdir -p build
+cp entitlements.mac.plist build/
+
+# Build desktop applications
+npx electron-builder --mac --win --linux --publish=never
+```
+
+### Step 5: Generate File Information
+```bash
+# Calculate hashes and sizes
+shasum -a 512 dist/*.dmg dist/*.exe dist/*.AppImage
+ls -la dist/
+```
+
+### Step 6: Update Auto-Update Files
+Update `latest-mac.yml` and `latest.yml` with new version, file sizes, and SHA512 hashes.
+
+### Step 7: Create GitHub Release
+```bash
+# Create release with all files
+gh release create v1.0.XX \
+  "dist/TimeFlow-v1.0.XX-Intel.dmg" \
+  "dist/TimeFlow-v1.0.XX-ARM64.dmg" \
+  "dist/TimeFlow-v1.0.XX-Setup.exe" \
+  "dist/TimeFlow-v1.0.XX-Linux.AppImage" \
+  "latest-mac.yml" \
+  "latest.yml" \
+  --title "TimeFlow v1.0.XX" \
+  --generate-notes \
+  --latest
+```
+
+### Step 8: Deploy Web Changes
+```bash
+git add -A
+git commit -m "🚀 Release v1.0.XX"
+git push origin main
+```
+
+---
+
+## 🔐 Signing & Notarization
+
+### macOS Code Signing
+- Uses `Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)`
+- Automatically signs during electron-builder process
+- Requires certificate in Keychain
+
+### macOS Notarization
+- Automatic via electron-builder
+- Uses Apple ID and app-specific password
+- Takes 5-10 minutes per build
+- Required for Gatekeeper approval
+
+### Windows Code Signing
+- Currently set up for future implementation
+- Will use Windows certificate when available
+
+---
+
+## 📱 Auto-Update System
+
+### How It Works
+1. App checks GitHub releases for new versions
+2. Downloads `latest-mac.yml` or `latest.yml`
+3. Compares current version with available version
+4. Shows update notification if newer version exists
+5. Downloads and installs update when user approves
+
+### Configuration Files
+
+**latest-mac.yml** (macOS):
 ```yaml
 version: 1.0.XX
 files:
   - url: TimeFlow-v1.0.XX-Intel.dmg
-    sha512: [HASH]
-    size: [SIZE]
+    sha512: [hash]
+    size: [bytes]
   - url: TimeFlow-v1.0.XX-ARM64.dmg
-    sha512: [HASH]
-    size: [SIZE]
+    sha512: [hash]
+    size: [bytes]
 path: TimeFlow-v1.0.XX-Intel.dmg
-sha512: [HASH]
-releaseDate: '2025-XX-XXTXX:XX:XX.000Z'
+sha512: [hash]
+releaseDate: '2025-01-17T00:00:00.000Z'
 ```
 
-### **Windows Auto-Update** (`latest.yml`)
+**latest.yml** (Windows):
 ```yaml
 version: 1.0.XX
 files:
   - url: TimeFlow-v1.0.XX-Setup.exe
-    sha512: [HASH]
-    size: [SIZE]
+    sha512: [hash]
+    size: [bytes]
 path: TimeFlow-v1.0.XX-Setup.exe
-sha512: [HASH]
-releaseDate: '2025-XX-XXTXX:XX:XX.000Z'
+sha512: [hash]
+releaseDate: '2025-01-17T00:00:00.000Z'
+```
+
+### Update URLs
+- macOS: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.XX/latest-mac.yml`
+- Windows: `https://github.com/mafatah/time-flow-admin/releases/download/v1.0.XX/latest.yml`
+
+---
+
+## 🧪 Testing & Verification
+
+### Pre-Release Testing
+1. **Build verification**: Ensure all expected files are created
+2. **Signature verification**: Check code signatures are valid
+3. **Installation testing**: Test fresh installations on clean machines
+
+### Post-Release Testing
+1. **Download verification**: Test download links work correctly
+2. **Auto-update testing**: Verify existing users see update notifications
+3. **Installation verification**: Ensure no security warnings on signed builds
+
+### Testing Commands
+```bash
+# Verify macOS code signature
+codesign -v --verbose "TimeFlow.app"
+
+# Check notarization status
+spctl -a -v "TimeFlow.app"
+
+# Test file integrity
+shasum -a 512 -c checksums.txt
 ```
 
 ---
 
-## **📱 Platform-Specific Build Details**
+## 🔧 Troubleshooting
 
-### **🍎 macOS Builds**
-- **Intel**: `Ebdaa Work Time-1.0.XX.dmg` → `TimeFlow-v1.0.XX-Intel.dmg`
-- **Apple Silicon**: `Ebdaa Work Time-1.0.XX-arm64.dmg` → `TimeFlow-v1.0.XX-ARM64.dmg`
-- **Signing**: Developer ID Application certificate
-- **Notarization**: Automatic via Apple notary service
-- **Requirements**: macOS 10.14+ (Intel) / macOS 11.0+ (Apple Silicon)
+### Common Issues
 
-### **🪟 Windows Builds**
-- **Installer**: `TimeFlow Setup 1.0.XX.exe` → `TimeFlow-v1.0.XX-Setup.exe`
-- **Architecture**: x64 (64-bit)
-- **Installer**: NSIS with custom options
-- **Requirements**: Windows 10/11 (64-bit)
-
-### **🐧 Linux Builds**
-- **Format**: `TimeFlow-1.0.XX.AppImage` → `TimeFlow-v1.0.XX-Linux.AppImage`
-- **Portable**: No installation required
-- **Requirements**: Ubuntu 18.04+ or equivalent
-
----
-
-## **🌐 Web Deployment**
-
-### **Automatic Deployment**
-- **Platform**: Vercel
-- **Trigger**: Push to `main` branch
-- **URL**: `https://time-flow-admin.vercel.app`
-
-### **Download Page Updates**
-Two locations need version updates:
-1. `src/pages/download/index.tsx` - Main download page
-2. `src/components/ui/desktop-download.tsx` - Login page download
-
-### **Manual Deployment** (if needed)
+**Code Signing Failed**
 ```bash
-# Deploy to Vercel manually
-vercel --prod
-```
-
----
-
-## **🔍 Troubleshooting**
-
-### **Common Issues**
-
-#### **Code Signing Fails**
-```bash
-# Check certificate installation
+# Check certificates
 security find-identity -v -p codesigning
 
-# Reinstall certificate if needed
-# Use Keychain Access to import CertificateSigningRequest.certSigningRequest
+# Install certificate if missing
+security import /path/to/certificate.p12 -k ~/Library/Keychains/login.keychain
 ```
 
-#### **Notarization Timeout**
-- **Cause**: Apple's notary service is slow
-- **Solution**: Wait up to 30 minutes, or retry
-- **Check Status**: Apple will email results to Apple ID
+**Notarization Failed**
+- Verify Apple ID and app-specific password
+- Check Team ID is correct
+- Ensure entitlements file exists
+- Wait longer (notarization can take 10+ minutes)
 
-#### **GitHub Release Fails**
-```bash
-# Check GitHub CLI authentication
-gh auth status
-
-# Re-authenticate if needed
-gh auth login
-```
-
-#### **Auto-Update Not Working**
+**Auto-Update Not Working**
 - Verify `latest-mac.yml` is in GitHub release assets
 - Check SHA512 hashes match exactly
 - Ensure file sizes are correct
+- Test update URL accessibility
 
-### **Build Failures**
+**DMG Installation Issues**
+- Ensure DMG is properly signed and notarized
+- Check Gatekeeper settings
+- Verify entitlements include necessary permissions
 
-#### **Electron Builder Errors**
-```bash
-# Clear node_modules and rebuild
-rm -rf node_modules
-npm install
+---
 
-# Clear electron cache
-npx electron-builder install-app-deps
+## 📊 File Structure
+
 ```
-
-#### **Missing Dependencies**
-```bash
-# Rebuild native modules
-npm run rebuild
-
-# Install specific dependencies
-npm install --platform=darwin --arch=x64
-npm install --platform=darwin --arch=arm64
+TimeFlow Release Files:
+├── dist/
+│   ├── TimeFlow-v1.0.XX-Intel.dmg       # macOS Intel (signed & notarized)
+│   ├── TimeFlow-v1.0.XX-ARM64.dmg       # macOS Apple Silicon (signed & notarized)
+│   ├── TimeFlow-v1.0.XX-Setup.exe       # Windows installer
+│   └── TimeFlow-v1.0.XX-Linux.AppImage  # Linux portable
+├── latest-mac.yml                        # macOS auto-update config
+├── latest.yml                            # Windows auto-update config
+└── public/downloads/                     # Web-accessible files
+    ├── TimeFlow-v1.0.XX-Intel.dmg
+    ├── TimeFlow-v1.0.XX-ARM64.dmg
+    ├── TimeFlow-v1.0.XX-Setup.exe
+    ├── TimeFlow-v1.0.XX-Linux.AppImage
+    └── checksums.txt
 ```
 
 ---
 
-## **📊 Verification Checklist**
+## 🌐 Web Deployment
 
-### **Pre-Release**
-- [ ] Version number updated in package.json
-- [ ] Download URLs updated in web app
-- [ ] Code signing certificate installed
+### Automatic Deployment
+- Vercel automatically deploys on push to `main` branch
+- No manual deployment needed
+- Download page updates automatically
+
+### Manual Verification
+1. Check download page: https://time-flow-admin.vercel.app/download
+2. Verify version numbers are updated
+3. Test download links work correctly
+4. Confirm file sizes and checksums match
+
+---
+
+## 📈 Release Checklist
+
+### Pre-Release
+- [ ] Version number updated in `package.json`
+- [ ] Download URLs updated in both web locations
+- [ ] Apple Developer Certificate installed
 - [ ] GitHub CLI authenticated
-- [ ] Environment variables set
+- [ ] All credentials set as environment variables
 
-### **Post-Release**
-- [ ] GitHub release contains all files
-- [ ] Download links work correctly
-- [ ] DMG files install without security warnings
-- [ ] Auto-update notifications appear
-- [ ] Web app shows correct version
-- [ ] All platforms tested on clean machines
+### During Release
+- [ ] Build process completes without errors
+- [ ] All expected files are generated
+- [ ] File sizes and hashes calculated correctly
+- [ ] Auto-update configurations updated
+- [ ] GitHub release created successfully
 
-### **Auto-Update Verification**
-- [ ] `latest-mac.yml` accessible from GitHub
-- [ ] `latest.yml` accessible from GitHub
-- [ ] SHA512 hashes match actual files
-- [ ] File sizes are correct
-- [ ] Existing users see update notification
-
----
-
-## **🎯 Best Practices**
-
-### **Version Management**
-- Use semantic versioning (1.0.XX)
-- Update version in all locations consistently
-- Test with pre-release versions first
-
-### **Security**
-- Always sign macOS builds
-- Verify notarization completes successfully
-- Test installations on clean machines
-- Use app-specific passwords for automation
-
-### **Testing**
-- Test auto-updates before public release
-- Verify all download links work
-- Check installations on multiple OS versions
-- Test permission requests and functionality
-
-### **Documentation**
-- Update release notes with meaningful changes
-- Document breaking changes clearly
-- Include installation instructions
-- Provide troubleshooting guides
+### Post-Release
+- [ ] Download links work on web interface
+- [ ] Auto-update notifications appear for existing users
+- [ ] Fresh installations work without security warnings
+- [ ] All platforms install and run correctly
+- [ ] GitHub release contains all necessary files
 
 ---
 
-## **📞 Emergency Procedures**
+## 🎯 Best Practices
 
-### **Rollback Release**
-```bash
-# Delete problematic release
-gh release delete v1.0.XX
+### Version Management
+- Use semantic versioning (major.minor.patch)
+- Increment patch for bug fixes and small features
+- Increment minor for new features
+- Increment major for breaking changes
 
-# Restore previous latest-mac.yml
-git checkout HEAD~1 latest-mac.yml
-git commit -m "Rollback auto-updater to previous version"
-git push origin main
-```
+### Release Timing
+- Release during business hours for immediate issue response
+- Avoid releasing on Fridays or before holidays
+- Ensure team availability for support
 
-### **Quick Hotfix**
-```bash
-# For critical bugs, use patch version
-npm version patch --no-git-tag-version
+### Communication
+- Document all changes in release notes
+- Announce updates to users via appropriate channels
+- Monitor for issues post-release
 
-# Build and release immediately
-./scripts/complete-release.sh
-```
-
-### **Emergency Web Update**
-```bash
-# Update download URLs to previous working version
-# Edit src/pages/download/index.tsx and src/components/ui/desktop-download.tsx
-# Deploy immediately
-git add -A
-git commit -m "Emergency: Revert to working download links"
-git push origin main
-```
+### Security
+- Always verify signatures before releasing
+- Test on clean machines to catch security warnings
+- Keep signing certificates secure and backed up
 
 ---
 
-## **🎊 Success!**
+## 🔗 Useful Links
 
-Following this guide ensures:
-- ✅ Professional, signed, and notarized releases
-- ✅ Seamless auto-updates for existing users  
-- ✅ Cross-platform compatibility
-- ✅ Proper version management
-- ✅ Reliable deployment pipeline
+- [GitHub Repository](https://github.com/mafatah/time-flow-admin)
+- [Latest Release](https://github.com/mafatah/time-flow-admin/releases/latest)
+- [Download Page](https://time-flow-admin.vercel.app/download)
+- [Apple Developer Console](https://developer.apple.com)
+- [Electron Builder Documentation](https://www.electron.build)
 
-**Your TimeFlow releases are now enterprise-ready!** 🚀 
+---
+
+## 📞 Support
+
+For release issues or questions:
+1. Check troubleshooting section above
+2. Review GitHub Actions logs (if using CI/CD)
+3. Verify all credentials and certificates
+4. Test on clean development machine
+5. Consult Electron Builder documentation for platform-specific issues
+
+---
+
+*Last updated: January 17, 2025* 

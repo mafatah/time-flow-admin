@@ -1,57 +1,121 @@
 #!/bin/bash
 set -e
 
-# 🚀 Cross-Platform Build Script for Windows and Linux
-# This script builds Windows EXE and Linux AppImage versions
+# 🚀 Cross-Platform Build Script (Windows + Linux)
+# Builds Windows EXE and Linux AppImage without macOS
 
-echo "🚀 Building TimeFlow for Windows and Linux..."
-echo "=============================================="
+echo "🚀 Starting Cross-Platform Build (Windows + Linux)..."
 
-# Configuration
-NEW_VERSION=$(grep '"version"' package.json | cut -d'"' -f4)
-echo "📦 Version: v$NEW_VERSION"
+# Get current version
+CURRENT_VERSION=$(node -p "require('./package.json').version")
 
-# Build web application first
-echo "🏗️ Building web application..."
-npm run build
+echo "📦 Current version: ${CURRENT_VERSION}"
 
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
-rm -rf dist
-rm -rf build
+rm -rf dist build node_modules/.cache
 
-# Build desktop application files
-echo "🔨 Building desktop application files..."
-npm run build:all
+# Install dependencies
+echo "📦 Installing dependencies..."
+npm ci
 
-# Build Windows and Linux versions
-echo "🪟 Building Windows version..."
-npx electron-builder --win --publish=never
+# Build web application
+echo "🌐 Building web application..."
+npm run build
 
-echo "🐧 Building Linux version..."
-npx electron-builder --linux --publish=never
+# Build desktop applications for Windows and Linux
+echo "🖥️ Building cross-platform desktop applications..."
+echo "   - Building for Windows (x64)..."
+echo "   - Building for Linux (x64)..."
 
-echo "✅ Cross-platform build completed!"
+# Build Windows and Linux with electron-builder
+npx electron-builder --win --linux --publish=never
 
-# Show results
+echo "✅ Cross-platform builds completed!"
+
+# Show build results
 echo "📊 Build Results:"
-echo "=================="
 ls -la dist/
 
+# Rename files to match our naming convention
+echo "📝 Renaming files to match naming convention..."
+
+# Find and rename Windows file
+if ls dist/*Setup*.exe 1> /dev/null 2>&1; then
+    WIN_FILE=$(ls dist/*Setup*.exe | head -1)
+    cp "$WIN_FILE" "dist/TimeFlow-v${CURRENT_VERSION}-Setup.exe"
+    echo "✅ Windows: $WIN_FILE -> TimeFlow-v${CURRENT_VERSION}-Setup.exe"
+fi
+
+# Find and rename Linux file
+if ls dist/*.AppImage 1> /dev/null 2>&1; then
+    LINUX_FILE=$(ls dist/*.AppImage | head -1)
+    cp "$LINUX_FILE" "dist/TimeFlow-v${CURRENT_VERSION}-Linux.AppImage"
+    echo "✅ Linux: $LINUX_FILE -> TimeFlow-v${CURRENT_VERSION}-Linux.AppImage"
+fi
+
 # Generate file information
-echo "📋 File Information:"
-echo "===================="
+echo "📊 Generating file information..."
 
-if [ -f "dist/TimeFlow-v$NEW_VERSION-Setup.exe" ]; then
-    WINDOWS_SIZE=$(stat -f%z "dist/TimeFlow-v$NEW_VERSION-Setup.exe")
-    WINDOWS_SHA512=$(shasum -a 512 "dist/TimeFlow-v$NEW_VERSION-Setup.exe" | cut -d' ' -f1)
-    echo "Windows EXE: $WINDOWS_SIZE bytes, SHA512: $WINDOWS_SHA512"
+WIN_RENAMED="dist/TimeFlow-v${CURRENT_VERSION}-Setup.exe"
+LINUX_RENAMED="dist/TimeFlow-v${CURRENT_VERSION}-Linux.AppImage"
+
+if [[ -f "$WIN_RENAMED" ]]; then
+    WIN_SHA512=$(shasum -a 512 "$WIN_RENAMED" | cut -d' ' -f1)
+    WIN_SIZE=$(stat -f%z "$WIN_RENAMED" 2>/dev/null || stat -c%s "$WIN_RENAMED")
+    echo "   Windows EXE: ${WIN_SIZE} bytes, SHA512: ${WIN_SHA512}"
 fi
 
-if [ -f "dist/TimeFlow-v$NEW_VERSION-Linux.AppImage" ]; then
-    LINUX_SIZE=$(stat -f%z "dist/TimeFlow-v$NEW_VERSION-Linux.AppImage")
-    LINUX_SHA512=$(shasum -a 512 "dist/TimeFlow-v$NEW_VERSION-Linux.AppImage" | cut -d' ' -f1)
-    echo "Linux AppImage: $LINUX_SIZE bytes, SHA512: $LINUX_SHA512"
+if [[ -f "$LINUX_RENAMED" ]]; then
+    LINUX_SHA512=$(shasum -a 512 "$LINUX_RENAMED" | cut -d' ' -f1)
+    LINUX_SIZE=$(stat -f%z "$LINUX_RENAMED" 2>/dev/null || stat -c%s "$LINUX_RENAMED")
+    echo "   Linux AppImage: ${LINUX_SIZE} bytes, SHA512: ${LINUX_SHA512}"
 fi
 
-echo "🎉 Cross-platform build complete!" 
+# Update Windows auto-update configuration if Windows build exists
+if [[ -f "$WIN_RENAMED" ]]; then
+    echo "⚙️ Updating Windows auto-update configuration..."
+    RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+    
+    cat > latest.yml << EOF
+version: ${CURRENT_VERSION}
+files:
+  - url: TimeFlow-v${CURRENT_VERSION}-Setup.exe
+    sha512: ${WIN_SHA512}
+    size: ${WIN_SIZE}
+path: TimeFlow-v${CURRENT_VERSION}-Setup.exe
+sha512: ${WIN_SHA512}
+releaseDate: '${RELEASE_DATE}'
+EOF
+    echo "✅ Windows auto-update configuration updated"
+fi
+
+# Copy files to public downloads directory
+echo "📁 Copying files to public downloads directory..."
+mkdir -p public/downloads
+
+if [[ -f "$WIN_RENAMED" ]]; then
+    cp "$WIN_RENAMED" "public/downloads/"
+fi
+
+if [[ -f "$LINUX_RENAMED" ]]; then
+    cp "$LINUX_RENAMED" "public/downloads/"
+fi
+
+echo "✅ Files copied to public/downloads/"
+
+echo "🎉 Cross-Platform Build Complete!"
+echo ""
+echo "📋 Build Summary:"
+echo "   Version: v${CURRENT_VERSION}"
+if [[ -f "$WIN_RENAMED" ]]; then
+    echo "   Windows: ✅ Built and ready"
+fi
+if [[ -f "$LINUX_RENAMED" ]]; then
+    echo "   Linux: ✅ Built and ready"
+fi
+echo ""
+echo "🔗 Next steps:"
+echo "   1. Test installations on Windows and Linux"
+echo "   2. Add these files to a GitHub release"
+echo "   3. Update web deployment links" 

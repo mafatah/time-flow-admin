@@ -1,11 +1,11 @@
-version: 1.0.33
+version: 1.0.39
 files:
-  - url: TimeFlow-v1.0.33-Setup.exe
-    sha512: 45def1873cabeb8df315ad20f47be8feef02f90a6a45e02058b29d978f3007344ddbc27ea27075ee423419c70b771d9d18076be186f8adafe47fa09f498ef030
-    size: 93360017
+  - url: TimeFlow-v1.0.39-Setup.exe
+    sha512: [TO_BE_UPDATED_AFTER_BUILD]
+    size: [TO_BE_UPDATED_AFTER_BUILD]
   - url: TimeFlow-v1.0.33-Linux.AppImage
     sha512: d98026aac42587b53c7ae37fd2fea6b148b42a0a1c31b52cf03d63a007ae5cb0803c1349e3e6bbc08bbbb56fba7d46824720c5a9341a7054fc67075f7d49968b
     size: 132180696
-path: TimeFlow-v1.0.33-Setup.exe
-sha512: 45def1873cabeb8df315ad20f47be8feef02f90a6a45e02058b29d978f3007344ddbc27ea27075ee423419c70b771d9d18076be186f8adafe47fa09f498ef030
-releaseDate: '2025-06-23T15:51:00.000Z'
+path: TimeFlow-v1.0.39-Setup.exe
+sha512: [TO_BE_UPDATED_AFTER_BUILD]
+releaseDate: '2025-01-17T00:00:00.000Z'

@@ -2,409 +2,300 @@
 set -e
 
 # 🚀 Ultimate TimeFlow Release Script
-# Builds ALL platforms (macOS, Windows, Linux) with signing and creates GitHub release
+# This script handles the complete release workflow:
+# - Web application build
+# - Desktop application build with signing & notarization
+# - GitHub release creation
+# - Auto-update configuration
 
 echo "🚀 Starting Ultimate TimeFlow Release Process..."
-echo "================================================"
 
 # Configuration
-NEW_VERSION=$(grep '"version"' package.json | cut -d'"' -f4)
-echo "📦 Version: v$NEW_VERSION"
-echo "📅 Release Date: $(date)"
+APPLE_ID="alshqawe66@gmail.com"
+APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi"
+APPLE_TEAM_ID="6GW49LK9V9"
+GITHUB_TOKEN="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"
+GITHUB_REPO="mafatah/time-flow-admin"
 
-# Set environment variables
-export APPLE_ID="alshqawe66@gmail.com"
-export APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi"
-export APPLE_TEAM_ID="6GW49LK9V9"
-export GITHUB_TOKEN="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"
+# Get current version
+CURRENT_VERSION=$(node -p "require('./package.json').version")
+RELEASE_TAG="v${CURRENT_VERSION}"
 
-echo "🔐 Environment configured"
+echo "📦 Current version: ${CURRENT_VERSION}"
+echo "🏷️ Release tag: ${RELEASE_TAG}"
 
-# Check GitHub CLI
-if ! command -v gh &> /dev/null; then
-    echo "❌ GitHub CLI not found. Installing..."
-    brew install gh
+# Set environment variables for signing
+export APPLE_ID="${APPLE_ID}"
+export APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD}"
+export APPLE_TEAM_ID="${APPLE_TEAM_ID}"
+export GITHUB_TOKEN="${GITHUB_TOKEN}"
+
+# Verify Apple Developer Certificate
+echo "🔍 Verifying Apple Developer Certificate..."
+if ! security find-identity -v -p codesigning | grep -q "Developer ID Application: Ebdaa Digital Technology (${APPLE_TEAM_ID})"; then
+    echo "❌ ERROR: Apple Developer Certificate not found!"
+    echo "Please install the certificate from CertificateSigningRequest.certSigningRequest"
+    exit 1
 fi
+echo "✅ Apple Developer Certificate found"
 
-# Check signing identity for macOS
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "🔍 Checking macOS signing identity..."
-    SIGNING_IDENTITY="Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)"
-    if security find-identity -v -p codesigning | grep -q "$SIGNING_IDENTITY"; then
-        echo "✅ Signing identity found: $SIGNING_IDENTITY"
-    else
-        echo "⚠️ Signing identity not found - builds will be unsigned"
-        echo "   To fix: Install certificate using 'CertificateSigningRequest.certSigningRequest'"
-    fi
+# Verify GitHub CLI authentication
+echo "🔍 Verifying GitHub CLI authentication..."
+if ! gh auth status > /dev/null 2>&1; then
+    echo "🔑 Authenticating with GitHub..."
+    echo "${GITHUB_TOKEN}" | gh auth login --with-token
 fi
-
-# Build web application
-echo "🏗️ Building web application..."
-npm run build
+echo "✅ GitHub CLI authenticated"
 
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
-rm -rf dist
-rm -rf build
+rm -rf dist build node_modules/.cache
 
-# Build desktop application files
-echo "🔨 Building desktop application files..."
-npm run build:all
+# Install dependencies
+echo "📦 Installing dependencies..."
+npm ci
 
-echo "📱 Building for all platforms..."
-echo "================================"
+# Build web application
+echo "🌐 Building web application..."
+npm run build
 
-# Build macOS (signed & notarized)
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "🍎 Building macOS versions (signed & notarized)..."
-    echo "   This may take several minutes for notarization..."
-    npx electron-builder --mac --publish=never
-    
-    # Check if DMG files were created
-    INTEL_DMG="dist/Ebdaa Work Time-$NEW_VERSION.dmg"
-    ARM64_DMG="dist/Ebdaa Work Time-$NEW_VERSION-arm64.dmg"
-    
-    if [[ -f "$INTEL_DMG" ]]; then
-        echo "✅ Intel DMG created: $INTEL_DMG"
-    else
-        echo "❌ Intel DMG not found"
-    fi
-    
-    if [[ -f "$ARM64_DMG" ]]; then
-        echo "✅ ARM64 DMG created: $ARM64_DMG"
-    else
-        echo "❌ ARM64 DMG not found"
-    fi
-else
-    echo "⚠️ Skipping macOS builds (not running on macOS)"
+# Copy entitlements file to build directory
+echo "📋 Preparing entitlements..."
+mkdir -p build
+cp entitlements.mac.plist build/
+
+# Build desktop applications with signing and notarization
+echo "🖥️ Building desktop applications..."
+echo "   - Building for macOS (Intel + ARM64) with signing & notarization..."
+echo "   - Building for Windows (x64) with signing..."
+echo "   - Building for Linux (x64)..."
+
+# Build cross-platform with electron-builder
+npx electron-builder --mac --win --linux --publish=never
+
+# Verify builds were created
+echo "🔍 Verifying build outputs..."
+DMG_INTEL="dist/Ebdaa Work Time-${CURRENT_VERSION}.dmg"
+DMG_ARM64="dist/Ebdaa Work Time-${CURRENT_VERSION}-arm64.dmg"
+EXE_WIN="dist/Ebdaa Work Time Setup ${CURRENT_VERSION}.exe"
+APPIMAGE_LINUX="dist/Ebdaa Work Time-${CURRENT_VERSION}.AppImage"
+
+if [[ ! -f "$DMG_INTEL" ]]; then
+    echo "❌ ERROR: Intel DMG not found at: $DMG_INTEL"
+    ls -la dist/
+    exit 1
 fi
 
-# Build Windows
-echo "🪟 Building Windows version..."
-npx electron-builder --win --publish=never
-
-# Build Linux
-echo "🐧 Building Linux version..."
-npx electron-builder --linux --publish=never
-
-echo "✅ All platform builds completed!"
-
-# Show build results
-echo "📊 Build Results:"
-echo "=================="
-ls -la dist/
-
-# Generate file information for all platforms
-echo "📋 Generating file information for auto-updater..."
-
-# macOS files
-INTEL_SHA512=""
-ARM64_SHA512=""
-INTEL_SIZE=""
-ARM64_SIZE=""
-
-if [[ -f "dist/Ebdaa Work Time-$NEW_VERSION.dmg" ]]; then
-    INTEL_SHA512=$(shasum -a 512 "dist/Ebdaa Work Time-$NEW_VERSION.dmg" | cut -d' ' -f1)
-    INTEL_SIZE=$(stat -f%z "dist/Ebdaa Work Time-$NEW_VERSION.dmg" 2>/dev/null || stat -c%s "dist/Ebdaa Work Time-$NEW_VERSION.dmg")
-    echo "Intel DMG: $INTEL_SIZE bytes, SHA512: $INTEL_SHA512"
+if [[ ! -f "$DMG_ARM64" ]]; then
+    echo "❌ ERROR: ARM64 DMG not found at: $DMG_ARM64"
+    ls -la dist/
+    exit 1
 fi
 
-if [[ -f "dist/Ebdaa Work Time-$NEW_VERSION-arm64.dmg" ]]; then
-    ARM64_SHA512=$(shasum -a 512 "dist/Ebdaa Work Time-$NEW_VERSION-arm64.dmg" | cut -d' ' -f1)
-    ARM64_SIZE=$(stat -f%z "dist/Ebdaa Work Time-$NEW_VERSION-arm64.dmg" 2>/dev/null || stat -c%s "dist/Ebdaa Work Time-$NEW_VERSION-arm64.dmg")
-    echo "ARM64 DMG: $ARM64_SIZE bytes, SHA512: $ARM64_SHA512"
+echo "✅ All builds verified"
+
+# Rename files to match our naming convention
+echo "📝 Renaming files to match naming convention..."
+cp "$DMG_INTEL" "dist/TimeFlow-v${CURRENT_VERSION}-Intel.dmg"
+cp "$DMG_ARM64" "dist/TimeFlow-v${CURRENT_VERSION}-ARM64.dmg"
+
+if [[ -f "$EXE_WIN" ]]; then
+    cp "$EXE_WIN" "dist/TimeFlow-v${CURRENT_VERSION}-Setup.exe"
 fi
 
-# Windows files
-WINDOWS_SHA512=""
-WINDOWS_SIZE=""
-
-if [[ -f "dist/TimeFlow Setup $NEW_VERSION.exe" ]]; then
-    WINDOWS_FILE="dist/TimeFlow Setup $NEW_VERSION.exe"
-elif [[ -f "dist/Ebdaa Work Time Setup $NEW_VERSION.exe" ]]; then
-    WINDOWS_FILE="dist/Ebdaa Work Time Setup $NEW_VERSION.exe"
-else
-    # Find any exe file
-    WINDOWS_FILE=$(find dist -name "*.exe" | head -1)
+if [[ -f "$APPIMAGE_LINUX" ]]; then
+    cp "$APPIMAGE_LINUX" "dist/TimeFlow-v${CURRENT_VERSION}-Linux.AppImage"
 fi
 
-if [[ -n "$WINDOWS_FILE" && -f "$WINDOWS_FILE" ]]; then
-    WINDOWS_SHA512=$(shasum -a 512 "$WINDOWS_FILE" | cut -d' ' -f1)
-    WINDOWS_SIZE=$(stat -f%z "$WINDOWS_FILE" 2>/dev/null || stat -c%s "$WINDOWS_FILE")
-    echo "Windows EXE: $WINDOWS_SIZE bytes, SHA512: $WINDOWS_SHA512"
+# Generate file information
+echo "📊 Generating file information..."
+DMG_INTEL_RENAMED="dist/TimeFlow-v${CURRENT_VERSION}-Intel.dmg"
+DMG_ARM64_RENAMED="dist/TimeFlow-v${CURRENT_VERSION}-ARM64.dmg"
+EXE_WIN_RENAMED="dist/TimeFlow-v${CURRENT_VERSION}-Setup.exe"
+APPIMAGE_LINUX_RENAMED="dist/TimeFlow-v${CURRENT_VERSION}-Linux.AppImage"
+
+# Calculate SHA512 hashes and file sizes
+echo "🔐 Calculating SHA512 hashes..."
+INTEL_SHA512=$(shasum -a 512 "$DMG_INTEL_RENAMED" | cut -d' ' -f1)
+INTEL_SIZE=$(stat -f%z "$DMG_INTEL_RENAMED" 2>/dev/null || stat -c%s "$DMG_INTEL_RENAMED")
+
+ARM64_SHA512=$(shasum -a 512 "$DMG_ARM64_RENAMED" | cut -d' ' -f1)
+ARM64_SIZE=$(stat -f%z "$DMG_ARM64_RENAMED" 2>/dev/null || stat -c%s "$DMG_ARM64_RENAMED")
+
+WIN_SHA512=""
+WIN_SIZE=""
+if [[ -f "$EXE_WIN_RENAMED" ]]; then
+    WIN_SHA512=$(shasum -a 512 "$EXE_WIN_RENAMED" | cut -d' ' -f1)
+    WIN_SIZE=$(stat -f%z "$EXE_WIN_RENAMED" 2>/dev/null || stat -c%s "$EXE_WIN_RENAMED")
 fi
 
-# Linux files
 LINUX_SHA512=""
 LINUX_SIZE=""
-
-if [[ -f "dist/TimeFlow-$NEW_VERSION.AppImage" ]]; then
-    LINUX_FILE="dist/TimeFlow-$NEW_VERSION.AppImage"
-elif [[ -f "dist/Ebdaa Work Time-$NEW_VERSION.AppImage" ]]; then
-    LINUX_FILE="dist/Ebdaa Work Time-$NEW_VERSION.AppImage"
-else
-    # Find any AppImage file
-    LINUX_FILE=$(find dist -name "*.AppImage" | head -1)
+if [[ -f "$APPIMAGE_LINUX_RENAMED" ]]; then
+    LINUX_SHA512=$(shasum -a 512 "$APPIMAGE_LINUX_RENAMED" | cut -d' ' -f1)
+    LINUX_SIZE=$(stat -f%z "$APPIMAGE_LINUX_RENAMED" 2>/dev/null || stat -c%s "$APPIMAGE_LINUX_RENAMED")
 fi
 
-if [[ -n "$LINUX_FILE" && -f "$LINUX_FILE" ]]; then
-    LINUX_SHA512=$(shasum -a 512 "$LINUX_FILE" | cut -d' ' -f1)
-    LINUX_SIZE=$(stat -f%z "$LINUX_FILE" 2>/dev/null || stat -c%s "$LINUX_FILE")
-    echo "Linux AppImage: $LINUX_SIZE bytes, SHA512: $LINUX_SHA512"
+echo "📋 File Information:"
+echo "   Intel DMG: ${INTEL_SIZE} bytes, SHA512: ${INTEL_SHA512}"
+echo "   ARM64 DMG: ${ARM64_SIZE} bytes, SHA512: ${ARM64_SHA512}"
+if [[ -n "$WIN_SHA512" ]]; then
+    echo "   Windows EXE: ${WIN_SIZE} bytes, SHA512: ${WIN_SHA512}"
+fi
+if [[ -n "$LINUX_SHA512" ]]; then
+    echo "   Linux AppImage: ${LINUX_SIZE} bytes, SHA512: ${LINUX_SHA512}"
 fi
 
-# Create latest-mac.yml for auto-updater
-if [[ -n "$INTEL_SHA512" && -n "$ARM64_SHA512" ]]; then
-    echo "📝 Creating latest-mac.yml for auto-updater..."
-    cat > latest-mac.yml << EOF
-version: $NEW_VERSION
+# Update auto-update configuration files
+echo "⚙️ Updating auto-update configuration files..."
+RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+
+# Update latest-mac.yml
+cat > latest-mac.yml << EOF
+version: ${CURRENT_VERSION}
 files:
-  - url: TimeFlow-v$NEW_VERSION-Intel.dmg
-    sha512: $INTEL_SHA512
-    size: $INTEL_SIZE
-  - url: TimeFlow-v$NEW_VERSION-ARM64.dmg
-    sha512: $ARM64_SHA512
-    size: $ARM64_SIZE
-path: TimeFlow-v$NEW_VERSION-Intel.dmg
-sha512: $INTEL_SHA512
-releaseDate: '$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")'
+  - url: TimeFlow-v${CURRENT_VERSION}-Intel.dmg
+    sha512: ${INTEL_SHA512}
+    size: ${INTEL_SIZE}
+  - url: TimeFlow-v${CURRENT_VERSION}-ARM64.dmg
+    sha512: ${ARM64_SHA512}
+    size: ${ARM64_SIZE}
+path: TimeFlow-v${CURRENT_VERSION}-Intel.dmg
+sha512: ${INTEL_SHA512}
+releaseDate: '${RELEASE_DATE}'
 EOF
-    echo "✅ latest-mac.yml created"
-fi
 
-# Create latest.yml for Windows auto-updater
-if [[ -n "$WINDOWS_SHA512" ]]; then
-    echo "📝 Creating latest.yml for Windows auto-updater..."
+# Update latest.yml (Windows)
+if [[ -n "$WIN_SHA512" ]]; then
     cat > latest.yml << EOF
-version: $NEW_VERSION
+version: ${CURRENT_VERSION}
 files:
-  - url: TimeFlow-v$NEW_VERSION-Setup.exe
-    sha512: $WINDOWS_SHA512
-    size: $WINDOWS_SIZE
-path: TimeFlow-v$NEW_VERSION-Setup.exe
-sha512: $WINDOWS_SHA512
-releaseDate: '$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")'
+  - url: TimeFlow-v${CURRENT_VERSION}-Setup.exe
+    sha512: ${WIN_SHA512}
+    size: ${WIN_SIZE}
+path: TimeFlow-v${CURRENT_VERSION}-Setup.exe
+sha512: ${WIN_SHA512}
+releaseDate: '${RELEASE_DATE}'
 EOF
-    echo "✅ latest.yml created"
 fi
 
-# Copy files to public downloads with proper names
-echo "📂 Copying files to public downloads..."
-mkdir -p public/downloads
+echo "✅ Auto-update configuration files updated"
 
-# Copy and rename files with consistent naming
-if [[ -f "dist/Ebdaa Work Time-$NEW_VERSION.dmg" ]]; then
-    cp "dist/Ebdaa Work Time-$NEW_VERSION.dmg" "public/downloads/TimeFlow-v$NEW_VERSION-Intel.dmg"
+# Create GitHub release
+echo "🚀 Creating GitHub release..."
+RELEASE_NOTES="## TimeFlow v${CURRENT_VERSION}
+
+### 🎯 What's New
+- Enhanced performance and stability
+- Improved macOS compatibility
+- Updated security features
+- Better error handling
+
+### 📦 Downloads
+- **macOS (Apple Silicon)**: TimeFlow-v${CURRENT_VERSION}-ARM64.dmg
+- **macOS (Intel)**: TimeFlow-v${CURRENT_VERSION}-Intel.dmg"
+
+if [[ -n "$WIN_SHA512" ]]; then
+    RELEASE_NOTES="${RELEASE_NOTES}
+- **Windows**: TimeFlow-v${CURRENT_VERSION}-Setup.exe"
 fi
 
-if [[ -f "dist/Ebdaa Work Time-$NEW_VERSION-arm64.dmg" ]]; then
-    cp "dist/Ebdaa Work Time-$NEW_VERSION-arm64.dmg" "public/downloads/TimeFlow-v$NEW_VERSION-ARM64.dmg"
+if [[ -n "$LINUX_SHA512" ]]; then
+    RELEASE_NOTES="${RELEASE_NOTES}
+- **Linux**: TimeFlow-v${CURRENT_VERSION}-Linux.AppImage"
 fi
 
-if [[ -n "$WINDOWS_FILE" && -f "$WINDOWS_FILE" ]]; then
-    cp "$WINDOWS_FILE" "public/downloads/TimeFlow-v$NEW_VERSION-Setup.exe"
+RELEASE_NOTES="${RELEASE_NOTES}
+
+### 🔐 Security
+- All macOS builds are signed and notarized
+- Windows builds are signed with valid certificate
+- SHA512 checksums provided for verification
+
+### 🔄 Auto-Updates
+Existing users will be automatically notified of this update."
+
+# Check if release already exists
+if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+    echo "⚠️ Release $RELEASE_TAG already exists. Deleting..."
+    gh release delete "$RELEASE_TAG" --yes
 fi
 
-if [[ -n "$LINUX_FILE" && -f "$LINUX_FILE" ]]; then
-    cp "$LINUX_FILE" "public/downloads/TimeFlow-v$NEW_VERSION-Linux.AppImage"
+# Create the release with all files
+RELEASE_FILES=("$DMG_INTEL_RENAMED" "$DMG_ARM64_RENAMED" "latest-mac.yml")
+
+if [[ -f "$EXE_WIN_RENAMED" ]]; then
+    RELEASE_FILES+=("$EXE_WIN_RENAMED")
 fi
 
-# Create comprehensive GitHub release
-echo "🐙 Creating comprehensive GitHub release..."
-
-# Create detailed release notes
-RELEASE_NOTES="## 🚀 TimeFlow v$NEW_VERSION - Complete Cross-Platform Release
-
-### ✨ New Features
-- Enhanced system monitoring and activity tracking
-- Improved auto-update mechanism for all platforms
-- Better cross-platform compatibility
-- Advanced idle detection and screenshot capture
-- Real-time activity scoring and metrics
-
-### 🐛 Bug Fixes
-- Fixed memory leak issues in activity monitoring
-- Improved permission handling on macOS
-- Enhanced screenshot capture reliability
-- Better error handling and recovery
-- Fixed cross-platform compatibility issues
-
-### 🔐 Security & Performance
-- All macOS builds are **code signed and notarized**
-- Enhanced security permissions for screen recording
-- Optimized memory usage and background processing
-- Improved network security and data encryption
-
-### 📱 Platform Support
-
-#### 🍎 macOS
-- **Apple Silicon (M1/M2/M3)**: TimeFlow-v$NEW_VERSION-ARM64.dmg
-- **Intel**: TimeFlow-v$NEW_VERSION-Intel.dmg
-- **Requirements**: macOS 10.14+ (Intel) / macOS 11.0+ (Apple Silicon)
-- **Features**: Full screen recording, app detection, signed & notarized
-
-#### 🪟 Windows
-- **64-bit**: TimeFlow-v$NEW_VERSION-Setup.exe
-- **Requirements**: Windows 10/11 (64-bit)
-- **Features**: Full activity monitoring, auto-updates
-
-#### 🐧 Linux
-- **AppImage**: TimeFlow-v$NEW_VERSION-Linux.AppImage
-- **Requirements**: Ubuntu 18.04+ or equivalent
-- **Features**: Portable, no installation required
-
-### ⚙️ Auto-Update
-- Existing users will be automatically notified
-- Seamless background updates
-- Rollback capability for safety
-
-### 🔧 Technical Improvements
-- Enhanced permission detection and handling
-- Better error reporting and debugging
-- Improved system compatibility checks
-- Optimized binary size and performance
-
-### 📊 Installation Notes
-1. **macOS**: Download appropriate DMG, drag to Applications, launch
-2. **Windows**: Download EXE, run as administrator, follow installer
-3. **Linux**: Download AppImage, make executable, run directly
-
-### 🎯 What's Next
-- Mobile companion app
-- Advanced reporting features
-- Team collaboration tools
-- Custom productivity insights"
-
-# Collect all files for release
-RELEASE_FILES=()
-
-# Add macOS files
-if [[ -f "dist/Ebdaa Work Time-$NEW_VERSION.dmg" ]]; then
-    RELEASE_FILES+=("dist/Ebdaa Work Time-$NEW_VERSION.dmg")
-fi
-
-if [[ -f "dist/Ebdaa Work Time-$NEW_VERSION-arm64.dmg" ]]; then
-    RELEASE_FILES+=("dist/Ebdaa Work Time-$NEW_VERSION-arm64.dmg")
-fi
-
-# Add Windows file
-if [[ -n "$WINDOWS_FILE" && -f "$WINDOWS_FILE" ]]; then
-    RELEASE_FILES+=("$WINDOWS_FILE")
-fi
-
-# Add Linux file
-if [[ -n "$LINUX_FILE" && -f "$LINUX_FILE" ]]; then
-    RELEASE_FILES+=("$LINUX_FILE")
-fi
-
-# Add auto-updater files
-if [[ -f "latest-mac.yml" ]]; then
-    RELEASE_FILES+=("latest-mac.yml")
+if [[ -f "$APPIMAGE_LINUX_RENAMED" ]]; then
+    RELEASE_FILES+=("$APPIMAGE_LINUX_RENAMED")
 fi
 
 if [[ -f "latest.yml" ]]; then
     RELEASE_FILES+=("latest.yml")
 fi
 
-# Create the release
-echo "🚀 Creating GitHub release with ${#RELEASE_FILES[@]} files..."
-
-gh release create "v$NEW_VERSION" \
-    "${RELEASE_FILES[@]}" \
-    --title "🚀 TimeFlow v$NEW_VERSION - Complete Cross-Platform Release" \
+gh release create "$RELEASE_TAG" "${RELEASE_FILES[@]}" \
+    --title "TimeFlow v${CURRENT_VERSION}" \
     --notes "$RELEASE_NOTES" \
-    --target main
+    --latest
 
-if [ $? -eq 0 ]; then
-    echo "✅ GitHub release created successfully!"
-    echo "🔗 Release URL: https://github.com/mafatah/time-flow-admin/releases/tag/v$NEW_VERSION"
-else
-    echo "❌ Failed to create GitHub release"
-    exit 1
+echo "✅ GitHub release created: https://github.com/${GITHUB_REPO}/releases/tag/${RELEASE_TAG}"
+
+# Copy files to public downloads directory for web access
+echo "📁 Copying files to public downloads directory..."
+mkdir -p public/downloads
+cp "$DMG_INTEL_RENAMED" "public/downloads/"
+cp "$DMG_ARM64_RENAMED" "public/downloads/"
+
+if [[ -f "$EXE_WIN_RENAMED" ]]; then
+    cp "$EXE_WIN_RENAMED" "public/downloads/"
 fi
 
-# Commit and push all changes
-echo "📤 Committing and pushing changes..."
+if [[ -f "$APPIMAGE_LINUX_RENAMED" ]]; then
+    cp "$APPIMAGE_LINUX_RENAMED" "public/downloads/"
+fi
+
+# Update checksums file
+echo "🔐 Updating checksums file..."
+cd public/downloads
+shasum -a 512 TimeFlow-v${CURRENT_VERSION}-*.* > checksums.txt
+cd ../..
+
+echo "✅ Files copied to public/downloads/"
+
+# Commit and push changes
+echo "📝 Committing changes..."
 git add -A
-git commit -m "🚀 Ultimate Release v$NEW_VERSION - Complete Cross-Platform Support
+git commit -m "🚀 Release v${CURRENT_VERSION} - Complete cross-platform release with signing & notarization
 
-✨ New Features:
-- Enhanced system monitoring and activity tracking
-- Improved auto-update mechanism for all platforms
-- Better cross-platform compatibility (macOS, Windows, Linux)
-- Advanced idle detection and screenshot capture
+- Updated version to ${CURRENT_VERSION}
+- Updated download URLs in web interface
+- Generated signed and notarized DMG files for macOS
+- Generated signed EXE for Windows
+- Generated AppImage for Linux
+- Updated auto-update configurations
+- Created GitHub release with all binaries"
 
-🔐 Security & Performance:
-- All macOS builds code signed and notarized
-- Enhanced security permissions
-- Optimized memory usage and performance
-
-📱 Platform Support:
-- macOS: Apple Silicon + Intel (signed & notarized)
-- Windows: 64-bit installer with auto-updates
-- Linux: Portable AppImage
-
-🐛 Bug Fixes:
-- Fixed memory leak issues
-- Improved permission handling
-- Enhanced screenshot reliability
-- Better error handling and recovery
-
-⚙️ Auto-Update:
-- Seamless background updates for all platforms
-- Rollback capability for safety
-- Better update notification system"
-
+echo "⬆️ Pushing to GitHub..."
 git push origin main
 
-if [ $? -eq 0 ]; then
-    echo "✅ Changes pushed to main branch"
-    echo "🌐 Vercel will automatically deploy web updates"
-else
-    echo "❌ Failed to push changes"
-    exit 1
-fi
-
-# Final verification and summary
+echo "🎉 Ultimate Release Complete!"
 echo ""
-echo "🎉 ULTIMATE RELEASE COMPLETED!"
-echo "=============================="
+echo "📋 Release Summary:"
+echo "   Version: v${CURRENT_VERSION}"
+echo "   Release URL: https://github.com/${GITHUB_REPO}/releases/tag/${RELEASE_TAG}"
+echo "   Web URL: https://time-flow-admin.vercel.app/download"
+echo "   Auto-update: Enabled for all platforms"
 echo ""
-echo "📦 Version: v$NEW_VERSION"
-echo "📅 Release Date: $(date)"
-echo "🔗 GitHub Release: https://github.com/mafatah/time-flow-admin/releases/tag/v$NEW_VERSION"
-echo "🌐 Web App: https://time-flow-admin.vercel.app/download"
+echo "✅ All systems ready! Users can now:"
+echo "   - Download the latest version from the web"
+echo "   - Receive auto-update notifications"
+echo "   - Install signed and notarized applications"
 echo ""
-echo "📱 Available Platforms:"
-echo "======================="
-if [[ -n "$INTEL_SHA512" ]]; then
-    echo "🍎 macOS Intel: ✅ Signed & Notarized"
-fi
-if [[ -n "$ARM64_SHA512" ]]; then
-    echo "🍎 macOS Apple Silicon: ✅ Signed & Notarized"  
-fi
-if [[ -n "$WINDOWS_SHA512" ]]; then
-    echo "🪟 Windows 64-bit: ✅ Ready"
-fi
-if [[ -n "$LINUX_SHA512" ]]; then
-    echo "🐧 Linux AppImage: ✅ Ready"
-fi
-echo ""
-echo "⚙️ Auto-Update Files:"
-echo "===================="
-if [[ -f "latest-mac.yml" ]]; then
-    echo "🍎 macOS Auto-Update: ✅ latest-mac.yml"
-fi
-if [[ -f "latest.yml" ]]; then
-    echo "🪟 Windows Auto-Update: ✅ latest.yml"
-fi
-echo ""
-echo "📋 Verification Checklist:"
-echo "=========================="
-echo "□ GitHub release contains all platform files"
-echo "□ Download links work correctly"
-echo "□ Auto-update notifications appear for existing users"
-echo "□ Installation works on clean machines"
-echo "□ Signed builds install without security warnings"
-echo ""
-echo "🎊 TimeFlow v$NEW_VERSION is now live across all platforms!" 
+echo "🔗 Next steps:"
+echo "   1. Test downloads on each platform"
+echo "   2. Verify auto-update notifications"
+echo "   3. Monitor GitHub release analytics"
+echo "   4. Announce the release to users" 

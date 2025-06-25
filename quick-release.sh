@@ -1,76 +1,98 @@
 #!/bin/bash
 set -e
 
-# 🚀 TimeFlow Quick Release v1.0.38
-# Run this script to create a complete release with signing and notarization
+# 🚀 Quick Release Menu for TimeFlow
+# Interactive script to choose release type
 
-echo "🚀 TimeFlow Quick Release Started..."
-echo "===================================="
+clear
+echo "🚀 TimeFlow Release Menu"
+echo "========================"
+echo ""
+echo "Current version: $(node -p "require('./package.json').version")"
+echo ""
+echo "Choose your release option:"
+echo ""
+echo "1. 🍎 Ultimate Release (All Platforms + GitHub)"
+echo "   - Builds macOS (signed & notarized), Windows, Linux"
+echo "   - Creates GitHub release with all files"
+echo "   - Updates web deployment"
+echo "   - Full auto-update configuration"
+echo ""
+echo "2. 🍎 Complete Release (macOS Only + GitHub)"
+echo "   - Builds macOS Intel & Apple Silicon"
+echo "   - Code signing & notarization"
+echo "   - Creates GitHub release"
+echo "   - Faster than ultimate release"
+echo ""
+echo "3. 🪟🐧 Cross-Platform Build (Windows + Linux)"
+echo "   - Builds Windows EXE and Linux AppImage"
+echo "   - No GitHub release (manual upload needed)"
+echo "   - For testing builds"
+echo ""
+echo "4. 📋 Web Build Only"
+echo "   - Builds web application only"
+echo "   - Updates download page"
+echo "   - No desktop applications"
+echo ""
+echo "5. ❌ Cancel"
 echo ""
 
-# Check if we're on macOS
-if [[ "$OSTYPE" != "darwin"* ]]; then
-    echo "❌ This script must be run on macOS for code signing and notarization"
-    echo "   Use ./scripts/build-cross-platform.sh for Windows/Linux builds on other platforms"
-    exit 1
-fi
-
-# Check GitHub CLI
-if ! command -v gh &> /dev/null; then
-    echo "📦 Installing GitHub CLI..."
-    brew install gh
-fi
-
-# Check if signed in to GitHub
-if ! gh auth status &> /dev/null; then
-    echo "🔐 Please authenticate with GitHub:"
-    gh auth login
-fi
-
-echo "✅ Environment ready!"
-echo ""
-
-# Show current version
-CURRENT_VERSION=$(grep '"version"' package.json | cut -d'"' -f4)
-echo "📦 Current Version: v$CURRENT_VERSION"
-echo ""
-
-# Ask user which release type to run
-echo "🚀 Choose Release Type:"
-echo "1. Ultimate Release (ALL platforms - macOS, Windows, Linux)"
-echo "2. Complete Release (macOS only with signing)"
-echo "3. Cross-Platform Build (Windows + Linux only)"
-echo ""
-
-read -p "Enter choice (1-3): " choice
+read -p "Enter your choice (1-5): " choice
 
 case $choice in
     1)
-        echo "🌟 Running Ultimate Release (All Platforms)..."
-        ./scripts/ultimate-release.sh
+        echo ""
+        echo "🚀 Starting Ultimate Release (All Platforms)..."
+        echo "This will take 10-15 minutes due to Apple notarization..."
+        echo ""
+        read -p "Are you sure? This will create a new GitHub release. (y/N): " confirm
+        if [[ $confirm =~ ^[Yy]$ ]]; then
+            chmod +x scripts/ultimate-release.sh
+            ./scripts/ultimate-release.sh
+        else
+            echo "❌ Ultimate release cancelled"
+        fi
         ;;
     2)
-        echo "🍎 Running Complete Release (macOS only)..."
-        ./scripts/complete-release.sh
+        echo ""
+        echo "🍎 Starting Complete Release (macOS Only)..."
+        echo "This will take 5-10 minutes due to Apple notarization..."
+        echo ""
+        read -p "Are you sure? This will create a new GitHub release. (y/N): " confirm
+        if [[ $confirm =~ ^[Yy]$ ]]; then
+            chmod +x scripts/complete-release.sh
+            ./scripts/complete-release.sh
+        else
+            echo "❌ Complete release cancelled"
+        fi
         ;;
     3)
-        echo "🔧 Running Cross-Platform Build..."
-        ./scripts/build-cross-platform.sh
+        echo ""
+        echo "🪟🐧 Starting Cross-Platform Build..."
+        echo "This will build Windows and Linux versions only..."
+        echo ""
+        read -p "Continue? (y/N): " confirm
+        if [[ $confirm =~ ^[Yy]$ ]]; then
+            chmod +x scripts/build-cross-platform.sh
+            ./scripts/build-cross-platform.sh
+        else
+            echo "❌ Cross-platform build cancelled"
+        fi
+        ;;
+    4)
+        echo ""
+        echo "📋 Building web application only..."
+        npm run build
+        echo "✅ Web build complete!"
+        echo "🌐 Deploy with: git push origin main"
+        ;;
+    5)
+        echo "❌ Release cancelled"
         ;;
     *)
-        echo "❌ Invalid choice. Please run again and select 1, 2, or 3."
-        exit 1
+        echo "❌ Invalid option. Please choose 1-5."
         ;;
 esac
 
 echo ""
-echo "🎉 Release process completed!"
-echo ""
-echo "📋 What to do next:"
-echo "==================="
-echo "1. Check GitHub release: https://github.com/mafatah/time-flow-admin/releases"
-echo "2. Verify download page: https://time-flow-admin.vercel.app/download"
-echo "3. Test auto-updates on existing installations"
-echo "4. Test fresh installations on clean machines"
-echo ""
-echo "🚀 TimeFlow v$CURRENT_VERSION is ready for users!" 
+echo "🏁 Release menu finished" 

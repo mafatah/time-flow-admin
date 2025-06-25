@@ -24,5 +24,9 @@
     <true/>
     <key>com.apple.security.personal-information.screen-capture</key>
     <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
 </dict>
 </plist>
