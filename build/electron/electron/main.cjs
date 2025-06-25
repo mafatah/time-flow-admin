@@ -418,6 +418,19 @@ electron_1.ipcMain.handle('user-logged-in', (event, userData) => {
     }
     console.log('Set user ID:', userData.id);
     console.log('✅ User ID set, ready for manual tracking start');
+    // Perform system check after login to inform user of any issues
+    setTimeout(async () => {
+        console.log('🔍 Performing post-login system check...');
+        const systemCheck = await performSystemCheck();
+        // Send system check results to the renderer
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('show-system-check', {
+                systemCheck: systemCheck,
+                autoShow: true, // Show automatically after login
+                message: 'Welcome! Let\'s verify your system is ready for time tracking.'
+            });
+        }
+    }, 1000); // Small delay to ensure UI is ready
     return { success: true, message: 'User logged in successfully' };
 });
 // Handle user logout from desktop-agent UI
@@ -444,33 +457,8 @@ async function performSystemCheck() {
         // 1. Check Screen Recording Permission (both Electron API and actual binary test)
         console.log('📺 Checking screen recording permission...');
         const electronAPIPermission = await (0, permissionManager_1.checkScreenRecordingPermission)();
-        // Also test the actual binary that needs permission
-        let binaryCanAccess = false;
-        try {
-            const { spawn } = require('child_process');
-            const path = require('path');
-            const activeWinPath = path.join(__dirname, '../node_modules/active-win/main');
-            const binaryTest = await new Promise((resolve) => {
-                const child = spawn(activeWinPath, [], { timeout: 3000 });
-                let stdout = '';
-                child.stdout?.on('data', (data) => {
-                    stdout += data.toString();
-                });
-                child.on('close', (code) => {
-                    if (code === 0 && !stdout.includes('screen recording permission')) {
-                        resolve(true);
-                    }
-                    else {
-                        resolve(false);
-                    }
-                });
-                child.on('error', () => resolve(false));
-            });
-            binaryCanAccess = binaryTest;
-        }
-        catch (error) {
-            console.log('⚠️ Could not test binary permission:', error);
-        }
+        // Use safe binary testing to prevent memory leaks
+        const binaryCanAccess = await testActiveWinBinaryAccess();
         const actualPermission = electronAPIPermission && binaryCanAccess;
         details.permissions.screenRecording = actualPermission;
         details.permissions.electronAPI = electronAPIPermission;
@@ -516,51 +504,32 @@ async function performSystemCheck() {
         if (!screenshotWorks) {
             issues.push('Screenshot capture not working - check permissions and system settings');
         }
-        // 4. Test App Detection (test active-win binary directly)
+        // 4. Test App Detection (use safe binary testing to prevent memory leaks)
         console.log('🖥️ Testing app detection...');
         let appDetectionWorks = false;
         try {
-            // Test the actual active-win binary that's failing
-            const { spawn } = require('child_process');
-            const path = require('path');
-            const activeWinPath = path.join(__dirname, '../node_modules/active-win/main');
-            const testResult = await new Promise((resolve) => {
-                const child = spawn(activeWinPath, [], { timeout: 5000 });
-                let stdout = '';
-                let stderr = '';
-                child.stdout?.on('data', (data) => {
-                    stdout += data.toString();
-                });
-                child.stderr?.on('data', (data) => {
-                    stderr += data.toString();
-                });
-                child.on('close', (code) => {
-                    if (code === 0 && stdout.trim() !== '') {
-                        resolve({ success: true, app: stdout.trim() });
-                    }
-                    else if (stdout.includes('screen recording permission')) {
-                        resolve({ success: false, reason: 'PERMISSION_DENIED', output: stdout });
-                    }
-                    else {
-                        resolve({ success: false, reason: 'OTHER_ERROR', output: stdout || stderr });
-                    }
-                });
-                child.on('error', (error) => {
-                    resolve({ success: false, reason: 'SPAWN_ERROR', error: error.message });
-                });
-            });
-            appDetectionWorks = testResult.success;
-            details.tests.currentApp = appDetectionWorks ? testResult.app : testResult.output || 'PERMISSION_ERROR';
-            if (!testResult.success) {
-                console.log('❌ Active-win binary test failed:', testResult);
-                if (testResult.reason === 'PERMISSION_DENIED') {
-                    details.tests.appDetectionError = 'SCREEN_RECORDING_PERMISSION_REQUIRED';
+            // Use the safe binary testing function we created
+            appDetectionWorks = await testActiveWinBinaryAccess();
+            if (appDetectionWorks) {
+                // If binary access works, try to get current app name
+                try {
+                    const { getCurrentAppName } = require('./activityMonitor.cjs');
+                    const currentApp = await getCurrentAppName();
+                    details.tests.currentApp = currentApp || 'DETECTED_BUT_NO_APP_NAME';
                 }
+                catch (error) {
+                    details.tests.currentApp = 'BINARY_WORKS_BUT_NO_APP_NAME';
+                }
+            }
+            else {
+                details.tests.currentApp = 'PERMISSION_ERROR';
+                details.tests.appDetectionError = 'SCREEN_RECORDING_PERMISSION_REQUIRED';
             }
         }
         catch (error) {
             console.log('❌ App detection test failed:', error);
             details.tests.currentApp = 'ERROR';
+            appDetectionWorks = false;
         }
         details.capabilities.appDetection = appDetectionWorks;
         if (!appDetectionWorks) {
@@ -632,125 +601,197 @@ async function performSystemCheck() {
         };
     }
 }
-// Handle tracking start with comprehensive system check
-electron_1.ipcMain.handle('start-tracking', async (event, projectId) => {
+// === SECURE TRACKING START FUNCTION ===
+// This is the ONLY function that can start tracking - all entry points must go through this
+async function startTrackingSecure(projectId, source = 'UI') {
+    let popup = null;
     try {
-        console.log('▶️ Manual tracking start requested with project ID:', projectId);
-        // Ensure user ID is set before starting tracking
+        console.log(`🔐 [${source}] SECURE TRACKING START requested - validating ALL systems...`);
+        // 1. Show user-friendly permission checking popup (only for UI requests)
+        if (source === 'UI') {
+            popup = showPermissionCheckingPopup();
+        }
+        // 2. Check if already tracking
+        if (isTracking) {
+            if (popup)
+                popup.close();
+            return { success: false, message: 'Tracking is already active' };
+        }
+        // 3. Check if user is logged in
         const currentUserId = (0, tracker_1.getUserId)();
         if (!currentUserId) {
+            if (popup)
+                popup.close();
             return {
                 success: false,
-                message: 'User not logged in. Please log in first.',
-                requiresLogin: true
+                message: 'User must be logged in before starting tracking',
+                issues: ['No user session']
             };
         }
-        // 1. First, automatically request permissions if not already granted
+        // 4. Request and validate permissions with user feedback
         console.log('🔐 Requesting required permissions...');
-        // Check if we need to request Screen Recording permission
-        const currentScreenPermission = await (0, permissionManager_1.checkScreenRecordingPermission)();
-        if (!currentScreenPermission) {
-            console.log('📱 Automatically requesting Screen Recording permission...');
-            const requestResult = await electron_1.dialog.showMessageBox({
-                type: 'question',
-                title: 'Screen Recording Permission Required',
-                message: 'TimeFlow needs Screen Recording permission to function properly.',
-                detail: 'This permission allows TimeFlow to:\n• Capture screenshots for activity monitoring\n• Detect which applications you use\n• Track URLs in browsers\n\nWould you like to grant this permission now?',
-                buttons: ['Open System Preferences', 'Cancel'],
-                defaultId: 0,
-                cancelId: 1
-            });
-            if (requestResult.response === 0) {
-                electron_1.shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+        if (popup) {
+            popup.webContents.executeJavaScript(`
+        document.getElementById('status').textContent = 'Checking Screen Recording permission...';
+        document.getElementById('step-screen').className = 'step checking';
+      `);
+        }
+        const hasScreenPermission = await (0, permissionManager_1.ensureScreenRecordingPermission)();
+        if (!hasScreenPermission) {
+            console.log('❌ SECURE TRACKING BLOCKED: Screen Recording permission denied');
+            if (popup) {
+                popup.webContents.executeJavaScript(`
+          document.getElementById('step-screen').className = 'step fail';
+          document.getElementById('status').textContent = 'Screen Recording permission required!';
+          document.getElementById('spinner').style.display = 'none';
+        `);
+                setTimeout(() => popup.close(), 3000);
             }
             return {
                 success: false,
-                message: 'Please grant Screen Recording permission in System Preferences, then restart TimeFlow and try again.',
-                requiresPermission: true,
-                permissionType: 'screen_recording'
+                message: 'Screen Recording permission is required. Please grant permission in System Settings and try again.',
+                issues: ['Screen Recording Permission Required'],
+                criticalFailure: true
             };
         }
-        // Check accessibility permission for macOS
+        if (popup) {
+            popup.webContents.executeJavaScript(`
+        document.getElementById('step-screen').className = 'step pass';
+      `);
+        }
+        // 5. Check accessibility permission for macOS
         if (process.platform === 'darwin') {
-            const { systemPreferences } = require('electron');
-            const hasAccessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
-            if (!hasAccessibilityPermission) {
-                // Request accessibility permission
-                const requestResult = await electron_1.dialog.showMessageBox({
-                    type: 'question',
-                    title: 'Accessibility Permission Required',
-                    message: 'TimeFlow needs Accessibility permission to detect apps and URLs.',
-                    detail: 'This permission allows TimeFlow to:\n• Track which applications you use\n• Detect URLs in browsers\n• Provide accurate activity monitoring\n\nWould you like to grant this permission now?',
-                    buttons: ['Open System Preferences', 'Skip for Now'],
-                    defaultId: 0,
-                    cancelId: 1
-                });
-                if (requestResult.response === 0) {
-                    electron_1.shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+            if (popup) {
+                popup.webContents.executeJavaScript(`
+          document.getElementById('status').textContent = 'Checking Accessibility permission...';
+          document.getElementById('step-accessibility').className = 'step checking';
+        `);
+            }
+            try {
+                const { systemPreferences } = require('electron');
+                const hasAccessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
+                if (!hasAccessibilityPermission) {
+                    console.log('❌ SECURE TRACKING BLOCKED: Accessibility permission required');
+                    if (popup) {
+                        popup.webContents.executeJavaScript(`
+              document.getElementById('step-accessibility').className = 'step fail';
+              document.getElementById('status').textContent = 'Accessibility permission required!';
+              document.getElementById('spinner').style.display = 'none';
+            `);
+                        setTimeout(() => popup.close(), 3000);
+                    }
                     return {
                         success: false,
-                        message: 'Please grant Accessibility permission in System Preferences, then restart TimeFlow and try again.',
-                        requiresPermission: true,
-                        permissionType: 'accessibility'
+                        message: 'Accessibility permission is required on macOS for app and URL detection. Please grant permission in System Settings and restart the app.',
+                        issues: ['Accessibility Permission Required'],
+                        criticalFailure: true
                     };
                 }
-                // If they skip, continue but with limited functionality
+                if (popup) {
+                    popup.webContents.executeJavaScript(`
+            document.getElementById('step-accessibility').className = 'step pass';
+          `);
+                }
+            }
+            catch (error) {
+                console.log('⚠️ Could not verify accessibility permission:', error);
             }
         }
-        // 2. Perform comprehensive system check
+        // 6. Perform comprehensive system check with STRICT validation
         console.log('🔍 Performing comprehensive system check...');
+        if (popup) {
+            popup.webContents.executeJavaScript(`
+        document.getElementById('status').textContent = 'Running comprehensive system check...';
+        document.getElementById('step-app').className = 'step checking';
+      `);
+        }
         const systemCheck = await performSystemCheck();
-        // 3. STRICT VALIDATION: ALL critical components must pass
+        // 7. Update popup with test results
+        if (popup) {
+            popup.webContents.executeJavaScript(`
+        document.getElementById('step-app').className = '${systemCheck.details?.capabilities?.appDetection ? 'step pass' : 'step fail'}';
+        document.getElementById('step-screenshot').className = '${systemCheck.details?.capabilities?.screenshot ? 'step pass' : 'step fail'}';
+        document.getElementById('step-input').className = '${systemCheck.details?.capabilities?.inputMonitoring ? 'step pass' : 'step fail'}';
+      `);
+        }
+        // 8. CRITICAL VALIDATION: ALL components must pass - NO EXCEPTIONS
         const requiredChecks = [
-            { name: 'Screen Recording Permission', check: systemCheck.details.permissions.screenRecording },
-            { name: 'App Detection', check: systemCheck.details.capabilities.appDetection },
-            { name: 'Screenshot Capability', check: systemCheck.details.capabilities.screenshot },
-            { name: 'Input Monitoring', check: systemCheck.details.capabilities.inputMonitoring },
-            { name: 'Idle Detection', check: systemCheck.details.capabilities.idleDetection }
+            { name: 'Screen Recording Permission', check: systemCheck.details?.permissions?.screenRecording === true },
+            { name: 'App Detection', check: systemCheck.details?.capabilities?.appDetection === true },
+            { name: 'Screenshot Capability', check: systemCheck.details?.capabilities?.screenshot === true },
+            { name: 'Input Monitoring', check: systemCheck.details?.capabilities?.inputMonitoring === true },
+            { name: 'Idle Detection', check: systemCheck.details?.capabilities?.idleDetection === true }
         ];
-        const failedChecks = requiredChecks.filter(check => !check.check);
+        const failedChecks = requiredChecks.filter(check => check.check !== true);
         if (failedChecks.length > 0) {
             const failedNames = failedChecks.map(check => check.name);
-            console.log('❌ TRACKING BLOCKED: Critical components failed:', failedNames);
+            console.log(`❌ [${source}] SECURE TRACKING BLOCKED: Critical components failed:`, failedNames);
+            console.log('🚫 TRACKING WILL NOT START - System validation failed');
+            if (popup) {
+                popup.webContents.executeJavaScript(`
+          document.getElementById('status').textContent = 'System validation failed!';
+          document.getElementById('spinner').style.display = 'none';
+        `);
+                setTimeout(() => popup.close(), 5000);
+            }
             return {
                 success: false,
                 message: `TRACKING BLOCKED: Critical system components failed validation.\n\nFailed components:\n${failedNames.map(name => `• ${name}`).join('\n')}\n\nAll components must pass before tracking can start. Please resolve these issues and try again.`,
                 issues: failedNames,
                 systemCheck: systemCheck,
-                requiresSystemFix: true,
                 criticalFailure: true
             };
         }
-        // Additional check: Verify accessibility permission on macOS
-        if (process.platform === 'darwin' && !systemCheck.details.permissions.accessibility) {
-            console.log('❌ TRACKING BLOCKED: Accessibility permission required on macOS');
+        // 9. Additional macOS accessibility check
+        if (process.platform === 'darwin' && systemCheck.details?.permissions?.accessibility !== true) {
+            console.log(`❌ [${source}] SECURE TRACKING BLOCKED: Accessibility permission validation failed`);
+            if (popup) {
+                popup.webContents.executeJavaScript(`
+          document.getElementById('status').textContent = 'Accessibility permission validation failed!';
+          document.getElementById('spinner').style.display = 'none';
+        `);
+                setTimeout(() => popup.close(), 5000);
+            }
             return {
                 success: false,
-                message: 'TRACKING BLOCKED: Accessibility permission is required on macOS for app and URL detection. Please grant permission in System Preferences and restart the app.',
-                issues: ['Accessibility Permission Required'],
+                message: 'TRACKING BLOCKED: Accessibility permission validation failed. Please grant permission in System Settings and restart the app.',
+                issues: ['Accessibility Permission Validation Failed'],
                 systemCheck: systemCheck,
-                requiresSystemFix: true,
                 criticalFailure: true
             };
         }
-        console.log('✅ ALL CRITICAL CHECKS PASSED - Tracking approved to start');
-        // 4. Start tracking with all systems verified
+        console.log(`✅ [${source}] ALL CRITICAL CHECKS PASSED - Starting tracking securely`);
+        // 10. Show success in popup
+        if (popup) {
+            popup.webContents.executeJavaScript(`
+        document.getElementById('status').textContent = 'All checks passed! Starting tracking...';
+        document.getElementById('spinner').style.display = 'none';
+      `);
+        }
+        // 11. Start tracking ONLY after all validations pass
         if (projectId) {
             (0, tracker_1.setProjectId)(projectId);
         }
+        // Start all tracking components
         (0, tracker_1.startTracking)();
         startTrackingTimer();
         await (0, activityMonitor_1.startActivityMonitoring)(currentUserId);
-        // Start input monitoring for real activity detection
         startGlobalInputMonitoring();
         isTracking = true;
         updateTrayMenu();
-        console.log('✅ Tracking started successfully with all systems verified');
+        console.log(`✅ [${source}] Tracking started successfully with all systems verified`);
+        // 12. Close popup with success message
+        if (popup) {
+            popup.webContents.executeJavaScript(`
+        document.getElementById('status').textContent = 'Tracking started successfully!';
+      `);
+            setTimeout(() => popup.close(), 2000);
+        }
         // Send system check results to debug console
         if (exports.appEvents) {
             exports.appEvents.emit('debug-log', {
                 type: 'SYSTEM',
-                message: `Tracking started successfully! System check: ${systemCheck.success ? 'PASSED' : 'PARTIAL'}`,
+                message: `[${source}] Tracking started successfully! All systems validated`,
                 stats: {
                     screenshots: 0,
                     apps: 0,
@@ -762,18 +803,27 @@ electron_1.ipcMain.handle('start-tracking', async (event, projectId) => {
         }
         return {
             success: true,
-            message: 'Time tracking started successfully!',
+            message: 'Time tracking started successfully with full system validation!',
             systemCheck: systemCheck
         };
     }
     catch (error) {
-        console.error('❌ Error starting tracking:', error);
+        console.error(`❌ [${source}] Error in secure tracking start:`, error);
+        // Close popup on error
+        if (popup) {
+            popup.close();
+        }
         return {
             success: false,
             message: 'Failed to start tracking: ' + error.message,
-            error: error.message
+            issues: ['System Error'],
+            criticalFailure: true
         };
     }
+}
+// Handle tracking start (updated to use secure function)
+electron_1.ipcMain.handle('start-tracking', async (event, projectId) => {
+    return await startTrackingSecure(projectId, 'UI');
 });
 // Handle tracking pause
 electron_1.ipcMain.handle('pause-tracking', () => {
@@ -1188,60 +1238,20 @@ function updateTrayMenu() {
                     updateTrayMenu();
                 }
                 else {
-                    console.log('▶️ Manual tracking start requested from tray - checking permissions...');
-                    // Check if user is logged in
-                    const currentUserId = (0, tracker_1.getUserId)();
-                    if (!currentUserId) {
-                        electron_1.dialog.showErrorBox('Login Required', 'Please open the TimeFlow app and log in before starting tracking.');
-                        return;
+                    console.log('▶️ Manual tracking start requested from tray - using secure function');
+                    // Use the SECURE tracking start function - NO direct calls to tracking functions
+                    const result = await startTrackingSecure(undefined, 'TRAY');
+                    if (!result.success) {
+                        console.log('❌ TRAY: Secure tracking start failed:', result.issues);
+                        if (result.criticalFailure) {
+                            electron_1.dialog.showErrorBox('Tracking Blocked - System Issues', result.message);
+                        }
+                        else {
+                            electron_1.dialog.showErrorBox('Tracking Failed', result.message);
+                        }
                     }
-                    // Use the same strict validation as the main start-tracking handler
-                    try {
-                        // Request permissions first
-                        const hasScreenPermission = await (0, permissionManager_1.ensureScreenRecordingPermission)();
-                        if (!hasScreenPermission) {
-                            electron_1.dialog.showErrorBox('Permission Required', 'Screen Recording permission is required. Please grant permission in System Preferences and try again.');
-                            return;
-                        }
-                        // Check accessibility permission for macOS
-                        if (process.platform === 'darwin') {
-                            const { systemPreferences } = require('electron');
-                            const hasAccessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
-                            if (!hasAccessibilityPermission) {
-                                electron_1.dialog.showErrorBox('Accessibility Permission Required', 'Accessibility permission is required on macOS for app and URL detection. Please grant permission in System Preferences and restart the app.');
-                                return;
-                            }
-                        }
-                        // Perform comprehensive system check with STRICT validation
-                        const systemCheck = await performSystemCheck();
-                        // Same strict validation as main handler
-                        const requiredChecks = [
-                            { name: 'Screen Recording Permission', check: systemCheck.details.permissions.screenRecording },
-                            { name: 'App Detection', check: systemCheck.details.capabilities.appDetection },
-                            { name: 'Screenshot Capability', check: systemCheck.details.capabilities.screenshot },
-                            { name: 'Input Monitoring', check: systemCheck.details.capabilities.inputMonitoring },
-                            { name: 'Idle Detection', check: systemCheck.details.capabilities.idleDetection }
-                        ];
-                        const failedChecks = requiredChecks.filter(check => !check.check);
-                        if (failedChecks.length > 0) {
-                            const failedNames = failedChecks.map(check => check.name);
-                            console.log('❌ TRAY TRACKING BLOCKED: Critical components failed:', failedNames);
-                            electron_1.dialog.showErrorBox('Tracking Blocked - System Issues', `Critical system components failed validation:\n\n${failedNames.map(name => `• ${name}`).join('\n')}\n\nAll components must pass before tracking can start. Please resolve these issues and try again.`);
-                            return;
-                        }
-                        console.log('✅ TRAY: ALL CRITICAL CHECKS PASSED - Starting tracking');
-                        // Start tracking with all checks passed
-                        (0, tracker_1.startTracking)();
-                        startTrackingTimer();
-                        await (0, activityMonitor_1.startActivityMonitoring)(currentUserId);
-                        startGlobalInputMonitoring();
-                        isTracking = true;
-                        updateTrayMenu();
-                        console.log('✅ Tracking started from tray with strict validation passed');
-                    }
-                    catch (error) {
-                        console.error('❌ Error starting tracking from tray:', error);
-                        electron_1.dialog.showErrorBox('Tracking Failed', 'Failed to start tracking: ' + error.message);
+                    else {
+                        console.log('✅ TRAY: Tracking started successfully via secure function');
                     }
                 }
             }
@@ -1646,7 +1656,36 @@ exports.appEvents.on('debug-log', (data) => {
 electron_1.ipcMain.handle('system-check-permissions', async () => {
     try {
         console.log('🔍 System check: Testing permissions...');
-        const screenPermission = await (0, permissionManager_1.checkScreenRecordingPermission)();
+        // Use same logic as debug-test-screen-permission with binary testing
+        const electronAPIPermission = await (0, permissionManager_1.checkScreenRecordingPermission)();
+        // Also test the actual binary that needs permission (same as debug handler)
+        let binaryCanAccess = false;
+        try {
+            const { spawn } = require('child_process');
+            // Use dynamic path resolution for both dev and DMG environments
+            const activeWinPath = getActiveWinBinaryPath();
+            const binaryTest = await new Promise((resolve) => {
+                const child = spawn(activeWinPath, [], { timeout: 3000 });
+                let stdout = '';
+                child.stdout?.on('data', (data) => {
+                    stdout += data.toString();
+                });
+                child.on('close', (code) => {
+                    if (code === 0 && !stdout.includes('screen recording permission')) {
+                        resolve(true);
+                    }
+                    else {
+                        resolve(false);
+                    }
+                });
+                child.on('error', () => resolve(false));
+            });
+            binaryCanAccess = binaryTest;
+        }
+        catch (error) {
+            console.log('⚠️ Could not test binary permission:', error);
+        }
+        const actualScreenPermission = electronAPIPermission && binaryCanAccess;
         let accessibilityPermission = false;
         if (process.platform === 'darwin') {
             try {
@@ -1660,11 +1699,11 @@ electron_1.ipcMain.handle('system-check-permissions', async () => {
         else {
             accessibilityPermission = true; // Not required on other platforms
         }
-        console.log(`✅ Permission check results: Screen=${screenPermission}, Accessibility=${accessibilityPermission}`);
+        console.log(`✅ Permission check results: Screen=${actualScreenPermission}, Accessibility=${accessibilityPermission}, ElectronAPI=${electronAPIPermission}, BinaryAccess=${binaryCanAccess}`);
         return {
             success: true,
             permissions: {
-                screen: screenPermission,
+                screen: actualScreenPermission,
                 accessibility: accessibilityPermission
             }
         };
@@ -1894,10 +1933,25 @@ electron_1.ipcMain.handle('debug-test-database', async () => {
 electron_1.ipcMain.handle('debug-test-screen-permission', async () => {
     try {
         console.log('🔍 Debug: Testing screen permission...');
-        const hasPermission = await (0, permissionManager_1.checkScreenRecordingPermission)();
+        const electronAPIPermission = await (0, permissionManager_1.checkScreenRecordingPermission)();
+        // Use safe binary testing to prevent memory leaks
+        const binaryCanAccess = await testActiveWinBinaryAccess();
+        const actualPermission = electronAPIPermission && binaryCanAccess;
+        let message = '';
+        if (actualPermission) {
+            message = 'Screen recording permission granted';
+        }
+        else if (electronAPIPermission && !binaryCanAccess) {
+            message = 'Screen recording permission granted to Electron but not accessible to child processes - restart app or re-grant permission';
+        }
+        else {
+            message = 'Screen recording permission required';
+        }
         return {
-            success: hasPermission,
-            message: hasPermission ? 'Screen recording permission granted' : 'Screen recording permission required'
+            success: actualPermission,
+            message: message,
+            electronAPI: electronAPIPermission,
+            binaryAccess: binaryCanAccess
         };
     }
     catch (error) {
@@ -1908,22 +1962,11 @@ electron_1.ipcMain.handle('debug-test-screen-permission', async () => {
 electron_1.ipcMain.handle('debug-test-accessibility-permission', async () => {
     try {
         console.log('🔍 Debug: Testing accessibility permission...');
-        let hasPermission = false;
-        if (process.platform === 'darwin') {
-            try {
-                const { systemPreferences } = require('electron');
-                hasPermission = systemPreferences.isTrustedAccessibilityClient(false);
-            }
-            catch (error) {
-                console.log('⚠️ Could not check accessibility permission:', error);
-            }
-        }
-        else {
-            hasPermission = true; // Not required on other platforms
-        }
+        const { checkAccessibilityPermission } = require('./permissionManager.cjs');
+        const hasPermission = await checkAccessibilityPermission();
         return {
             success: hasPermission,
-            message: hasPermission ? 'Accessibility permission granted' : 'Accessibility permission required'
+            message: hasPermission ? 'Accessibility permission granted' : 'Accessibility permission required - MANDATORY for mouse and keyboard tracking'
         };
     }
     catch (error) {
@@ -1969,3 +2012,290 @@ electron_1.ipcMain.handle('debug-test-idle-detection', async () => {
         return { success: false, error: error.message };
     }
 });
+// === Missing IPC Handler for Debug Console ===
+electron_1.ipcMain.handle('open-debug-console', async () => {
+    try {
+        console.log('🔬 IPC request to open debug console...');
+        const window = createDebugWindow();
+        if (window) {
+            return { success: true, message: 'Debug console opened successfully' };
+        }
+        else {
+            return { success: false, error: 'Failed to create debug window' };
+        }
+    }
+    catch (error) {
+        console.error('❌ Failed to open debug console:', error);
+        return { success: false, error: error.message };
+    }
+});
+// === Permission Management Helper ===
+electron_1.ipcMain.handle('request-all-permissions', async () => {
+    try {
+        console.log('🔐 Requesting all required permissions...');
+        const results = {
+            screen: false,
+            accessibility: false,
+            messages: []
+        };
+        // Request Screen Recording Permission
+        try {
+            if (process.platform === 'darwin') {
+                const { ensureScreenRecordingPermission } = require('./permissionManager.cjs');
+                results.screen = await ensureScreenRecordingPermission();
+                if (!results.screen) {
+                    results.messages.push('Screen Recording permission is required for app detection and screenshots');
+                }
+            }
+            else {
+                results.screen = true; // Not required on other platforms
+            }
+        }
+        catch (error) {
+            results.messages.push(`Screen Recording permission error: ${error.message}`);
+        }
+        // Request Accessibility Permission
+        try {
+            if (process.platform === 'darwin') {
+                const { requestAccessibilityPermission } = require('./permissionManager.cjs');
+                results.accessibility = await requestAccessibilityPermission();
+                if (!results.accessibility) {
+                    results.messages.push('Accessibility permission is required for mouse and keyboard tracking');
+                }
+            }
+            else {
+                results.accessibility = true; // Not required on other platforms
+            }
+        }
+        catch (error) {
+            results.messages.push(`Accessibility permission error: ${error.message}`);
+        }
+        const allGranted = results.screen && results.accessibility;
+        if (allGranted) {
+            results.messages.push('All permissions granted successfully!');
+        }
+        else {
+            results.messages.push('Some permissions are missing. Please check System Preferences > Security & Privacy > Privacy');
+        }
+        return {
+            success: allGranted,
+            results: results,
+            message: allGranted ? 'All permissions granted' : 'Some permissions missing'
+        };
+    }
+    catch (error) {
+        console.error('❌ Failed to request permissions:', error);
+        return { success: false, error: error.message };
+    }
+});
+// === DYNAMIC PATH RESOLUTION FOR ACTIVE-WIN BINARY ===
+function getActiveWinBinaryPath() {
+    const { app } = require('electron');
+    const path = require('path');
+    // Check if app is packaged (DMG/built version)
+    if (app.isPackaged) {
+        // DMG/Packaged version - binary is in Contents/Resources/app.asar.unpacked
+        // app.getAppPath() returns the asar file, we need the Resources directory
+        const resourcesPath = process.resourcesPath;
+        const activeWinPath = path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'active-win', 'main');
+        console.log('🔧 DMG MODE: Using correct packaged active-win binary path:', activeWinPath);
+        return activeWinPath;
+    }
+    else {
+        // Development version - binary is in build directory
+        const activeWinPath = path.join(__dirname, 'node_modules', 'active-win', 'main');
+        console.log('🔧 DEV MODE: Using development active-win binary path:', activeWinPath);
+        return activeWinPath;
+    }
+}
+// === SAFE ACTIVE-WIN BINARY TESTING (PREVENTS MEMORY LEAKS) ===
+let isTestingBinary = false; // Prevent simultaneous tests
+let lastBinaryTestResult = null;
+let lastBinaryTestTime = 0;
+async function testActiveWinBinaryAccess() {
+    // Prevent simultaneous tests that caused the memory leak
+    if (isTestingBinary) {
+        console.log('⏳ Binary test already in progress, returning cached result...');
+        return lastBinaryTestResult || false;
+    }
+    // Use cached result if recent (within 5 seconds)
+    const now = Date.now();
+    if (lastBinaryTestResult !== null && (now - lastBinaryTestTime) < 5000) {
+        console.log('📋 Using cached binary test result:', lastBinaryTestResult);
+        return lastBinaryTestResult;
+    }
+    isTestingBinary = true;
+    console.log('🧪 Testing active-win binary access with proper timeout...');
+    try {
+        const { spawn } = require('child_process');
+        const activeWinPath = getActiveWinBinaryPath();
+        const binaryTest = await new Promise((resolve) => {
+            let isResolved = false;
+            // Create timeout to prevent hanging processes
+            const timeout = setTimeout(() => {
+                if (!isResolved) {
+                    isResolved = true;
+                    console.log('⏰ Binary test timed out after 2 seconds');
+                    if (child && !child.killed) {
+                        child.kill('SIGTERM');
+                        setTimeout(() => {
+                            if (child && !child.killed) {
+                                child.kill('SIGKILL'); // Force kill if still running
+                            }
+                        }, 1000);
+                    }
+                    resolve(false);
+                }
+            }, 2000);
+            const child = spawn(activeWinPath, [], {
+                detached: false,
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+            let stdout = '';
+            let hasError = false;
+            child.stdout?.on('data', (data) => {
+                stdout += data.toString();
+            });
+            child.stderr?.on('data', (data) => {
+                console.log('🔍 Binary stderr:', data.toString());
+                if (data.toString().includes('screen recording permission')) {
+                    hasError = true;
+                }
+            });
+            child.on('close', (code) => {
+                clearTimeout(timeout);
+                if (!isResolved) {
+                    isResolved = true;
+                    // Success if we got exit code 0 and some stdout (JSON data from active-win)
+                    const success = code === 0 && !hasError && stdout.length > 10;
+                    console.log(`🔍 Binary test result: code=${code}, hasError=${hasError}, stdout=${stdout.length} chars, success=${success}`);
+                    resolve(success);
+                }
+            });
+            child.on('error', (error) => {
+                clearTimeout(timeout);
+                if (!isResolved) {
+                    isResolved = true;
+                    console.log('❌ Binary test error:', error.message);
+                    resolve(false);
+                }
+            });
+        });
+        // Cache the result
+        lastBinaryTestResult = binaryTest;
+        lastBinaryTestTime = now;
+        console.log(`✅ Binary test completed: ${binaryTest}`);
+        return binaryTest;
+    }
+    catch (error) {
+        console.error('❌ Binary test exception:', error);
+        lastBinaryTestResult = false;
+        lastBinaryTestTime = now;
+        return false;
+    }
+    finally {
+        isTestingBinary = false;
+    }
+}
+// === USER-FRIENDLY PERMISSION CHECKING POPUP ===
+function showPermissionCheckingPopup() {
+    const popup = new electron_1.BrowserWindow({
+        width: 500,
+        height: 300,
+        parent: mainWindow || undefined,
+        modal: true,
+        show: false,
+        resizable: false,
+        frame: false,
+        alwaysOnTop: true,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {
+          margin: 0;
+          padding: 20px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: calc(100vh - 40px);
+          text-align: center;
+        }
+        h2 {
+          margin: 0 0 20px 0;
+          font-size: 20px;
+          font-weight: 600;
+        }
+        .status {
+          font-size: 16px;
+          margin: 10px 0;
+          opacity: 0.9;
+        }
+        .spinner {
+          width: 40px;
+          height: 40px;
+          margin: 20px auto;
+          border: 3px solid rgba(255,255,255,0.3);
+          border-top: 3px solid white;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .steps {
+          margin-top: 20px;
+          text-align: left;
+          opacity: 0.8;
+          font-size: 14px;
+        }
+        .step {
+          margin: 5px 0;
+          padding-left: 20px;
+        }
+        .step.checking::before {
+          content: "🔄";
+          margin-right: 8px;
+        }
+        .step.pass::before {
+          content: "✅";
+          margin-right: 8px;
+        }
+        .step.fail::before {
+          content: "❌";
+          margin-right: 8px;
+        }
+      </style>
+    </head>
+    <body>
+      <h2>🔒 Checking System Permissions</h2>
+      <div class="status" id="status">Validating system components...</div>
+      <div class="spinner" id="spinner"></div>
+      <div class="steps">
+        <div class="step checking" id="step-screen">Screen Recording Permission</div>
+        <div class="step" id="step-accessibility">Accessibility Permission</div>
+        <div class="step" id="step-app">App Detection</div>
+        <div class="step" id="step-screenshot">Screenshot Capability</div>
+        <div class="step" id="step-input">Input Monitoring</div>
+      </div>
+    </body>
+    </html>
+  `;
+    popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent));
+    popup.once('ready-to-show', () => {
+        popup.show();
+    });
+    return popup;
+}
+// === ENHANCED SECURE TRACKING START WITH USER FEEDBACK ===

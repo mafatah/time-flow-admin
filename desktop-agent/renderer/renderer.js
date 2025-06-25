@@ -332,6 +332,27 @@ function setupIpcListeners() {
         
         showNotification('Time tracking resumed', 'success');
     });
+
+    // System check trigger after login (with 5-minute cooldown)
+    ipcRenderer.on('trigger-system-check-after-login', (event, data) => {
+        console.log('📋 System check trigger received from main process:', data);
+        
+        // Implement 5-minute cooldown system to prevent spam
+        const lastCheckTime = localStorage.getItem('timeflow_system_check_desktop');
+        if (lastCheckTime) {
+            const minutesSinceCheck = (Date.now() - parseInt(lastCheckTime)) / (1000 * 60);
+            
+            // Don't show if checked in last 5 minutes
+            if (minutesSinceCheck < 5) {
+                console.log('✅ System check recently completed, skipping auto-show (cooldown active)');
+                showNotification('System check recently completed. All systems ready!', 'info');
+                return;
+            }
+        }
+        
+        // Show system check notification with option to open debug console
+        showSystemCheckPrompt();
+    });
     
     console.log('✅ IPC listeners set up successfully');
 }
@@ -1026,15 +1047,29 @@ function updateTrackingStatus() {
 }
 
 function startSessionTimer() {
+    // Always clear any existing timer first
     if (sessionTimer) {
         clearInterval(sessionTimer);
+        sessionTimer = null;
     }
+    
+    // Only start if we're actually tracking and have a start time
+    if (!isTracking || !sessionStartTime) {
+        console.log('⚠️ Skipping timer start - not tracking or no start time');
+        return;
+    }
+    
+    console.log('⏰ Starting session timer with start time:', sessionStartTime);
     
     sessionTimer = setInterval(() => {
         if (isTracking && sessionStartTime) {
             const elapsed = Date.now() - sessionStartTime.getTime();
             const timeString = formatElapsedTime(elapsed);
             updateSessionTime(timeString);
+        } else {
+            // Stop timer if tracking stopped
+            clearInterval(sessionTimer);
+            sessionTimer = null;
         }
     }, 1000);
 }
@@ -1301,6 +1336,145 @@ window.addEventListener('beforeunload', () => {
         clearInterval(sessionTimer);
     }
 });
+
+// === SYSTEM CHECK FUNCTIONALITY ===
+function showSystemCheckPrompt() {
+    console.log('🔧 Showing system check prompt for desktop agent');
+    
+    // Create system check popup overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'systemCheckOverlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        backdrop-filter: blur(4px);
+    `;
+    
+    // Create popup content
+    const popup = document.createElement('div');
+    popup.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 32px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        animation: fadeInScale 0.3s ease-out;
+    `;
+    
+    popup.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 16px;">🔧</div>
+        <h2 style="margin: 0 0 16px 0; color: #1e293b; font-size: 24px; font-weight: 600;">
+            System Check Recommended
+        </h2>
+        <p style="color: #64748b; font-size: 16px; line-height: 1.5; margin-bottom: 24px;">
+            Welcome to TimeFlow! Let's verify that all tracking components are working properly before you start your session.
+        </p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="runSystemCheckBtn" style="
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: background 0.2s;
+            ">
+                Run System Check
+            </button>
+            <button id="skipSystemCheckBtn" style="
+                background: #f1f5f9;
+                color: #64748b;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: background 0.2s;
+            ">
+                Skip for Now
+            </button>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px; margin-bottom: 0;">
+            This will open the Debug Console to test all tracking components
+        </p>
+    `;
+    
+    // Add CSS animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        #runSystemCheckBtn:hover {
+            background: #2563eb !important;
+        }
+        #skipSystemCheckBtn:hover {
+            background: #e2e8f0 !important;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
+    
+    // Handle button clicks
+    document.getElementById('runSystemCheckBtn').addEventListener('click', () => {
+        console.log('🔬 User chose to run system check');
+        
+        // Mark as checked to start cooldown
+        localStorage.setItem('timeflow_system_check_desktop', Date.now().toString());
+        
+        // Open debug console
+        ipcRenderer.invoke('open-debug-console').then(() => {
+            showNotification('Debug Console opened! Check all system components.', 'success');
+        }).catch(error => {
+            console.error('Failed to open debug console:', error);
+            showNotification('Could not open Debug Console. Try Cmd+Shift+D manually.', 'error');
+        });
+        
+        // Close popup
+        document.body.removeChild(overlay);
+    });
+    
+    document.getElementById('skipSystemCheckBtn').addEventListener('click', () => {
+        console.log('⏭️ User chose to skip system check');
+        
+        // Mark as checked to start cooldown (shorter for skip)
+        localStorage.setItem('timeflow_system_check_desktop', Date.now().toString());
+        
+        showNotification('System check skipped. You can access it anytime via Cmd+Shift+D', 'info');
+        
+        // Close popup
+        document.body.removeChild(overlay);
+    });
+    
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+        }
+    });
+}
 
 console.log('📱 TimeFlow Desktop Agent Renderer loaded successfully');
 

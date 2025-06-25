@@ -45,10 +45,12 @@ export default function TimeTrackingPage() {
     // Add listener if in Electron environment
     if (window.electron && window.electron.on && window.electron.removeAllListeners) {
       window.electron.on('show-system-check', handleShowSystemCheck);
+      window.electron.on('trigger-system-check-after-login', handleShowSystemCheck);
       
-      // Cleanup listener
+      // Cleanup listeners
       return () => {
         window.electron?.removeAllListeners?.('show-system-check');
+        window.electron?.removeAllListeners?.('trigger-system-check-after-login');
       };
     }
   }, []);

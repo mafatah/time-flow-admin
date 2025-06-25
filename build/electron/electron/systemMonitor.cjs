@@ -106,8 +106,10 @@ function initSystemMonitor() {
         if (session) {
             console.log('🔄 System resumed - tracking will need to be manually restarted with proper validation');
             console.log('⚠️  Auto-resume disabled to ensure all components are validated before tracking starts');
+            console.log('✅ Manual restart required - this prevents bypassing permission checks and system validation');
             // NOTE: User must manually start tracking to ensure system validation
             // This prevents bypassing permission checks and system validation
+            // NO AUTOMATIC TRACKING START - all starts must go through startTrackingSecure()
         }
     });
     electron_1.powerMonitor.on('on-ac', () => {

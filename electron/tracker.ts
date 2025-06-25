@@ -19,6 +19,7 @@ let appInterval: ReturnType<typeof setInterval> | undefined;
 let trackingActive = false;
 let userId: string | null = null;
 let currentProjectId: string | null = null;
+let systemCheckTriggered = false; // Track if we've already triggered system check
 
 // Session persistence handled by sessionManager
 let currentTimeLogId: string | null = null;
@@ -26,8 +27,46 @@ let currentTimeLogId: string | null = null;
 // Set the current user ID for tracking
 export function setUserId(id: string) {
   const validatedId = validateAndGetUUID(id, randomUUID());
+  const isFirstTimeLogin = !userId; // Check if this is first time setting user
   userId = validatedId;
   console.log(`Set user ID: ${userId}`);
+  
+  // Trigger system check after user login (only on first login, not repeated calls)
+  if (isFirstTimeLogin && !systemCheckTriggered) {
+    systemCheckTriggered = true; // Mark as triggered to prevent duplicates
+    
+    setTimeout(async () => {
+      try {
+        console.log('🔍 Performing post-login system check...');
+        
+        // Import electron dynamically to avoid issues
+        const electron = require('electron');
+        const allWindows = electron.BrowserWindow.getAllWindows();
+        
+        console.log(`📡 Broadcasting system check trigger to ${allWindows.length} windows...`);
+        
+        allWindows.forEach((window: any, index: number) => {
+          if (!window.isDestroyed()) {
+            console.log(`📤 Sending trigger to window ${index + 1}/${allWindows.length}`);
+            window.webContents.send('trigger-system-check-after-login', {
+              autoShow: true,
+              message: 'Welcome! Let\'s verify your system is ready for time tracking.',
+              timestamp: Date.now()
+            });
+          } else {
+            console.log(`⚠️ Window ${index + 1} is destroyed, skipping`);
+          }
+        });
+        
+        console.log('✅ System check trigger sent to all windows');
+      } catch (error) {
+        console.error('❌ Error triggering post-login system check:', error);
+        console.error('❌ Error details:', error instanceof Error ? error.message : String(error));
+      }
+    }, 3000); // 3-second delay to ensure UI is ready
+  } else {
+    console.log(`ℹ️ Skipping system check trigger (isFirstTime: ${isFirstTimeLogin}, alreadyTriggered: ${systemCheckTriggered})`);
+  }
 }
 
 // Get the current user ID
