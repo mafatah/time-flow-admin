@@ -7,7 +7,9 @@ import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/auth-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInMinutes } from 'date-fns';
-import { Play, Square, Clock } from 'lucide-react';
+import { Play, Square, Clock, Shield, CheckCircle, AlertTriangle, X, RotateCcw } from 'lucide-react';
+import { timerHealthChecker } from '@/utils/timer-health-check';
+import type { HealthCheckResult } from '@/utils/timer-health-check';
 
 interface Project {
   id: string;
@@ -31,15 +33,43 @@ export default function TimeTrackerPage() {
   const [activeLogs, setActiveLogs] = useState<TimeLog[]>([]);
   const [recentLogs, setRecentLogs] = useState<TimeLog[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Health check states
+  const [healthCheckResult, setHealthCheckResult] = useState<HealthCheckResult | null>(null);
+  const [performingHealthCheck, setPerformingHealthCheck] = useState(false);
+  const [showHealthDetails, setShowHealthDetails] = useState(false);
+  const [startingTimer, setStartingTimer] = useState(false);
 
   // Calculate if tracking is active based on active logs
   const hasActiveSession = activeLogs.length > 0;
 
   useEffect(() => {
     if (userDetails?.id) {
-      fetchProjects();
-      fetchActiveLogs();
-      fetchRecentLogs();
+      setLoading(true);
+      
+      Promise.all([
+        fetchProjects(),
+        fetchActiveLogs(),
+        fetchRecentLogs(),
+      ]).finally(() => {
+        setLoading(false);
+      });
+
+      // Perform initial friendly health check on page load
+      setTimeout(() => {
+        toast({
+          title: '👋 Welcome to TimeFlow!',
+          description: 'Performing a quick system check to ensure everything is ready...',
+        });
+        performComprehensiveHealthCheck().catch(error => {
+          console.error('Initial health check failed:', error);
+          toast({
+            title: '⚠️ Health Check Error',
+            description: 'Unable to verify system health. Some features may not work properly.',
+            variant: 'destructive',
+          });
+        });
+      }, 1500); // 1.5 second delay to let page load
     }
   }, [userDetails]);
 
@@ -175,6 +205,60 @@ export default function TimeTrackerPage() {
     }
   };
 
+  const performComprehensiveHealthCheck = async (): Promise<HealthCheckResult> => {
+    setPerformingHealthCheck(true);
+    
+    try {
+      toast({
+        title: '🔍 Performing Health Check',
+        description: 'Verifying all features before starting timer...',
+      });
+
+      const result = await timerHealthChecker.performPreTimerHealthCheck();
+      setHealthCheckResult(result);
+      
+      if (result.isHealthy) {
+        toast({
+          title: '🎉 All Systems Healthy!',
+          description: '✅ Screenshots ✅ URL Tracking ✅ App Detection ✅ Fraud Protection ✅ Database - You\'re ready to track time!',
+        });
+      } else if (result.canStartTimer) {
+        toast({
+          title: '🟡 Health Check Warning',
+          description: `${result.failedFeatures.length} features failed but timer can start with limited functionality`,
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: '❌ Health Check Failed',
+          description: 'Critical features failed. Timer cannot start.',
+          variant: 'destructive',
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Health check failed:', error);
+      const failedResult: HealthCheckResult = {
+        isHealthy: false,
+        failedFeatures: ['healthCheckSystem'],
+        details: timerHealthChecker.getHealthStatus(),
+        canStartTimer: false
+      };
+      
+      setHealthCheckResult(failedResult);
+      toast({
+        title: '❌ Health Check Error',
+        description: 'Failed to perform health check',
+        variant: 'destructive',
+      });
+      
+      return failedResult;
+    } finally {
+      setPerformingHealthCheck(false);
+    }
+  };
+
   const startTracking = async () => {
     if (!selectedProjectId) {
       toast({
@@ -204,7 +288,55 @@ export default function TimeTrackerPage() {
       return;
     }
 
+    setStartingTimer(true);
+
     try {
+      // Step 1: Perform comprehensive health check
+      toast({
+        title: '🔍 Starting Health Check',
+        description: 'Verifying all systems before timer start...',
+      });
+
+      const healthCheck = await performComprehensiveHealthCheck();
+      
+      if (!healthCheck.canStartTimer) {
+        toast({
+          title: '⛔ Timer Start Blocked',
+          description: 'Critical features failed health check. Please fix issues and try again.',
+          variant: 'destructive',
+        });
+        setShowHealthDetails(true);
+        return;
+      }
+
+      // Step 2: Initialize desktop app tracking if available
+      if (window.electron) {
+        toast({
+          title: '🖥️ Initializing Desktop Features',
+          description: 'Starting advanced tracking features...',
+        });
+
+        try {
+          // Start desktop tracking
+          window.electron.startTracking();
+          if (userDetails?.id) {
+            window.electron.setUserId(userDetails.id);
+          }
+        } catch (electronError) {
+          console.warn('Desktop features not available:', electronError);
+          toast({
+            title: '⚠️ Desktop Features Limited',
+            description: 'Some advanced features may not be available.',
+          });
+        }
+      }
+
+      // Step 3: Start database tracking
+      toast({
+        title: '💾 Creating Time Log',
+        description: 'Saving session to database...',
+      });
+
       const { data, error } = await supabase
         .from('time_logs')
         .insert({ 
@@ -212,7 +344,9 @@ export default function TimeTrackerPage() {
           project_id: selectedProjectId,
           start_time: new Date().toISOString(),
           status: 'active',
-          is_idle: false
+          is_idle: false,
+          health_check_passed: healthCheck.isHealthy,
+          failed_features: healthCheck.failedFeatures.length > 0 ? healthCheck.failedFeatures : null
         })
         .select()
         .single();
@@ -227,13 +361,38 @@ export default function TimeTrackerPage() {
         return;
       }
 
+      // Step 4: Refresh data and confirm success
       await Promise.all([fetchActiveLogs(), fetchRecentLogs()]);
       
       const projectName = projects.find(p => p.id === selectedProjectId)?.name || 'selected project';
-      toast({
-        title: 'Time tracking started',
-        description: `Started tracking time for ${projectName}.`,
-      });
+      
+      if (healthCheck.isHealthy) {
+        toast({
+          title: '✅ Timer Started Successfully',
+          description: `All features verified! Tracking time for ${projectName}.`,
+        });
+      } else {
+        toast({
+          title: '🟡 Timer Started with Warnings',
+          description: `Tracking started for ${projectName} with limited functionality.`,
+        });
+      }
+
+      // Step 5: Schedule periodic health checks during tracking
+      setInterval(() => {
+        if (hasActiveSession) {
+          timerHealthChecker.performPreTimerHealthCheck().then(result => {
+            if (!result.canStartTimer) {
+              console.warn('Health check failed during tracking:', result.failedFeatures);
+              toast({
+                title: '⚠️ Feature Issues Detected',
+                description: 'Some tracking features may not be working properly.',
+              });
+            }
+          });
+        }
+      }, 300000); // Check every 5 minutes
+
     } catch (error) {
       console.error('Error starting time tracking:', error);
       toast({
@@ -241,6 +400,8 @@ export default function TimeTrackerPage() {
         description: 'Failed to start time tracking.',
         variant: 'destructive',
       });
+    } finally {
+      setStartingTimer(false);
     }
   };
 
@@ -331,12 +492,153 @@ export default function TimeTrackerPage() {
     return project?.name || 'Unknown Project';
   };
 
+  const retryFeature = async (featureName: string) => {
+    try {
+      await timerHealthChecker.retryFeatureCheck(featureName as any);
+      // Refresh health check result
+      const newResult = await timerHealthChecker.performPreTimerHealthCheck();
+      setHealthCheckResult(newResult);
+    } catch (error) {
+      console.error('Feature retry failed:', error);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
+      {/* Initial Health Check Welcome Card */}
+      {!healthCheckResult && userDetails?.id && (
+        <Card className="mb-6 border-blue-200 bg-blue-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center space-x-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-600 border-t-transparent"></div>
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-blue-800">🏥 Running System Health Check</h3>
+                <p className="text-sm text-blue-600 mt-1">
+                  Verifying screenshots, URL tracking, app detection, fraud protection, and database connection...
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Health Check Status Card */}
+      {healthCheckResult && (
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                <CardTitle>System Health Check</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                {healthCheckResult.isHealthy ? (
+                  <Badge className="bg-green-100 text-green-800">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    All Systems Healthy
+                  </Badge>
+                ) : healthCheckResult.canStartTimer ? (
+                  <Badge className="bg-yellow-100 text-yellow-800">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Limited Functionality
+                  </Badge>
+                ) : (
+                  <Badge className="bg-red-100 text-red-800">
+                    <X className="h-3 w-3 mr-1" />
+                    Critical Issues
+                  </Badge>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowHealthDetails(!showHealthDetails)}
+                >
+                  {showHealthDetails ? 'Hide' : 'Show'} Details
+                </Button>
+              </div>
+            </div>
+            <CardDescription>
+              Last checked: {format(healthCheckResult.details.lastCheck, 'MMM dd, yyyy HH:mm:ss')}
+            </CardDescription>
+          </CardHeader>
+          {showHealthDetails && (
+            <CardContent>
+              <div className="space-y-3">
+                {/* Feature Status List */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[
+                    { name: 'screenshots', label: '📸 Screenshot Capture', status: healthCheckResult.details.screenshots },
+                    { name: 'urlDetection', label: '🌐 URL Detection', status: healthCheckResult.details.urlDetection },
+                    { name: 'appDetection', label: '🖥️ App Detection', status: healthCheckResult.details.appDetection },
+                    { name: 'fraudDetection', label: '🛡️ Fraud Detection', status: healthCheckResult.details.fraudDetection },
+                    { name: 'databaseConnection', label: '💾 Database Connection', status: healthCheckResult.details.databaseConnection },
+                  ].map((feature) => (
+                    <div key={feature.name} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-2">
+                        {feature.status ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <X className="h-4 w-4 text-red-600" />
+                        )}
+                        <span className="text-sm font-medium">{feature.label}</span>
+                      </div>
+                      {!feature.status && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => retryFeature(feature.name)}
+                          disabled={performingHealthCheck}
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          Retry
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Error Details */}
+                {Object.keys(healthCheckResult.details.errorDetails).length > 0 && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <h4 className="text-sm font-medium text-red-800 mb-2">Error Details:</h4>
+                    <div className="space-y-1">
+                      {Object.entries(healthCheckResult.details.errorDetails).map(([feature, error]) => (
+                        <div key={feature} className="text-xs text-red-700">
+                          <strong>{feature}:</strong> {error}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={performComprehensiveHealthCheck}
+                  disabled={performingHealthCheck}
+                >
+                  {performingHealthCheck ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-background border-t-transparent mr-2" />
+                      Running Health Check...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="h-4 w-4 mr-2" />
+                      Re-run Health Check
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Time Tracker</CardTitle>
-          <CardDescription>Track your work time efficiently.</CardDescription>
+          <CardDescription>Track your work time efficiently with comprehensive health monitoring.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -361,10 +663,84 @@ export default function TimeTrackerPage() {
                 <Square className="mr-2 h-4 w-4" /> Stop Tracking
               </Button>
             ) : (
-              <Button className="w-full" onClick={startTracking} disabled={!selectedProjectId || loading}>
-                <Play className="mr-2 h-4 w-4" /> Start Tracking
+              <Button 
+                className="w-full" 
+                onClick={startTracking} 
+                disabled={!selectedProjectId || loading || startingTimer || performingHealthCheck}
+              >
+                {startingTimer ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-background border-t-transparent mr-2" />
+                    Starting Timer...
+                  </>
+                ) : performingHealthCheck ? (
+                  <>
+                    <Shield className="mr-2 h-4 w-4" />
+                    Health Check Running...
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    Start Tracking
+                  </>
+                )}
               </Button>
             )}
+            
+            {/* Manual Health Check Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-2"
+              onClick={performComprehensiveHealthCheck}
+              disabled={performingHealthCheck}
+            >
+              {performingHealthCheck ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-background border-t-transparent mr-2" />
+                  Running Health Check...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Run System Health Check
+                </>
+              )}
+            </Button>
+            
+            {/* Health Check Status Indicator */}
+            {healthCheckResult && !hasActiveSession && (
+              <div className="mt-2 text-center">
+                {healthCheckResult.canStartTimer ? (
+                  <div className="text-xs text-green-600 flex items-center justify-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    System ready for tracking
+                  </div>
+                ) : (
+                  <div className="text-xs text-red-600 flex items-center justify-center gap-1">
+                    <X className="h-3 w-3" />
+                    Fix critical issues before starting
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Desktop Agent Status */}
+            <div className="mt-2 text-center">
+              <div className="text-xs text-gray-600 flex items-center justify-center gap-1">
+                {window.electron ? (
+                  <>
+                    <CheckCircle className="h-3 w-3 text-green-500" />
+                    Desktop Agent Connected
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-3 w-3 text-yellow-500" />
+                    Web Version (Limited Features)
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

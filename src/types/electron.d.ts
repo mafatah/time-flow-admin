@@ -1,4 +1,3 @@
-
 interface ElectronAPI {
   setUserId: (id: string) => void;
   startTracking: () => void;
@@ -8,6 +7,19 @@ interface ElectronAPI {
   clearSession: () => void;
   send: (channel: string, ...args: any[]) => void;
   invoke: (channel: string, ...args: any[]) => Promise<any>;
+  
+  // App information
+  appVersion?: string;
+  
+  // Automated release trigger
+  triggerAutomatedRelease?: (failureReport: {
+    timestamp: string;
+    failedFeatures: string[];
+    failureHistory: Record<string, number>;
+    errorDetails: Record<string, string>;
+    userAgent: string;
+    appVersion: string;
+  }) => Promise<void>;
   
   // Activity monitoring methods
   getActivityStats?: () => Promise<{
@@ -32,6 +44,31 @@ interface ElectronAPI {
   onActivityStatsUpdate?: (callback: (stats: any) => void) => void;
   onIdleStatusChange?: (callback: (status: any) => void) => void;
   onScreenshotCaptured?: (callback: (screenshot: any) => void) => void;
+
+  // Health Check APIs for Timer Pre-flight Checks
+  screenshots?: {
+    testCapability: () => Promise<{ success: boolean; error?: string }>;
+  };
+  
+  urlTracker?: {
+    testDetection: () => Promise<{ success: boolean; error?: string }>;
+  };
+  
+  appTracker?: {
+    testDetection: () => Promise<{ 
+      success: boolean; 
+      error?: string; 
+      detectedApps?: string[] 
+    }>;
+  };
+  
+  fraudDetector?: {
+    testSystem: () => Promise<{ success: boolean; error?: string }>;
+  };
+  
+  database?: {
+    testConnection: (testData: any) => Promise<{ success: boolean; error?: string }>;
+  };
 }
 
 declare global {
