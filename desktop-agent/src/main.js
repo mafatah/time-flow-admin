@@ -4542,6 +4542,127 @@ ipcMain.handle('debug-test-activity', async () => {
   }
 });
 
+// === HEALTH CHECK SYSTEM IPC HANDLERS ===
+
+// Test screenshot capability for health check
+ipcMain.handle('test-screenshot-capability', async () => {
+  try {
+    console.log('🏥 [HEALTH-CHECK] Testing screenshot capability...');
+    const result = await captureScreenshot();
+    
+    if (result) {
+      console.log('✅ [HEALTH-CHECK] Screenshot test passed');
+      return { success: true, message: 'Screenshot system operational' };
+    } else {
+      console.log('❌ [HEALTH-CHECK] Screenshot test failed');
+      return { success: false, error: 'Screenshot capture failed' };
+    }
+  } catch (error) {
+    console.error('❌ [HEALTH-CHECK] Screenshot test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test URL detection for health check
+ipcMain.handle('test-url-detection', async () => {
+  try {
+    console.log('🏥 [HEALTH-CHECK] Testing URL detection...');
+    const urlData = await detectBrowserUrl();
+    
+    // Consider it successful even if no URL is currently available
+    console.log('✅ [HEALTH-CHECK] URL detection system operational');
+    return { 
+      success: true, 
+      message: 'URL detection system operational',
+      currentUrl: urlData?.url || null
+    };
+  } catch (error) {
+    console.error('❌ [HEALTH-CHECK] URL detection test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test app detection for health check
+ipcMain.handle('test-app-detection', async () => {
+  try {
+    console.log('🏥 [HEALTH-CHECK] Testing app detection...');
+    const activeApp = await detectActiveApplication();
+    
+    if (activeApp && activeApp.name) {
+      console.log('✅ [HEALTH-CHECK] App detection test passed:', activeApp.name);
+      return { 
+        success: true, 
+        message: 'App detection system operational',
+        currentApp: activeApp.name
+      };
+    } else {
+      console.log('⚠️ [HEALTH-CHECK] App detection warning: No active app detected');
+      return { success: false, error: 'No active application detected' };
+    }
+  } catch (error) {
+    console.error('❌ [HEALTH-CHECK] App detection test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test fraud detection for health check
+ipcMain.handle('test-fraud-detection', async () => {
+  try {
+    console.log('🏥 [HEALTH-CHECK] Testing fraud detection...');
+    
+    // Check if anti-cheat detector is available and functional
+    if (AntiCheatDetector) {
+      const hasRecentActivity = (Date.now() - lastActivity) < 60000; // Activity within 1 minute
+      const activityScore = calculateActivityPercent();
+      
+      console.log('✅ [HEALTH-CHECK] Fraud detection system operational');
+      return { 
+        success: true, 
+        message: 'Fraud detection system operational',
+        recentActivity: hasRecentActivity,
+        activityScore
+      };
+    } else {
+      console.log('⚠️ [HEALTH-CHECK] Fraud detection warning: System not initialized');
+      return { success: false, error: 'Fraud detection system not available' };
+    }
+  } catch (error) {
+    console.error('❌ [HEALTH-CHECK] Fraud detection test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test database connection for health check
+ipcMain.handle('test-database-connection', async () => {
+  try {
+    console.log('🏥 [HEALTH-CHECK] Testing database connection...');
+    
+    if (!config.supabase_url || !config.supabase_key) {
+      return { success: false, error: 'Missing Supabase configuration' };
+    }
+    
+    // Test connection with a simple query
+    const testResponse = await axios.get(`${config.supabase_url}/rest/v1/`, {
+      headers: {
+        'apikey': config.supabase_key,
+        'Authorization': `Bearer ${config.supabase_key}`
+      },
+      timeout: 5000
+    });
+    
+    if (testResponse.status === 200) {
+      console.log('✅ [HEALTH-CHECK] Database connection test passed');
+      return { success: true, message: 'Database connection operational' };
+    } else {
+      console.log('❌ [HEALTH-CHECK] Database connection test failed');
+      return { success: false, error: 'Database connection failed' };
+    }
+  } catch (error) {
+    console.error('❌ [HEALTH-CHECK] Database connection test error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Enhanced system state tracking
 let systemSuspended = false;
 let suspendTime = null;

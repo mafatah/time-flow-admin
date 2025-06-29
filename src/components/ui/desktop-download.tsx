@@ -123,7 +123,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     setDownloading(platform);
     
     // Use GitHub releases for reliable downloads - Updated automatically by release pipeline
-          const currentVersion = "1.0.40"; // v1.0.40 - Signed & Notarized Release: 202506291230
+          const currentVersion = "1.0.41"; // v1.0.41 - Signed & Notarized Release: 202506291800
     const downloadFiles = {
       windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`,
       'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED

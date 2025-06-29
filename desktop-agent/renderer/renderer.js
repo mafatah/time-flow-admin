@@ -688,6 +688,41 @@ async function startTracking() {
         showNotification('Please log in first', 'error');
         return;
     }
+
+    // === STEP 1: FRIENDLY HEALTH CHECK ===
+    console.log('🏥 [HEALTH-CHECK] Starting comprehensive system health check...');
+    
+    // Show welcome health check notification
+    showNotification('👋 Welcome to TimeFlow! Running system health check...', 'info');
+    
+    try {
+        // Show health check modal
+        showHealthCheckModal();
+        
+        const healthCheckResult = await performComprehensiveHealthCheck();
+        
+        if (!healthCheckResult.canStartTimer) {
+            showNotification('⛔ Timer start blocked due to critical system failures. Please check system status.', 'error');
+            hideHealthCheckModal();
+            return;
+        }
+        
+        if (healthCheckResult.isHealthy) {
+            showNotification('🎉 All Systems Healthy! ✅ Screenshots ✅ URL Tracking ✅ App Detection ✅ Database - Ready to track!', 'success');
+        } else {
+            showNotification(`🟡 Timer starting with ${healthCheckResult.failedFeatures.length} warnings - some features may be limited`, 'info');
+        }
+        
+        hideHealthCheckModal();
+        
+        // Brief delay to show success message
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+    } catch (error) {
+        console.error('❌ [HEALTH-CHECK] Health check failed:', error);
+        showNotification('⚠️ Health check failed - some features may not work properly', 'error');
+        hideHealthCheckModal();
+    }
     
     console.log('👤 [RENDERER] Current user:', currentUser);
     
@@ -2012,6 +2047,235 @@ function generateProductivityInsight(focusScore, clicks, keystrokes) {
         return "Some activity detected. Make sure you're actively working on important tasks.";
     } else {
         return "Low activity detected. Ensure you're actively using your computer during work sessions.";
+    }
+}
+
+// === HEALTH CHECK SYSTEM ===
+async function performComprehensiveHealthCheck() {
+    console.log('🏥 [HEALTH-CHECK] Starting comprehensive feature verification...');
+    
+    const healthStatus = {
+        screenshots: false,
+        urlDetection: false,
+        appDetection: false,
+        fraudDetection: false,
+        databaseConnection: false,
+        lastCheck: new Date(),
+        errorDetails: {}
+    };
+    
+    const failedFeatures = [];
+    
+    try {
+        // Test 1: Screenshot Capability
+        updateHealthCheckProgress('Testing screenshot capability...', 20);
+        try {
+            const screenshotTest = await ipcRenderer.invoke('test-screenshot-capability');
+            healthStatus.screenshots = screenshotTest.success;
+            if (!screenshotTest.success) {
+                failedFeatures.push('screenshots');
+                healthStatus.errorDetails.screenshots = screenshotTest.error || 'Screenshot test failed';
+            }
+            console.log('📸 [HEALTH-CHECK] Screenshot test:', screenshotTest.success ? '✅ PASS' : '❌ FAIL');
+        } catch (error) {
+            failedFeatures.push('screenshots');
+            healthStatus.errorDetails.screenshots = error.message;
+            console.error('📸 [HEALTH-CHECK] Screenshot test failed:', error);
+        }
+        
+        // Test 2: URL Detection
+        updateHealthCheckProgress('Testing URL detection...', 40);
+        try {
+            const urlTest = await ipcRenderer.invoke('test-url-detection');
+            healthStatus.urlDetection = urlTest.success;
+            if (!urlTest.success) {
+                failedFeatures.push('urlDetection');
+                healthStatus.errorDetails.urlDetection = urlTest.error || 'URL detection test failed';
+            }
+            console.log('🌐 [HEALTH-CHECK] URL detection test:', urlTest.success ? '✅ PASS' : '❌ FAIL');
+        } catch (error) {
+            failedFeatures.push('urlDetection');
+            healthStatus.errorDetails.urlDetection = error.message;
+            console.error('🌐 [HEALTH-CHECK] URL detection test failed:', error);
+        }
+        
+        // Test 3: App Detection
+        updateHealthCheckProgress('Testing app detection...', 60);
+        try {
+            const appTest = await ipcRenderer.invoke('test-app-detection');
+            healthStatus.appDetection = appTest.success;
+            if (!appTest.success) {
+                failedFeatures.push('appDetection');
+                healthStatus.errorDetails.appDetection = appTest.error || 'App detection test failed';
+            }
+            console.log('🖥️ [HEALTH-CHECK] App detection test:', appTest.success ? '✅ PASS' : '❌ FAIL');
+        } catch (error) {
+            failedFeatures.push('appDetection');
+            healthStatus.errorDetails.appDetection = error.message;
+            console.error('🖥️ [HEALTH-CHECK] App detection test failed:', error);
+        }
+        
+        // Test 4: Fraud Detection
+        updateHealthCheckProgress('Testing fraud protection...', 80);
+        try {
+            const fraudTest = await ipcRenderer.invoke('test-fraud-detection');
+            healthStatus.fraudDetection = fraudTest.success;
+            if (!fraudTest.success) {
+                failedFeatures.push('fraudDetection');
+                healthStatus.errorDetails.fraudDetection = fraudTest.error || 'Fraud detection test failed';
+            }
+            console.log('🛡️ [HEALTH-CHECK] Fraud detection test:', fraudTest.success ? '✅ PASS' : '❌ FAIL');
+        } catch (error) {
+            failedFeatures.push('fraudDetection');
+            healthStatus.errorDetails.fraudDetection = error.message;
+            console.error('🛡️ [HEALTH-CHECK] Fraud detection test failed:', error);
+        }
+        
+        // Test 5: Database Connection
+        updateHealthCheckProgress('Testing database connection...', 100);
+        try {
+            const dbTest = await ipcRenderer.invoke('test-database-connection');
+            healthStatus.databaseConnection = dbTest.success;
+            if (!dbTest.success) {
+                failedFeatures.push('databaseConnection');
+                healthStatus.errorDetails.databaseConnection = dbTest.error || 'Database connection test failed';
+            }
+            console.log('💾 [HEALTH-CHECK] Database test:', dbTest.success ? '✅ PASS' : '❌ FAIL');
+        } catch (error) {
+            failedFeatures.push('databaseConnection');
+            healthStatus.errorDetails.databaseConnection = error.message;
+            console.error('💾 [HEALTH-CHECK] Database test failed:', error);
+        }
+        
+        const isHealthy = failedFeatures.length === 0;
+        const criticalFeatures = ['databaseConnection'];
+        const canStartTimer = !failedFeatures.some(feature => criticalFeatures.includes(feature));
+        
+        console.log('🏥 [HEALTH-CHECK] Results:', {
+            isHealthy,
+            failedFeatures,
+            canStartTimer,
+            errorCount: Object.keys(healthStatus.errorDetails).length
+        });
+        
+        return {
+            isHealthy,
+            failedFeatures,
+            details: healthStatus,
+            canStartTimer
+        };
+        
+    } catch (error) {
+        console.error('❌ [HEALTH-CHECK] Comprehensive check failed:', error);
+        return {
+            isHealthy: false,
+            failedFeatures: ['healthCheckSystem'],
+            details: healthStatus,
+            canStartTimer: false
+        };
+    }
+}
+
+function showHealthCheckModal() {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('healthCheckModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.id = 'healthCheckModal';
+    modal.innerHTML = `
+        <div class="health-check-overlay">
+            <div class="health-check-modal">
+                <div class="health-check-header">
+                    <h3>🏥 System Health Check</h3>
+                    <p>Verifying all features before starting timer...</p>
+                </div>
+                <div class="health-check-content">
+                    <div class="health-check-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="healthProgressFill"></div>
+                        </div>
+                        <div class="progress-text" id="healthProgressText">Initializing health check...</div>
+                    </div>
+                    <div class="health-check-features">
+                        <div class="feature-item">
+                            <span class="feature-icon">📸</span>
+                            <span class="feature-name">Screenshot Capture</span>
+                            <span class="feature-status" id="screenshotStatus">⏳</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🌐</span>
+                            <span class="feature-name">URL Detection</span>
+                            <span class="feature-status" id="urlStatus">⏳</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🖥️</span>
+                            <span class="feature-name">App Detection</span>
+                            <span class="feature-status" id="appStatus">⏳</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🛡️</span>
+                            <span class="feature-name">Fraud Protection</span>
+                            <span class="feature-status" id="fraudStatus">⏳</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">💾</span>
+                            <span class="feature-name">Database Connection</span>
+                            <span class="feature-status" id="databaseStatus">⏳</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function updateHealthCheckProgress(text, percentage) {
+    const progressFill = document.getElementById('healthProgressFill');
+    const progressText = document.getElementById('healthProgressText');
+    
+    if (progressFill) {
+        progressFill.style.width = `${percentage}%`;
+    }
+    
+    if (progressText) {
+        progressText.textContent = text;
+    }
+    
+    // Update feature status icons based on progress
+    if (percentage >= 20) {
+        const screenshotStatus = document.getElementById('screenshotStatus');
+        if (screenshotStatus) screenshotStatus.textContent = '✅';
+    }
+    if (percentage >= 40) {
+        const urlStatus = document.getElementById('urlStatus');
+        if (urlStatus) urlStatus.textContent = '✅';
+    }
+    if (percentage >= 60) {
+        const appStatus = document.getElementById('appStatus');
+        if (appStatus) appStatus.textContent = '✅';
+    }
+    if (percentage >= 80) {
+        const fraudStatus = document.getElementById('fraudStatus');
+        if (fraudStatus) fraudStatus.textContent = '✅';
+    }
+    if (percentage >= 100) {
+        const databaseStatus = document.getElementById('databaseStatus');
+        if (databaseStatus) databaseStatus.textContent = '✅';
+    }
+}
+
+function hideHealthCheckModal() {
+    const modal = document.getElementById('healthCheckModal');
+    if (modal) {
+        modal.style.opacity = '0';
+        setTimeout(() => {
+            modal.remove();
+        }, 300);
     }
 }
 

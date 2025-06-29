@@ -623,6 +623,141 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* === HEALTH CHECK MODAL === */
+        .health-check-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            backdrop-filter: blur(4px);
+        }
+
+        .health-check-modal {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 25px 75px rgba(0, 0, 0, 0.3);
+            width: 500px;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: hidden;
+            animation: healthCheckSlideIn 0.3s ease-out;
+        }
+
+        .health-check-header {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .health-check-header h3 {
+            margin: 0 0 8px 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .health-check-header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 16px;
+        }
+
+        .health-check-content {
+            padding: 24px;
+        }
+
+        .health-check-progress {
+            margin-bottom: 24px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #34d399);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: #64748b;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .health-check-features {
+            display: grid;
+            gap: 12px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .feature-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .feature-name {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+            color: #1e293b;
+        }
+
+        .feature-status {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        @keyframes healthCheckSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        @keyframes healthCheckPulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        .feature-item:has(.feature-status:contains("⏳")) {
+            animation: healthCheckPulse 1.5s infinite;
+        }
     </style>
 </head>
 <body>

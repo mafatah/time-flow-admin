@@ -1,0 +1,11 @@
+version: 1.0.41
+files:
+  - url: TimeFlow-v1.0.41-ARM64.dmg
+    sha512: FUJTB9wgOZNk5KtxvGo5s44kF7N+7VbL9Es4rfsSTsgmLOx/2D6SDd9GevXTgrc0OyVX+Z1iGbSM3hvTx1Wv8Q==
+    size: 114984094
+  - url: TimeFlow-v1.0.41-Intel.dmg
+    sha512: XPJyj9D1K/Yf/9/MuwezNxG36QamaTAmby+qF0/RtQFtRzZfHkV5prqAe6TrlSH9OOaWVDby9V5KsIuLxGLhCg==
+    size: 121519356
+path: TimeFlow-v1.0.41-Intel.dmg
+sha512: XPJyj9D1K/Yf/9/MuwezNxG36QamaTAmby+qF0/RtQFtRzZfHkV5prqAe6TrlSH9OOaWVDby9V5KsIuLxGLhCg==
+releaseDate: '2025-06-29T15:54:00.000Z'
