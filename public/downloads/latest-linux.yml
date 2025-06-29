@@ -1,0 +1,9 @@
+version: 1.0.41
+files:
+  - url: TimeFlow-v1.0.41-Linux.AppImage
+    sha512: Z2bJ9ryAr7o0hFeh5QFaPP+SEQ10fQ+VF3mUSaSaiVWbFktiqbxVpuX5jvja8VSf7baOIC9pTvG76CHGSfjU2A==
+    size: 125420587
+    blockMapSize: 132159
+path: TimeFlow-v1.0.41-Linux.AppImage
+sha512: Z2bJ9ryAr7o0hFeh5QFaPP+SEQ10fQ+VF3mUSaSaiVWbFktiqbxVpuX5jvja8VSf7baOIC9pTvG76CHGSfjU2A==
+releaseDate: '2025-06-29T15:54:00.000Z'
