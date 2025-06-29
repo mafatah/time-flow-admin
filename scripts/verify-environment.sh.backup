@@ -71,7 +71,7 @@ echo ""
 echo "🌍 Environment Variables:"
 
 if [ -z "$APPLE_ID" ]; then
-    echo "⚠️  APPLE_ID not set. Set with: export APPLE_ID='${APPLE_ID}'"
+    echo "⚠️  APPLE_ID not set. Set with: export APPLE_ID='alshqawe66@gmail.com'"
 else
     echo "✅ APPLE_ID: $APPLE_ID"
 fi
@@ -123,10 +123,10 @@ echo ""
 echo "🎯 Quick Setup Commands:"
 echo "========================"
 echo "# Set Apple credentials:"
-echo "export APPLE_ID='${APPLE_ID}'"
-echo "export APPLE_APP_SPECIFIC_PASSWORD='${APPLE_APP_SPECIFIC_PASSWORD}'"
+echo "export APPLE_ID='alshqawe66@gmail.com'"
+echo "export APPLE_APP_SPECIFIC_PASSWORD='icmi-tdzi-ydvi-lszi'"
 echo "export APPLE_TEAM_ID='6GW49LK9V9'"
-echo "export GITHUB_TOKEN='${GITHUB_TOKEN}'"
+echo "export GITHUB_TOKEN='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'"
 echo ""
 echo "# Install GitHub CLI (if needed):"
 echo "brew install gh"

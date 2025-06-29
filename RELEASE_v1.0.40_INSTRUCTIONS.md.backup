@@ -15,10 +15,10 @@
 2. **Apple Developer Certificate**: Ensure "Developer ID Application: Ebdaa Digital Technology (6GW49LK9V9)" is in Keychain
 3. **Environment Setup**:
    ```bash
-   export APPLE_ID="${APPLE_ID}"
-   export APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD}" 
+   export APPLE_ID="alshqawe66@gmail.com"
+   export APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi" 
    export APPLE_TEAM_ID="6GW49LK9V9"
-   export GITHUB_TOKEN="${GITHUB_TOKEN}"
+   export GITHUB_TOKEN="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"
    ```
 
 ### Step 1: Version Update ✅ COMPLETED
@@ -187,5 +187,5 @@ Existing users will be automatically notified of this update.
 
 - **GitHub Repository**: https://github.com/mafatah/time-flow-admin
 - **Team ID**: 6GW49LK9V9
-- **Apple Developer Account**: ${APPLE_ID}
+- **Apple Developer Account**: alshqawe66@gmail.com
 - **Release URL**: https://github.com/mafatah/time-flow-admin/releases/tag/v1.0.40 

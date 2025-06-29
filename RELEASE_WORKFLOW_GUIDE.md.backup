@@ -11,10 +11,10 @@ Complete guide for releasing TimeFlow with signing, notarization, and cross-plat
 - **Xcode Command Line Tools** (macOS)
 
 ### Required Credentials
-- **Apple Developer Account**: `${APPLE_ID}`
-- **App-Specific Password**: `${APPLE_APP_SPECIFIC_PASSWORD}`
+- **Apple Developer Account**: `alshqawe66@gmail.com`
+- **App-Specific Password**: `icmi-tdzi-ydvi-lszi`
 - **Team ID**: `6GW49LK9V9`
-- **GitHub Token**: `${GITHUB_TOKEN}`
+- **GitHub Token**: `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`
 - **Repository**: `mafatah/time-flow-admin`
 
 ### Apple Developer Certificate
@@ -101,10 +101,10 @@ Update version strings in these files:
 
 ### Step 3: Set Environment Variables
 ```bash
-export APPLE_ID="${APPLE_ID}"
-export APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD}"
+export APPLE_ID="alshqawe66@gmail.com"
+export APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi"
 export APPLE_TEAM_ID="6GW49LK9V9"
-export GITHUB_TOKEN="${GITHUB_TOKEN}"
+export GITHUB_TOKEN="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"
 ```
 
 ### Step 4: Build Applications

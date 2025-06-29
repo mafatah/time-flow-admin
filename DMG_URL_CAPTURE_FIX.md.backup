@@ -84,8 +84,8 @@ codesign --force --sign "Developer ID Application: Ebdaa Digital Technology (6GW
 
 # Notarize with Apple
 xcrun notarytool submit dist/*.dmg \
-  --apple-id "${APPLE_ID}" \
-  --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
+  --apple-id "alshqawe66@gmail.com" \
+  --password "icmi-tdzi-ydvi-lszi" \
   --team-id "6GW49LK9V9" \
   --wait
 
