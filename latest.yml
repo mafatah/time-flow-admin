@@ -1,8 +1,8 @@
 version: 1.0.40
 files:
   - url: TimeFlow-v1.0.40-Setup.exe
-    sha512: placeholder_windows_sha512
-    size: 0
+    sha512: b5e8bfce0701ab74114cec37d12e9262a15fcf6e3458bd7ef32bcad7023c01abd424348b2a0c07a56b118cb1084ee3d9ed4bc39ac49889af36dd2d76a32e3154
+    size: 88173814
 path: TimeFlow-v1.0.40-Setup.exe
-sha512: placeholder_windows_sha512
-releaseDate: '2025-06-29T15:15:00.000Z'
+sha512: b5e8bfce0701ab74114cec37d12e9262a15fcf6e3458bd7ef32bcad7023c01abd424348b2a0c07a56b118cb1084ee3d9ed4bc39ac49889af36dd2d76a32e3154
+releaseDate: '2025-06-29T16:55:00.000Z'
