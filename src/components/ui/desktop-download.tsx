@@ -290,14 +290,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '126MB'; // TimeFlow-v1.0.38-ARM64.dmg (UPDATED for v1.0.38)
+        return '115MB'; // Ebdaa Work Time-1.0.40-arm64.dmg (UPDATED for v1.0.40)
       case 'mac-intel':
       case 'mac':
-        return '132MB'; // TimeFlow-v1.0.38-Intel.dmg (UPDATED for v1.0.38)
+        return '122MB'; // Ebdaa Work Time-1.0.40.dmg (UPDATED for v1.0.40)
       case 'windows':
-        return '97MB'; // TimeFlow-v1.0.38-Setup.exe (UPDATED for v1.0.38)
+        return '84MB'; // Ebdaa Work Time Setup 1.0.40.exe (UPDATED for v1.0.40)
       case 'linux':
-        return '136MB'; // TimeFlow-v1.0.38-Linux.AppImage (UPDATED for v1.0.38)
+        return '120MB'; // Ebdaa Work Time-1.0.40.AppImage (UPDATED for v1.0.40)
       default:
         return '';
     }
@@ -306,14 +306,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 131664749; // TimeFlow-v1.0.38-ARM64.dmg (UPDATED for v1.0.38)
+        return 114984230; // Ebdaa Work Time-1.0.40-arm64.dmg (UPDATED for v1.0.40)
       case 'mac-intel':
       case 'mac':
-        return 138148580; // TimeFlow-v1.0.38-Intel.dmg (UPDATED for v1.0.38)
+        return 121517388; // Ebdaa Work Time-1.0.40.dmg (UPDATED for v1.0.40)
       case 'windows':
-        return 101763530; // TimeFlow-v1.0.38-Setup.exe (UPDATED for v1.0.38)
+        return 88173814; // Ebdaa Work Time Setup 1.0.40.exe (UPDATED for v1.0.40)
       case 'linux':
-        return 142659550; // TimeFlow-v1.0.38-Linux.AppImage (UPDATED for v1.0.38)
+        return 125420399; // Ebdaa Work Time-1.0.40.AppImage (UPDATED for v1.0.40)
       default:
         return 0;
     }
