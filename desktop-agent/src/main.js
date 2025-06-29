@@ -1407,6 +1407,11 @@ let lastUrlCapture = null;
 let lastUrlCaptureTime = null;
 const MAX_URL_CAPTURE_FAILURES = 3;
 
+// Enhanced tab change detection variables
+let activeBrowserUrlCheckInterval = null;
+let lastActiveBrowserCheck = 0;
+let currentActiveBrowser = null;
+
 // Enhanced browser URL detection
 async function detectBrowserUrl() {
   try {
@@ -1562,7 +1567,7 @@ async function getMacBrowserUrl(browserName) {
     console.log(`🔍 [URL-EXTRACT] Executing AppleScript for ${browserName}...`);
     const result = execSync(`osascript -e '${script}'`, { 
       encoding: 'utf8',
-      timeout: 5000  // Standard timeout
+      timeout: 3000  // Reduced timeout for faster tab change detection
     }).trim();
     
     console.log(`🔍 [URL-EXTRACT] Raw AppleScript result for ${browserName}: "${result}"`);
@@ -1619,13 +1624,70 @@ async function getLinuxBrowserUrl(windowTitle) {
   }
 }
 
+// Enhanced active browser monitoring for tab changes
+function startActiveBrowserMonitoring() {
+  // Clear any existing interval
+  if (activeBrowserUrlCheckInterval) {
+    clearInterval(activeBrowserUrlCheckInterval);
+  }
+  
+  console.log('🔍 [TAB-MONITOR] Starting enhanced tab change detection...');
+  
+  // Check for tab changes every 2 seconds when browser is active
+  activeBrowserUrlCheckInterval = setInterval(async () => {
+    try {
+      const activeApp = await detectActiveApplication();
+      const currentApp = activeApp?.name;
+      
+      // Only monitor if browser is currently active
+      if (currentApp && isBrowserApp(currentApp)) {
+        console.log(`🔍 [TAB-MONITOR] Checking tab changes in active browser: ${currentApp}`);
+        
+        // Extract current URL
+        const url = await extractUrlFromBrowser(currentApp, activeApp?.title);
+        if (url) {
+          const urlData = {
+            url: url,
+            title: activeApp?.title || 'Untitled',
+            browser: currentApp,
+            domain: extractDomain(url),
+            isActive: true,
+            fromTabMonitor: true
+          };
+          
+          // Process the URL (this will handle throttling internally)
+          await processFoundUrl(urlData);
+        }
+        
+        currentActiveBrowser = currentApp;
+      } else {
+        // Not a browser, clear current active browser
+        if (currentActiveBrowser) {
+          console.log(`🔍 [TAB-MONITOR] Browser no longer active, was: ${currentActiveBrowser}`);
+          currentActiveBrowser = null;
+        }
+      }
+    } catch (error) {
+      console.log('❌ [TAB-MONITOR] Error during tab monitoring:', error.message);
+    }
+  }, 2000); // Check every 2 seconds for tab changes
+}
+
+function stopActiveBrowserMonitoring() {
+  if (activeBrowserUrlCheckInterval) {
+    clearInterval(activeBrowserUrlCheckInterval);
+    activeBrowserUrlCheckInterval = null;
+    console.log('🛑 [TAB-MONITOR] Stopped tab change monitoring');
+  }
+}
+
 // Track last URL per browser to only capture changes
 // Using global lastBrowserUrls map declared at top of file
 
 function startUrlCapture() {
   if (urlCaptureInterval) clearInterval(urlCaptureInterval);
   
-  console.log('🌐 [URL-CAPTURE] Starting TRULY EVENT-DRIVEN URL capture - only on browser usage');
+  console.log('🌐 [URL-CAPTURE] Starting ENHANCED EVENT-DRIVEN URL capture with tab change detection');
   console.log('🔧 [URL-CAPTURE] URL capture enabled:', urlCaptureEnabled);
   console.log('🔧 [URL-CAPTURE] Current tracking state:', isTracking);
   console.log('🔧 [URL-CAPTURE] Current time log ID:', currentTimeLogId);
@@ -1634,6 +1696,9 @@ function startUrlCapture() {
     console.log('⚠️ [URL-CAPTURE] URL capture is disabled - enabling with fallback methods');
     urlCaptureEnabled = true; // Enable anyway with fallbacks
   }
+  
+  // Start enhanced tab change monitoring
+  startActiveBrowserMonitoring();
   
   // TRULY EVENT-DRIVEN: Only capture URLs when browsers are actually used
   const captureActiveUrl = async () => {
@@ -1669,8 +1734,11 @@ function startUrlCapture() {
   // Capture current URL immediately
   captureActiveUrl();
   
-  // NO TIMER - URL capture now triggered only by user activity
-  console.log('✅ [URL-CAPTURE] Truly event-driven URL capture started (NO TIMERS - only on activity)');
+  console.log('✅ [URL-CAPTURE] Enhanced URL capture started with:');
+  console.log('   📱 Event-driven capture on activity');
+  console.log('   🔄 Tab change monitoring every 2 seconds');
+  console.log('   ⚡ Reduced throttling for tab switches (5s vs 30s)');
+  console.log('   🌐 Background browser monitoring every 10 seconds');
 }
 
 async function processFoundUrl(urlData) {
@@ -1685,21 +1753,31 @@ async function processFoundUrl(urlData) {
     const timeSinceLastCapture = now - lastCaptureTime;
     const lastUrl = lastBrowserUrls.get(urlData.browser);
     
-    // FIXED: More aggressive URL capture - capture new URLs immediately, revisited URLs after 30 seconds
+    // Enhanced tab change detection: Immediate capture for new URLs, reduced throttling for tab monitor
     const isNewUrl = lastUrl !== urlData.url;
-    const enoughTimePassed = timeSinceLastCapture > (30 * 1000); // Reduced from 2 minutes to 30 seconds
+    const isFromTabMonitor = urlData.fromTabMonitor;
+    
+    // More aggressive capture for tab changes
+    let throttleDelay = 30 * 1000; // Default 30 seconds
+    if (isFromTabMonitor) {
+      throttleDelay = 5 * 1000; // Only 5 seconds for tab monitor
+    }
+    
+    const enoughTimePassed = timeSinceLastCapture > throttleDelay;
     const shouldCapture = isNewUrl || enoughTimePassed;
     
     if (!shouldCapture) {
-      console.log(`🔗 [URL-CAPTURE] SKIPPING: "${urlData.url}" | Browser: "${urlData.browser}" | Reason: Recent capture (${Math.round(timeSinceLastCapture/1000)}s ago)`);
+      const source = isFromTabMonitor ? '[TAB-MONITOR]' : '[ACTIVITY]';
+      console.log(`🔗 [URL-CAPTURE] SKIPPING ${source}: "${urlData.url}" | Browser: "${urlData.browser}" | Reason: Recent capture (${Math.round(timeSinceLastCapture/1000)}s ago, threshold: ${throttleDelay/1000}s)`);
       return;
     }
     
     // If different URL or enough time passed, capture it
+    const source = isFromTabMonitor ? '[TAB-MONITOR]' : '[ACTIVITY]';
     if (isNewUrl) {
-      console.log(`🔗 [URL-CAPTURE] 🆕 NEW URL DETECTED: "${urlData.url}" | Browser: "${urlData.browser}" | Domain: "${urlData.domain}" | Previous: "${lastUrl || 'none'}"`);
+      console.log(`🔗 [URL-CAPTURE] 🆕 NEW URL DETECTED ${source}: "${urlData.url}" | Browser: "${urlData.browser}" | Domain: "${urlData.domain}" | Previous: "${lastUrl || 'none'}"`);
     } else {
-      console.log(`🔗 [URL-CAPTURE] 🔄 RE-VISITING URL: "${urlData.url}" | Browser: "${urlData.browser}" | Time since last: ${Math.round(timeSinceLastCapture/1000)}s`);
+      console.log(`🔗 [URL-CAPTURE] 🔄 RE-VISITING URL ${source}: "${urlData.url}" | Browser: "${urlData.browser}" | Time since last: ${Math.round(timeSinceLastCapture/1000)}s`);
     }
     
     // Update last URL for this browser and timing tracking
@@ -1952,6 +2030,11 @@ function stopUrlCapture() {
     clearInterval(urlCaptureInterval);
     urlCaptureInterval = null;
   }
+  
+  // Stop enhanced tab monitoring
+  stopActiveBrowserMonitoring();
+  
+  console.log('🌐 Enhanced URL capture and tab monitoring stopped');
 }
 
 // Cross-platform permission checking
@@ -3036,8 +3119,8 @@ async function resumeTracking() {
 
 // === ENHANCED IPC HANDLERS ===
 if (isElectronContext && ipcMain) {
-// Employee login/logout handlers
-ipcMain.on('user-logged-in', (event, user) => {
+  // Employee login/logout handlers
+  ipcMain.on('user-logged-in', (event, user) => {
   console.log('👤 User logged in:', user.email);
   // Set the user for activity monitoring
   // Auto-start activity monitoring when user logs in
@@ -3300,7 +3383,7 @@ async function captureActiveUrl() {
 // === APP LIFECYCLE ===
 if (isElectronContext && app) {
   app.whenReady().then(async () => {
-  console.log('🚀 TimeFlow Desktop Agent starting...');
+  safeLog('🚀 TimeFlow Desktop Agent starting...');
   
   // Initialize components
   initializeComponents();
@@ -3329,8 +3412,8 @@ if (isElectronContext && app) {
       const currentPermission = systemPreferences.getMediaAccessStatus('screen');
       
       if (currentPermission !== 'granted') {
-        console.log('🔒 Startup permission check: Screen Recording not granted');
-        console.log('📋 App and URL capture features will be limited until permissions are granted');
+        safeLog('🔒 Startup permission check: Screen Recording not granted');
+        safeLog('📋 App and URL capture features will be limited until permissions are granted');
         
         // Show a subtle notification about enhanced features
         showTrayNotification(
@@ -3338,14 +3421,21 @@ if (isElectronContext && app) {
           'info'
         );
       } else {
-        console.log('✅ Startup permission check: Screen Recording permission already granted');
+        safeLog('✅ Startup permission check: Screen Recording permission already granted');
       }
     }
   }, 3000);
   
-  // Auto-start if enabled
+  // Auto-start if enabled - but only if not already tracking
   if (appSettings.auto_start_tracking) {
-    setTimeout(() => startTracking(), 5000);
+    setTimeout(() => {
+      if (!isTracking) {
+        safeLog('🚀 Auto-starting tracking after 5 second delay...');
+        startTracking();
+      } else {
+        safeLog('⚠️ Auto-start skipped - tracking already active');
+      }
+    }, 5000);
   }
 
   // Register global debug shortcut (Ctrl+Shift+D or Cmd+Shift+D)
@@ -3359,7 +3449,7 @@ if (isElectronContext && app) {
       const currentPermission = systemPreferences.getMediaAccessStatus('screen');
       
       if (currentPermission !== 'granted') {
-        console.log('🔒 Manual permission request triggered via keyboard shortcut');
+        safeLog('🔒 Manual permission request triggered via keyboard shortcut');
         permissionDialogShown = false; // Reset to allow dialog
         await checkMacScreenPermissions();
       } else {
@@ -3370,9 +3460,9 @@ if (isElectronContext && app) {
     }
   });
 
-  console.log('✅ TimeFlow Agent ready');
-  console.log('🔬 Debug Console: Right-click tray icon → Debug Console, or press Ctrl+Shift+D');
-  console.log('🔒 Permission Request: Press Ctrl+Shift+P to manage screen recording permissions');
+  safeLog('✅ TimeFlow Agent ready');
+  safeLog('🔬 Debug Console: Right-click tray icon → Debug Console, or press Ctrl+Shift+D');
+  safeLog('🔒 Permission Request: Press Ctrl+Shift+P to manage screen recording permissions');
 });
 
 app.on('window-all-closed', () => {

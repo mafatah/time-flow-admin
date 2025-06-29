@@ -1,7 +1,7 @@
 {
   "name": "vite_react_shadcn_ts",
   "private": true,
-  "version": "1.0.39",
+  "version": "1.0.40",
   "type": "module",
   "author": "Ebdaa Digital Technology",
   "description": "Ebdaa Work Time - Employee time tracking and productivity monitoring application",
@@ -22,7 +22,7 @@
     "electron:build": "electron-builder",
     "electron:build-unsigned": "electron-builder --config.mac.identity=null --config.mac.notarize=null",
     "build:web": "tsc -p tsconfig.app.json",
-    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\; && node fix-imports.cjs && mkdir -p build/desktop-agent && cp -r desktop-agent/renderer desktop-agent/config.json desktop-agent/assets desktop-agent/debug-window.html build/desktop-agent/ && mkdir -p build/electron/assets && cp -r electron/assets/* build/electron/assets/ && cp public/app-update.yml build/electron/ && mkdir -p build/electron/node_modules/active-win && cp -r node_modules/active-win/* build/electron/node_modules/active-win/ && chmod +x build/electron/node_modules/active-win/main",
+    "build:electron": "mkdir -p build/electron && tsc -p tsconfig.electron.json && find build/electron -name '*.js' -exec sh -c 'mv \"$1\" \"${1%.js}.cjs\"' _ {} \\; && node fix-imports.cjs && mkdir -p build/desktop-agent && cp -r desktop-agent/renderer desktop-agent/config.json desktop-agent/assets desktop-agent/debug-window.html build/desktop-agent/ && mkdir -p build/electron/assets && cp -r electron/assets/* build/electron/assets/ && cp public/app-update.yml build/electron/ && mkdir -p build/electron/node_modules/active-win && cp -r node_modules/active-win/* build/electron/node_modules/active-win/ && chmod +x build/electron/node_modules/active-win/main && mkdir -p build/electron/node_modules/node-global-key-listener && cp -r node_modules/node-global-key-listener/* build/electron/node_modules/node-global-key-listener/",
     "build:all": "npm run build:dev && npm run build:electron && mkdir -p build/dist && cp -r dist/* build/dist/",
     "build:notarized": "scripts/build-notarized.sh",
     "build:release": "scripts/build-and-release.sh",
@@ -147,21 +147,15 @@
     "files": [
       "build/electron/**/*",
       "build/desktop-agent/**/*",
-      "build/entitlements.mac.plist",
-      "!build/dist/**/*"
+      "build/dist/**/*",
+      "build/entitlements.mac.plist"
     ],
-    "extraResources": [
-      {
-        "from": "build/dist",
-        "to": "app",
-        "filter": [
-          "**/*",
-          "!downloads/**/*",
-          "!*.dmg",
-          "!*.blockmap"
-        ]
-      }
+    "asarUnpack": [
+      "**/node_modules/active-win/**/*",
+      "**/node_modules/node-global-key-listener/**/*"
     ],
+    "nodeGypRebuild": false,
+    "buildDependenciesFromSource": false,
     "mac": {
       "target": [
         {

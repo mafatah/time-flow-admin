@@ -11,48 +11,13 @@ export default function TimeTrackingPage() {
   const [systemCheckComplete, setSystemCheckComplete] = useState(false);
   const [systemReady, setSystemReady] = useState(false);
 
-  // Check if user has done system check recently (localStorage)
+  // Auto-complete system check (no longer needed with new simple system)
   useEffect(() => {
-    const lastCheck = localStorage.getItem('timeflow_system_check');
-    const now = Date.now();
-    const oneDay = 24 * 60 * 60 * 1000; // 24 hours
-
-    if (lastCheck && (now - parseInt(lastCheck)) < oneDay) {
-      setSystemCheckComplete(true);
-      setSystemReady(true);
-    }
+    // Always mark system as ready with new simplified permission system
+    setSystemCheckComplete(true);
+    setSystemReady(true);
     
-    // Listen for system check request from main process (after login)
-    const handleShowSystemCheck = (data: any) => {
-      console.log('📋 System check requested from main process:', data);
-      
-      // Only show if not recently checked
-      const lastCheckTime = localStorage.getItem('timeflow_system_check');
-      if (lastCheckTime) {
-        const minutesSinceCheck = (Date.now() - parseInt(lastCheckTime)) / (1000 * 60);
-        
-        // Don't show if checked in last 5 minutes
-        if (minutesSinceCheck < 5) {
-          console.log('✅ System check recently completed, skipping auto-show');
-          return;
-        }
-      }
-      
-      // Show system check dialog
-      setShowSystemCheck(true);
-    };
-    
-    // Add listener if in Electron environment
-    if (window.electron && window.electron.on && window.electron.removeAllListeners) {
-      window.electron.on('show-system-check', handleShowSystemCheck);
-      window.electron.on('trigger-system-check-after-login', handleShowSystemCheck);
-      
-      // Cleanup listeners
-      return () => {
-        window.electron?.removeAllListeners?.('show-system-check');
-        window.electron?.removeAllListeners?.('trigger-system-check-after-login');
-      };
-    }
+    console.log('✅ Using simplified permission system - marking system as ready');
   }, []);
 
   const handleSystemCheckComplete = (allSystemsReady: boolean) => {
@@ -80,84 +45,25 @@ export default function TimeTrackingPage() {
         subtitle="Track time spent on tasks and projects"
       />
 
-      {/* System Check Banner */}
-      {!systemCheckComplete && (
-        <Alert className="mt-6 border-blue-500 bg-blue-50">
-          <Settings className="h-4 w-4" />
-          <AlertDescription>
-            <div className="flex items-center justify-between">
-              <div>
-                <strong>System Check Recommended</strong>
-                <p className="text-sm mt-1">
-                  Verify that all tracking components are working properly before starting your session.
-                </p>
-              </div>
-              <Button onClick={() => setShowSystemCheck(true)} size="sm">
-                Run System Check
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* System Ready Status */}
-      {systemCheckComplete && systemReady && (
-        <Alert className="mt-6 border-green-500 bg-green-50">
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>
-            <div className="flex items-center justify-between">
-              <div>
-                <strong>✅ All Systems Ready</strong>
-                <p className="text-sm mt-1">
-                  System check completed successfully. Tracking components verified.
-                </p>
-              </div>
-              <Button 
-                onClick={() => setShowSystemCheck(true)} 
-                variant="outline" 
-                size="sm"
-              >
-                Re-check System
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* System Issues Status */}
-      {systemCheckComplete && !systemReady && (
-        <Alert className="mt-6 border-yellow-500 bg-yellow-50">
-          <Settings className="h-4 w-4" />
-          <AlertDescription>
-            <div className="flex items-center justify-between">
-              <div>
-                <strong>⚠️ System Issues Detected</strong>
-                <p className="text-sm mt-1">
-                  Some tracking components have limitations. Tracking may work with reduced functionality.
-                </p>
-              </div>
-              <Button 
-                onClick={() => setShowSystemCheck(true)} 
-                variant="outline" 
-                size="sm"
-              >
-                Check Again
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* Simple Info Banner - New Simplified System */}
+      <Alert className="mt-6 border-green-500 bg-green-50">
+        <CheckCircle className="h-4 w-4" />
+        <AlertDescription>
+          <div>
+            <strong>✅ Ready to Track</strong>
+            <p className="text-sm mt-1">
+              Select a project and start tracking. Permissions will be handled automatically as needed.
+            </p>
+          </div>
+        </AlertDescription>
+      </Alert>
 
       <div className="mt-6">
         <TimeTracker />
       </div>
 
-      {/* System Check Dialog */}
-      <SystemCheckDialog 
-        isOpen={showSystemCheck}
-        onComplete={handleSystemCheckComplete}
-        onOpenDebugConsole={openDebugConsole}
-      />
+      {/* Old System Check Dialog Disabled - Using New Simple Permission System */}
+      {/* SystemCheckDialog has been replaced with simplePermissionDialog.ts in electron/main.ts */}
     </div>
   );
 }

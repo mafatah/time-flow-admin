@@ -252,109 +252,44 @@ function setupEventListeners() {
 function setupIpcListeners() {
     console.log('🔧 Setting up IPC listeners...');
     
-    // Activity updates from main process
+    // Listen for tracking status updates from main process
+    ipcRenderer.on('tracking-status-changed', (event, data) => {
+        console.log('📊 Tracking status changed:', data);
+        isTracking = data.isTracking;
+        updateTrackingStatus();
+        updateTrackingButtons();
+    });
+    
+    // Listen for activity updates from main process
     ipcRenderer.on('activity-update', (event, data) => {
+        console.log('📊 Activity update received:', data);
         updateActivityStats(data);
     });
     
-    // Session updates from main process
-    ipcRenderer.on('session-update', (event, data) => {
-        updateSessionDisplay(data);
-    });
-    
-    // Notifications from main process
-    ipcRenderer.on('notification', (event, message, type = 'info') => {
-        showNotification(message, type);
-    });
-    
-    // Screenshot events
+    // Listen for screenshot capture events
     ipcRenderer.on('screenshot-captured', (event, data) => {
-        showNotification('Screenshot captured', 'info');
-        // Refresh screenshots if on screenshots page
-        const screenshotsPage = document.getElementById('screenshotsPage');
-        if (screenshotsPage && screenshotsPage.classList.contains('active')) {
-            setTimeout(loadRecentScreenshots, 1000);
-        }
+        console.log('📸 Screenshot captured:', data);
+        showNotification('Screenshot captured', 'success');
     });
     
-    // Tracking state events from main process
-    ipcRenderer.on('tracking-stopped', (event, data) => {
-        console.log('🛑 [RENDERER] Tracking stopped event received from main process');
-        isTracking = false;
-        trackingStatus = 'stopped';
-        sessionStartTime = null;
-        
-        // Update UI immediately
-        updateTrackingButtons();
-        updateTrackingStatus();
-        updateSessionTime('--:--:--');
-        
-        // Stop session timer
-        if (sessionTimer) {
-            clearInterval(sessionTimer);
-            sessionTimer = null;
-            console.log('⏰ [RENDERER] Session timer stopped');
-        }
-        
-        showNotification('Time tracking stopped', 'info');
+    // Listen for app updates
+    ipcRenderer.on('update-available', (event, data) => {
+        console.log('🔄 Update available:', data);
+        showNotification('Update available! Check the tray menu to download.', 'info');
     });
     
-    ipcRenderer.on('tracking-paused', (event, data) => {
-        console.log('⏸️ [RENDERER] Tracking paused event received from main process');
-        isTracking = false;
-        trackingStatus = 'paused';
-        
-        // Update UI
-        updateTrackingButtons();
-        updateTrackingStatus();
-        
-        // Stop session timer but keep start time
-        if (sessionTimer) {
-            clearInterval(sessionTimer);
-            sessionTimer = null;
-            console.log('⏰ [RENDERER] Session timer paused');
-        }
-        
-        showNotification(`Time tracking paused${data?.reason ? ` (${data.reason})` : ''}`, 'info');
-    });
+    // DISABLED: System check trigger to prevent duplicate dialogs
+    // The simple permission dialog in main process handles all permission checks
+    // ipcRenderer.on('trigger-system-check-after-login', (event, data) => {
+    //     console.log('🔍 System check trigger received:', data);
+    //     if (data.autoShow) {
+    //         setTimeout(() => {
+    //             showSystemCheckPrompt();
+    //         }, 2000);
+    //     }
+    // });
     
-    ipcRenderer.on('tracking-resumed', (event, data) => {
-        console.log('▶️ [RENDERER] Tracking resumed event received from main process');
-        isTracking = true;
-        trackingStatus = 'active';
-        
-        // Update UI
-        updateTrackingButtons();
-        updateTrackingStatus();
-        
-        // Restart session timer
-        startSessionTimer();
-        
-        showNotification('Time tracking resumed', 'success');
-    });
-
-    // System check trigger after login (with 5-minute cooldown)
-    ipcRenderer.on('trigger-system-check-after-login', (event, data) => {
-        console.log('📋 System check trigger received from main process:', data);
-        
-        // Implement 5-minute cooldown system to prevent spam
-        const lastCheckTime = localStorage.getItem('timeflow_system_check_desktop');
-        if (lastCheckTime) {
-            const minutesSinceCheck = (Date.now() - parseInt(lastCheckTime)) / (1000 * 60);
-            
-            // Don't show if checked in last 5 minutes
-            if (minutesSinceCheck < 5) {
-                console.log('✅ System check recently completed, skipping auto-show (cooldown active)');
-                showNotification('System check recently completed. All systems ready!', 'info');
-                return;
-            }
-        }
-        
-        // Show system check notification with option to open debug console
-        showSystemCheckPrompt();
-    });
-    
-    console.log('✅ IPC listeners set up successfully');
+    console.log('✅ IPC listeners set up');
 }
 
 // === REMEMBER ME FUNCTIONALITY ===

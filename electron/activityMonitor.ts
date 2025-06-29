@@ -996,30 +996,7 @@ async function uploadActivityScreenshot(filePath: string, filename: string) {
 async function getCurrentAppName(): Promise<string> {
   try {
     if (process.platform === 'darwin') {
-      const { exec } = require('child_process');
-      const { promisify } = require('util');
-      const execAsync = promisify(exec);
-      
-      // Use multiple detection methods
-      const methods = [
-        'osascript -e "tell application \"System Events\" to get name of first application process whose frontmost is true"',
-        'osascript -e "tell application \"System Events\" to get displayed name of first application process whose frontmost is true"'
-      ];
-      
-      for (const method of methods) {
-        try {
-          const { stdout } = await execAsync(method);
-          const appName = stdout.trim();
-          if (appName && appName !== 'Ebdaa Work Time' && appName !== 'TimeFlow') {
-            safeLog('✅ App detected:', appName);
-            return appName;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      // Fallback to active-win library
+      // Try active-win first (works with Screen Recording permission)
       try {
         const activeWin = require('active-win');
         const activeWindow = await activeWin();
@@ -1031,7 +1008,30 @@ async function getCurrentAppName(): Promise<string> {
           }
         }
       } catch (e) {
-        safeLog('❌ Active-win fallback failed:', e);
+        safeLog('❌ Active-win failed:', e);
+      }
+      
+      // Fallback to AppleScript (requires Accessibility permission)
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      
+      const methods = [
+        'osascript -e "tell application \"System Events\" to get name of first application process whose frontmost is true"',
+        'osascript -e "tell application \"System Events\" to get displayed name of first application process whose frontmost is true"'
+      ];
+      
+      for (const method of methods) {
+        try {
+          const { stdout } = await execAsync(method);
+          const appName = stdout.trim();
+          if (appName && appName !== 'Ebdaa Work Time' && appName !== 'TimeFlow') {
+            safeLog('✅ App detected via AppleScript:', appName);
+            return appName;
+          }
+        } catch (e) {
+          continue;
+        }
       }
     }
     

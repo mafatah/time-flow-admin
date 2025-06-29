@@ -7,6 +7,9 @@
   "scripts": {
     "start": "electron .",
     "electron": "electron .",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:dmg": "electron-builder --mac dmg",
     "test-mac": "electron test-mac-permissions.js",
     "test-screenshot": "node test-screenshot.js",
     "postinstall": "electron-builder install-app-deps"
@@ -26,16 +29,55 @@
   },
   "build": {
     "appId": "com.timeflow.desktop-agent",
-    "productName": "TimeFlow",
+    "productName": "TimeFlow Agent",
     "directories": {
       "output": "dist"
     },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "config/**/*",
+      "renderer/**/*",
+      "load-config.js",
+      "env-config.js",
+      "config.json",
+      "node_modules/**/*",
+      "package.json"
+    ],
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "assets/icon.png",
+      "identity": null,
       "target": [
         {
           "target": "dmg",
           "arch": ["universal"]
+        }
+      ],
+      "extendInfo": {
+        "NSCameraUsageDescription": "TimeFlow needs camera access for screenshot monitoring",
+        "NSMicrophoneUsageDescription": "TimeFlow needs microphone access for activity detection",
+        "NSScreenCaptureDescription": "TimeFlow needs screen recording permission for productivity monitoring"
+      }
+    },
+    "dmg": {
+      "title": "TimeFlow Agent v${version}",
+      "icon": "assets/icon.png",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 140,
+          "y": 220,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
         }
       ]
     }
