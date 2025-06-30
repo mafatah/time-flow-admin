@@ -893,16 +893,37 @@ export async function triggerActivityCapture(): Promise<void> {
   await captureActivityScreenshot();
 }
 
-export function recordRealActivity(): void {
+export function recordRealActivity(activityType?: string, count?: number): void {
   if (!currentUserId) {
     safeLog('⚠️ Cannot record activity: No user logged in');
     return;
   }
   
-  safeLog('📊 Recording real activity from main.ts');
-  // Update activity metrics
-  activityMetrics.last_activity_time = Date.now();
-  activityMetrics.activity_score = Math.min(100, activityMetrics.activity_score + 10);
+  safeLog(`📊 Recording real activity: ${activityType || 'general'} (${count || 1})`);
+  
+  // Update activity metrics based on type
+  const now = Date.now();
+  activityMetrics.last_activity_time = now;
+  
+  if (activityType === 'mouse_click') {
+    activityMetrics.mouse_clicks += (count || 1);
+    activityMetrics.activity_score = Math.min(100, activityMetrics.activity_score + 5);
+  } else if (activityType === 'keystroke') {
+    activityMetrics.keystrokes += (count || 1);
+    activityMetrics.activity_score = Math.min(100, activityMetrics.activity_score + 3);
+  } else if (activityType === 'mouse_movement') {
+    activityMetrics.mouse_movements += (count || 1);
+    activityMetrics.activity_score = Math.min(100, activityMetrics.activity_score + 1);
+  } else {
+    // General activity
+    activityMetrics.activity_score = Math.min(100, activityMetrics.activity_score + 10);
+  }
+  
+  safeLog(`📈 Activity updated: Score=${activityMetrics.activity_score}, Clicks=${activityMetrics.mouse_clicks}, Keys=${activityMetrics.keystrokes}`);
+}
+
+export function getCurrentActivityMetrics() {
+  return { ...activityMetrics };
 }
 
 export function demonstrateEnhancedLogging(): void {
