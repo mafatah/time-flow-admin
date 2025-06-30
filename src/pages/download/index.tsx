@@ -57,7 +57,7 @@ const DownloadPage = () => {
       size: "~84 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true,
-      disabled: false
+      disabled: true
     },
     {
       platform: "Linux",
