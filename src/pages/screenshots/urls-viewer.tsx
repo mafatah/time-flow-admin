@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/providers/auth-provider';
 import { format, startOfDay, endOfDay, addMinutes } from 'date-fns';
-import { Globe, Search, Filter, Clock, Activity, Pause, Grid, Eye, ChevronDown, ChevronUp, X, Download } from 'lucide-react';
+import { 
+  Globe, 
+  Search, 
+  Filter, 
+  Clock, 
+  Activity, 
+  Pause, 
+  Grid, 
+  Eye, 
+  ChevronDown, 
+  ChevronUp, 
+  X, 
+  Download,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
@@ -59,6 +74,7 @@ export default function UrlsViewer() {
   // Add modal states
   const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -209,15 +225,95 @@ export default function UrlsViewer() {
     }
   };
 
+  // Add navigation functions
+  const getCurrentScreenshotIndex = useCallback(() => {
+    if (!selectedScreenshot) return -1;
+    return filteredScreenshots.findIndex(s => s.id === selectedScreenshot.id);
+  }, [selectedScreenshot, filteredScreenshots]);
+
+  const navigateToScreenshot = useCallback((direction: 'prev' | 'next') => {
+    const currentIndex = getCurrentScreenshotIndex();
+    if (currentIndex === -1) return;
+
+    let newIndex;
+    if (direction === 'prev') {
+      newIndex = currentIndex > 0 ? currentIndex - 1 : filteredScreenshots.length - 1;
+    } else {
+      newIndex = currentIndex < filteredScreenshots.length - 1 ? currentIndex + 1 : 0;
+    }
+
+    const newScreenshot = filteredScreenshots[newIndex];
+    if (newScreenshot) {
+      setSelectedScreenshot(newScreenshot);
+      setCurrentImageIndex(newIndex);
+    }
+  }, [getCurrentScreenshotIndex, filteredScreenshots]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isModalOpen) return;
+      
+      switch (event.key) {
+        case 'ArrowLeft':
+          event.preventDefault();
+          navigateToScreenshot('prev');
+          break;
+        case 'ArrowRight':
+          event.preventDefault();
+          navigateToScreenshot('next');
+          break;
+        case 'Escape':
+          event.preventDefault();
+          closeScreenshotModal();
+          break;
+      }
+    };
+
+    if (isModalOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isModalOpen, navigateToScreenshot]);
+
+  // Touch/swipe support
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe) {
+      navigateToScreenshot('next');
+    } else if (isRightSwipe) {
+      navigateToScreenshot('prev');
+    }
+  };
+
   // Add modal handler functions
   const handleViewScreenshot = (screenshot: Screenshot) => {
     setSelectedScreenshot(screenshot);
+    setCurrentImageIndex(getCurrentScreenshotIndex());
     setIsModalOpen(true);
   };
 
   const closeScreenshotModal = () => {
     setSelectedScreenshot(null);
     setIsModalOpen(false);
+    setCurrentImageIndex(0);
   };
 
   const handleDownloadScreenshot = async (imageUrl: string, fileName: string) => {
@@ -601,24 +697,68 @@ export default function UrlsViewer() {
         </>
       )}
 
-      {/* Add Screenshot Modal */}
+      {/* Enhanced Screenshot Modal with Navigation */}
       {selectedScreenshot && (
         <Dialog open={isModalOpen} onOpenChange={closeScreenshotModal}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle className="flex items-center justify-between">
-                <span>Screenshot Details</span>
+                <div className="flex items-center gap-2">
+                  <span>Web Screenshot Details</span>
+                  <Badge variant="outline" className="text-xs">
+                    {getCurrentScreenshotIndex() + 1} of {filteredScreenshots.length}
+                  </Badge>
+                </div>
                 <Button variant="ghost" size="sm" onClick={closeScreenshotModal}>
                   <X className="h-4 w-4" />
                 </Button>
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <img
-                src={selectedScreenshot.image_url}
-                alt={`Screenshot ${selectedScreenshot.id}`}
-                className="w-full h-auto rounded-lg max-h-[60vh] object-contain"
-              />
+            
+            <div className="relative">
+              {/* Navigation Buttons */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 bg-white/90 hover:bg-white shadow-lg"
+                onClick={() => navigateToScreenshot('prev')}
+                disabled={filteredScreenshots.length <= 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 bg-white/90 hover:bg-white shadow-lg"
+                onClick={() => navigateToScreenshot('next')}
+                disabled={filteredScreenshots.length <= 1}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              
+              {/* Image with touch support */}
+              <div
+                className="select-none"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                <img
+                  src={selectedScreenshot.image_url}
+                  alt={`Web Screenshot ${selectedScreenshot.id}`}
+                  className="w-full h-auto rounded-lg max-h-[65vh] object-contain cursor-pointer"
+                  onClick={() => navigateToScreenshot('next')}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/placeholder-screenshot.png';
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Screenshot Details */}
+            <div className="space-y-4 max-h-[25vh] overflow-y-auto">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <span className="font-medium">Captured:</span>
@@ -645,12 +785,18 @@ export default function UrlsViewer() {
                   </p>
                 </div>
               </div>
+              
+              {/* Navigation Instructions */}
+              <div className="text-xs text-muted-foreground text-center border-t pt-2">
+                Use arrow keys ← → or swipe left/right to navigate • Click image to go next • ESC to close
+              </div>
+              
               <div className="flex justify-end space-x-2">
                 <Button
                   variant="outline"
                   onClick={() => handleDownloadScreenshot(
                     selectedScreenshot.image_url,
-                    `screenshot-${selectedScreenshot.id}.png`
+                    `web-screenshot-${selectedScreenshot.id}.png`
                   )}
                 >
                   <Download className="h-4 w-4 mr-2" />

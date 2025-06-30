@@ -24,7 +24,7 @@ interface DownloadItem {
 }
 
 const DownloadPage = () => {
-  const version = "v1.0.43"; // Updated automatically by release pipeline
+  const version = "v1.0.44"; // Updated automatically by release pipeline
   const releaseDate = new Date().toLocaleDateString(); // Force deploy v1.0.34
   
   const downloads: DownloadItem[] = [
@@ -57,7 +57,7 @@ const DownloadPage = () => {
       size: "~84 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true,
-      disabled: true
+      disabled: false
     },
     {
       platform: "Linux",
@@ -68,7 +68,7 @@ const DownloadPage = () => {
       size: "~120 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: true,
-      disabled: true
+      disabled: false
     }
   ];
 

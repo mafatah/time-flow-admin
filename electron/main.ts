@@ -17,6 +17,59 @@ import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 import { checkForUpdates, enableAutoUpdates, setupUpdaterIPC, getUpdateStatus } from './autoUpdater';
 
+// === SINGLE INSTANCE LOCK - PREVENT DUPLICATE APPS ===
+console.log('🔒 Checking for existing TimeFlow instance...');
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  console.log('❌ Another TimeFlow instance is already running - exiting this duplicate');
+  console.log('✅ The existing TimeFlow instance will be brought to the front');
+  
+  // Show notification to user that app is already running
+  try {
+    const { Notification } = require('electron');
+    const notification = new Notification({
+      title: 'TimeFlow Already Running',
+      body: 'TimeFlow is already running. Check your system tray for the app icon.',
+      silent: false
+    });
+    notification.show();
+  } catch (error) {
+    console.log('Could not show notification:', error);
+  }
+  
+  app.quit();
+} else {
+  console.log('✅ Single instance lock acquired - proceeding with app startup');
+
+  // Handle when someone tries to run a second instance
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    console.log('🔔 Second instance detected - focusing existing window');
+    
+    // Focus the existing window if it exists
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+      mainWindow.show();
+      
+      // Show notification that app is already running
+      try {
+        const notification = new Notification({
+          title: 'TimeFlow',
+          body: 'TimeFlow is already running and has been brought to the front.',
+          silent: false
+        });
+        notification.show();
+      } catch (error) {
+        console.log('Could not show second instance notification:', error);
+      }
+    }
+  });
+}
+
 // Safe console logging to prevent EPIPE errors
 function safeLog(...args: any[]) {
   try {
