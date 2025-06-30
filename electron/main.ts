@@ -1244,6 +1244,13 @@ ipcMain.handle('manual-screenshot', async () => {
 // Create tray icon
 function createTray() {
   try {
+    // ⭐ FIX MULTIPLE TRAY ICONS: Check if tray already exists
+    if (tray && !tray.isDestroyed()) {
+      console.log('🔄 Destroying existing tray before creating new one');
+      tray.destroy();
+      tray = null;
+    }
+    
     // Use platform-appropriate tray icons
     const iconPath = process.platform === 'win32'
       ? path.join(__dirname, '../assets/tray-icon.ico')  // Windows prefers ICO
@@ -1272,7 +1279,7 @@ function createTray() {
     // Set initial tooltip
     tray.setToolTip('TimeFlow - Not tracking');
     
-    console.log('✅ Tray created successfully');
+    console.log('✅ Tray created successfully (no duplicates)');
     console.log('🔍 Tray is destroyed?', tray.isDestroyed());
     
     // Create context menu
