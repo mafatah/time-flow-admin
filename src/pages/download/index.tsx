@@ -33,7 +33,7 @@ const DownloadPage = () => {
       icon: <Apple className="h-6 w-6" />,
       description: "For M1, M2, M3 Macs",
       filename: `TimeFlow-${version}-ARM64.dmg`,
-      url: `/downloads/TimeFlow-${version}-ARM64.dmg`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-ARM64.dmg`,
       size: "~115 MB",
       requirements: "macOS 11.0+",
       verified: true
@@ -43,7 +43,7 @@ const DownloadPage = () => {
       icon: <Apple className="h-6 w-6" />,
       description: "For Intel-based Macs",
       filename: `TimeFlow-${version}-Intel.dmg`,
-      url: `/downloads/TimeFlow-${version}-Intel.dmg`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Intel.dmg`,
       size: "~122 MB",
       requirements: "macOS 10.14+",
       verified: true
@@ -53,7 +53,7 @@ const DownloadPage = () => {
       icon: <Monitor className="h-6 w-6" />,
       description: "For Windows 10/11",
       filename: `TimeFlow-${version}-Setup.exe`,
-      url: `/downloads/TimeFlow-${version}-Setup.exe`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Setup.exe`,
       size: "~84 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true,
@@ -64,11 +64,11 @@ const DownloadPage = () => {
       icon: <Smartphone className="h-6 w-6" />,
       description: "AppImage for Linux",
       filename: `TimeFlow-${version}.AppImage`,
-      url: `/downloads/TimeFlow-${version}.AppImage`,
+      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}.AppImage`,
       size: "~120 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: true,
-      disabled: false
+      disabled: true
     }
   ];
 
