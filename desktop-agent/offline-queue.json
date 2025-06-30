@@ -1,22 +1,6 @@
 {
   "screenshots": [],
-  "appLogs": [
-    {
-      "id": "app_logs_1751211261363_rhtho4ldk",
-      "logs": [
-        {
-          "user_id": "0c3d3092-913e-436f-a352-3378e558c34f",
-          "time_log_id": "44573197-668c-424d-af63-96fb185e80d0",
-          "app_name": "Electron",
-          "window_title": "No Window",
-          "app_path": "com.github.Electron",
-          "timestamp": "2025-06-29T15:34:21.363Z"
-        }
-      ],
-      "timestamp": "2025-06-29T15:34:21.363Z",
-      "retries": 0
-    }
-  ],
+  "appLogs": [],
   "urlLogs": [],
   "idleLogs": [],
   "timeLogs": []

@@ -1,0 +1,8 @@
+version: 1.0.42
+files:
+  - url: TimeFlow-v1.0.42-Setup.exe
+    sha512: iO4PZDP2hzDttgapFwtGLd+rv7Ms5Sg9fmw142pSrBvNcuqXbl2h1oIH32xPo3rRCAVEt1LKQSRhrnolAbcncg==
+    size: 88173744
+path: TimeFlow-v1.0.42-Setup.exe
+sha512: iO4PZDP2hzDttgapFwtGLd+rv7Ms5Sg9fmw142pSrBvNcuqXbl2h1oIH32xPo3rRCAVEt1LKQSRhrnolAbcncg==
+releaseDate: '2025-06-29T16:35:00.000Z'

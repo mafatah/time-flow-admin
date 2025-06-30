@@ -713,7 +713,7 @@ async function startTracking() {
             showNotification(`🟡 Timer starting with ${healthCheckResult.failedFeatures.length} warnings - some features may be limited`, 'info');
         }
         
-        hideHealthCheckModal();
+        // Modal will be hidden by the health check function itself after showing results
         
         // Brief delay to show success message
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -721,7 +721,7 @@ async function startTracking() {
     } catch (error) {
         console.error('❌ [HEALTH-CHECK] Health check failed:', error);
         showNotification('⚠️ Health check failed - some features may not work properly', 'error');
-        hideHealthCheckModal();
+        // Modal will be hidden by the health check function itself after showing error
     }
     
     console.log('👤 [RENDERER] Current user:', currentUser);
@@ -2151,12 +2151,35 @@ async function performComprehensiveHealthCheck() {
         const criticalFeatures = ['databaseConnection'];
         const canStartTimer = !failedFeatures.some(feature => criticalFeatures.includes(feature));
         
+        // Show errors if any
+        const errors = Object.entries(healthStatus.errorDetails).map(([feature, error]) => 
+            `${feature}: ${error}`
+        );
+        
+        if (errors.length > 0) {
+            showHealthCheckErrors(errors);
+        }
+        
         console.log('🏥 [HEALTH-CHECK] Results:', {
             isHealthy,
             failedFeatures,
             canStartTimer,
             errorCount: Object.keys(healthStatus.errorDetails).length
         });
+        
+        // Show final results for at least 3 seconds
+        updateHealthCheckProgress(
+            isHealthy ? 
+                '✅ All systems working perfectly!' : 
+                `⚠️ ${failedFeatures.length} issues found. ${canStartTimer ? 'Timer can still start.' : 'Timer blocked due to critical issues.'}`,
+            100
+        );
+        
+        // Keep modal open longer to show results
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Close modal after showing results
+        hideHealthCheckModal();
         
         return {
             isHealthy,
@@ -2167,6 +2190,12 @@ async function performComprehensiveHealthCheck() {
         
     } catch (error) {
         console.error('❌ [HEALTH-CHECK] Comprehensive check failed:', error);
+        updateHealthCheckProgress('❌ Health check system failed: ' + error.message, 100);
+        
+        // Keep modal open to show error, then close
+        await new Promise(resolve => setTimeout(resolve, 4000));
+        hideHealthCheckModal();
+        
         return {
             isHealthy: false,
             failedFeatures: ['healthCheckSystem'],
@@ -2176,62 +2205,245 @@ async function performComprehensiveHealthCheck() {
     }
 }
 
+// === ENHANCED HEALTH CHECK MODAL WITH BETTER VISIBILITY ===
 function showHealthCheckModal() {
+    console.log('🏥 [HEALTH-CHECK] Creating health check modal...');
+    
     // Remove existing modal if any
     const existingModal = document.getElementById('healthCheckModal');
     if (existingModal) {
         existingModal.remove();
+        console.log('🗑️ [HEALTH-CHECK] Removed existing modal');
     }
     
+    // Create modal with enhanced styling
     const modal = document.createElement('div');
     modal.id = 'healthCheckModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 999999;
+        backdrop-filter: blur(4px);
+        animation: fadeIn 0.3s ease-out;
+    `;
+    
     modal.innerHTML = `
-        <div class="health-check-overlay">
-            <div class="health-check-modal">
-                <div class="health-check-header">
-                    <h3>🏥 System Health Check</h3>
-                    <p>Verifying all features before starting timer...</p>
-                </div>
-                <div class="health-check-content">
-                    <div class="health-check-progress">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="healthProgressFill"></div>
-                        </div>
-                        <div class="progress-text" id="healthProgressText">Initializing health check...</div>
+        <div class="health-check-modal" style="
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease-out;
+            position: relative;
+        ">
+            <div class="health-check-header" style="text-align: center; margin-bottom: 24px;">
+                <div style="font-size: 48px; margin-bottom: 16px;">🏥</div>
+                <h3 style="margin: 0 0 8px 0; color: #1e293b; font-size: 24px; font-weight: 600;">
+                    System Health Check
+                </h3>
+                <p style="color: #64748b; margin: 0; font-size: 16px;">
+                    Verifying all features before starting timer...
+                </p>
+            </div>
+            
+            <div class="health-check-content">
+                <div class="health-check-progress" style="margin-bottom: 24px;">
+                    <div class="progress-bar" style="
+                        width: 100%;
+                        height: 8px;
+                        background: #e2e8f0;
+                        border-radius: 4px;
+                        overflow: hidden;
+                        margin-bottom: 12px;
+                    ">
+                        <div class="progress-fill" id="healthProgressFill" style="
+                            height: 100%;
+                            background: linear-gradient(90deg, #3b82f6, #06b6d4);
+                            border-radius: 4px;
+                            width: 0%;
+                            transition: width 0.3s ease;
+                        "></div>
                     </div>
-                    <div class="health-check-features">
-                        <div class="feature-item">
-                            <span class="feature-icon">📸</span>
-                            <span class="feature-name">Screenshot Capture</span>
-                            <span class="feature-status" id="screenshotStatus">⏳</span>
+                    <div class="progress-text" id="healthProgressText" style="
+                        color: #64748b;
+                        font-size: 14px;
+                        text-align: center;
+                    ">Initializing health check...</div>
+                </div>
+                
+                <div class="health-check-features" style="display: grid; gap: 12px;">
+                    <div class="feature-item" style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 12px;
+                        background: #f8fafc;
+                        border-radius: 8px;
+                        border: 1px solid #e2e8f0;
+                    ">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="feature-icon" style="font-size: 20px;">📸</span>
+                            <span class="feature-name" style="font-weight: 500; color: #1e293b;">Screenshot Capture</span>
                         </div>
-                        <div class="feature-item">
-                            <span class="feature-icon">🌐</span>
-                            <span class="feature-name">URL Detection</span>
-                            <span class="feature-status" id="urlStatus">⏳</span>
+                        <span class="feature-status" id="screenshotStatus" style="font-size: 20px;">⏳</span>
+                    </div>
+                    
+                    <div class="feature-item" style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 12px;
+                        background: #f8fafc;
+                        border-radius: 8px;
+                        border: 1px solid #e2e8f0;
+                    ">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="feature-icon" style="font-size: 20px;">🌐</span>
+                            <span class="feature-name" style="font-weight: 500; color: #1e293b;">URL Detection</span>
                         </div>
-                        <div class="feature-item">
-                            <span class="feature-icon">🖥️</span>
-                            <span class="feature-name">App Detection</span>
-                            <span class="feature-status" id="appStatus">⏳</span>
+                        <span class="feature-status" id="urlStatus" style="font-size: 20px;">⏳</span>
+                    </div>
+                    
+                    <div class="feature-item" style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 12px;
+                        background: #f8fafc;
+                        border-radius: 8px;
+                        border: 1px solid #e2e8f0;
+                    ">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="feature-icon" style="font-size: 20px;">🖥️</span>
+                            <span class="feature-name" style="font-weight: 500; color: #1e293b;">App Detection</span>
                         </div>
-                        <div class="feature-item">
-                            <span class="feature-icon">🛡️</span>
-                            <span class="feature-name">Fraud Protection</span>
-                            <span class="feature-status" id="fraudStatus">⏳</span>
+                        <span class="feature-status" id="appStatus" style="font-size: 20px;">⏳</span>
+                    </div>
+                    
+                    <div class="feature-item" style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 12px;
+                        background: #f8fafc;
+                        border-radius: 8px;
+                        border: 1px solid #e2e8f0;
+                    ">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="feature-icon" style="font-size: 20px;">🛡️</span>
+                            <span class="feature-name" style="font-weight: 500; color: #1e293b;">Fraud Protection</span>
                         </div>
-                        <div class="feature-item">
-                            <span class="feature-icon">💾</span>
-                            <span class="feature-name">Database Connection</span>
-                            <span class="feature-status" id="databaseStatus">⏳</span>
+                        <span class="feature-status" id="fraudStatus" style="font-size: 20px;">⏳</span>
+                    </div>
+                    
+                    <div class="feature-item" style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 12px;
+                        background: #f8fafc;
+                        border-radius: 8px;
+                        border: 1px solid #e2e8f0;
+                    ">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="feature-icon" style="font-size: 20px;">💾</span>
+                            <span class="feature-name" style="font-weight: 500; color: #1e293b;">Database Connection</span>
                         </div>
+                        <span class="feature-status" id="databaseStatus" style="font-size: 20px;">⏳</span>
+                    </div>
+                </div>
+                
+                <div id="healthCheckErrors" style="
+                    margin-top: 20px;
+                    padding: 16px;
+                    background: #fef2f2;
+                    border: 1px solid #fecaca;
+                    border-radius: 8px;
+                    display: none;
+                ">
+                    <h4 style="margin: 0 0 12px 0; color: #dc2626; font-size: 16px; font-weight: 600;">
+                        ⚠️ Issues Detected
+                    </h4>
+                    <div id="healthCheckErrorList" style="color: #dc2626; font-size: 14px;"></div>
+                    <div style="margin-top: 12px;">
+                        <button id="showPermissionHelp" style="
+                            background: #dc2626;
+                            color: white;
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 6px;
+                            font-size: 14px;
+                            cursor: pointer;
+                            margin-right: 8px;
+                        ">Fix Permissions</button>
+                        <button id="continueAnyway" style="
+                            background: #6b7280;
+                            color: white;
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 6px;
+                            font-size: 14px;
+                            cursor: pointer;
+                        ">Continue Anyway</button>
                     </div>
                 </div>
             </div>
         </div>
     `;
     
+    // Add animations
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+    `;
+    document.head.appendChild(style);
+    
     document.body.appendChild(modal);
+    console.log('✅ [HEALTH-CHECK] Health check modal created and displayed');
+    
+    // Add event listeners for error handling buttons
+    const showPermissionHelp = document.getElementById('showPermissionHelp');
+    const continueAnyway = document.getElementById('continueAnyway');
+    
+    if (showPermissionHelp) {
+        showPermissionHelp.addEventListener('click', () => {
+            console.log('🔧 [HEALTH-CHECK] User requested permission help');
+            hideHealthCheckModal();
+            showPermissionFixDialog();
+        });
+    }
+    
+    if (continueAnyway) {
+        continueAnyway.addEventListener('click', () => {
+            console.log('⚠️ [HEALTH-CHECK] User chose to continue anyway');
+            hideHealthCheckModal();
+            showNotification('⚠️ Continuing with limited functionality', 'info');
+        });
+    }
 }
 
 function updateHealthCheckProgress(text, percentage) {
@@ -2246,27 +2458,44 @@ function updateHealthCheckProgress(text, percentage) {
         progressText.textContent = text;
     }
     
-    // Update feature status icons based on progress
-    if (percentage >= 20) {
-        const screenshotStatus = document.getElementById('screenshotStatus');
-        if (screenshotStatus) screenshotStatus.textContent = '✅';
+    console.log(`🏥 [HEALTH-CHECK] Progress: ${percentage}% - ${text}`);
+}
+
+function updateHealthCheckFeatureStatus(featureId, status, errorMessage = null) {
+    const statusElement = document.getElementById(`${featureId}Status`);
+    if (!statusElement) return;
+    
+    switch (status) {
+        case 'pass':
+            statusElement.textContent = '✅';
+            statusElement.title = 'Working correctly';
+            break;
+        case 'fail':
+            statusElement.textContent = '❌';
+            statusElement.title = errorMessage || 'Not working';
+            break;
+        case 'warning':
+            statusElement.textContent = '⚠️';
+            statusElement.title = errorMessage || 'Limited functionality';
+            break;
+        default:
+            statusElement.textContent = '⏳';
+            statusElement.title = 'Testing...';
     }
-    if (percentage >= 40) {
-        const urlStatus = document.getElementById('urlStatus');
-        if (urlStatus) urlStatus.textContent = '✅';
-    }
-    if (percentage >= 60) {
-        const appStatus = document.getElementById('appStatus');
-        if (appStatus) appStatus.textContent = '✅';
-    }
-    if (percentage >= 80) {
-        const fraudStatus = document.getElementById('fraudStatus');
-        if (fraudStatus) fraudStatus.textContent = '✅';
-    }
-    if (percentage >= 100) {
-        const databaseStatus = document.getElementById('databaseStatus');
-        if (databaseStatus) databaseStatus.textContent = '✅';
-    }
+    
+    console.log(`🏥 [HEALTH-CHECK] Feature ${featureId}: ${status} ${errorMessage ? `(${errorMessage})` : ''}`);
+}
+
+function showHealthCheckErrors(errors) {
+    const errorsContainer = document.getElementById('healthCheckErrors');
+    const errorsList = document.getElementById('healthCheckErrorList');
+    
+    if (!errorsContainer || !errorsList || errors.length === 0) return;
+    
+    errorsList.innerHTML = errors.map(error => `<div>• ${error}</div>`).join('');
+    errorsContainer.style.display = 'block';
+    
+    console.log('🚨 [HEALTH-CHECK] Showing errors:', errors);
 }
 
 function hideHealthCheckModal() {
@@ -2275,8 +2504,91 @@ function hideHealthCheckModal() {
         modal.style.opacity = '0';
         setTimeout(() => {
             modal.remove();
+            console.log('✅ [HEALTH-CHECK] Health check modal hidden');
         }, 300);
     }
 }
 
-console.log('📱 TimeFlow Desktop Agent Renderer loaded successfully');
+function showPermissionFixDialog() {
+    console.log('🔧 [PERMISSION-FIX] Showing permission fix dialog');
+    
+    const dialog = document.createElement('div');
+    dialog.id = 'permissionFixDialog';
+    dialog.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 999999;
+        backdrop-filter: blur(4px);
+    `;
+    
+    dialog.innerHTML = `
+        <div style="
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        ">
+            <div style="font-size: 48px; margin-bottom: 16px;">🔐</div>
+            <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 24px; font-weight: 600;">
+                Permissions Required
+            </h3>
+            <p style="color: #64748b; font-size: 16px; line-height: 1.5; margin-bottom: 24px;">
+                TimeFlow needs additional permissions to track apps and URLs. Please follow these steps:
+            </p>
+            <div style="text-align: left; background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
+                <div style="margin-bottom: 12px;">
+                    <strong>1. Screen Recording Permission:</strong><br>
+                    <span style="color: #64748b;">System Preferences → Privacy & Security → Screen Recording</span>
+                </div>
+                <div>
+                    <strong>2. Accessibility Permission:</strong><br>
+                    <span style="color: #64748b;">System Preferences → Privacy & Security → Accessibility</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button id="openSystemPrefs" style="
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 500;
+                    cursor: pointer;
+                ">Open System Preferences</button>
+                <button id="closePermissionDialog" style="
+                    background: #f1f5f9;
+                    color: #64748b;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 500;
+                    cursor: pointer;
+                ">Close</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    // Add event listeners
+    document.getElementById('openSystemPrefs').addEventListener('click', () => {
+        ipcRenderer.invoke('open-system-preferences').catch(console.error);
+        dialog.remove();
+    });
+    
+    document.getElementById('closePermissionDialog').addEventListener('click', () => {
+        dialog.remove();
+    });
+}

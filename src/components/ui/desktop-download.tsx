@@ -122,14 +122,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const handleDownload = async (platform: string) => {
     setDownloading(platform);
     
-    // Use GitHub releases for reliable downloads - Updated automatically by release pipeline
-          const currentVersion = "1.0.41"; // v1.0.41 - Signed & Notarized Release: 202506291800
+    // Use direct downloads for reliable access - Updated automatically by release pipeline
+          const currentVersion = "1.0.43"; // v1.0.43 - Complete Signed & Notarized Release: 202506301030
     const downloadFiles = {
-      windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`,
-      'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED
-      'mac-arm': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-ARM64.dmg`, // SIGNED & NOTARIZED
-      'mac': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-ARM64.dmg`, // Default to ARM64 for modern Macs
-      linux: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Linux.AppImage`
+      windows: `/downloads/TimeFlow-v${currentVersion}-Setup.exe`,
+      'mac-intel': `/downloads/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED
+      'mac-arm': `/downloads/TimeFlow-v${currentVersion}-ARM64.dmg`, // SIGNED & NOTARIZED
+      'mac': `/downloads/TimeFlow-v${currentVersion}-ARM64.dmg`, // Default to ARM64 for modern Macs
+      linux: `/downloads/TimeFlow-v${currentVersion}.AppImage`
     };
     
     const filePath = downloadFiles[platform as keyof typeof downloadFiles];

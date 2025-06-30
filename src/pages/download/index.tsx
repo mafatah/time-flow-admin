@@ -24,7 +24,7 @@ interface DownloadItem {
 }
 
 const DownloadPage = () => {
-  const version = "v1.0.41"; // Updated automatically by release pipeline
+  const version = "v1.0.43"; // Updated automatically by release pipeline
   const releaseDate = new Date().toLocaleDateString(); // Force deploy v1.0.34
   
   const downloads: DownloadItem[] = [
@@ -33,7 +33,7 @@ const DownloadPage = () => {
       icon: <Apple className="h-6 w-6" />,
       description: "For M1, M2, M3 Macs",
       filename: `TimeFlow-${version}-ARM64.dmg`,
-      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-ARM64.dmg`,
+      url: `/downloads/TimeFlow-${version}-ARM64.dmg`,
       size: "~115 MB",
       requirements: "macOS 11.0+",
       verified: true
@@ -43,7 +43,7 @@ const DownloadPage = () => {
       icon: <Apple className="h-6 w-6" />,
       description: "For Intel-based Macs",
       filename: `TimeFlow-${version}-Intel.dmg`,
-      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Intel.dmg`,
+      url: `/downloads/TimeFlow-${version}-Intel.dmg`,
       size: "~122 MB",
       requirements: "macOS 10.14+",
       verified: true
@@ -53,7 +53,7 @@ const DownloadPage = () => {
       icon: <Monitor className="h-6 w-6" />,
       description: "For Windows 10/11",
       filename: `TimeFlow-${version}-Setup.exe`,
-      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Setup.exe`,
+      url: `/downloads/TimeFlow-${version}-Setup.exe`,
       size: "~84 MB",
       requirements: "Windows 10/11 (64-bit)",
       verified: true,
@@ -63,8 +63,8 @@ const DownloadPage = () => {
       platform: "Linux",
       icon: <Smartphone className="h-6 w-6" />,
       description: "AppImage for Linux",
-      filename: `TimeFlow-${version}-Linux.AppImage`,
-      url: `https://github.com/mafatah/time-flow-admin/releases/download/${version}/TimeFlow-${version}-Linux.AppImage`,
+      filename: `TimeFlow-${version}.AppImage`,
+      url: `/downloads/TimeFlow-${version}.AppImage`,
       size: "~120 MB", 
       requirements: "Ubuntu 18.04+ or equivalent",
       verified: true,
@@ -192,8 +192,8 @@ const DownloadPage = () => {
               <h3 className="font-semibold text-lg mb-2">🐧 Linux Installation</h3>
               <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600">
                 <li>Download the AppImage file</li>
-                <li>Make it executable: <code className="bg-gray-100 px-1 rounded">chmod +x Ebdaa-Work-Time-{version}.AppImage</code></li>
-                <li>Run: <code className="bg-gray-100 px-1 rounded">./Ebdaa-Work-Time-{version}.AppImage</code></li>
+                <li>Make it executable: <code className="bg-gray-100 px-1 rounded">chmod +x TimeFlow-{version}.AppImage</code></li>
+                <li>Run: <code className="bg-gray-100 px-1 rounded">./TimeFlow-{version}.AppImage</code></li>
               </ol>
             </div>
           </CardContent>
