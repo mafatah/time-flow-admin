@@ -39,7 +39,8 @@ if (!gotTheLock) {
     console.log('Could not show notification:', error);
   }
   
-  app.quit();
+  // Force quit immediately - don't wait
+  app.exit(0);
 } else {
   console.log('✅ Single instance lock acquired - proceeding with app startup');
 
@@ -47,27 +48,36 @@ if (!gotTheLock) {
   app.on('second-instance', (event, commandLine, workingDirectory) => {
     console.log('🔔 Second instance detected - focusing existing window');
     
-    // Focus the existing window if it exists
-    if (mainWindow) {
+    // Show notification that app is already running
+    try {
+      const notification = new Notification({
+        title: 'TimeFlow',
+        body: 'TimeFlow is already running. Check your system tray.',
+        silent: false
+      });
+      notification.show();
+    } catch (error) {
+      console.log('Could not show second instance notification:', error);
+    }
+    
+    // Focus the existing window if it exists, otherwise do nothing (tray mode)
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
       }
       mainWindow.focus();
       mainWindow.show();
-      
-      // Show notification that app is already running
-      try {
-        const notification = new Notification({
-          title: 'TimeFlow',
-          body: 'TimeFlow is already running and has been brought to the front.',
-          silent: false
-        });
-        notification.show();
-      } catch (error) {
-        console.log('Could not show second instance notification:', error);
-      }
+    } else {
+      console.log('📍 App running in tray-only mode - no window to show');
     }
   });
+  
+  // ⭐ PREVENT APP FROM APPEARING IN DOCK unless window is shown
+  // This prevents the dock icon from showing when app runs in background
+  if (process.platform === 'darwin') {
+    app.dock.hide();
+    console.log('🚫 Dock icon hidden - app running in background mode');
+  }
 }
 
 // Safe console logging to prevent EPIPE errors
@@ -613,7 +623,11 @@ app.whenReady().then(async () => {
   // Let employees start fresh each time and manually control everything
   console.log('📋 App ready - waiting for employee to login and start tracking manually');
   
-  setupAutoLaunch().catch(err => console.error(err));
+  // ⭐ DISABLE AUTO-LAUNCH ON FIRST RUN to prevent conflicts
+  // Only enable auto-launch if user explicitly requests it
+  console.log('🔧 Skipping auto-launch setup to prevent multiple instances');
+  // setupAutoLaunch().catch(err => console.error(err));
+  
   initSystemMonitor();
   startSyncLoop();
   
@@ -627,8 +641,49 @@ app.whenReady().then(async () => {
   //   console.log('🔬 Main app debug window opened via keyboard shortcut (Cmd+Shift+I)');
   // });
 
+  // ⭐ FIX ACTIVATE EVENT: Only show window if explicitly requested
   app.on('activate', async () => {
-    if (BrowserWindow.getAllWindows().length === 0) await createWindow();
+    console.log('🖱️ App activated (clicked dock icon or cmd+tab)');
+    
+    // Check if any windows exist
+    const allWindows = BrowserWindow.getAllWindows();
+    console.log(`📊 Current windows: ${allWindows.length}`);
+    
+    if (allWindows.length === 0) {
+      // Only create window if tray is NOT available (fallback)
+      if (!tray || tray.isDestroyed()) {
+        console.log('🆘 No tray available - creating window as fallback');
+        await createWindow();
+        
+        // Show dock icon when window is created
+        if (process.platform === 'darwin') {
+          app.dock.show();
+        }
+      } else {
+        console.log('📍 Tray available - staying in background mode');
+        // Show notification instead of window
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'TimeFlow',
+            body: 'TimeFlow is running in the background. Check your system tray.',
+            silent: true
+          }).show();
+        }
+      }
+    } else {
+      // Window exists - just show it
+      const window = allWindows[0];
+      if (window.isMinimized()) {
+        window.restore();
+      }
+      window.show();
+      window.focus();
+      
+      // Show dock icon when window is shown
+      if (process.platform === 'darwin') {
+        app.dock.show();
+      }
+    }
   });
 });
 
@@ -1288,13 +1343,34 @@ function createTray() {
     // Handle click events
     tray.on('click', () => {
       console.log('🖱️ Tray icon clicked');
-      if (mainWindow) {
+      
+      if (mainWindow && !mainWindow.isDestroyed()) {
         if (mainWindow.isVisible()) {
+          console.log('🫥 Hiding window and dock icon');
           mainWindow.hide();
+          
+          // Hide dock icon when window is hidden
+          if (process.platform === 'darwin') {
+            app.dock.hide();
+          }
         } else {
+          console.log('👁️ Showing window and dock icon');
           mainWindow.show();
           mainWindow.focus();
+          
+          // Show dock icon when window is shown
+          if (process.platform === 'darwin') {
+            app.dock.show();
+          }
         }
+      } else {
+        console.log('🆕 Creating new window from tray click');
+        createWindow().then(() => {
+          // Show dock icon when window is created
+          if (process.platform === 'darwin') {
+            app.dock.show();
+          }
+        });
       }
     });
 
