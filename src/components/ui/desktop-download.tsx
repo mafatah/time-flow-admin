@@ -148,7 +148,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       });
     }
     
-    // All platforms now available in v1.0.34
+    // All platforms now available in v1.0.44
 
     if (filePath) {
       try {
@@ -290,14 +290,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '115MB'; // TimeFlow-v1.0.41-ARM64.dmg (UPDATED for v1.0.41)
+        return '115MB'; // TimeFlow-v1.0.44-ARM64.dmg (UPDATED for v1.0.44)
       case 'mac-intel':
       case 'mac':
-        return '122MB'; // TimeFlow-v1.0.41-Intel.dmg (UPDATED for v1.0.41)
+        return '122MB'; // TimeFlow-v1.0.44-Intel.dmg (UPDATED for v1.0.44)
       case 'windows':
-        return '88MB'; // TimeFlow-v1.0.41-Setup.exe (UPDATED for v1.0.41)
+        return '88MB'; // TimeFlow-v1.0.44-Setup.exe (UPDATED for v1.0.44)
       case 'linux':
-        return '125MB'; // TimeFlow-v1.0.41-Linux.AppImage (UPDATED for v1.0.41)
+        return '125MB'; // TimeFlow-v1.0.44-Linux.AppImage (UPDATED for v1.0.44)
       default:
         return '';
     }
@@ -306,14 +306,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 114984094; // TimeFlow-v1.0.41-ARM64.dmg (UPDATED for v1.0.41)
+        return 115018830; // TimeFlow-v1.0.44-ARM64.dmg (UPDATED for v1.0.44)
       case 'mac-intel':
       case 'mac':
-        return 121519356; // TimeFlow-v1.0.41-Intel.dmg (UPDATED for v1.0.41)
+        return 121495676; // TimeFlow-v1.0.44-Intel.dmg (UPDATED for v1.0.44)
       case 'windows':
-        return 88173744; // TimeFlow-v1.0.41-Setup.exe (UPDATED for v1.0.41)
+        return 88187651; // TimeFlow-v1.0.44-Setup.exe (UPDATED for v1.0.44)
       case 'linux':
-        return 125420587; // TimeFlow-v1.0.41-Linux.AppImage (UPDATED for v1.0.41)
+        return 125424268; // TimeFlow-v1.0.44-Linux.AppImage (UPDATED for v1.0.44)
       default:
         return 0;
     }
