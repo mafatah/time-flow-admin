@@ -65,6 +65,9 @@ const AntiCheatDetector = require('./anti-cheat-detector');
 
 // Global system state variables
 let systemSuspended = false;
+let suspendTime = null;
+let screenshotsPaused = false;
+let lastScreenshotBeforeSuspend = null;
 
 // Import our unified input detection system
 // Initialize system monitor module
@@ -451,9 +454,9 @@ function createWindow() {
     width: 1000,
     height: 700,
     webPreferences: {
-      preload: path.join(__dirname, '../renderer/renderer.js'),
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      enableRemoteModule: true
     },
     icon: path.join(__dirname, '../assets/icon.png'),
     title: 'Ebdaa Time - Employee Portal',
@@ -2775,15 +2778,19 @@ function scheduleRandomScreenshot() {
       return;
     }
 
-    // Generate random interval between 2-6 minutes (120-360 seconds)  
-    // This ensures 3 screenshots within each 10-minute window at random times
-    const minInterval = 120; // 2 minutes
-    const maxInterval = 360; // 6 minutes (reduced from 480 to fit 3 screenshots)
+    // OPTIMIZED: 3 random screenshots per 10 minutes (600 seconds)
+    // Divide 10 minutes into 3 segments and randomize within each segment
+    const tenMinutes = 600; // 10 minutes in seconds
+    const segmentSize = tenMinutes / 3; // ~200 seconds per segment
+    
+    // Add some randomness within a smaller range to ensure better distribution
+    const minInterval = 90;  // 1.5 minutes minimum
+    const maxInterval = 240; // 4 minutes maximum
     const randomInterval = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
     
     const nextScreenshotTime = new Date(Date.now() + randomInterval * 1000);
     
-    console.log(`📸 Next random screenshot scheduled in ${randomInterval} seconds (${Math.round(randomInterval/60)} minutes) at ${nextScreenshotTime.toLocaleTimeString()}`);
+    console.log(`📸 [3/10min] Next random screenshot in ${randomInterval}s (${Math.round(randomInterval/60)}min) at ${nextScreenshotTime.toLocaleTimeString()}`);
     
     screenshotInterval = setTimeout(async () => {
       try {
@@ -2792,9 +2799,9 @@ function scheduleRandomScreenshot() {
           const success = await captureScreenshot();
           
           if (success) {
-            console.log('✅ Screenshot captured successfully');
+            console.log('✅ Screenshot captured successfully - scheduling next random screenshot');
           } else {
-            console.log('❌ Screenshot capture failed');
+            console.log('❌ Screenshot capture failed - scheduling next anyway');
           }
         } else {
           console.log('⏭️ Skipping screenshot - system state changed');
@@ -3294,23 +3301,7 @@ ipcMain.on('start-activity-monitoring', (event, userId) => {
   // Activity monitoring is already running, just associate with user
 });
 
-// Tracking control handlers
-ipcMain.on('start-tracking', (event, userId) => {
-  console.log('▶️ Start tracking requested for user:', userId);
-  startTracking();
-});
-
-ipcMain.on('pause-tracking', (event) => {
-  console.log('⏸️ Pause tracking requested');
-  pauseTracking('manual');
-});
-
-ipcMain.on('stop-tracking', (event) => {
-  console.log('⏹️ Stop tracking requested');
-  stopTracking();
-});
-
-// Legacy IPC handlers for compatibility
+// FIXED: Unified tracking control handlers - removed duplicate on() handler
 ipcMain.handle('start-tracking', async (event, projectId = null) => {
   console.log('🎯 [MAIN] IPC start-tracking called with project_id:', projectId);
   console.log('🎯 [MAIN] typeof projectId:', typeof projectId);
@@ -4601,10 +4592,8 @@ ipcMain.handle('debug-test-activity', async () => {
 
 // Duplicate health check handlers removed - using enhanced versions below
 
-// Enhanced system state tracking
-let suspendTime = null;
-let screenshotsPaused = false;
-let lastScreenshotBeforeSuspend = null;
+// Enhanced system state tracking - MOVED TO TOP OF FILE FOR PROPER SCOPE
+// Variables moved to top to avoid hoisting issues
 
 // System suspend handler
 function handleSystemSuspend() {

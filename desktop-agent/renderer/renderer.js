@@ -2069,81 +2069,106 @@ async function performComprehensiveHealthCheck() {
     try {
         // Test 1: Screenshot Capability
         updateHealthCheckProgress('Testing screenshot capability...', 20);
+        updateHealthCheckFeatureStatus('screenshot', 'testing');
         try {
             const screenshotTest = await ipcRenderer.invoke('test-screenshot-capability');
             healthStatus.screenshots = screenshotTest.success;
             if (!screenshotTest.success) {
                 failedFeatures.push('screenshots');
                 healthStatus.errorDetails.screenshots = screenshotTest.error || 'Screenshot test failed';
+                updateHealthCheckFeatureStatus('screenshot', 'fail', screenshotTest.error);
+            } else {
+                updateHealthCheckFeatureStatus('screenshot', 'pass');
             }
             console.log('📸 [HEALTH-CHECK] Screenshot test:', screenshotTest.success ? '✅ PASS' : '❌ FAIL');
         } catch (error) {
             failedFeatures.push('screenshots');
             healthStatus.errorDetails.screenshots = error.message;
+            updateHealthCheckFeatureStatus('screenshot', 'fail', error.message);
             console.error('📸 [HEALTH-CHECK] Screenshot test failed:', error);
         }
         
         // Test 2: URL Detection
         updateHealthCheckProgress('Testing URL detection...', 40);
+        updateHealthCheckFeatureStatus('url', 'testing');
         try {
             const urlTest = await ipcRenderer.invoke('test-url-detection');
             healthStatus.urlDetection = urlTest.success;
             if (!urlTest.success) {
                 failedFeatures.push('urlDetection');
                 healthStatus.errorDetails.urlDetection = urlTest.error || 'URL detection test failed';
+                updateHealthCheckFeatureStatus('url', 'fail', urlTest.error);
+            } else {
+                updateHealthCheckFeatureStatus('url', 'pass');
             }
             console.log('🌐 [HEALTH-CHECK] URL detection test:', urlTest.success ? '✅ PASS' : '❌ FAIL');
         } catch (error) {
             failedFeatures.push('urlDetection');
             healthStatus.errorDetails.urlDetection = error.message;
+            updateHealthCheckFeatureStatus('url', 'fail', error.message);
             console.error('🌐 [HEALTH-CHECK] URL detection test failed:', error);
         }
         
         // Test 3: App Detection
         updateHealthCheckProgress('Testing app detection...', 60);
+        updateHealthCheckFeatureStatus('app', 'testing');
         try {
             const appTest = await ipcRenderer.invoke('test-app-detection');
             healthStatus.appDetection = appTest.success;
             if (!appTest.success) {
                 failedFeatures.push('appDetection');
                 healthStatus.errorDetails.appDetection = appTest.error || 'App detection test failed';
+                updateHealthCheckFeatureStatus('app', 'fail', appTest.error);
+            } else {
+                updateHealthCheckFeatureStatus('app', 'pass');
             }
             console.log('🖥️ [HEALTH-CHECK] App detection test:', appTest.success ? '✅ PASS' : '❌ FAIL');
         } catch (error) {
             failedFeatures.push('appDetection');
             healthStatus.errorDetails.appDetection = error.message;
+            updateHealthCheckFeatureStatus('app', 'fail', error.message);
             console.error('🖥️ [HEALTH-CHECK] App detection test failed:', error);
         }
         
         // Test 4: Fraud Detection
         updateHealthCheckProgress('Testing fraud protection...', 80);
+        updateHealthCheckFeatureStatus('fraud', 'testing');
         try {
             const fraudTest = await ipcRenderer.invoke('test-fraud-detection');
             healthStatus.fraudDetection = fraudTest.success;
             if (!fraudTest.success) {
                 failedFeatures.push('fraudDetection');
                 healthStatus.errorDetails.fraudDetection = fraudTest.error || 'Fraud detection test failed';
+                updateHealthCheckFeatureStatus('fraud', 'fail', fraudTest.error);
+            } else {
+                updateHealthCheckFeatureStatus('fraud', 'pass');
             }
             console.log('🛡️ [HEALTH-CHECK] Fraud detection test:', fraudTest.success ? '✅ PASS' : '❌ FAIL');
         } catch (error) {
             failedFeatures.push('fraudDetection');
             healthStatus.errorDetails.fraudDetection = error.message;
+            updateHealthCheckFeatureStatus('fraud', 'fail', error.message);
             console.error('🛡️ [HEALTH-CHECK] Fraud detection test failed:', error);
         }
         
         // Test 5: Database Connection
         updateHealthCheckProgress('Testing database connection...', 100);
+        updateHealthCheckFeatureStatus('database', 'testing');
         try {
             const dbTest = await ipcRenderer.invoke('test-database-connection');
             healthStatus.databaseConnection = dbTest.success;
             if (!dbTest.success) {
                 failedFeatures.push('databaseConnection');
                 healthStatus.errorDetails.databaseConnection = dbTest.error || 'Database connection test failed';
+                updateHealthCheckFeatureStatus('database', 'fail', dbTest.error);
+            } else {
+                updateHealthCheckFeatureStatus('database', 'pass');
             }
             console.log('💾 [HEALTH-CHECK] Database test:', dbTest.success ? '✅ PASS' : '❌ FAIL');
         } catch (error) {
             failedFeatures.push('databaseConnection');
             healthStatus.errorDetails.databaseConnection = error.message;
+            updateHealthCheckFeatureStatus('database', 'fail', error.message);
             console.error('💾 [HEALTH-CHECK] Database test failed:', error);
         }
         
@@ -2238,129 +2263,189 @@ function showHealthCheckModal() {
         <div class="health-check-modal" style="
             background: white;
             border-radius: 16px;
-            padding: 32px;
-            max-width: 600px;
+            padding: 24px;
+            max-width: 700px;
             width: 90%;
-            max-height: 80vh;
+            max-height: 70vh;
             overflow-y: auto;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
             animation: slideUp 0.3s ease-out;
             position: relative;
         ">
-            <div class="health-check-header" style="text-align: center; margin-bottom: 24px;">
-                <div style="font-size: 48px; margin-bottom: 16px;">🏥</div>
-                <h3 style="margin: 0 0 8px 0; color: #1e293b; font-size: 24px; font-weight: 600;">
+            <div class="health-check-header" style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 32px; margin-bottom: 12px;">🏥</div>
+                <h3 style="margin: 0 0 6px 0; color: #1e293b; font-size: 18px; font-weight: 600;">
                     System Health Check
                 </h3>
-                <p style="color: #64748b; margin: 0; font-size: 16px;">
+                <p style="color: #64748b; margin: 0; font-size: 13px;">
                     Verifying all features before starting timer...
                 </p>
             </div>
             
             <div class="health-check-content">
-                <div class="health-check-progress" style="margin-bottom: 24px;">
+                <div class="health-check-progress" style="margin-bottom: 16px;">
                     <div class="progress-bar" style="
                         width: 100%;
-                        height: 8px;
+                        height: 6px;
                         background: #e2e8f0;
-                        border-radius: 4px;
+                        border-radius: 3px;
                         overflow: hidden;
-                        margin-bottom: 12px;
+                        margin-bottom: 8px;
                     ">
                         <div class="progress-fill" id="healthProgressFill" style="
                             height: 100%;
                             background: linear-gradient(90deg, #3b82f6, #06b6d4);
-                            border-radius: 4px;
+                            border-radius: 3px;
                             width: 0%;
                             transition: width 0.3s ease;
                         "></div>
                     </div>
                     <div class="progress-text" id="healthProgressText" style="
                         color: #64748b;
-                        font-size: 14px;
+                        font-size: 12px;
                         text-align: center;
                     ">Initializing health check...</div>
                 </div>
                 
-                <div class="health-check-features" style="display: grid; gap: 12px;">
+                <div class="health-check-features" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
                     <div class="feature-item" style="
                         display: flex;
                         align-items: center;
-                        justify-content: space-between;
-                        padding: 12px;
+                        gap: 12px;
+                        padding: 16px;
                         background: #f8fafc;
-                        border-radius: 8px;
+                        border-radius: 12px;
                         border: 1px solid #e2e8f0;
+                        transition: all 0.2s ease;
                     ">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span class="feature-icon" style="font-size: 20px;">📸</span>
-                            <span class="feature-name" style="font-weight: 500; color: #1e293b;">Screenshot Capture</span>
+                        <div style="
+                            width: 48px;
+                            height: 48px;
+                            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 20px;
+                            flex-shrink: 0;
+                        ">📸</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 600; color: #1e293b; font-size: 14px; margin-bottom: 2px;">Screenshot Capture</div>
+                            <div id="screenshotStatusText" style="font-size: 12px; color: #64748b;">Checking...</div>
                         </div>
-                        <span class="feature-status" id="screenshotStatus" style="font-size: 20px;">⏳</span>
+                        <span class="feature-status" id="screenshotStatus" style="font-size: 18px;">⏳</span>
                     </div>
                     
                     <div class="feature-item" style="
                         display: flex;
                         align-items: center;
-                        justify-content: space-between;
-                        padding: 12px;
+                        gap: 12px;
+                        padding: 16px;
                         background: #f8fafc;
-                        border-radius: 8px;
+                        border-radius: 12px;
                         border: 1px solid #e2e8f0;
+                        transition: all 0.2s ease;
                     ">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span class="feature-icon" style="font-size: 20px;">🌐</span>
-                            <span class="feature-name" style="font-weight: 500; color: #1e293b;">URL Detection</span>
+                        <div style="
+                            width: 48px;
+                            height: 48px;
+                            background: linear-gradient(135deg, #10b981, #059669);
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 20px;
+                            flex-shrink: 0;
+                        ">🌐</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 600; color: #1e293b; font-size: 14px; margin-bottom: 2px;">URL Detection</div>
+                            <div id="urlStatusText" style="font-size: 12px; color: #64748b;">Checking...</div>
                         </div>
-                        <span class="feature-status" id="urlStatus" style="font-size: 20px;">⏳</span>
+                        <span class="feature-status" id="urlStatus" style="font-size: 18px;">⏳</span>
                     </div>
                     
                     <div class="feature-item" style="
                         display: flex;
                         align-items: center;
-                        justify-content: space-between;
-                        padding: 12px;
+                        gap: 12px;
+                        padding: 16px;
                         background: #f8fafc;
-                        border-radius: 8px;
+                        border-radius: 12px;
                         border: 1px solid #e2e8f0;
+                        transition: all 0.2s ease;
                     ">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span class="feature-icon" style="font-size: 20px;">🖥️</span>
-                            <span class="feature-name" style="font-weight: 500; color: #1e293b;">App Detection</span>
+                        <div style="
+                            width: 48px;
+                            height: 48px;
+                            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 20px;
+                            flex-shrink: 0;
+                        ">🖥️</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 600; color: #1e293b; font-size: 14px; margin-bottom: 2px;">App Detection</div>
+                            <div id="appStatusText" style="font-size: 12px; color: #64748b;">Checking...</div>
                         </div>
-                        <span class="feature-status" id="appStatus" style="font-size: 20px;">⏳</span>
+                        <span class="feature-status" id="appStatus" style="font-size: 18px;">⏳</span>
                     </div>
                     
                     <div class="feature-item" style="
                         display: flex;
                         align-items: center;
-                        justify-content: space-between;
-                        padding: 12px;
+                        gap: 12px;
+                        padding: 16px;
                         background: #f8fafc;
-                        border-radius: 8px;
+                        border-radius: 12px;
                         border: 1px solid #e2e8f0;
+                        transition: all 0.2s ease;
                     ">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span class="feature-icon" style="font-size: 20px;">🛡️</span>
-                            <span class="feature-name" style="font-weight: 500; color: #1e293b;">Fraud Protection</span>
+                        <div style="
+                            width: 48px;
+                            height: 48px;
+                            background: linear-gradient(135deg, #ef4444, #dc2626);
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 20px;
+                            flex-shrink: 0;
+                        ">🛡️</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 600; color: #1e293b; font-size: 14px; margin-bottom: 2px;">Fraud Detection</div>
+                            <div id="fraudStatusText" style="font-size: 12px; color: #64748b;">Checking...</div>
                         </div>
-                        <span class="feature-status" id="fraudStatus" style="font-size: 20px;">⏳</span>
+                        <span class="feature-status" id="fraudStatus" style="font-size: 18px;">⏳</span>
                     </div>
                     
                     <div class="feature-item" style="
                         display: flex;
                         align-items: center;
-                        justify-content: space-between;
-                        padding: 12px;
+                        gap: 12px;
+                        padding: 16px;
                         background: #f8fafc;
-                        border-radius: 8px;
+                        border-radius: 12px;
                         border: 1px solid #e2e8f0;
+                        transition: all 0.2s ease;
                     ">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span class="feature-icon" style="font-size: 20px;">💾</span>
-                            <span class="feature-name" style="font-weight: 500; color: #1e293b;">Database Connection</span>
+                        <div style="
+                            width: 48px;
+                            height: 48px;
+                            background: linear-gradient(135deg, #f59e0b, #d97706);
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 20px;
+                            flex-shrink: 0;
+                        ">💾</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 600; color: #1e293b; font-size: 14px; margin-bottom: 2px;">Database Connection</div>
+                            <div id="databaseStatusText" style="font-size: 12px; color: #64748b;">Checking...</div>
                         </div>
-                        <span class="feature-status" id="databaseStatus" style="font-size: 20px;">⏳</span>
+                        <span class="feature-status" id="databaseStatus" style="font-size: 18px;">⏳</span>
                     </div>
                 </div>
                 
@@ -2463,24 +2548,30 @@ function updateHealthCheckProgress(text, percentage) {
 
 function updateHealthCheckFeatureStatus(featureId, status, errorMessage = null) {
     const statusElement = document.getElementById(`${featureId}Status`);
+    const statusTextElement = document.getElementById(`${featureId}StatusText`);
+    
     if (!statusElement) return;
     
     switch (status) {
         case 'pass':
             statusElement.textContent = '✅';
             statusElement.title = 'Working correctly';
+            if (statusTextElement) statusTextElement.textContent = '✅ Working perfectly';
             break;
         case 'fail':
             statusElement.textContent = '❌';
             statusElement.title = errorMessage || 'Not working';
+            if (statusTextElement) statusTextElement.textContent = `❌ ${errorMessage || 'Failed'}`;
             break;
         case 'warning':
             statusElement.textContent = '⚠️';
             statusElement.title = errorMessage || 'Limited functionality';
+            if (statusTextElement) statusTextElement.textContent = `⚠️ ${errorMessage || 'Warning'}`;
             break;
         default:
             statusElement.textContent = '⏳';
             statusElement.title = 'Testing...';
+            if (statusTextElement) statusTextElement.textContent = 'Testing...';
     }
     
     console.log(`🏥 [HEALTH-CHECK] Feature ${featureId}: ${status} ${errorMessage ? `(${errorMessage})` : ''}`);

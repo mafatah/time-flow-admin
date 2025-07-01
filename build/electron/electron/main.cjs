@@ -475,11 +475,11 @@ async function createWindow() {
     // Determine the correct icon path
     const iconPath = path.join(__dirname, '../assets/icon.png');
     const iconExists = fs.existsSync(iconPath);
-    // Create the employee desktop app window
+    // Create the main TimeFlow window with fixed System Health Check
     mainWindow = new electron_1.BrowserWindow({
         width: 1200,
         height: 800,
-        show: true, // Show the window for employee interaction
+        show: true, // Show the window for interaction
         icon: iconExists ? iconPath : undefined, // Use icon only if it exists
         webPreferences: {
             nodeIntegration: true,
@@ -488,10 +488,13 @@ async function createWindow() {
         titleBarStyle: 'hiddenInset', // Modern macOS look
         vibrancy: 'under-window' // macOS transparency effect
     });
+    // 🎯 LOAD THE ELECTRON DESKTOP AGENT INTERFACE (NOT WEB INTERFACE)
+    // The electron app should have its own design for employees, not the web admin interface
+    console.log('📱 Loading TimeFlow Desktop Agent interface...');
     // Load the employee desktop app interface
     const desktopAgentPath = path.join(__dirname, '../desktop-agent/renderer/index.html');
     if (fs.existsSync(desktopAgentPath)) {
-        console.log('📱 Loading employee desktop app from:', desktopAgentPath);
+        console.log('✅ Loading employee desktop app from:', desktopAgentPath);
         mainWindow.loadFile(desktopAgentPath);
     }
     else {
@@ -523,6 +526,28 @@ async function createWindow() {
             }
         }
     }
+    // 🎯 SHOW DOCK ICON WHEN WINDOW IS CREATED
+    if (process.platform === 'darwin') {
+        electron_1.app.dock.show();
+        console.log('✅ Dock icon shown - app visible in dock');
+    }
+    // Window event handlers
+    mainWindow.on('focus', () => {
+        console.log('👁️ App gained focus');
+    });
+    mainWindow.on('blur', () => {
+        console.log('👁️ App lost focus');
+    });
+    mainWindow.on('close', (event) => {
+        // Prevent window from closing, just hide it
+        event.preventDefault();
+        mainWindow?.hide();
+        // Hide dock icon when window is hidden
+        if (process.platform === 'darwin') {
+            electron_1.app.dock.hide();
+            console.log('🫥 Hiding window and dock icon');
+        }
+    });
     // Show DevTools in development
     if (process.env.NODE_ENV === 'development') {
         mainWindow.webContents.openDevTools();
@@ -654,6 +679,31 @@ electron_1.app.on('before-quit', () => {
     // Clean up permission dialog
     (0, simplePermissionDialog_1.cleanupPermissionDialog)();
 });
+// === ENHANCED USER SESSION BRIDGE ===
+// This function connects all session management systems after user login
+async function establishUserSessionBridge(userId) {
+    console.log('🔗 Establishing user session bridge for:', userId);
+    try {
+        // 1. Set user ID in tracker module
+        (0, tracker_1.setUserId)(userId);
+        console.log('✅ User ID set in tracker module');
+        // 2. Start activity monitoring immediately with user session
+        console.log('🚀 Starting activity monitoring with user session...');
+        await (0, activityMonitor_1.startActivityMonitoring)(userId);
+        console.log('✅ Activity monitoring started with user session');
+        // 3. Trigger a test activity to verify session connectivity
+        setTimeout(() => {
+            (0, activityMonitor_1.recordRealActivity)('session_test', 1);
+            console.log('🧪 Test activity triggered to verify session connectivity');
+        }, 1000);
+        // 4. Log success
+        console.log('🎉 User session bridge established successfully!');
+        console.log('📊 All systems now have access to user session:', userId);
+    }
+    catch (error) {
+        console.error('❌ Failed to establish user session bridge:', error);
+    }
+}
 // Handle user login from desktop-agent UI - FIX: Use handle instead of on for invoke calls
 electron_1.ipcMain.handle('user-logged-in', async (event, userData) => {
     console.log('👤 User logged in from UI:', userData.email);
@@ -663,7 +713,9 @@ electron_1.ipcMain.handle('user-logged-in', async (event, userData) => {
         remember_me: userData.remember_me,
         session_keys: userData.session ? Object.keys(userData.session) : []
     });
-    (0, tracker_1.setUserId)(userData.id);
+    // === IMMEDIATE SESSION BRIDGE ESTABLISHMENT ===
+    console.log('🔗 Establishing session bridge immediately after login...');
+    await establishUserSessionBridge(userData.id);
     // Save user session if remember_me is true
     if (userData.session && userData.remember_me) {
         try {
@@ -2665,4 +2717,3 @@ function showPermissionCheckingPopup() {
     });
     return popup;
 }
-// === ENHANCED SECURE TRACKING WITH USER FEEDBACK ===
