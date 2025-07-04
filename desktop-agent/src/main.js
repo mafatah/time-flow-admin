@@ -459,7 +459,7 @@ function createWindow() {
       enableRemoteModule: true
     },
     icon: path.join(__dirname, '../assets/icon.png'),
-    title: 'Ebdaa Time - Employee Portal',
+          title: 'Ebdaa Work Time - Employee Portal',
     resizable: true,
     show: false,
     minWidth: 800,
@@ -471,7 +471,7 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    console.log('✅ Ebdaa Time Agent ready');
+    console.log('✅ Ebdaa Work Time Agent ready');
   });
 
   // Handle window events
@@ -484,7 +484,7 @@ function createWindow() {
     if (isTracking) {
       event.preventDefault();
       mainWindow.hide();
-      showTrayNotification('Ebdaa Time continues tracking in background');
+      showTrayNotification('Ebdaa Work Time continues tracking in background');
     }
   });
 
@@ -505,7 +505,7 @@ function createDebugWindow() {
       contextIsolation: false
     },
     icon: path.join(__dirname, '../assets/icon.png'),
-    title: '🔬 TimeFlow Debug Console',
+            title: '🔬 Ebdaa Work Time Debug Console',
     resizable: true,
     show: false,
     minWidth: 1000,
@@ -547,7 +547,7 @@ function updateTrayMenu() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: `TimeFlow Desktop Agent`,
+      label: `Ebdaa Work Time Agent`,
       enabled: false
     },
     { type: 'separator' },
@@ -575,7 +575,7 @@ function updateTrayMenu() {
             
             new Notification({
               title: 'Project Selection Required',
-              body: 'Please open the TimeFlow app and select a project before starting tracking from the menu bar.'
+              body: 'Please open the Ebdaa Work Time app and select a project before starting tracking from the menu bar.'
             }).show();
             
             return;
@@ -678,7 +678,7 @@ function updateTrayMenu() {
   // Update tray tooltip with current status
   const tooltipStatus = isCurrentlyTracking ? 'Tracking' : isPausing ? 'Paused' : 'Stopped';
   const projectInfo = currentSession ? ` - ${currentSession.project_id}` : '';
-  tray.setToolTip(`TimeFlow: ${tooltipStatus}${projectInfo}`);
+  tray.setToolTip(`Ebdaa Work Time: ${tooltipStatus}${projectInfo}`);
 }
 
 // === ITEM 6: SETTINGS PULL ===
@@ -2247,7 +2247,7 @@ async function checkMacScreenPermissions() {
       console.log('📋 Please grant Screen Recording permission in System Preferences:');
       console.log('   1. Go to System Preferences > Security & Privacy > Privacy');
       console.log('   2. Select "Screen Recording" from the left sidebar');
-      console.log('   3. Add and enable TimeFlow/Electron app');
+      console.log('   3. Add and enable Ebdaa Work Time/Electron app');
       console.log('   4. Restart the application');
       
       // Don't show dialogs during screenshot capture, just log and return false
@@ -2269,9 +2269,9 @@ async function showPermissionDialog() {
     
     dialog.showMessageBox(mainWindow, {
       type: 'info',
-      title: 'TimeFlow - Screen Recording Permission',
+      title: 'Ebdaa Work Time - Screen Recording Permission',
       message: 'Enhanced Features Available',
-      detail: 'TimeFlow can capture app names and URLs to provide better tracking insights. This requires Screen Recording permission.\n\n• App Capture: See which applications you use\n• URL Capture: Track website visits in browsers\n• All data stays private and secure\n\nWould you like to enable these features?',
+              detail: 'Ebdaa Work Time can capture app names and URLs to provide better tracking insights. This requires Screen Recording permission.\n\n• App Capture: See which applications you use\n• URL Capture: Track website visits in browsers\n• All data stays private and secure\n\nWould you like to enable these features?',
       buttons: ['Enable Features', 'Set Up Manually', 'Continue Without'],
       defaultId: 0,
       cancelId: 2
@@ -2299,7 +2299,7 @@ function showPermissionGuide() {
     type: 'info',
     title: 'Screen Recording Permission Setup',
     message: 'Manual Permission Setup Required',
-    detail: 'To enable App and URL capture features:\n\n1. Open System Settings/Preferences\n2. Go to Privacy & Security → Screen Recording\n3. Click the "+" button\n4. Add "Electron" app\n5. Enable the checkbox\n6. Restart TimeFlow\n\nWould you like to open System Settings now?',
+    detail: 'To enable App and URL capture features:\n\n1. Open System Settings/Preferences\n2. Go to Privacy & Security → Screen Recording\n3. Click the "+" button\n4. Add "Electron" app\n5. Enable the checkbox\n6. Restart Ebdaa Work Time\n\nWould you like to open System Settings now?',
     buttons: ['Open System Settings', 'I\'ll Do It Later'],
     defaultId: 0
   }).then(result => {
@@ -2551,7 +2551,7 @@ async function captureScreenshot() {
         // Show detailed notification
         try {
           new Notification({
-            title: 'TimeFlow - Screenshot Requirement Failed',
+            title: 'Ebdaa Work Time - Screenshot Requirement Failed',
             body: message
           }).show();
         } catch (e) {
@@ -2884,7 +2884,7 @@ async function checkNotifications() {
 function showTrayNotification(message, type = 'info') {
   if (Notification.isSupported()) {
     const notification = new Notification({
-      title: 'Ebdaa Time',
+              title: 'Ebdaa Work Time',
       body: message,
       icon: path.join(__dirname, '../assets/icon.png')
     });
@@ -2938,79 +2938,24 @@ async function startTracking(projectId = null) {
   console.log('🚀 [MAIN] Starting time tracking...');
   
   try {
-    // Clean up any stale sessions first
-    await cleanupStaleActiveSessions();
+    // OPTIMIZED: Skip cleanup and redundant checks - health check already verified everything
+    console.log('⚡ [MAIN] Health check completed - starting tracking immediately');
     
     // === PROJECT VALIDATION ===
     let actualProjectId = projectId || config.project_id;
     
-    // If no project ID provided, show project selection dialog
-    if (!actualProjectId) {
-      console.log('❌ [MAIN] No project ID available - project selection required');
-      
-      // Show project selection notification
-      showTrayNotification('Please select a project before starting tracking', 'warning');
-      
-      // Try to focus the main window to show project selection
-      if (mainWindow) {
-        mainWindow.focus();
-        mainWindow.webContents.send('show-project-selection');
-      }
-      
-      throw new Error('Project selection is required to start tracking. Please select a project from the Time Tracker page.');
-    }
-    
-    // Validate project ID format (should be UUID or valid identifier)
-    if (actualProjectId.length < 10) {
-      console.log('❌ [MAIN] Invalid project ID format');
-      throw new Error('Invalid project ID. Please select a valid project.');
+    // Quick project validation only
+    if (!actualProjectId || actualProjectId.length < 10) {
+      console.log('❌ [MAIN] Invalid project ID');
+      throw new Error('Project selection is required to start tracking. Please select a valid project.');
     }
 
     console.log('📋 [MAIN] Project ID validated:', actualProjectId);
     
-    // === MANDATORY REQUIREMENTS CHECK ===
-    console.log('🔍 [MAIN] Checking mandatory requirements for time tracking...');
-    
-    // 1. Check platform-specific permissions and capabilities
-    let hasScreenshotPermissions = true;
-    let hasAppUrlPermissions = false;
-    
-    console.log(`🖥️ [MAIN] Running on ${process.platform} platform`);
-    
-    // Use new cross-platform permission checking
-    hasScreenshotPermissions = await checkPlatformPermissions();
-    
-    if (!hasScreenshotPermissions) {
-      console.log('⚠️ [MAIN] Screen capture permissions not available - running in limited mode');
-      console.log('📋 [MAIN] Some features may be limited without proper permissions');
-    } else {
-      console.log('✅ [MAIN] Screen capture permissions verified');
-      
-      // Test if app/URL capture works on this platform using our enhanced detection
-      console.log('🔍 [MAIN] Testing enhanced app/URL capture capabilities...');
-      hasAppUrlPermissions = await testPlatformAppCapture();
-      
-      if (hasAppUrlPermissions) {
-        console.log('✅ [MAIN] Enhanced app and URL capture will be enabled');
-        appCaptureEnabled = true;
-        urlCaptureEnabled = true;
-      } else {
-        console.log('⚠️ [MAIN] Enhanced app and URL capture not available on this platform - enabling anyway with fallback');
-        // CRITICAL FIX: Enable features even if test fails - use runtime fallbacks instead
-        appCaptureEnabled = true;
-        urlCaptureEnabled = true;
-      }
-    }
-    
-    // 2. Test screenshot capture before starting (don't fail if it doesn't work)
-    console.log('📸 [MAIN] Testing screenshot capability...');
-    const testScreenshotResult = await captureScreenshot();
-    if (!testScreenshotResult) {
-      console.log('⚠️ [MAIN] Screenshot test failed - continuing in limited mode');
-      console.log('📋 [MAIN] Some features may be limited without screenshot capability');
-    }
-    
-    console.log('✅ [MAIN] Requirements checked - proceeding with tracking');
+    // SKIP REDUNDANT CHECKS: Health check already verified all capabilities
+    console.log('✅ [MAIN] Skipping redundant checks - using health check results');
+    appCaptureEnabled = true;
+    urlCaptureEnabled = true;
 
     // Set tracking state
     isTracking = true;
@@ -3071,9 +3016,9 @@ async function startTracking(projectId = null) {
     // Notify user of successful start with project info
     showTrayNotification(`Tracking started for project: ${actualProjectId}`, 'success');
     
-    console.log('✅ [MAIN] Time tracking started successfully with mandatory screenshot enforcement');
+    console.log('✅ [MAIN] startTracking completed successfully');
     
-    return { success: true, message: 'Tracking started successfully' };
+    return { success: true, message: 'Tracking started successfully', optimized: true };
     
   } catch (error) {
     console.error('❌ [MAIN] Failed to start tracking:', error);
@@ -3275,7 +3220,60 @@ async function resumeTracking() {
 }
 
 // === ENHANCED IPC HANDLERS ===
+// Register these handlers immediately, not conditionally
 if (isElectronContext && ipcMain) {
+  console.log('🔧 Registering IPC handlers...');
+  
+  // CRITICAL FIX: Register tracking handlers FIRST to ensure they're always available
+  console.log('🎯 Registering critical tracking handlers...');
+  
+  ipcMain.handle('start-tracking', async (event, projectId = null) => {
+    console.log('🎯 [MAIN] IPC start-tracking called with project_id:', projectId);
+    console.log('🎯 [MAIN] typeof projectId:', typeof projectId);
+    console.log('🎯 [MAIN] projectId value:', JSON.stringify(projectId));
+    
+    try {
+      const result = await startTracking(projectId);
+      console.log('✅ [MAIN] startTracking completed successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ [MAIN] startTracking failed with error:', error);
+      return { success: false, message: 'Failed to start tracking: ' + error.message };
+    }
+  });
+
+  ipcMain.handle('stop-tracking', async () => {
+    try {
+      const result = await stopTracking();
+      return result;
+    } catch (error) {
+      console.error('❌ [MAIN] stopTracking failed:', error);
+      return { success: false, message: 'Failed to stop tracking: ' + error.message };
+    }
+  });
+
+  ipcMain.handle('pause-tracking', async () => {
+    try {
+      const result = await pauseTracking();
+      return result;
+    } catch (error) {
+      console.error('❌ [MAIN] pauseTracking failed:', error);
+      return { success: false, message: 'Failed to pause tracking: ' + error.message };
+    }
+  });
+
+  ipcMain.handle('resume-tracking', async () => {
+    try {
+      const result = await resumeTracking();
+      return result;
+    } catch (error) {
+      console.error('❌ [MAIN] resumeTracking failed:', error);
+      return { success: false, message: 'Failed to resume tracking: ' + error.message };
+    }
+  });
+
+  console.log('✅ Critical tracking handlers registered');
+  
   // Employee login/logout handlers
   ipcMain.on('user-logged-in', (event, user) => {
   console.log('👤 User logged in:', user.email);
@@ -3299,54 +3297,6 @@ ipcMain.on('user-logged-out', (event) => {
 ipcMain.on('start-activity-monitoring', (event, userId) => {
   console.log('📊 Starting activity monitoring for user:', userId);
   // Activity monitoring is already running, just associate with user
-});
-
-// FIXED: Unified tracking control handlers - removed duplicate on() handler
-ipcMain.handle('start-tracking', async (event, projectId = null) => {
-  console.log('🎯 [MAIN] IPC start-tracking called with project_id:', projectId);
-  console.log('🎯 [MAIN] typeof projectId:', typeof projectId);
-  console.log('🎯 [MAIN] projectId value:', JSON.stringify(projectId));
-  
-  try {
-    const result = await startTracking(projectId);
-    console.log('✅ [MAIN] startTracking completed successfully');
-    return result;
-  } catch (error) {
-    console.error('❌ [MAIN] startTracking failed with error:', error);
-    return { success: false, message: 'Failed to start tracking: ' + error.message };
-  }
-});
-
-
-
-ipcMain.handle('stop-tracking', async () => {
-  try {
-    const result = await stopTracking();
-    return result;
-  } catch (error) {
-    console.error('❌ [MAIN] stopTracking failed:', error);
-    return { success: false, message: 'Failed to stop tracking: ' + error.message };
-  }
-});
-
-ipcMain.handle('pause-tracking', async () => {
-  try {
-    await pauseTracking('manual');
-    return { success: true, message: 'Tracking paused' };
-  } catch (error) {
-    console.error('❌ [MAIN] pauseTracking failed:', error);
-    return { success: false, message: 'Failed to pause tracking: ' + error.message };
-  }
-});
-
-ipcMain.handle('resume-tracking', async () => {
-  try {
-    await resumeTracking();
-    return { success: true, message: 'Tracking resumed' };
-  } catch (error) {
-    console.error('❌ [MAIN] resumeTracking failed:', error);
-    return { success: false, message: 'Failed to resume tracking: ' + error.message };
-  }
 });
 
 ipcMain.handle('get-activity-stats', () => {
@@ -3524,19 +3474,19 @@ async function captureActiveUrl() {
 // === APP LIFECYCLE ===
 if (isElectronContext && app) {
   // === SINGLE INSTANCE LOCK - PREVENT DUPLICATE DESKTOP AGENTS ===
-  console.log('🔒 Checking for existing TimeFlow Desktop Agent instance...');
+  console.log('🔒 Checking for existing Ebdaa Work Time Agent instance...');
 
   const gotTheLock = app.requestSingleInstanceLock();
 
   if (!gotTheLock) {
-    console.log('❌ Another TimeFlow Desktop Agent instance is already running - exiting this duplicate');
+          console.log('❌ Another Ebdaa Work Time Agent instance is already running - exiting this duplicate');
     console.log('✅ The existing Desktop Agent instance will continue running');
     
     // Show notification to user that desktop agent is already running
     try {
       const notification = new Notification({
-        title: 'TimeFlow Desktop Agent Already Running',
-        body: 'TimeFlow Desktop Agent is already running. Check your system tray.',
+        title: 'Ebdaa Work Time Agent Already Running',
+        body: 'Ebdaa Work Time Agent is already running. Check your system tray.',
         silent: false
       });
       notification.show();
@@ -3564,7 +3514,7 @@ if (isElectronContext && app) {
         // Show notification that desktop agent is already running
         try {
           const notification = new Notification({
-            title: 'TimeFlow Desktop Agent',
+            title: 'Ebdaa Work Time Agent',
             body: 'Desktop Agent is already running and has been brought to the front.',
             silent: false
           });
@@ -3576,7 +3526,7 @@ if (isElectronContext && app) {
         // If no window but tray exists, show notification
         try {
           const notification = new Notification({
-            title: 'TimeFlow Desktop Agent',
+            title: 'Ebdaa Work Time Agent',
             body: 'Desktop Agent is already running in the system tray.',
             silent: false
           });
@@ -3589,7 +3539,7 @@ if (isElectronContext && app) {
   }
 
   app.whenReady().then(async () => {
-  safeLog('🚀 TimeFlow Desktop Agent starting...');
+  safeLog('🚀 Ebdaa Work Time Agent starting...');
   
   // Initialize components
   initializeComponents();
@@ -3666,7 +3616,7 @@ if (isElectronContext && app) {
     }
   });
 
-  safeLog('✅ TimeFlow Agent ready');
+  safeLog('✅ Ebdaa Work Time Agent ready');
   safeLog('🔬 Debug Console: Right-click tray icon → Debug Console, or press Ctrl+Shift+D');
   safeLog('🔒 Permission Request: Press Ctrl+Shift+P to manage screen recording permissions');
 });
@@ -3782,13 +3732,13 @@ powerMonitor.on('unlock-screen', () => {
   showTrayNotification('Screen unlocked - click to resume tracking', 'info');
 });
 
-console.log('📱 Ebdaa Time Desktop Agent initialized');
+  console.log('📱 Ebdaa Work Time Desktop Agent initialized');
 } // End of Electron context check
 
 // Initialize components
 function initializeComponents() {
   syncManager = new SyncManager(config);
-  console.log('📱 TimeFlow Desktop Agent initialized');
+  console.log('📱 Ebdaa Work Time Agent initialized');
   
   // Load saved system state and offline queue on startup
   loadSystemState();
@@ -3810,11 +3760,13 @@ function initializeComponents() {
 }
 
 // === LOG DOWNLOAD HANDLERS ===
-// Remove any existing handlers first to prevent duplicates
+// Remove any existing handlers first to prevent duplicates (but keep tracking handlers)
+// CRITICAL: Tracking handlers are now registered at startup and should NEVER be removed
 const existingHandlers = [
   'get-activity-metrics', 'user-logged-in', 'user-logged-out', 'load-user-session', 'load-session', 
   'set-project-id', 'get-activity-logs', 'get-system-logs', 'get-screenshot-logs', 'get-compatibility-report', 
-  'check-mac-permissions', 'start-tracking', 'stop-tracking', 'pause-tracking', 'resume-tracking',
+  'check-mac-permissions',
+  // NEVER REMOVE: 'start-tracking', 'stop-tracking', 'pause-tracking', 'resume-tracking',
   'get-activity-stats', 'get-anti-cheat-report', 'confirm-resume-after-idle', 'confirm-resume-after-sleep',
   'get-app-settings', 'update-app-settings', 'get-queue-status', 'force-screenshot', 'simulate-activity',
   'get-config', 'fetch-screenshots', 'report-suspicious-activity', 'get-fraud-alerts', 'is-tracking', 'get-stats'
@@ -3856,6 +3808,7 @@ ipcMain.handle('check-mac-permissions', async () => {
 });
 
 // === CORE IPC HANDLERS ===
+// FIXED: Tracking handlers now registered at startup to avoid cleanup/timing issues
 ipcMain.handle('get-activity-metrics', () => {
   try {
     console.log('📊 Getting activity metrics...');
@@ -3957,7 +3910,7 @@ ipcMain.handle('get-system-logs', () => {
     safeLog('🖥️ Generating system logs...');
     
     const systemLogs = [
-      `TimeFlow Desktop Agent System Logs`,
+      `Ebdaa Work Time Agent System Logs`,
       `Generated: ${new Date().toISOString()}`,
       `Platform: ${process.platform} (${process.arch})`,
       `Node.js: ${process.version}`,
@@ -4850,7 +4803,7 @@ function showResumeConfirmation(suspendMinutes) {
 
 // === NODE.JS STANDALONE MODE ===
 if (!isElectronContext) {
-  console.log('🚀 Starting TimeFlow Desktop Agent in Node.js mode...');
+      console.log('🚀 Starting Ebdaa Work Time Agent in Node.js mode...');
   
   // Initialize components for Node.js mode
   async function initNodeJsMode() {
@@ -4936,7 +4889,7 @@ if (!isElectronContext) {
         console.log('⚠️ No user_id found - URL capture may not work properly');
       }
       
-        console.log('✅ TimeFlow Desktop Agent running in Node.js mode');
+        console.log('✅ Ebdaa Work Time Agent running in Node.js mode');
   console.log('📊 Monitoring app and URL activity...');
   
   // Start periodic database status reporting

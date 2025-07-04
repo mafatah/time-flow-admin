@@ -20,7 +20,7 @@ let activityStats = {
 // === INITIALIZATION ===
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        console.log('🚀 TimeFlow Desktop Agent initializing...');
+        console.log('🚀 Ebdaa Work Time Agent initializing...');
         
         // Get config from main process via IPC
         console.log('🔄 Desktop agent requesting config from main process...');
@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // === APP INITIALIZATION ===
 async function initializeApp() {
     try {
-        console.log('🚀 TimeFlow Desktop Agent initializing...');
+        console.log('🚀 Ebdaa Work Time Agent initializing...');
         
         // Skip Supabase client initialization if already created
         if (!supabaseClient) {
@@ -134,9 +134,9 @@ async function initializeApp() {
                     console.log('👤 User restored from saved session:', currentUser);
                     
                     // Update localStorage for UI consistency
-                    localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
-                    localStorage.setItem('timeflow_remember_email', currentUser.email);
-                    localStorage.setItem('timeflow_remember_me', 'true');
+                    localStorage.setItem('ebdaa_user', JSON.stringify(currentUser));
+                    localStorage.setItem('ebdaa_remember_email', currentUser.email);
+                    localStorage.setItem('ebdaa_remember_me', 'true');
                     
                     // Auto-login successful - go directly to main app
                     showMainApp();
@@ -294,8 +294,8 @@ function setupIpcListeners() {
 
 // === REMEMBER ME FUNCTIONALITY ===
 function loadRememberedLoginData() {
-    const rememberedEmail = localStorage.getItem('timeflow_remember_email');
-    const rememberMeChecked = localStorage.getItem('timeflow_remember_me') === 'true';
+    const rememberedEmail = localStorage.getItem('ebdaa_remember_email');
+    const rememberMeChecked = localStorage.getItem('ebdaa_remember_me') === 'true';
     
     const emailInput = document.getElementById('loginEmail');
     const rememberMeCheckbox = document.getElementById('rememberMe');
@@ -401,16 +401,16 @@ async function handleLogin(e) {
         console.log('👤 User set:', currentUser);
 
         // Save user to localStorage
-        localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
+        localStorage.setItem('ebdaa_user', JSON.stringify(currentUser));
 
         // Handle remember me functionality - save to localStorage for UI
         if (rememberMe) {
-            localStorage.setItem('timeflow_remember_email', email);
-            localStorage.setItem('timeflow_remember_me', 'true');
+            localStorage.setItem('ebdaa_remember_email', email);
+            localStorage.setItem('ebdaa_remember_me', 'true');
             console.log('💾 Login credentials remembered in localStorage');
         } else {
-            localStorage.removeItem('timeflow_remember_email');
-            localStorage.removeItem('timeflow_remember_me');
+            localStorage.removeItem('ebdaa_remember_email');
+            localStorage.removeItem('ebdaa_remember_me');
             console.log('🗑️ Login credentials cleared from localStorage');
         }
 
@@ -483,9 +483,15 @@ async function handleQuickLogin() {
         errorDiv.textContent = '';
     }
 
-    // Set demo credentials and enable remember me by default for quick login
-    emailInput.value = 'employee@timeflow.com';
-                    // Auto-fill removed for security
+    // Get credentials from form inputs
+    const email = emailInput.value;
+    const password = passwordInput.value;
+    
+    if (!email || !password) {
+        showNotification('Please enter both email and password', 'error');
+        return;
+    }
+
     if (rememberMeCheckbox) {
         rememberMeCheckbox.checked = true;
     }
@@ -496,10 +502,10 @@ async function handleQuickLogin() {
     quickLoginBtn.textContent = '🔄 Signing in...';
 
     try {
-        // Authenticate with Supabase using demo credentials
+        // Authenticate with Supabase using form credentials
         const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
-            email: 'employee@timeflow.com',
-            password: '' // Password removed for security
+            email: email,
+            password: password
         });
 
         if (authError) {
@@ -526,11 +532,11 @@ async function handleQuickLogin() {
         console.log('👤 Quick login user set:', currentUser);
 
         // Save user to localStorage
-        localStorage.setItem('timeflow_user', JSON.stringify(currentUser));
+        localStorage.setItem('ebdaa_user', JSON.stringify(currentUser));
 
         // Save remember me for quick login
-        localStorage.setItem('timeflow_remember_email', 'employee@timeflow.com');
-        localStorage.setItem('timeflow_remember_me', 'true');
+        localStorage.setItem('ebdaa_remember_email', email);
+        localStorage.setItem('ebdaa_remember_me', 'true');
 
         // Prepare session data for quick login with remember me enabled
         const sessionData = {
@@ -552,7 +558,7 @@ async function handleQuickLogin() {
 
         // Show main app
         showMainApp();
-        showNotification('🚀 Welcome to TimeFlow! Ready to track your time.', 'success');
+        showNotification('🚀 Welcome to Ebdaa Work Time! Ready to track your time.', 'success');
         
     } catch (error) {
         console.error('❌ Quick login error:', error);
@@ -723,6 +729,9 @@ async function startTracking() {
         showNotification('⚠️ Health check failed - some features may not work properly', 'error');
         // Modal will be hidden by the health check function itself after showing error
     }
+    
+    // INSTANT: Skip delay - IPC handlers are ready immediately after health check
+    console.log('⚡ [RENDERER] IPC handlers ready, proceeding immediately...');
     
     console.log('👤 [RENDERER] Current user:', currentUser);
     
@@ -1248,7 +1257,7 @@ async function logout() {
         }
         
         // Clear user data
-        localStorage.removeItem('timeflow_user');
+        localStorage.removeItem('ebdaa_user');
         currentUser = null;
         isTracking = false;
         trackingStatus = 'stopped';
@@ -1347,7 +1356,7 @@ function showSystemCheckPrompt() {
             System Check Recommended
         </h2>
         <p style="color: #64748b; font-size: 16px; line-height: 1.5; margin-bottom: 24px;">
-            Welcome to TimeFlow! Let's verify that all tracking components are working properly before you start your session.
+            Welcome to Ebdaa Work Time! Let's verify that all tracking components are working properly before you start your session.
         </p>
         <div style="display: flex; gap: 12px; justify-content: center;">
             <button id="runSystemCheckBtn" style="
@@ -1412,7 +1421,7 @@ function showSystemCheckPrompt() {
         console.log('🔬 User chose to run system check');
         
         // Mark as checked to start cooldown
-        localStorage.setItem('timeflow_system_check_desktop', Date.now().toString());
+        localStorage.setItem('ebdaa_system_check_desktop', Date.now().toString());
         
         // Open debug console
         ipcRenderer.invoke('open-debug-console').then(() => {
@@ -1430,7 +1439,7 @@ function showSystemCheckPrompt() {
         console.log('⏭️ User chose to skip system check');
         
         // Mark as checked to start cooldown (shorter for skip)
-        localStorage.setItem('timeflow_system_check_desktop', Date.now().toString());
+        localStorage.setItem('ebdaa_system_check_desktop', Date.now().toString());
         
         showNotification('System check skipped. You can access it anytime via Cmd+Shift+D', 'info');
         
@@ -1446,7 +1455,7 @@ function showSystemCheckPrompt() {
     });
 }
 
-console.log('📱 TimeFlow Desktop Agent Renderer loaded successfully');
+console.log('📱 Ebdaa Work Time Agent Renderer loaded successfully');
 
 // === MANUAL TESTING FUNCTIONS ===
 async function testScreenshotCapture() {
@@ -1503,7 +1512,7 @@ function checkMacPermissions() {
             permissionCard.innerHTML = `
                 <h3 class="font-semibold text-gray-900 mb-2">🔒 macOS Permissions</h3>
                 <p class="text-sm text-gray-600 mb-4">
-                    On macOS, TimeFlow needs Screen Recording permission to capture screenshots.
+                    On macOS, Ebdaa Work Time needs Screen Recording permission to capture screenshots.
                 </p>
                 <button id="checkPermissionsBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
                     Check Permissions
@@ -1527,7 +1536,7 @@ function checkMacPermissions() {
                             <span class="text-red-600">❌ Screen Recording permission needed</span>
                             <br><span class="text-sm text-gray-600">
                                 Please go to System Preferences > Security & Privacy > Privacy > Screen Recording
-                                and enable TimeFlow
+                                and enable Ebdaa Work Time
                             </span>
                         `;
                     }
@@ -2067,110 +2076,45 @@ async function performComprehensiveHealthCheck() {
     const failedFeatures = [];
     
     try {
-        // Test 1: Screenshot Capability
-        updateHealthCheckProgress('Testing screenshot capability...', 20);
+        // Start all tests in parallel for faster execution
+        updateHealthCheckProgress('Running comprehensive system tests...', 50);
+        
+        // Set all features to testing state
         updateHealthCheckFeatureStatus('screenshot', 'testing');
-        try {
-            const screenshotTest = await ipcRenderer.invoke('test-screenshot-capability');
-            healthStatus.screenshots = screenshotTest.success;
-            if (!screenshotTest.success) {
-                failedFeatures.push('screenshots');
-                healthStatus.errorDetails.screenshots = screenshotTest.error || 'Screenshot test failed';
-                updateHealthCheckFeatureStatus('screenshot', 'fail', screenshotTest.error);
-            } else {
-                updateHealthCheckFeatureStatus('screenshot', 'pass');
-            }
-            console.log('📸 [HEALTH-CHECK] Screenshot test:', screenshotTest.success ? '✅ PASS' : '❌ FAIL');
-        } catch (error) {
-            failedFeatures.push('screenshots');
-            healthStatus.errorDetails.screenshots = error.message;
-            updateHealthCheckFeatureStatus('screenshot', 'fail', error.message);
-            console.error('📸 [HEALTH-CHECK] Screenshot test failed:', error);
-        }
-        
-        // Test 2: URL Detection
-        updateHealthCheckProgress('Testing URL detection...', 40);
         updateHealthCheckFeatureStatus('url', 'testing');
-        try {
-            const urlTest = await ipcRenderer.invoke('test-url-detection');
-            healthStatus.urlDetection = urlTest.success;
-            if (!urlTest.success) {
-                failedFeatures.push('urlDetection');
-                healthStatus.errorDetails.urlDetection = urlTest.error || 'URL detection test failed';
-                updateHealthCheckFeatureStatus('url', 'fail', urlTest.error);
-            } else {
-                updateHealthCheckFeatureStatus('url', 'pass');
-            }
-            console.log('🌐 [HEALTH-CHECK] URL detection test:', urlTest.success ? '✅ PASS' : '❌ FAIL');
-        } catch (error) {
-            failedFeatures.push('urlDetection');
-            healthStatus.errorDetails.urlDetection = error.message;
-            updateHealthCheckFeatureStatus('url', 'fail', error.message);
-            console.error('🌐 [HEALTH-CHECK] URL detection test failed:', error);
-        }
-        
-        // Test 3: App Detection
-        updateHealthCheckProgress('Testing app detection...', 60);
         updateHealthCheckFeatureStatus('app', 'testing');
-        try {
-            const appTest = await ipcRenderer.invoke('test-app-detection');
-            healthStatus.appDetection = appTest.success;
-            if (!appTest.success) {
-                failedFeatures.push('appDetection');
-                healthStatus.errorDetails.appDetection = appTest.error || 'App detection test failed';
-                updateHealthCheckFeatureStatus('app', 'fail', appTest.error);
-            } else {
-                updateHealthCheckFeatureStatus('app', 'pass');
-            }
-            console.log('🖥️ [HEALTH-CHECK] App detection test:', appTest.success ? '✅ PASS' : '❌ FAIL');
-        } catch (error) {
-            failedFeatures.push('appDetection');
-            healthStatus.errorDetails.appDetection = error.message;
-            updateHealthCheckFeatureStatus('app', 'fail', error.message);
-            console.error('🖥️ [HEALTH-CHECK] App detection test failed:', error);
-        }
-        
-        // Test 4: Fraud Detection
-        updateHealthCheckProgress('Testing fraud protection...', 80);
         updateHealthCheckFeatureStatus('fraud', 'testing');
-        try {
-            const fraudTest = await ipcRenderer.invoke('test-fraud-detection');
-            healthStatus.fraudDetection = fraudTest.success;
-            if (!fraudTest.success) {
-                failedFeatures.push('fraudDetection');
-                healthStatus.errorDetails.fraudDetection = fraudTest.error || 'Fraud detection test failed';
-                updateHealthCheckFeatureStatus('fraud', 'fail', fraudTest.error);
-            } else {
-                updateHealthCheckFeatureStatus('fraud', 'pass');
-            }
-            console.log('🛡️ [HEALTH-CHECK] Fraud detection test:', fraudTest.success ? '✅ PASS' : '❌ FAIL');
-        } catch (error) {
-            failedFeatures.push('fraudDetection');
-            healthStatus.errorDetails.fraudDetection = error.message;
-            updateHealthCheckFeatureStatus('fraud', 'fail', error.message);
-            console.error('🛡️ [HEALTH-CHECK] Fraud detection test failed:', error);
-        }
-        
-        // Test 5: Database Connection
-        updateHealthCheckProgress('Testing database connection...', 100);
         updateHealthCheckFeatureStatus('database', 'testing');
-        try {
-            const dbTest = await ipcRenderer.invoke('test-database-connection');
-            healthStatus.databaseConnection = dbTest.success;
-            if (!dbTest.success) {
-                failedFeatures.push('databaseConnection');
-                healthStatus.errorDetails.databaseConnection = dbTest.error || 'Database connection test failed';
-                updateHealthCheckFeatureStatus('database', 'fail', dbTest.error);
+        
+        // Run all tests simultaneously
+        const [screenshotTest, urlTest, appTest, fraudTest, dbTest] = await Promise.all([
+            ipcRenderer.invoke('test-screenshot-capability').catch(err => ({ success: false, error: err.message })),
+            ipcRenderer.invoke('test-url-detection').catch(err => ({ success: false, error: err.message })),
+            ipcRenderer.invoke('test-app-detection').catch(err => ({ success: false, error: err.message })),
+            ipcRenderer.invoke('test-fraud-detection').catch(err => ({ success: false, error: err.message })),
+            ipcRenderer.invoke('test-database-connection').catch(err => ({ success: false, error: err.message }))
+        ]);
+        
+        // Process results
+        const tests = [
+            { name: 'screenshots', test: screenshotTest, id: 'screenshot', icon: '📸' },
+            { name: 'urlDetection', test: urlTest, id: 'url', icon: '🌐' },
+            { name: 'appDetection', test: appTest, id: 'app', icon: '🖥️' },
+            { name: 'fraudDetection', test: fraudTest, id: 'fraud', icon: '🛡️' },
+            { name: 'databaseConnection', test: dbTest, id: 'database', icon: '💾' }
+        ];
+        
+        tests.forEach(({ name, test, id, icon }) => {
+            healthStatus[name] = test.success;
+            if (!test.success) {
+                failedFeatures.push(name);
+                healthStatus.errorDetails[name] = test.error || `${name} test failed`;
+                updateHealthCheckFeatureStatus(id, 'fail', test.error);
             } else {
-                updateHealthCheckFeatureStatus('database', 'pass');
+                updateHealthCheckFeatureStatus(id, 'pass');
             }
-            console.log('💾 [HEALTH-CHECK] Database test:', dbTest.success ? '✅ PASS' : '❌ FAIL');
-        } catch (error) {
-            failedFeatures.push('databaseConnection');
-            healthStatus.errorDetails.databaseConnection = error.message;
-            updateHealthCheckFeatureStatus('database', 'fail', error.message);
-            console.error('💾 [HEALTH-CHECK] Database test failed:', error);
-        }
+            console.log(`${icon} [HEALTH-CHECK] ${name} test:`, test.success ? '✅ PASS' : '❌ FAIL');
+        });
         
         const isHealthy = failedFeatures.length === 0;
         const criticalFeatures = ['databaseConnection'];
@@ -2192,7 +2136,7 @@ async function performComprehensiveHealthCheck() {
             errorCount: Object.keys(healthStatus.errorDetails).length
         });
         
-        // Show final results for at least 3 seconds
+        // Show final results - quick display
         updateHealthCheckProgress(
             isHealthy ? 
                 '✅ All systems working perfectly!' : 
@@ -2200,8 +2144,8 @@ async function performComprehensiveHealthCheck() {
             100
         );
         
-        // Keep modal open longer to show results
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Quick display of results before closing
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Close modal after showing results
         hideHealthCheckModal();
@@ -2217,8 +2161,8 @@ async function performComprehensiveHealthCheck() {
         console.error('❌ [HEALTH-CHECK] Comprehensive check failed:', error);
         updateHealthCheckProgress('❌ Health check system failed: ' + error.message, 100);
         
-        // Keep modal open to show error, then close
-        await new Promise(resolve => setTimeout(resolve, 4000));
+        // Brief display of error before closing
+        await new Promise(resolve => setTimeout(resolve, 1000));
         hideHealthCheckModal();
         
         return {
@@ -2634,7 +2578,7 @@ function showPermissionFixDialog() {
                 Permissions Required
             </h3>
             <p style="color: #64748b; font-size: 16px; line-height: 1.5; margin-bottom: 24px;">
-                TimeFlow needs additional permissions to track apps and URLs. Please follow these steps:
+                Ebdaa Work Time needs additional permissions to track apps and URLs. Please follow these steps:
             </p>
             <div style="text-align: left; background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
                 <div style="margin-bottom: 12px;">

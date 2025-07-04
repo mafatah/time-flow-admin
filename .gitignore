@@ -1,130 +1,122 @@
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local  
+.env.production.local
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+out/
+*.tgz
+*.tar.gz
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
 # Logs
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-.env
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-build/
-
-# Build artifacts and releases
-releases/
-local-builds/
-
-# Desktop app binaries
-public/downloads/*.dmg
-public/downloads/*.exe
-public/downloads/*.AppImage
-dist/
-
-# dependencies
-node_modules
-.pnp
-.pnp.js
-
-# testing
-coverage
-
-# production
-build
-dist
-
-# misc
-.DS_Store
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Electron
-/out/
-/dist_electron/
 
 # Temporary folders
 tmp/
 temp/
 
-# Code signing and certificates (SENSITIVE - DO NOT COMMIT)
-.env.signing
-build/code-signing-cert.p12
-build/AuthKey.p8
-build/*.p12
-build/*.p8
-*.p12
-*.p8
-AuthKey_*.p8
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
 
-# Apple Developer certificates
-*.cer
-*.certSigningRequest
-*.mobileprovision
+# Dependency directories
+node_modules/
+jspm_packages/
 
-# Windows code signing
-*.pfx
+# Optional npm cache directory
+.npm
 
-# Notarization logs
-*notarization*.log
-notarization-*.log
+# Optional eslint cache
+.eslintcache
 
-# Local test files
-test-*
-debug-*
-check-*
-.vercel
+# Optional REPL history
+.node_repl_history
 
+# Output of 'npm pack'
+*.tgz
 
-# Security - Environment Variables
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
 .env
-.env.local
-.env.production
-.env.*.local
+.env.test
 
-# Security - Credentials
-*.pem
-*.key
-credentials.json
-config-with-credentials.json
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
 
-# Security - Desktop Agent Environment Files
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# rollup.js default build output
+dist/
+
+# Uncomment the public line in if the project holds assets meant for production
+# public
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Desktop agent specific
+desktop-agent/node_modules/
+desktop-agent/dist/
 desktop-agent/.env
-desktop-agent/env-config.js
+desktop-agent/.env.local
 
-# Security - Build Environment Files (Contains embedded credentials)
-build/electron/electron/env-config.js
-build/**/env-config.js
-
-# Development Scripts with Credentials
-temp_env_source.js
-setup-idle-logs-remote.js
-create-idle-logs-table.js# Exclude release binaries from git
-TimeFlow-v*.dmg
-TimeFlow-v*.exe
-TimeFlow-v*.AppImage
-*.dmg
-*.exe
-*.AppImage
+# Sensitive credential files  
+desktop-agent/env-config.production.js
+.env.signing
+.env.production

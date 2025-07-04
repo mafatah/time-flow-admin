@@ -7,10 +7,16 @@ set -e
 echo "🚀 Starting Automated Release v1.0.41"
 
 # Configuration
-APPLE_ID="${APPLE_ID:-alshqawe66@gmail.com}"
-APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD:-icmi-tdzi-ydvi-lszi}"
-APPLE_TEAM_ID="${APPLE_TEAM_ID:-6GW49LK9V9}"
-GITHUB_TOKEN="${GITHUB_TOKEN:-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}"
+# Load from environment variables - DO NOT COMMIT HARDCODED VALUES
+if [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ] || [ -z "$GITHUB_TOKEN" ]; then
+    echo -e "${RED}❌ ERROR: Missing required environment variables${NC}"
+    echo "Please set the following environment variables:"
+    echo "  - APPLE_ID"
+    echo "  - APPLE_APP_SPECIFIC_PASSWORD"
+    echo "  - APPLE_TEAM_ID"
+    echo "  - GITHUB_TOKEN"
+    exit 1
+fi
 
 # Export credentials for electron-builder
 export APPLE_ID

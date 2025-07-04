@@ -9,7 +9,8 @@ let movementCount = 0;
 function checkActivity() {
   try {
     // Get mouse position
-    const pos = execSync('./electron/get_mouse_pos', { encoding: 'utf8' }).trim().split(',');
+    // Mouse position test removed - electron directory no longer available
+// const pos = execSync('./electron/get_mouse_pos', { encoding: 'utf8' }).trim().split(',');
     const currentX = parseInt(pos[0]);
     const currentY = parseInt(pos[1]);
     

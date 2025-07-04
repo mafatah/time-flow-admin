@@ -21,8 +21,12 @@ DOWNLOADS_DIR="public/downloads"
 
 # Set up environment variables for Apple signing and notarization
 echo -e "${BLUE}🔐 Setting up Apple credentials...${NC}"
-export APPLE_ID="alshqawe66@gmail.com"
-export APPLE_APP_SPECIFIC_PASSWORD="icmi-tdzi-ydvi-lszi"
+# Load from environment variables - DO NOT COMMIT HARDCODED VALUES
+if [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ]; then
+    echo -e "${RED}❌ ERROR: Missing Apple credentials${NC}"
+    echo "Please set APPLE_ID and APPLE_APP_SPECIFIC_PASSWORD environment variables"
+    exit 1
+fi
 export APPLE_TEAM_ID="6GW49LK9V9"
 
 # Verify GitHub CLI is authenticated (using existing auth)

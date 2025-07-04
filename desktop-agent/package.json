@@ -1,9 +1,9 @@
 {
-  "name": "timeflow-desktop-agent",
-  "version": "1.0.31",
-  "description": "TimeFlow Desktop Agent - Employee time tracking and productivity monitoring",
+  "name": "ebdaa-work-time-agent",
+  "version": "1.0.45",
+  "description": "Ebdaa Work Time Agent - Employee time tracking and productivity monitoring",
   "main": "src/main.js",
-  "author": "TimeFlow Team",
+  "author": "Ebdaa Digital Technology",
   "scripts": {
     "start": "electron .",
     "electron": "electron .",
@@ -28,8 +28,8 @@
     "electron-rebuild": "^3.2.9"
   },
   "build": {
-    "appId": "com.timeflow.desktop-agent",
-    "productName": "TimeFlow Agent",
+    "appId": "com.ebdaa.work-time-agent",
+    "productName": "Ebdaa Work Time",
     "directories": {
       "output": "dist"
     },
@@ -47,7 +47,11 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "assets/icon.png",
-      "identity": null,
+      "identity": "Ebdaa Digital Technology (6GW49LK9V9)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
       "target": [
         {
           "target": "dmg",
@@ -55,14 +59,16 @@
         }
       ],
       "extendInfo": {
-        "NSCameraUsageDescription": "TimeFlow needs camera access for screenshot monitoring",
-        "NSMicrophoneUsageDescription": "TimeFlow needs microphone access for activity detection",
-        "NSScreenCaptureDescription": "TimeFlow needs screen recording permission for productivity monitoring"
+        "NSCameraUsageDescription": "Ebdaa Work Time needs camera access for screenshot monitoring",
+        "NSMicrophoneUsageDescription": "Ebdaa Work Time needs microphone access for activity detection",
+        "NSScreenCaptureDescription": "Ebdaa Work Time needs screen recording permission for productivity monitoring",
+        "NSAccessibilityUsageDescription": "Ebdaa Work Time needs accessibility permission for activity monitoring"
       }
     },
     "dmg": {
-      "title": "TimeFlow Agent v${version}",
+      "title": "Install Ebdaa Work Time v${version}",
       "icon": "assets/icon.png",
+      "background": null,
       "window": {
         "width": 540,
         "height": 380
