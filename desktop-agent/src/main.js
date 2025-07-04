@@ -478,6 +478,7 @@ function createWindow() {
   mainWindow.on('minimize', () => {
     mainWindow.hide();
     showTrayNotification('Ebdaa Time continues tracking in background');
+    console.log('📱 Window minimized and hidden - use tray or dock icon to restore');
   });
 
   mainWindow.on('close', (event) => {
@@ -485,6 +486,10 @@ function createWindow() {
       event.preventDefault();
       mainWindow.hide();
       showTrayNotification('Ebdaa Work Time continues tracking in background');
+      console.log('📱 Window hidden (tracking active) - use tray or dock icon to restore');
+    } else {
+      // Allow close when not tracking
+      console.log('📱 Window closed (tracking inactive)');
     }
   });
 
@@ -535,6 +540,23 @@ function createDebugWindow() {
 function createTray() {
   const iconPath = path.join(__dirname, '../assets/tray-icon.png');
   tray = new Tray(iconPath);
+  
+  // Add double-click handler to show window (same as dock icon)
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.show();
+      mainWindow.focus();
+      
+      if (process.platform === 'darwin') {
+        app.focus();
+      }
+      
+      console.log('📱 Window activated from tray double-click');
+    }
+  });
   
   updateTrayMenu();
 }
@@ -3508,8 +3530,13 @@ if (isElectronContext && app) {
         if (mainWindow.isMinimized()) {
           mainWindow.restore();
         }
-        mainWindow.focus();
         mainWindow.show();
+        mainWindow.focus();
+        
+        // Ensure window is brought to front on all platforms
+        if (process.platform === 'darwin') {
+          app.focus();
+        }
         
         // Show notification that desktop agent is already running
         try {
@@ -3666,7 +3693,19 @@ app.on('before-quit', async () => {
 
 app.on('activate', () => {
   if (mainWindow) {
+    // Properly restore window when dock/taskbar icon is clicked
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
     mainWindow.show();
+    mainWindow.focus();
+    
+    // Ensure window is brought to front on all platforms
+    if (process.platform === 'darwin') {
+      app.focus();
+    }
+    
+    console.log('📱 Window activated from dock/taskbar click');
   }
 });
 
