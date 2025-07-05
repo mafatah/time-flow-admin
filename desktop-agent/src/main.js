@@ -537,170 +537,228 @@ function createDebugWindow() {
   return debugWindow;
 }
 
+// === PERFORMANCE OPTIMIZED EVENT HANDLING ===
+const EVENT_DEBOUNCE_MS = 200;
+let lastEventTime = 0;
+let eventDebounceTimeouts = new Map();
+
+function debounceEvent(eventName, handler, delay = EVENT_DEBOUNCE_MS) {
+  return function(...args) {
+    const now = Date.now();
+    
+    // Clear any existing timeout for this event
+    if (eventDebounceTimeouts.has(eventName)) {
+      clearTimeout(eventDebounceTimeouts.get(eventName));
+    }
+    
+    // Only execute if enough time has passed OR this is the first event
+    if (now - lastEventTime > delay) {
+      lastEventTime = now;
+      handler.apply(this, args);
+    } else {
+      // Schedule execution for later
+      const timeoutId = setTimeout(() => {
+        lastEventTime = Date.now();
+        handler.apply(this, args);
+        eventDebounceTimeouts.delete(eventName);
+      }, delay);
+      eventDebounceTimeouts.set(eventName, timeoutId);
+    }
+  };
+}
+
 function createTray() {
   const iconPath = path.join(__dirname, '../assets/tray-icon.png');
   tray = new Tray(iconPath);
   
-  // Add double-click handler to show window (same as dock icon)
-  tray.on('double-click', () => {
+  // PERFORMANCE FIX: Debounced double-click handler to prevent Apple Events loop
+  const debouncedDoubleClick = debounceEvent('tray-double-click', () => {
     if (mainWindow) {
-      if (mainWindow.isMinimized()) {
-        mainWindow.restore();
-      }
-      mainWindow.show();
-      mainWindow.focus();
+      console.log('📱 Tray double-click (debounced)');
       
-      if (process.platform === 'darwin') {
-        app.focus();
+      try {
+        if (mainWindow.isMinimized()) {
+          mainWindow.restore();
+        }
+        mainWindow.show();
+        mainWindow.focus();
+        
+        if (process.platform === 'darwin') {
+          app.focus();
+        }
+        
+        console.log('📱 Window activated from tray double-click');
+      } catch (error) {
+        console.error('❌ Error in tray double-click:', error);
       }
-      
-      console.log('📱 Window activated from tray double-click');
     }
   });
   
-  updateTrayMenu();
+  tray.on('double-click', debouncedDoubleClick);
+  
+  // PERFORMANCE FIX: Throttled tray menu updates
+  updateTrayMenuThrottled();
+}
+
+// === PERFORMANCE OPTIMIZED TRAY MENU UPDATES ===
+let trayUpdateTimeout = null;
+const TRAY_UPDATE_THROTTLE_MS = 500;
+
+function updateTrayMenuThrottled() {
+  if (trayUpdateTimeout) {
+    clearTimeout(trayUpdateTimeout);
+  }
+  
+  trayUpdateTimeout = setTimeout(() => {
+    updateTrayMenu();
+  }, TRAY_UPDATE_THROTTLE_MS);
 }
 
 function updateTrayMenu() {
   if (!tray) return;
 
-  const isCurrentlyTracking = isTracking && !isPaused;
-  const isPausing = isTracking && isPaused;
+  try {
+    const isCurrentlyTracking = isTracking && !isPaused;
+    const isPausing = isTracking && isPaused;
 
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: `Ebdaa Work Time Agent`,
-      enabled: false
-    },
-    { type: 'separator' },
-    {
-      label: `Status: ${isCurrentlyTracking ? '🟢 Tracking' : isPausing ? '⏸️ Paused' : '⭕ Stopped'}`,
-      enabled: false
-    },
-    {
-      label: currentSession ? `Project: ${currentSession.project_id || 'Unknown'}` : 'No active project',
-      enabled: false
-    },
-    { type: 'separator' },
-    {
-      label: '▶️ Start Tracking',
-      enabled: !isTracking,
-      click: async () => {
-        try {
-          // Check if project is selected
-          if (!config.project_id) {
-            // Show project selection requirement
-            if (mainWindow) {
-              mainWindow.focus();
-              mainWindow.webContents.send('show-project-selection-required');
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: `Ebdaa Work Time Agent`,
+        enabled: false
+      },
+      { type: 'separator' },
+      {
+        label: `Status: ${isCurrentlyTracking ? '🟢 Tracking' : isPausing ? '⏸️ Paused' : '⭕ Stopped'}`,
+        enabled: false
+      },
+      {
+        label: currentSession ? `Project: ${currentSession.project_id || 'Unknown'}` : 'No active project',
+        enabled: false
+      },
+      { type: 'separator' },
+      {
+        label: '▶️ Start Tracking',
+        enabled: !isTracking,
+        click: debounceEvent('start-tracking', async () => {
+          try {
+            // Check if project is selected
+            if (!config.project_id) {
+              // Show project selection requirement
+              if (mainWindow) {
+                mainWindow.focus();
+                mainWindow.webContents.send('show-project-selection-required');
+              }
+              
+              new Notification({
+                title: 'Project Selection Required',
+                body: 'Please open the Ebdaa Work Time app and select a project before starting tracking from the menu bar.'
+              }).show();
+              
+              return;
             }
             
+            await startTracking(config.project_id);
+            console.log('✅ [TRAY] Tracking started from menu bar');
+          } catch (error) {
+            console.error('❌ [TRAY] Failed to start tracking:', error.message);
             new Notification({
-              title: 'Project Selection Required',
-              body: 'Please open the Ebdaa Work Time app and select a project before starting tracking from the menu bar.'
+              title: 'Failed to Start Tracking',
+              body: error.message
             }).show();
-            
-            return;
           }
-          
-          await startTracking(config.project_id);
-          console.log('✅ [TRAY] Tracking started from menu bar');
-        } catch (error) {
-          console.error('❌ [TRAY] Failed to start tracking:', error.message);
-          new Notification({
-            title: 'Failed to Start Tracking',
-            body: error.message
-          }).show();
-        }
+        })
+      },
+      {
+        label: '⏸️ Pause Tracking',
+        enabled: isCurrentlyTracking,
+        click: debounceEvent('pause-tracking', async () => {
+          try {
+            await pauseTracking('manual');
+            console.log('✅ [TRAY] Tracking paused from menu bar');
+          } catch (error) {
+            console.error('❌ [TRAY] Failed to pause tracking:', error);
+          }
+        })
+      },
+      {
+        label: '▶️ Resume Tracking',
+        enabled: isPausing,
+        click: debounceEvent('resume-tracking', async () => {
+          try {
+            await resumeTracking();
+            console.log('✅ [TRAY] Tracking resumed from menu bar');
+          } catch (error) {
+            console.error('❌ [TRAY] Failed to resume tracking:', error);
+          }
+        })
+      },
+      {
+        label: '⏹️ Stop Tracking',
+        enabled: isTracking,
+        click: debounceEvent('stop-tracking', async () => {
+          try {
+            await stopTracking();
+            console.log('✅ [TRAY] Tracking stopped from menu bar');
+          } catch (error) {
+            console.error('❌ [TRAY] Failed to stop tracking:', error);
+          }
+        })
+      },
+      { type: 'separator' },
+      {
+        label: '📊 Open Dashboard',
+        click: debounceEvent('open-dashboard', () => {
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        })
+      },
+      {
+        label: '📋 Select Project',
+        click: debounceEvent('select-project', () => {
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+            mainWindow.webContents.send('navigate-to-time-tracker');
+          }
+        })
+      },
+      { type: 'separator' },
+      {
+        label: '🔬 Debug Console',
+        click: debounceEvent('debug-console', () => {
+          createDebugWindow();
+        })
+      },
+      {
+        label: '🔒 Enable Enhanced Features',
+        visible: process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted',
+        click: debounceEvent('enable-features', async () => {
+          console.log('🔒 Manual permission request from tray menu');
+          permissionDialogShown = false; // Reset to allow dialog
+          await checkMacScreenPermissions();
+        })
+      },
+      { type: 'separator' },
+      {
+        label: 'Quit',
+        click: debounceEvent('quit', () => {
+          app.quit();
+        })
       }
-    },
-    {
-      label: '⏸️ Pause Tracking',
-      enabled: isCurrentlyTracking,
-      click: async () => {
-        try {
-          await pauseTracking('manual');
-          console.log('✅ [TRAY] Tracking paused from menu bar');
-        } catch (error) {
-          console.error('❌ [TRAY] Failed to pause tracking:', error);
-        }
-      }
-    },
-    {
-      label: '▶️ Resume Tracking',
-      enabled: isPausing,
-      click: async () => {
-        try {
-          await resumeTracking();
-          console.log('✅ [TRAY] Tracking resumed from menu bar');
-        } catch (error) {
-          console.error('❌ [TRAY] Failed to resume tracking:', error);
-        }
-      }
-    },
-    {
-      label: '⏹️ Stop Tracking',
-      enabled: isTracking,
-      click: async () => {
-        try {
-          await stopTracking();
-          console.log('✅ [TRAY] Tracking stopped from menu bar');
-        } catch (error) {
-          console.error('❌ [TRAY] Failed to stop tracking:', error);
-        }
-      }
-    },
-    { type: 'separator' },
-    {
-      label: '📊 Open Dashboard',
-      click: () => {
-        if (mainWindow) {
-          mainWindow.show();
-          mainWindow.focus();
-        }
-      }
-    },
-    {
-      label: '📋 Select Project',
-      click: () => {
-        if (mainWindow) {
-          mainWindow.show();
-          mainWindow.focus();
-          mainWindow.webContents.send('navigate-to-time-tracker');
-        }
-      }
-    },
-    { type: 'separator' },
-    {
-      label: '🔬 Debug Console',
-      click: () => {
-        createDebugWindow();
-      }
-    },
-    {
-      label: '🔒 Enable Enhanced Features',
-      visible: process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted',
-      click: async () => {
-        console.log('🔒 Manual permission request from tray menu');
-        permissionDialogShown = false; // Reset to allow dialog
-        await checkMacScreenPermissions();
-      }
-    },
-    { type: 'separator' },
-    {
-      label: 'Quit',
-      click: () => {
-        app.quit();
-      }
-    }
-  ]);
+    ]);
 
-  tray.setContextMenu(contextMenu);
-  
-  // Update tray tooltip with current status
-  const tooltipStatus = isCurrentlyTracking ? 'Tracking' : isPausing ? 'Paused' : 'Stopped';
-  const projectInfo = currentSession ? ` - ${currentSession.project_id}` : '';
-  tray.setToolTip(`Ebdaa Work Time: ${tooltipStatus}${projectInfo}`);
+    tray.setContextMenu(contextMenu);
+    
+    // Update tray tooltip with current status (throttled)
+    const tooltipStatus = isCurrentlyTracking ? 'Tracking' : isPausing ? 'Paused' : 'Stopped';
+    const projectInfo = currentSession ? ` - ${currentSession.project_id}` : '';
+    tray.setToolTip(`Ebdaa Work Time: ${tooltipStatus}${projectInfo}`);
+    
+  } catch (error) {
+    console.error('❌ Error updating tray menu:', error);
+  }
 }
 
 // === ITEM 6: SETTINGS PULL ===
@@ -2582,7 +2640,7 @@ async function captureScreenshot() {
       }
       
       // Update tray to reflect stopped state
-      updateTrayMenu();
+      updateTrayMenuThrottled();
     }
     
     return false; // Failure
@@ -3030,7 +3088,7 @@ async function startTracking(projectId = null) {
     startMandatoryScreenshotMonitoring();
 
     // Update tray
-    updateTrayMenu();
+    updateTrayMenuThrottled();
     
     // Update UI
     mainWindow?.webContents.send('tracking-started', currentSession);
@@ -3183,7 +3241,7 @@ async function stopTracking() {
   }
 
   // Update tray
-  updateTrayMenu();
+  updateTrayMenuThrottled();
   
   // Update UI
   mainWindow?.webContents.send('tracking-stopped');
@@ -3521,48 +3579,44 @@ if (isElectronContext && app) {
   } else {
     console.log('✅ Single instance lock acquired - proceeding with Desktop Agent startup');
 
-    // Handle when someone tries to run a second desktop agent instance
-    app.on('second-instance', (event, commandLine, workingDirectory) => {
-      console.log('🔔 Second Desktop Agent instance detected - focusing existing window');
+    // PERFORMANCE FIX: Debounced second-instance handler to prevent Apple Events loop
+    app.on('second-instance', debounceEvent('second-instance', (event, commandLine, workingDirectory) => {
+      console.log('🔔 Second Desktop Agent instance detected (debounced)');
       
-      // Focus the existing window if it exists
-      if (mainWindow) {
-        if (mainWindow.isMinimized()) {
-          mainWindow.restore();
-        }
-        mainWindow.show();
-        mainWindow.focus();
-        
-        // Ensure window is brought to front on all platforms
-        if (process.platform === 'darwin') {
-          app.focus();
-        }
-        
-        // Show notification that desktop agent is already running
-        try {
+      try {
+        // Focus the existing window if it exists
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) {
+            mainWindow.restore();
+          }
+          mainWindow.show();
+          mainWindow.focus();
+          
+          // Ensure window is brought to front on all platforms
+          if (process.platform === 'darwin') {
+            app.focus();
+          }
+          
+          // Show notification that desktop agent is already running
           const notification = new Notification({
             title: 'Ebdaa Work Time Agent',
             body: 'Desktop Agent is already running and has been brought to the front.',
             silent: false
           });
           notification.show();
-        } catch (error) {
-          console.log('Could not show second instance notification:', error);
-        }
-      } else if (tray) {
-        // If no window but tray exists, show notification
-        try {
+        } else if (tray) {
+          // If no window but tray exists, show notification
           const notification = new Notification({
             title: 'Ebdaa Work Time Agent',
             body: 'Desktop Agent is already running in the system tray.',
             silent: false
           });
           notification.show();
-        } catch (error) {
-          console.log('Could not show tray notification:', error);
         }
+      } catch (error) {
+        console.error('❌ Error in second instance handler:', error);
       }
-    });
+    }));
   }
 
   app.whenReady().then(async () => {
@@ -3625,6 +3679,32 @@ if (isElectronContext && app) {
   globalShortcut.register('CommandOrControl+Shift+D', () => {
     createDebugWindow();
   });
+  
+  // === PERFORMANCE MONITORING ===
+  startPerformanceMonitoring();
+  
+// === PERFORMANCE MONITORING FUNCTION ===
+function startPerformanceMonitoring() {
+  const PERFORMANCE_CHECK_INTERVAL = 30000; // 30 seconds
+  
+  setInterval(() => {
+    const usage = process.memoryUsage();
+    const memoryMB = Math.round(usage.heapUsed / 1024 / 1024);
+    
+    console.log(`📊 Memory usage: ${memoryMB}MB`);
+    
+    // Alert if memory usage is excessive
+    if (memoryMB > 500) {
+      console.warn('⚠️ High memory usage detected:', memoryMB + 'MB');
+      
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+        console.log('🧹 Garbage collection forced');
+      }
+    }
+  }, PERFORMANCE_CHECK_INTERVAL);
+}
 
   // Register global permission request shortcut (Ctrl+Shift+P or Cmd+Shift+P)
   globalShortcut.register('CommandOrControl+Shift+P', async () => {
@@ -3691,23 +3771,30 @@ app.on('before-quit', async () => {
   console.log('✅ Aggressive cleanup completed');
 });
 
-app.on('activate', () => {
+// PERFORMANCE FIX: Debounced activate event to prevent Apple Events loop
+app.on('activate', debounceEvent('app-activate', () => {
   if (mainWindow) {
-    // Properly restore window when dock/taskbar icon is clicked
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore();
-    }
-    mainWindow.show();
-    mainWindow.focus();
+    console.log('📱 App activate event (debounced)');
     
-    // Ensure window is brought to front on all platforms
-    if (process.platform === 'darwin') {
-      app.focus();
+    try {
+      // Properly restore window when dock/taskbar icon is clicked
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.show();
+      mainWindow.focus();
+      
+      // Ensure window is brought to front on all platforms
+      if (process.platform === 'darwin') {
+        app.focus();
+      }
+      
+      console.log('📱 Window activated from dock/taskbar click');
+    } catch (error) {
+      console.error('❌ Error in activate event:', error);
     }
-    
-    console.log('📱 Window activated from dock/taskbar click');
   }
-});
+}));
 
 // === ENHANCED POWER MONITORING ===
 powerMonitor.on('suspend', () => {
@@ -3749,7 +3836,7 @@ powerMonitor.on('resume', () => {
   );
   
   // Update tray to reflect stopped state
-  updateTrayMenu();
+  updateTrayMenuThrottled();
   
   systemSleepStart = null;
 });
