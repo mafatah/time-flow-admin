@@ -294,8 +294,8 @@ export class EmailReportsService {
     } 
     
     if (config.template_type === 'weekly') {
-      const startOfLastWeek = startOfWeek(subDays(today, 7), { weekStartsOn: 1 });
-      const endOfLastWeek = endOfWeek(subDays(today, 7), { weekStartsOn: 1 });
+          const startOfLastWeek = startOfWeek(subDays(today, 7), { weekStartsOn: 0 });
+    const endOfLastWeek = endOfWeek(subDays(today, 7), { weekStartsOn: 0 });
       
       const employees = await this.getWeeklyEmployeeData(startOfLastWeek, endOfLastWeek, config);
       

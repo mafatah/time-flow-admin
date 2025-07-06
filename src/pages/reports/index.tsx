@@ -73,8 +73,8 @@ export default function ReportsPage() {
           startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
           break;
         case "week":
-          startDate = startOfWeek(now, { weekStartsOn: 1 });
-          endDate = endOfWeek(now, { weekStartsOn: 1 });
+                  startDate = startOfWeek(now, { weekStartsOn: 0 });
+        endDate = endOfWeek(now, { weekStartsOn: 0 });
           break;
         case "month":
           startDate = startOfMonth(now);

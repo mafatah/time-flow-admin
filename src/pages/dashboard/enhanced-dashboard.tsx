@@ -83,7 +83,7 @@ export function EnhancedDashboard() {
         const yesterday = subDays(now, 1);
         return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
       case 'week':
-        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+        return { start: startOfWeek(now, { weekStartsOn: 0 }), end: endOfWeek(now, { weekStartsOn: 0 }) };
       case 'month':
         return { start: startOfDay(subDays(now, 30)), end: endOfDay(now) };
       default:
