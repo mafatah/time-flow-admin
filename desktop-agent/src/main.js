@@ -477,9 +477,11 @@ function createWindow() {
     icon: path.join(__dirname, '../assets/icon.png'),
           title: 'Ebdaa Work Time - Employee Portal',
     resizable: true,
-    show: false,
+    show: true,
     minWidth: 800,
-    minHeight: 600
+    minHeight: 600,
+    center: true,
+    alwaysOnTop: false
   });
 
   mainWindow.setMenuBarVisibility(false);
@@ -487,8 +489,21 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    console.log('✅ Ebdaa Work Time Agent ready');
+    mainWindow.focus();
+    if (process.platform === 'darwin') {
+      app.focus();
+    }
+    console.log('✅ Ebdaa Work Time Agent ready and visible');
   });
+
+  // Force show the window after a short delay
+  setTimeout(() => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+      console.log('🔄 Window forced to show');
+    }
+  }, 2000);
 
   // Handle window events
   mainWindow.on('minimize', () => {

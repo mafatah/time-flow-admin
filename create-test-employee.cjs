@@ -1,20 +1,22 @@
-require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
+const config = require('./env-config.cjs');
 
-const supabaseUrl = 'process.env.VITE_SUPABASE_URL';
-const supabaseKey = 'process.env.VITE_SUPABASE_ANON_KEY';
-
-
-// Environment variable validation
-if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_ANON_KEY) {
-  console.error('❌ Missing required environment variables:');
-  console.error('   - VITE_SUPABASE_URL');
-  console.error('   - VITE_SUPABASE_ANON_KEY');
-  console.error('Please check your .env file.');
+// Configuration validation
+if (!config.supabase_url || !config.supabase_key) {
+  console.error('❌ Missing required configuration:');
+  console.error('   - supabase_url');
+  console.error('   - supabase_key');
+  console.error('Please run: node generate-env-config.cjs');
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+console.log('🔧 Using configuration:', {
+  hasUrl: !!config.supabase_url,
+  hasKey: !!config.supabase_key,
+  urlPreview: config.supabase_url ? config.supabase_url.substring(0, 30) + '...' : 'None'
+});
+
+const supabase = createClient(config.supabase_url, config.supabase_key);
 
 async function createTestEmployee() {
   console.log('👤 Creating test employee user...');
