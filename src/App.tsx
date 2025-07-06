@@ -36,6 +36,7 @@ import TimeLogsPage from '@/pages/time-logs';
 import EmployeeSettingsPage from '@/pages/employee-settings';
 import FinancePage from '@/pages/finance';
 import SuspiciousActivityPage from '@/pages/suspicious-activity';
+import AIAnalysisPage from '@/pages/ai-analysis';
 import EmailReportsPage from '@/pages/admin/email-reports';
 import AdminScreenshotsPage from '@/pages/admin/screenshots';
 import AdminIdleLogsPage from '@/pages/admin/idle-logs';
@@ -452,11 +453,16 @@ function AppRoutes() {
         </AdminLayoutWrapper>
       } />
       
-      <Route path="/suspicious-activity" element={
-        <AdminLayoutWrapper routeName="suspicious-activity">
-          <SuspiciousActivityPage />
-        </AdminLayoutWrapper>
-      } />
+                  <Route path="/suspicious-activity" element={
+              <AdminLayoutWrapper routeName="suspicious-activity">
+                <SuspiciousActivityPage />
+              </AdminLayoutWrapper>
+            } />
+            <Route path="/ai-analysis" element={
+              <AdminLayoutWrapper routeName="ai-analysis">
+                <AIAnalysisPage />
+              </AdminLayoutWrapper>
+            } />
       
       <Route path="/admin" element={
         <AdminLayoutWrapper routeName="admin">

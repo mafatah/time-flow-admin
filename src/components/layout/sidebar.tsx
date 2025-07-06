@@ -175,6 +175,12 @@ const Sidebar = () => {
           href: "/suspicious-activity",
           icon: AlertTriangle,
           description: "Security alerts"
+        },
+        {
+          title: "AI Analysis",
+          href: "/ai-analysis",
+          icon: Shield,
+          description: "DeepSeek AI productivity analysis"
         }
       ]
     },
