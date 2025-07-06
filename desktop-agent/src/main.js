@@ -129,8 +129,29 @@ try {
 // Load configuration using our new environment variable loader
 const { loadConfig } = require('../load-config');
 let config;
+let supabase;
 try {
   config = loadConfig();
+  
+  // Initialize Supabase client with proper error handling
+  if (!config.supabase_url || !config.supabase_key) {
+    throw new Error('Missing required Supabase configuration');
+  }
+  
+  // Validate URL format
+  try {
+    new URL(config.supabase_url);
+  } catch (urlError) {
+    throw new Error(`Invalid Supabase URL format: ${config.supabase_url}`);
+  }
+  
+  // Initialize Supabase client - prioritize service key for admin operations
+  supabase = config.supabase_service_key ? 
+    createClient(config.supabase_url, config.supabase_service_key) :
+    createClient(config.supabase_url, config.supabase_key);
+    
+  console.log('✅ Supabase client initialized successfully');
+  
 } catch (error) {
   console.error('❌ Failed to load configuration:', error);
   
@@ -141,7 +162,7 @@ try {
       app.whenReady().then(() => {
         dialog.showErrorBox(
           'Configuration Error',
-          `Failed to load Supabase configuration:\n\n${error.message}\n\nPlease ensure the app has proper environment variables or contact support.`
+          `Failed to load Supabase configuration:\n\n${error.message}\n\nPlease ensure the app has proper environment variables or contact support.\n\nRequired:\n- VITE_SUPABASE_URL\n- VITE_SUPABASE_ANON_KEY`
         );
         app.quit();
       });
@@ -208,11 +229,6 @@ console.log('🎛️ Initializing performance optimization...');
 autoDetectPerformanceMode();
 console.log(`📊 Performance mode: ${getCurrentMode()}`);
 console.log('📋 Current intervals:', getAllIntervals());
-
-// Initialize Supabase client - prioritize service key for admin operations
-const supabase = config.supabase_service_key ? 
-  createClient(config.supabase_url, config.supabase_service_key) :
-  createClient(config.supabase_url, config.supabase_key);
 
 const supabaseService = supabase; // Use the same client
 console.log(`🔧 [DEBUG] Service key available: ${!!config.supabase_service_key}`);
@@ -814,7 +830,7 @@ function startIdleMonitoring() {
   
   // Initialize anti-cheat detector if enabled
   if (appSettings.enable_anti_cheat && !antiCheatDetector) {
-    antiCheatDetector = new AntiCheatDetector(appSettings);
+    antiCheatDetector = new AntiCheatDetector(appSettings, syncManager);
     antiCheatDetector.startMonitoring();
     console.log('🕵️  Anti-cheat detection enabled');
   }
@@ -3420,7 +3436,7 @@ ipcMain.handle('update-app-settings', (event, newSettings) => {
   // Restart anti-cheat detector with new settings
   if (antiCheatDetector && appSettings.enable_anti_cheat) {
     antiCheatDetector.stopMonitoring();
-    antiCheatDetector = new AntiCheatDetector(appSettings);
+    antiCheatDetector = new AntiCheatDetector(appSettings, syncManager);
     antiCheatDetector.startMonitoring();
   }
   
@@ -3635,7 +3651,7 @@ if (isElectronContext && app) {
   createWindow();
   
   // Initialize anti-cheat detector
-  antiCheatDetector = new AntiCheatDetector(config);
+  antiCheatDetector = new AntiCheatDetector(config, syncManager);
   
   // Fetch settings from server
   fetchSettings();
@@ -3824,7 +3840,7 @@ powerMonitor.on('resume', () => {
   // Restart anti-cheat monitoring
   if (appSettings.enable_anti_cheat) {
     if (!antiCheatDetector) {
-      antiCheatDetector = new AntiCheatDetector(appSettings);
+      antiCheatDetector = new AntiCheatDetector(appSettings, syncManager);
     }
     antiCheatDetector.startMonitoring();
   }
@@ -4954,7 +4970,7 @@ if (!isElectronContext) {
       
       // Initialize anti-cheat detector
       try {
-        antiCheatDetector = new AntiCheatDetector(appSettings);
+        antiCheatDetector = new AntiCheatDetector(appSettings, syncManager);
         console.log('✅ Anti-cheat detector initialized');
       } catch (error) {
         console.log('⚠️ Anti-cheat detector initialization failed:', error.message);

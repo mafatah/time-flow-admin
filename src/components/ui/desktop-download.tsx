@@ -123,7 +123,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     setDownloading(platform);
     
     // Use direct downloads for reliable access - Updated automatically by release pipeline
-          const currentVersion = "1.0.50"; // v1.0.45 - Complete Cross-Platform Release: 202506301430
+          const currentVersion = "1.0.52"; // v1.0.52 - Complete Cross-Platform Release: 202506301430
     const downloadFiles = {
       windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`,
       'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED
@@ -148,7 +148,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
       });
     }
     
-    // All platforms now available in v1.0.44
+    // All platforms now available in v1.0.52
 
     if (filePath) {
       try {
@@ -290,14 +290,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '115MB'; // TimeFlow-v1.0.44-ARM64.dmg (UPDATED for v1.0.44)
+        return '115MB'; // TimeFlow-v1.0.52-ARM64.dmg (UPDATED for v1.0.52)
       case 'mac-intel':
       case 'mac':
-        return '122MB'; // TimeFlow-v1.0.44-Intel.dmg (UPDATED for v1.0.44)
+        return '122MB'; // TimeFlow-v1.0.52-Intel.dmg (UPDATED for v1.0.52)
       case 'windows':
-        return '88MB'; // TimeFlow-v1.0.44-Setup.exe (UPDATED for v1.0.44)
+                                      return '88MB'; // TimeFlow-v1.0.52-Setup.exe (UPDATED for v1.0.52)
       case 'linux':
-        return '125MB'; // TimeFlow-v1.0.44-Linux.AppImage (UPDATED for v1.0.44)
+                                      return '125MB'; // TimeFlow-v1.0.52-Linux.AppImage (UPDATED for v1.0.52)
       default:
         return '';
     }
@@ -306,14 +306,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 115018830; // TimeFlow-v1.0.44-ARM64.dmg (UPDATED for v1.0.44)
+        return 115018830; // TimeFlow-v1.0.52-ARM64.dmg (UPDATED for v1.0.52)
       case 'mac-intel':
       case 'mac':
-        return 121495676; // TimeFlow-v1.0.44-Intel.dmg (UPDATED for v1.0.44)
+        return 121495676; // TimeFlow-v1.0.52-Intel.dmg (UPDATED for v1.0.52)
       case 'windows':
-        return 88187651; // TimeFlow-v1.0.44-Setup.exe (UPDATED for v1.0.44)
+                                      return 88187651; // TimeFlow-v1.0.52-Setup.exe (UPDATED for v1.0.52)
       case 'linux':
-        return 125424268; // TimeFlow-v1.0.44-Linux.AppImage (UPDATED for v1.0.44)
+                                      return 125424268; // TimeFlow-v1.0.52-Linux.AppImage (UPDATED for v1.0.52)
       default:
         return 0;
     }

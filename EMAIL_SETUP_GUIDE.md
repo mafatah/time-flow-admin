@@ -19,7 +19,7 @@
 
 ### ✅ 4. **Automated Reports Ready**
 - Complete automated reports system available
-- Daily reports at 7 PM, Weekly reports on Mondays at 9 AM
+- Daily reports at 7 PM, Weekly reports on Sundays at 9 AM
 
 ---
 
@@ -146,7 +146,7 @@ Users will receive email confirmations when:
 ### Automated Reports
 HR will receive:
 - **Daily Summary** (7 PM): Employee hours, activity %, alerts
-- **Weekly Summary** (Monday 9 AM): Week totals, recurring issues, patterns
+- **Weekly Summary** (Sunday 9 AM): Week totals, recurring issues, patterns
 
 ---
 

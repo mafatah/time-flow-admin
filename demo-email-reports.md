@@ -86,7 +86,7 @@ Each report can be configured to include/exclude:
 |---------------|----------------|-------------|
 | **Daily standup report** | `0 9 * * 1-5` | Weekdays at 9 AM |
 | **End-of-day summary** | `0 18 * * *` | Every day at 6 PM |
-| **Weekly team review** | `0 9 * * 1` | Monday mornings |
+| **Weekly team review** | `0 9 * * 0` | Sunday mornings |
 | **Monthly analysis** | `0 9 1 * *` | First of each month |
 | **Friday wrap-up** | `0 17 * * 5` | Fridays at 5 PM |
 

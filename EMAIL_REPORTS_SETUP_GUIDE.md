@@ -83,7 +83,7 @@ The system will automatically find admin users from your database, but you can a
 | Schedule | Cron Expression | Description |
 |----------|----------------|-------------|
 | Daily 7 PM | `0 19 * * *` | Every day at 7:00 PM |
-| Monday 9 AM | `0 9 * * 1` | Every Monday at 9:00 AM |
+| Sunday 9 AM | `0 9 * * 0` | Every Sunday at 9:00 AM |
 | Weekdays 6 PM | `0 18 * * 1-5` | Monday-Friday at 6:00 PM |
 | First of month | `0 9 1 * *` | 9 AM on the 1st of every month |
 

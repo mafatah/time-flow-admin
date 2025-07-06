@@ -44,7 +44,8 @@ class SyncManager {
       appLogs: [],
       urlLogs: [],
       idleLogs: [],
-      timeLogs: []
+      timeLogs: [],
+      fraudAlerts: []
     };
   }
 
@@ -260,6 +261,58 @@ class SyncManager {
     }
   }
 
+  // === FRAUD ALERTS HANDLING ===
+  async addFraudAlert(fraudAlert) {
+    const alertData = {
+      id: `fraud_alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      alert: fraudAlert,
+      timestamp: new Date().toISOString(),
+      retries: 0
+    };
+
+    if (this.isOnline) {
+      try {
+        await this.uploadFraudAlert(alertData);
+        console.log('✅ Fraud alert uploaded immediately');
+        return;
+      } catch (error) {
+        console.log('⚠️ Fraud alert upload failed, queuing for later');
+      }
+    }
+
+    // Add to queue
+    this.queue.fraudAlerts.push(alertData);
+    this.saveQueue();
+    console.log(`📦 Fraud alert queued (${this.queue.fraudAlerts.length} pending)`);
+  }
+
+  async uploadFraudAlert(alertData) {
+    const { alert } = alertData;
+    
+    // Transform the alert data to match database schema
+    const fraudAlertRecord = {
+      user_id: alert.userId,
+      time_log_id: alert.timeLogId || null,
+      alert_type: alert.type,
+      severity: alert.severity || 'HIGH',
+      risk_score: (alert.riskScore * 100), // Convert to percentage
+      confidence: (alert.confidence * 100) || 0,
+      suspicious_patterns: alert.suspiciousPatterns || [],
+      detection_details: alert.details || {},
+      behavior_analysis: alert.behaviorAnalysis || {},
+      screenshot_context: alert.screenshotContext || {},
+      activity_context: alert.activityContext || {},
+      system_context: alert.systemContext || {},
+      detected_at: new Date(alert.timestamp).toISOString()
+    };
+
+    const { error } = await this.supabaseService
+      .from('fraud_alerts')
+      .insert(fraudAlertRecord);
+
+    if (error) throw error;
+  }
+
   // === SYNC PROCESS ===
   startSyncProcess() {
     // Sync every 30 seconds
@@ -293,6 +346,9 @@ class SyncManager {
     
     // Sync time logs
     await this.syncTimeLogs();
+    
+    // Sync fraud alerts
+    await this.syncFraudAlerts();
 
     this.saveQueue();
   }
@@ -408,6 +464,28 @@ class SyncManager {
     }
   }
 
+  async syncFraudAlerts() {
+    const fraudAlerts = [...this.queue.fraudAlerts];
+    
+    for (let i = fraudAlerts.length - 1; i >= 0; i--) {
+      const alertData = fraudAlerts[i];
+      
+      try {
+        await this.uploadFraudAlert(alertData);
+        this.queue.fraudAlerts.splice(i, 1);
+        console.log('✅ Fraud alert synced');
+      } catch (error) {
+        alertData.retries++;
+        console.error(`❌ Fraud alert sync failed (retry ${alertData.retries}):`, error.message);
+        
+        if (alertData.retries >= 5) {
+          this.queue.fraudAlerts.splice(i, 1);
+          console.log('🗑️ Fraud alert removed after 5 failed attempts');
+        }
+      }
+    }
+  }
+
   // === CONNECTION MONITORING ===
   monitorConnection() {
     setInterval(async () => {
@@ -442,6 +520,7 @@ class SyncManager {
       urlLogs: this.queue.urlLogs.length,
       idleLogs: this.queue.idleLogs.length,
       timeLogs: this.queue.timeLogs.length,
+      fraudAlerts: this.queue.fraudAlerts.length,
       total: Object.values(this.queue).reduce((sum, arr) => sum + arr.length, 0),
       isOnline: this.isOnline
     };

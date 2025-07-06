@@ -17,6 +17,9 @@ let activityStats = {
     focusPercent: 100
 };
 
+// === UI PERFORMANCE OPTIMIZATION - CACHE DOM ELEMENTS ===
+let cachedElements = null;
+
 // === INITIALIZATION ===
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -667,9 +670,6 @@ async function handleQuickLogin() {
 }
 
 // === UI STATE MANAGEMENT - PERFORMANCE OPTIMIZED ===
-
-// Cache DOM elements for better performance
-let cachedElements = null;
 
 function validateCache() {
     if (!cachedElements) return false;

@@ -5,7 +5,7 @@
 The Time Flow automated email reporting system sends **two scheduled reports** to HR:
 
 1. **📅 Daily Report** - Every day at **7 PM**
-2. **📊 Weekly Report** - Every **Monday at 9 AM**
+2. **📊 Weekly Report** - Every **Sunday at 9 AM**
 
 Each report includes employee performance data and behavioral alerts, all consolidated into **one professional email**.
 
@@ -54,12 +54,12 @@ Each report includes employee performance data and behavioral alerts, all consol
 
 ---
 
-## 📈 Weekly Report (Monday 9 AM)
+## 📈 Weekly Report (Sunday 9 AM)
 
 ### 📧 Email Details
 - **Subject**: `📊 Weekly Performance Summary – [Start Date] – [End Date]`
 - **To**: `hr@yourdomain.com`
-- **Schedule**: `0 9 * * 1` (Every Monday at 9 AM)
+- **Schedule**: `0 9 * * 0` (Every Sunday at 9 AM)
 
 ### 📊 Content Sections
 
@@ -104,8 +104,8 @@ backend/src/reports/
 @Cron('0 19 * * *')
 async sendDailyReport() { ... }
 
-// Weekly Report - Every Monday at 9 AM  
-@Cron('0 9 * * 1')
+// Weekly Report - Every Sunday at 9 AM  
+@Cron('0 9 * * 0')
 async sendWeeklyReport() { ... }
 ```
 

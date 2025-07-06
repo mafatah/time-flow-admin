@@ -3,8 +3,9 @@
 const { powerMonitor } = require('electron');
 
 class AntiCheatDetector {
-  constructor(config) {
+  constructor(config, syncManager = null) {
     this.config = config;
+    this.syncManager = syncManager;
     this.activityHistory = [];
     this.mousePositions = [];
     this.keystrokes = [];
@@ -452,21 +453,70 @@ class AntiCheatDetector {
       timestamp: Date.now(),
       userId: this.config.user_id,
       riskScore: analysis.riskScore,
+      confidence: analysis.confidence || 0,
       details: analysis,
-      suspiciousPatterns: this.suspiciousPatterns.slice(-10) // Last 10 patterns
+      suspiciousPatterns: this.suspiciousPatterns.slice(-10), // Last 10 patterns
+      severity: analysis.riskScore > 0.7 ? 'CRITICAL' : 'HIGH',
+      behaviorAnalysis: analysis.behaviorProfile,
+      activityContext: {
+        totalEvents: this.activityHistory.length,
+        recentMouseMoves: this.recentMouseMoves.length,
+        recentKeyPresses: this.recentKeyPresses.length,
+        mouseClickCount: this.mouseClickTimestamps.length
+      },
+      systemContext: {
+        isMonitoring: this.isMonitoring,
+        patternWindow: this.PATTERN_WINDOW,
+        detectionThreshold: this.REPETITIVE_THRESHOLD
+      }
     };
     
-    // This would typically send to a fraud detection service
+    // Log for debugging
     console.log('🚨🚨🚨 FRAUD ALERT:', JSON.stringify(alert, null, 2));
     
-    // TODO: Send to monitoring service
-    // await this.sendFraudAlert(alert);
+    // Send to monitoring service via sync manager
+    if (this.syncManager) {
+      this.syncManager.addFraudAlert(alert);
+    } else {
+      console.warn('⚠️ Sync manager not available - fraud alert not transmitted');
+    }
   }
 
   logSuspiciousActivities(activities) {
     activities.forEach(activity => {
       this.suspiciousPatterns.push(activity);
       console.log(`🚨 Suspicious ${activity.type} detected (${activity.severity}):`, activity.details);
+      
+      // Send high and critical severity activities as fraud alerts
+      if (activity.severity === 'HIGH' || activity.severity === 'CRITICAL') {
+        const fraudAlert = {
+          type: activity.type,
+          timestamp: activity.timestamp,
+          userId: this.config.user_id,
+          riskScore: activity.details.riskScore || 0.5,
+          confidence: activity.details.confidence || 0,
+          details: activity.details,
+          suspiciousPatterns: [activity],
+          severity: activity.severity,
+          behaviorAnalysis: {},
+          activityContext: {
+            totalEvents: this.activityHistory.length,
+            recentMouseMoves: this.recentMouseMoves.length,
+            recentKeyPresses: this.recentKeyPresses.length,
+            mouseClickCount: this.mouseClickTimestamps.length
+          },
+          systemContext: {
+            isMonitoring: this.isMonitoring,
+            patternWindow: this.PATTERN_WINDOW,
+            detectionThreshold: this.REPETITIVE_THRESHOLD
+          }
+        };
+        
+        // Send to monitoring service via sync manager
+        if (this.syncManager) {
+          this.syncManager.addFraudAlert(fraudAlert);
+        }
+      }
     });
     
     // Keep only recent patterns
