@@ -65,8 +65,8 @@ export class AutomatedReportsService {
     
     try {
       const today = new Date();
-      const startOfLastWeek = startOfWeek(subDays(today, 7), { weekStartsOn: 1 });
-      const endOfLastWeek = endOfWeek(subDays(today, 7), { weekStartsOn: 1 });
+          const startOfLastWeek = startOfWeek(subDays(today, 7), { weekStartsOn: 0 });
+    const endOfLastWeek = endOfWeek(subDays(today, 7), { weekStartsOn: 0 });
 
       // Get employee performance data for last week
       const employees = await this.getWeeklyEmployeePerformance(startOfLastWeek, endOfLastWeek);

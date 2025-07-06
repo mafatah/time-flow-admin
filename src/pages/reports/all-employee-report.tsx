@@ -71,21 +71,21 @@ export default function AllEmployeeReport() {
         end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
         break;
       case "week":
-        start = startOfWeek(now, { weekStartsOn: 1 });
-        end = endOfWeek(now, { weekStartsOn: 1 });
+        start = startOfWeek(now, { weekStartsOn: 0 });
+        end = endOfWeek(now, { weekStartsOn: 0 });
         break;
       case "month":
         start = startOfMonth(now);
         end = endOfMonth(now);
         break;
       case "last-week":
-        const lastWeekEnd = endOfWeek(subDays(now, 7), { weekStartsOn: 1 });
-        start = startOfWeek(subDays(now, 7), { weekStartsOn: 1 });
+        const lastWeekEnd = endOfWeek(subDays(now, 7), { weekStartsOn: 0 });
+        start = startOfWeek(subDays(now, 7), { weekStartsOn: 0 });
         end = lastWeekEnd;
         break;
       default:
-        start = startOfWeek(now, { weekStartsOn: 1 });
-        end = endOfWeek(now, { weekStartsOn: 1 });
+        start = startOfWeek(now, { weekStartsOn: 0 });
+        end = endOfWeek(now, { weekStartsOn: 0 });
     }
 
     return { start, end };
