@@ -1,8 +1,8 @@
-version: 1.0.55
+version: 1.0.56
 files:
-  - url: TimeFlow-v1.0.55-Setup.exe
-    sha512: a29fad4625de693d53f5ea7e5f142fcc263bb53717be57068d3c8f0329c08c74d88e8e6e429e0108490bce28e7fae85990d4a8de9d770d35b75ba71a378fda1d
-    size: 78884442
-path: TimeFlow-v1.0.55-Setup.exe
-sha512: a29fad4625de693d53f5ea7e5f142fcc263bb53717be57068d3c8f0329c08c74d88e8e6e429e0108490bce28e7fae85990d4a8de9d770d35b75ba71a378fda1d
-releaseDate: '2025-01-18T15:20:00.000Z'
+  - url: TimeFlow-v1.0.56-Setup.exe
+    sha512: placeholder-windows-build-not-available-yet
+    size: 0
+path: TimeFlow-v1.0.56-Setup.exe
+sha512: placeholder-windows-build-not-available-yet
+releaseDate: '2025-07-06T15:53:00.000Z'
