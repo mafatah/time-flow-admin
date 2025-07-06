@@ -17,8 +17,28 @@ let activityStats = {
     focusPercent: 100
 };
 
+// === PERFORMANCE OPTIMIZATIONS ===
+// Content loading states to prevent multiple simultaneous loads
+let contentLoadingStates = {
+    screenshots: false,
+    reports: false,
+    projects: false
+};
+
+// Content cache to avoid repeated loads
+let contentCache = {
+    screenshots: null,
+    reports: null,
+    projects: null,
+    lastUpdated: {}
+};
+
 // === UI PERFORMANCE OPTIMIZATION - CACHE DOM ELEMENTS ===
 let cachedElements = null;
+let performanceMetrics = {
+    tabSwitchTimes: [],
+    loadTimes: []
+};
 
 // === INITIALIZATION ===
 document.addEventListener('DOMContentLoaded', async () => {
@@ -190,50 +210,63 @@ function setupEventListeners() {
         quickLoginBtn.addEventListener('click', handleQuickLogin);
     }
     
-    // === NAVIGATION EVENTS - PERFORMANCE OPTIMIZED ===
+    // === NAVIGATION EVENTS - ULTRA PERFORMANCE OPTIMIZED ===
     const navItems = document.querySelectorAll('.nav-item');
     
-    // Debounce function to prevent rapid tab switching
-    function debounce(func, wait) {
+    // Advanced debounce function with immediate execution for better UX
+    function debounce(func, wait, immediate = false) {
         let timeout;
         return function executedFunction(...args) {
             const later = () => {
-                clearTimeout(timeout);
-                func(...args);
+                timeout = null;
+                if (!immediate) func(...args);
             };
+            const callNow = immediate && !timeout;
             clearTimeout(timeout);
             timeout = setTimeout(later, wait);
+            if (callNow) func(...args);
         };
     }
     
-    // Safe request idle callback with fallback
-    function safeRequestIdleCallback(callback) {
+    // Advanced request idle callback with performance monitoring
+    function safeRequestIdleCallback(callback, fallbackDelay = 16) {
         if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(callback);
+            requestIdleCallback(callback, { timeout: 100 });
         } else {
-            // Fallback to setTimeout for compatibility
-            setTimeout(callback, 100);
+            // Use optimized setTimeout for compatibility
+            setTimeout(callback, fallbackDelay);
         }
     }
     
-    // Optimized navigation handler with debouncing
+    // Pre-load content when hovering over nav items for instant switching
+    const preloadContent = debounce((targetPage) => {
+        if (targetPage === 'screenshots' && !contentLoadingStates.screenshots && !contentCache.screenshots) {
+            preloadScreenshots();
+        } else if (targetPage === 'reports' && !contentLoadingStates.reports && !contentCache.reports) {
+            preloadReports();
+        }
+    }, 300);
+    
+    // Ultra-optimized navigation handler with immediate execution
     const handleNavigation = debounce((targetPage) => {
-        console.time('navClick');
+        const startTime = performance.now();
         
         showPage(targetPage);
         updatePageTitle(targetPage);
         
-        // Lazy load heavy content only when needed (with fallback)
-        safeRequestIdleCallback(() => {
-            if (targetPage === 'screenshots') {
-                loadRecentScreenshots();
-            } else if (targetPage === 'reports') {
-                loadEmployeeReports();
-            }
-        });
+        // Immediate content loading for better UX
+        loadPageContent(targetPage);
         
-        console.timeEnd('navClick');
-    }, 50); // 50ms debounce - more responsive while still preventing issues
+        // Track performance
+        const endTime = performance.now();
+        performanceMetrics.tabSwitchTimes.push(endTime - startTime);
+        
+        // Log performance every 10 switches
+        if (performanceMetrics.tabSwitchTimes.length % 10 === 0) {
+            const avgTime = performanceMetrics.tabSwitchTimes.slice(-10).reduce((a, b) => a + b, 0) / 10;
+            console.log(`🚀 Avg tab switch time (last 10): ${avgTime.toFixed(2)}ms`);
+        }
+    }, 20, true); // 20ms debounce with immediate execution
     
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
@@ -241,6 +274,14 @@ function setupEventListeners() {
             const targetPage = item.getAttribute('data-page');
             if (targetPage) {
                 handleNavigation(targetPage);
+            }
+        });
+        
+        // Pre-load content on hover for instant switching
+        item.addEventListener('mouseenter', (e) => {
+            const targetPage = item.getAttribute('data-page');
+            if (targetPage) {
+                preloadContent(targetPage);
             }
         });
     });
@@ -780,70 +821,69 @@ function updatePageTitle(pageId) {
     pageTitle.textContent = pageTitles[pageId] || 'Dashboard';
 }
 
-// PERFORMANCE OPTIMIZED: Fast tab switching with cached elements
+// ULTRA PERFORMANCE OPTIMIZED: Lightning-fast tab switching with cached elements
 function showPage(pageId) {
-    console.time('showPage');
+    // Initialize cache if not already done - fast validation
+    const cache = cachedElements || initializeUICache();
     
-    // Initialize cache if not already done and validate it
-    const cache = initializeUICache();
-    
-    // Validate cache before proceeding
-    if (!validateCache()) {
-        console.log('🔄 Cache validation failed, reinitializing...');
-        initializeUICache();
-    }
-    
-    // Early return if already on the target page
+    // Ultra-fast early return if already on the target page
     if (cache.currentActivePage && cache.currentActivePage.id === pageId + 'Page') {
-        console.log('📄 Already on page:', pageId);
-        console.timeEnd('showPage');
-        return;
+        return; // Already on page, no work needed
     }
     
-    // Hide current active page (single operation instead of looping through all)
+    // Batch DOM operations for better performance
+    const operations = [];
+    
+    // Hide current active page (single operation)
     if (cache.currentActivePage) {
-        cache.currentActivePage.classList.remove('active');
+        operations.push(() => cache.currentActivePage.classList.remove('active'));
     }
     
     // Remove active state from current nav item (single operation)
     if (cache.currentActiveNav) {
-        cache.currentActiveNav.classList.remove('active');
+        operations.push(() => cache.currentActiveNav.classList.remove('active'));
     }
     
     // Show target page using cached element
     const targetPage = cache.pages[pageId];
     if (targetPage) {
-        targetPage.classList.add('active');
-        cache.currentActivePage = targetPage;
+        operations.push(() => {
+            targetPage.classList.add('active');
+            cache.currentActivePage = targetPage;
+        });
     } else {
-        console.warn('⚠️ Page not found in cache:', pageId);
-        // Fallback to original method
+        // Fallback with cache update
         const fallbackPage = document.getElementById(pageId + 'Page');
         if (fallbackPage) {
-            fallbackPage.classList.add('active');
-            cache.currentActivePage = fallbackPage;
-            cache.pages[pageId] = fallbackPage; // Update cache
+            operations.push(() => {
+                fallbackPage.classList.add('active');
+                cache.currentActivePage = fallbackPage;
+                cache.pages[pageId] = fallbackPage; // Update cache
+            });
         }
     }
     
     // Add active state to corresponding nav item using cached element
     const navItem = cache.navItems[pageId];
     if (navItem) {
-        navItem.classList.add('active');
-        cache.currentActiveNav = navItem;
+        operations.push(() => {
+            navItem.classList.add('active');
+            cache.currentActiveNav = navItem;
+        });
     } else {
-        console.warn('⚠️ Nav item not found in cache:', pageId);
-        // Fallback to original method
+        // Fallback with cache update
         const fallbackNav = document.querySelector(`[data-page="${pageId}"]`);
         if (fallbackNav) {
-            fallbackNav.classList.add('active');
-            cache.currentActiveNav = fallbackNav;
-            cache.navItems[pageId] = fallbackNav; // Update cache
+            operations.push(() => {
+                fallbackNav.classList.add('active');
+                cache.currentActiveNav = fallbackNav;
+                cache.navItems[pageId] = fallbackNav; // Update cache
+            });
         }
     }
     
-    console.log('📄 Switched to page:', pageId);
-    console.timeEnd('showPage');
+    // Execute all DOM operations in a single batch
+    operations.forEach(op => op());
 }
 
 function updateUserInfo() {
@@ -889,17 +929,18 @@ async function startTracking() {
         return;
     }
 
-    // === STEP 1: FRIENDLY HEALTH CHECK ===
-    console.log('🏥 [HEALTH-CHECK] Starting comprehensive system health check...');
+    // === STEP 1: OPTIMIZED HEALTH CHECK ===
+    console.log('🏥 [HEALTH-CHECK] Starting quick system health check...');
     
     // Show welcome health check notification
-    showNotification('👋 Welcome to TimeFlow! Running system health check...', 'info');
+    showNotification('👋 Welcome to TimeFlow! Running quick system check...', 'info');
     
     try {
         // Show health check modal
         showHealthCheckModal();
         
-        const healthCheckResult = await performComprehensiveHealthCheck();
+        // Run optimized health check in background
+        const healthCheckResult = await performOptimizedHealthCheck();
         
         if (!healthCheckResult.canStartTimer) {
             showNotification('⛔ Timer start blocked due to critical system failures. Please check system status.', 'error');
@@ -908,15 +949,15 @@ async function startTracking() {
         }
         
         if (healthCheckResult.isHealthy) {
-            showNotification('🎉 All Systems Healthy! ✅ Screenshots ✅ URL Tracking ✅ App Detection ✅ Database - Ready to track!', 'success');
+            showNotification('🎉 All Systems Healthy! Ready to track!', 'success');
         } else {
             showNotification(`🟡 Timer starting with ${healthCheckResult.failedFeatures.length} warnings - some features may be limited`, 'info');
         }
         
         // Modal will be hidden by the health check function itself after showing results
         
-        // Brief delay to show success message
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Brief delay to show success message (reduced from 1000ms to 300ms)
+        await new Promise(resolve => setTimeout(resolve, 300));
         
     } catch (error) {
         console.error('❌ [HEALTH-CHECK] Health check failed:', error);
@@ -1286,6 +1327,99 @@ function updateActivityStats(data) {
     });
 }
 
+// === PERFORMANCE OPTIMIZED CONTENT LOADING ===
+function loadPageContent(pageId) {
+    switch (pageId) {
+        case 'screenshots':
+            loadRecentScreenshots();
+            break;
+        case 'reports':
+            loadEmployeeReports();
+            break;
+        default:
+            // No heavy content for other pages
+            break;
+    }
+}
+
+// Pre-load screenshots without blocking UI
+function preloadScreenshots() {
+    if (contentLoadingStates.screenshots || contentCache.screenshots) return;
+    
+    contentLoadingStates.screenshots = true;
+    console.log('🔄 Pre-loading screenshots...');
+    
+    safeRequestIdleCallback(async () => {
+        try {
+            const startTime = performance.now();
+            const screenshots = await fetchScreenshots();
+            
+            contentCache.screenshots = screenshots;
+            contentCache.lastUpdated.screenshots = Date.now();
+            
+            const loadTime = performance.now() - startTime;
+            performanceMetrics.loadTimes.push(loadTime);
+            
+            console.log(`✅ Screenshots pre-loaded in ${loadTime.toFixed(2)}ms`);
+        } catch (error) {
+            console.warn('⚠️ Failed to pre-load screenshots:', error);
+        } finally {
+            contentLoadingStates.screenshots = false;
+        }
+    });
+}
+
+// Pre-load reports without blocking UI
+function preloadReports() {
+    if (contentLoadingStates.reports || contentCache.reports) return;
+    
+    contentLoadingStates.reports = true;
+    console.log('🔄 Pre-loading reports...');
+    
+    safeRequestIdleCallback(async () => {
+        try {
+            const startTime = performance.now();
+            const reports = await fetchReports();
+            
+            contentCache.reports = reports;
+            contentCache.lastUpdated.reports = Date.now();
+            
+            const loadTime = performance.now() - startTime;
+            performanceMetrics.loadTimes.push(loadTime);
+            
+            console.log(`✅ Reports pre-loaded in ${loadTime.toFixed(2)}ms`);
+        } catch (error) {
+            console.warn('⚠️ Failed to pre-load reports:', error);
+        } finally {
+            contentLoadingStates.reports = false;
+        }
+    });
+}
+
+// Check if cached content is still fresh (5 minutes)
+function isCacheFresh(contentType) {
+    const lastUpdated = contentCache.lastUpdated[contentType];
+    return lastUpdated && (Date.now() - lastUpdated) < 300000; // 5 minutes
+}
+
+// Separate fetch function for screenshots to support pre-loading
+async function fetchScreenshots(selectedDate) {
+    const date = selectedDate || new Date().toISOString().split('T')[0];
+    
+    if (!currentUser) {
+        throw new Error('No user logged in');
+    }
+    
+    // Use IPC to get screenshots from main process
+    const response = await ipcRenderer.invoke('fetch-screenshots', {
+        user_id: currentUser.id,
+        date: date,
+        limit: 20
+    });
+    
+    return response && response.success ? response.screenshots : [];
+}
+
 // === SCREENSHOT FUNCTIONALITY ===
 async function loadRecentScreenshots() {
     const screenshotDate = document.getElementById('screenshotDate');
@@ -1508,7 +1642,54 @@ window.addEventListener('beforeunload', () => {
     if (sessionTimer) {
         clearInterval(sessionTimer);
     }
+    
+    // Clear caches to free memory
+    clearPerformanceCache();
 });
+
+// === MEMORY MANAGEMENT ===
+function clearPerformanceCache() {
+    // Clear content cache if it gets too large
+    const cacheSize = JSON.stringify(contentCache).length;
+    if (cacheSize > 500000) { // 500KB
+        console.log('🧹 Clearing performance cache (size:', cacheSize, 'bytes)');
+        contentCache = {
+            screenshots: null,
+            reports: null,
+            projects: null,
+            lastUpdated: {}
+        };
+    }
+    
+    // Trim performance metrics arrays
+    if (performanceMetrics.tabSwitchTimes.length > 50) {
+        performanceMetrics.tabSwitchTimes = performanceMetrics.tabSwitchTimes.slice(-25);
+    }
+    if (performanceMetrics.loadTimes.length > 50) {
+        performanceMetrics.loadTimes = performanceMetrics.loadTimes.slice(-25);
+    }
+    
+    console.log('🧹 Performance cache optimized');
+}
+
+// Automatically clean cache every 10 minutes
+setInterval(clearPerformanceCache, 600000);
+
+// === PERFORMANCE MONITORING ===
+function logPerformanceStats() {
+    if (performanceMetrics.tabSwitchTimes.length > 0) {
+        const avgTabSwitch = performanceMetrics.tabSwitchTimes.reduce((a, b) => a + b, 0) / performanceMetrics.tabSwitchTimes.length;
+        console.log(`🚀 Performance Stats - Avg tab switch: ${avgTabSwitch.toFixed(2)}ms`);
+    }
+    
+    if (performanceMetrics.loadTimes.length > 0) {
+        const avgLoad = performanceMetrics.loadTimes.reduce((a, b) => a + b, 0) / performanceMetrics.loadTimes.length;
+        console.log(`📊 Performance Stats - Avg content load: ${avgLoad.toFixed(2)}ms`);
+    }
+}
+
+// Log performance stats every 5 minutes
+setInterval(logPerformanceStats, 300000);
 
 // === SYSTEM CHECK FUNCTIONALITY ===
 function showSystemCheckPrompt() {
@@ -1956,6 +2137,13 @@ async function handleDashboardProjectSelection() {
 
 // === REPORTS FUNCTIONALITY ===
 async function loadEmployeeReports() {
+    // Check cache first for instant loading
+    if (contentCache.reports && isCacheFresh('reports')) {
+        console.log('📊 Using cached reports for instant loading');
+        updateReportsDisplay(contentCache.reports);
+        return;
+    }
+
     if (!currentUser) {
         console.log('⚠️ No user logged in, cannot load reports');
         return;
@@ -1964,47 +2152,57 @@ async function loadEmployeeReports() {
     try {
         console.log('📊 Loading employee reports...');
         
-        // Calculate date ranges
-        const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const startOfWeek = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-        const startOfMonth = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-
-        // Get time logs for different periods
-        const [todayLogs, weekLogs, monthLogs] = await Promise.all([
-            getTimeLogsForPeriod(startOfToday, now),
-            getTimeLogsForPeriod(startOfWeek, now),
-            getTimeLogsForPeriod(startOfMonth, now)
-        ]);
-
-        // Get activity data (screenshots with activity metrics)
-        const activityData = await getActivityData(startOfWeek, now);
-
-        // Calculate totals
-        const todayHours = calculateTotalHours(todayLogs);
-        const weekHours = calculateTotalHours(weekLogs);
-        const monthHours = calculateTotalHours(monthLogs);
-
-        // Calculate average activity score
-        const avgActivityScore = activityData.length > 0 
-            ? Math.round(activityData.reduce((sum, activity) => sum + (activity.activity_percent || 0), 0) / activityData.length)
-            : 0;
-
-        // Update the reports page UI
-        updateReportsDisplay({
-            todayHours,
-            weekHours,
-            monthHours,
-            avgActivityScore,
-            todayLogs,
-            weekLogs,
-            activityData
-        });
+        const reports = await fetchReports();
+        
+        // Update cache for next time
+        contentCache.reports = reports;
+        contentCache.lastUpdated.reports = Date.now();
+        
+        updateReportsDisplay(reports);
 
     } catch (error) {
         console.error('❌ Failed to load employee reports:', error);
         showNotification('Failed to load reports: ' + error.message, 'error');
     }
+}
+
+// Separate fetch function for better caching and pre-loading
+async function fetchReports() {
+    // Calculate date ranges
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+    const startOfMonth = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+    // Get time logs for different periods
+    const [todayLogs, weekLogs, monthLogs] = await Promise.all([
+        getTimeLogsForPeriod(startOfToday, now),
+        getTimeLogsForPeriod(startOfWeek, now),
+        getTimeLogsForPeriod(startOfMonth, now)
+    ]);
+
+    // Get activity data (screenshots with activity metrics)
+    const activityData = await getActivityData(startOfWeek, now);
+
+    // Calculate totals
+    const todayHours = calculateTotalHours(todayLogs);
+    const weekHours = calculateTotalHours(weekLogs);
+    const monthHours = calculateTotalHours(monthLogs);
+
+    // Calculate average activity score
+    const avgActivityScore = activityData.length > 0 
+        ? Math.round(activityData.reduce((sum, activity) => sum + (activity.activity_percent || 0), 0) / activityData.length)
+        : 0;
+
+    return {
+        todayHours,
+        weekHours,
+        monthHours,
+        avgActivityScore,
+        todayLogs,
+        weekLogs,
+        activityData
+    };
 }
 
 async function getTimeLogsForPeriod(startDate, endDate) {
@@ -2254,6 +2452,110 @@ function generateProductivityInsight(focusScore, clicks, keystrokes) {
 }
 
 // === HEALTH CHECK SYSTEM ===
+// Optimized health check that's faster and less blocking
+async function performOptimizedHealthCheck() {
+    console.log('🏥 [HEALTH-CHECK] Starting optimized feature verification...');
+    
+    const healthStatus = {
+        screenshots: false,
+        databaseConnection: false,
+        lastCheck: new Date(),
+        errorDetails: {}
+    };
+    
+    const failedFeatures = [];
+    
+    try {
+        // Run only critical tests for faster startup
+        updateHealthCheckProgress('Running essential system tests...', 50);
+        
+        // Set critical features to testing state
+        updateHealthCheckFeatureStatus('screenshot', 'testing');
+        updateHealthCheckFeatureStatus('database', 'testing');
+        
+        // Run only essential tests in parallel
+        const [screenshotTest, dbTest] = await Promise.all([
+            ipcRenderer.invoke('test-screenshot-capability').catch(err => ({ success: false, error: err.message })),
+            ipcRenderer.invoke('test-database-connection').catch(err => ({ success: false, error: err.message }))
+        ]);
+        
+        // Process results
+        const tests = [
+            { name: 'screenshots', test: screenshotTest, id: 'screenshot', icon: '📸' },
+            { name: 'databaseConnection', test: dbTest, id: 'database', icon: '💾' }
+        ];
+        
+        tests.forEach(({ name, test, id, icon }) => {
+            healthStatus[name] = test.success;
+            if (!test.success) {
+                failedFeatures.push(name);
+                healthStatus.errorDetails[name] = test.error || `${name} test failed`;
+                updateHealthCheckFeatureStatus(id, 'fail', test.error);
+            } else {
+                updateHealthCheckFeatureStatus(id, 'pass');
+            }
+            console.log(`${icon} [HEALTH-CHECK] ${name} test:`, test.success ? '✅ PASS' : '❌ FAIL');
+        });
+        
+        const isHealthy = failedFeatures.length === 0;
+        const criticalFeatures = ['databaseConnection'];
+        const canStartTimer = !failedFeatures.some(feature => criticalFeatures.includes(feature));
+        
+        // Show errors if any
+        const errors = Object.entries(healthStatus.errorDetails).map(([feature, error]) => 
+            `${feature}: ${error}`
+        );
+        
+        if (errors.length > 0) {
+            showHealthCheckErrors(errors);
+        }
+        
+        console.log('🏥 [HEALTH-CHECK] Results:', {
+            isHealthy,
+            failedFeatures,
+            canStartTimer,
+            errorCount: Object.keys(healthStatus.errorDetails).length
+        });
+        
+        // Show final results - quick display
+        updateHealthCheckProgress(
+            isHealthy ? 
+                '✅ Essential systems working!' : 
+                `⚠️ ${failedFeatures.length} issues found. ${canStartTimer ? 'Timer can still start.' : 'Timer blocked due to critical issues.'}`,
+            100
+        );
+        
+        // Quick display of results before closing
+        await new Promise(resolve => setTimeout(resolve, 150));
+        
+        // Close modal after showing results
+        hideHealthCheckModal();
+        
+        return {
+            isHealthy,
+            failedFeatures,
+            details: healthStatus,
+            canStartTimer
+        };
+        
+    } catch (error) {
+        console.error('❌ [HEALTH-CHECK] Quick check failed:', error);
+        updateHealthCheckProgress('❌ Health check system failed: ' + error.message, 100);
+        
+        // Brief display of error before closing
+        await new Promise(resolve => setTimeout(resolve, 500));
+        hideHealthCheckModal();
+        
+        return {
+            isHealthy: false,
+            failedFeatures: ['healthCheckSystem'],
+            details: healthStatus,
+            canStartTimer: false
+        };
+    }
+}
+
+// Original comprehensive health check (for manual testing)
 async function performComprehensiveHealthCheck() {
     console.log('🏥 [HEALTH-CHECK] Starting comprehensive feature verification...');
     
