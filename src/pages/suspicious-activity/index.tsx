@@ -241,6 +241,29 @@ export default function SuspiciousActivityPage() {
     let baseRiskScore = 0;
     const flags: string[] = [];
 
+    // DEBUG: Log data availability (remove after fixing)
+    const debugMode = true; // Set to false to disable debug logging
+    if (debugMode) {
+      console.log('🔍 Analysis Debug:', {
+        screenshots: screenshots.length,
+        urlLogs: urlLogs.length,
+        appLogs: appLogs.length,
+        idleLogs: idleLogs.length,
+        sampleScreenshot: screenshots[0] ? {
+          url: screenshots[0].url,
+          window_title: screenshots[0].window_title,
+          active_window_title: screenshots[0].active_window_title,
+          app_name: screenshots[0].app_name
+        } : null,
+        sampleUrlLog: urlLogs[0] ? {
+          url: urlLogs[0].url,
+          site_url: urlLogs[0].site_url,
+          domain: urlLogs[0].domain,
+          title: urlLogs[0].title
+        } : null
+      });
+    }
+
     // 1. ENHANCED URL ANALYSIS
     let socialMediaUsage = 0;
     let newsConsumption = 0;
@@ -250,31 +273,39 @@ export default function SuspiciousActivityPage() {
     let shoppingUsage = 0;
 
     urlLogs.forEach(log => {
-      const url = (log.site_url || log.url || '').toLowerCase();
+      // Check multiple possible URL fields
+      const url = (log.site_url || log.url || log.domain || '').toLowerCase();
+      const title = (log.title || '').toLowerCase();
       
-      if (SUSPICIOUS_PATTERNS.social_media.some(domain => url.includes(domain))) {
+      // Also check window title from URL logs if available
+      const windowTitle = (log.window_title || '').toLowerCase();
+      
+      const allText = `${url} ${title} ${windowTitle}`.toLowerCase();
+      
+      if (SUSPICIOUS_PATTERNS.social_media.some(domain => allText.includes(domain) || allText.includes(domain.split('.')[0]))) {
         socialMediaUsage++;
         baseRiskScore += RISK_WEIGHTS.social_media;
+        if (debugMode) console.log('🔍 Social media detected in URL:', allText);
       }
       
-      if (SUSPICIOUS_PATTERNS.news.some(domain => url.includes(domain))) {
+      if (SUSPICIOUS_PATTERNS.news.some(domain => allText.includes(domain) || allText.includes(domain.split('.')[0]))) {
         newsConsumption++;
         baseRiskScore += RISK_WEIGHTS.news;
       }
       
-      if (SUSPICIOUS_PATTERNS.entertainment.some(domain => url.includes(domain))) {
+      if (SUSPICIOUS_PATTERNS.entertainment.some(domain => allText.includes(domain) || allText.includes(domain.split('.')[0]))) {
         entertainmentUsage++;
         unproductiveWebsites++;
         baseRiskScore += RISK_WEIGHTS.entertainment;
       }
       
-      if (SUSPICIOUS_PATTERNS.gaming.some(domain => url.includes(domain))) {
+      if (SUSPICIOUS_PATTERNS.gaming.some(domain => allText.includes(domain) || allText.includes(domain.split('.')[0]))) {
         gamingUsage++;
         unproductiveWebsites++;
         baseRiskScore += RISK_WEIGHTS.gaming;
       }
       
-      if (SUSPICIOUS_PATTERNS.shopping.some(domain => url.includes(domain))) {
+      if (SUSPICIOUS_PATTERNS.shopping.some(domain => allText.includes(domain) || allText.includes(domain.split('.')[0]))) {
         shoppingUsage++;
         unproductiveWebsites++;
         baseRiskScore += RISK_WEIGHTS.shopping;
@@ -283,12 +314,25 @@ export default function SuspiciousActivityPage() {
 
     // 2. ENHANCED APP ANALYSIS
     let entertainmentApps = 0;
-    const suspiciousApps = ['game', 'steam', 'discord', 'spotify', 'netflix', 'youtube', 'twitch'];
+    const suspiciousApps = ['game', 'steam', 'discord', 'spotify', 'netflix', 'youtube', 'twitch', 'safari', 'chrome', 'firefox', 'edge'];
+    const socialMediaApps = ['facebook', 'instagram', 'twitter', 'tiktok', 'linkedin', 'reddit', 'whatsapp', 'telegram'];
     
     appLogs.forEach(log => {
-      const appName = log.app_name.toLowerCase();
+      const appName = (log.app_name || '').toLowerCase();
+      const windowTitle = (log.window_title || '').toLowerCase();
+      const appPath = (log.app_path || '').toLowerCase();
       
-      if (suspiciousApps.some(app => appName.includes(app))) {
+      const allAppText = `${appName} ${windowTitle} ${appPath}`.toLowerCase();
+      
+      // Check for social media in app data
+      if (socialMediaApps.some(app => allAppText.includes(app))) {
+        socialMediaUsage++;
+        baseRiskScore += RISK_WEIGHTS.social_media;
+        if (debugMode) console.log('🔍 Social media detected in app:', allAppText);
+      }
+      
+      // Check for entertainment apps
+      if (suspiciousApps.some(app => allAppText.includes(app))) {
         entertainmentApps++;
         baseRiskScore += RISK_WEIGHTS.entertainment;
       }
@@ -305,7 +349,7 @@ export default function SuspiciousActivityPage() {
     }, 0);
 
     // 4. ADVANCED SCREENSHOT ANALYSIS
-    const screenshotAnalysis = analyzeScreenshotsAdvanced(screenshots);
+    const screenshotAnalysis = analyzeScreenshotsAdvanced(screenshots, debugMode);
     
     // Add screenshot-based risk scoring
     baseRiskScore += screenshotAnalysis.duplicate_screenshots * RISK_WEIGHTS.duplicate_screenshots;
@@ -367,6 +411,13 @@ export default function SuspiciousActivityPage() {
     if (focusConsistency < 30) flags.push('Poor focus consistency');
     if (workPatternScore < 40) flags.push('Irregular work patterns');
     
+    // Check for missing metadata
+    const metadataAvailable = screenshots.some(s => s.url || s.active_window_title || s.window_title || s.app_name);
+    if (!metadataAvailable && screenshots.length > 0) {
+      flags.push('Limited monitoring - missing window/app metadata');
+      baseRiskScore += 10; // Add some base risk when we can't properly detect activities
+    }
+    
     // Combination flags
     if (suspiciousPatterns.social_media_during_work) flags.push('Social media during productive hours');
     if (suspiciousPatterns.entertainment_heavy_usage) flags.push('Heavy entertainment usage');
@@ -410,7 +461,7 @@ export default function SuspiciousActivityPage() {
   };
 
   // Advanced screenshot analysis function
-  const analyzeScreenshotsAdvanced = (screenshots: any[]) => {
+  const analyzeScreenshotsAdvanced = (screenshots: any[], debugMode: boolean = false) => {
     let duplicateScreenshots = 0;
     let staticScreenPeriods = 0;
     let lowActivityCount = 0;
@@ -450,28 +501,53 @@ export default function SuspiciousActivityPage() {
         }
       }
       
-      // Analyze content
-      const title = (screenshot.active_window_title || '').toLowerCase();
+      // Analyze content - check multiple title fields
+      const title = (screenshot.active_window_title || screenshot.window_title || '').toLowerCase();
       const url = (screenshot.url || '').toLowerCase();
+      const appName = (screenshot.app_name || '').toLowerCase();
+      
+      // Combine all available text for analysis
+      const allText = `${title} ${url} ${appName}`.toLowerCase();
       
       let isSuspicious = false;
       
-      if (SUSPICIOUS_PATTERNS.social_media.some(domain => title.includes(domain.split('.')[0]) || url.includes(domain))) {
+      if (SUSPICIOUS_PATTERNS.social_media.some(domain => 
+        allText.includes(domain) || 
+        allText.includes(domain.split('.')[0]) ||
+        title.includes(domain.split('.')[0]) ||
+        url.includes(domain)
+      )) {
         socialMediaCount++;
         isSuspicious = true;
+        if (debugMode) console.log('🔍 Social media detected in screenshot:', allText);
       }
       
-      if (SUSPICIOUS_PATTERNS.entertainment.some(domain => title.includes(domain.split('.')[0]) || url.includes(domain))) {
+      if (SUSPICIOUS_PATTERNS.entertainment.some(domain => 
+        allText.includes(domain) || 
+        allText.includes(domain.split('.')[0]) ||
+        title.includes(domain.split('.')[0]) ||
+        url.includes(domain)
+      )) {
         entertainmentCount++;
         isSuspicious = true;
       }
       
-      if (SUSPICIOUS_PATTERNS.news.some(domain => title.includes(domain.split('.')[0]) || url.includes(domain))) {
+      if (SUSPICIOUS_PATTERNS.news.some(domain => 
+        allText.includes(domain) || 
+        allText.includes(domain.split('.')[0]) ||
+        title.includes(domain.split('.')[0]) ||
+        url.includes(domain)
+      )) {
         newsCount++;
         isSuspicious = true;
       }
       
-      if (SUSPICIOUS_PATTERNS.gaming.some(domain => title.includes(domain.split('.')[0]) || url.includes(domain))) {
+      if (SUSPICIOUS_PATTERNS.gaming.some(domain => 
+        allText.includes(domain) || 
+        allText.includes(domain.split('.')[0]) ||
+        title.includes(domain.split('.')[0]) ||
+        url.includes(domain)
+      )) {
         gamingCount++;
         isSuspicious = true;
       }
