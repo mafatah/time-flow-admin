@@ -15,10 +15,10 @@ echo -e "${BLUE}🚀 Building Signed TimeFlow DMG for Testing${NC}"
 echo "=============================================="
 
 # Configuration
-CURRENT_VERSION="1.0.47"
+CURRENT_VERSION="1.0.48"
 CERT_NAME="Ebdaa Digital Technology (6GW49LK9V9)"
 BUILD_DIR="dist"
-FINAL_DMG="TimeFlow-v${CURRENT_VERSION}-Signed-Test.dmg"
+FINAL_DMG="TimeFlow-v${CURRENT_VERSION}-TabPerformance-Signed.dmg"
 
 # Verify prerequisites
 echo -e "${BLUE}🔍 Verifying prerequisites...${NC}"

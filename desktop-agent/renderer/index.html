@@ -624,6 +624,47 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        /* === PERFORMANCE OPTIMIZED TAB SWITCHING === */
+        .page-section {
+            /* Hardware acceleration for smooth transitions */
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+            
+            /* Fast transitions */
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+            opacity: 0;
+            transform: translateX(20px);
+            
+            /* Hidden by default */
+            display: none;
+        }
+
+        .page-section.active {
+            display: block;
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .nav-item {
+            /* Hardware acceleration for hover effects */
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            
+            /* Fast transitions */
+            transition: all 0.15s ease-out;
+        }
+
+        .nav-item:hover {
+            /* Optimize hover for better responsiveness */
+            transform: translateX(4px) translateZ(0);
+        }
+
+        .nav-item.active {
+            /* Hardware accelerated active state */
+            transform: translateZ(0);
+        }
+
         /* === HEALTH CHECK MODAL === */
         .health-check-overlay {
             position: fixed;

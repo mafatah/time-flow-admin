@@ -15,9 +15,9 @@ echo -e "${BLUE}🚀 Building Test TimeFlow DMG (Unsigned)${NC}"
 echo "=============================================="
 
 # Configuration
-CURRENT_VERSION="1.0.46"
+CURRENT_VERSION="1.0.47"
 BUILD_DIR="dist"
-FINAL_DMG="TimeFlow-v${CURRENT_VERSION}-Test-WindowManagement.dmg"
+FINAL_DMG="TimeFlow-v${CURRENT_VERSION}-Test-PerformanceFixes.dmg"
 
 # Verify prerequisites
 echo -e "${BLUE}🔍 Verifying prerequisites...${NC}"
@@ -44,6 +44,15 @@ echo -e "${GREEN}✅ Web application built${NC}"
 # Build desktop agent
 echo -e "${BLUE}🖥️ Building desktop agent...${NC}"
 cd desktop-agent
+
+# Setup environment if needed
+if [ ! -f ".env" ]; then
+    echo -e "${YELLOW}⚙️ Setting up environment variables...${NC}"
+    chmod +x setup-local-env.sh
+    ./setup-local-env.sh
+else
+    echo -e "${GREEN}✅ Environment file found${NC}"
+fi
 
 # Update desktop-agent package.json for unsigned build
 echo -e "${BLUE}⚙️ Configuring desktop-agent for unsigned build...${NC}"

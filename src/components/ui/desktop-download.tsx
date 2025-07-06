@@ -123,7 +123,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     setDownloading(platform);
     
     // Use direct downloads for reliable access - Updated automatically by release pipeline
-          const currentVersion = "1.0.45"; // v1.0.45 - Complete Cross-Platform Release: 202506301430
+          const currentVersion = "1.0.50"; // v1.0.45 - Complete Cross-Platform Release: 202506301430
     const downloadFiles = {
       windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`,
       'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED

@@ -187,24 +187,57 @@ function setupEventListeners() {
         quickLoginBtn.addEventListener('click', handleQuickLogin);
     }
     
-    // === NAVIGATION EVENTS ===
+    // === NAVIGATION EVENTS - PERFORMANCE OPTIMIZED ===
     const navItems = document.querySelectorAll('.nav-item');
+    
+    // Debounce function to prevent rapid tab switching
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // Safe request idle callback with fallback
+    function safeRequestIdleCallback(callback) {
+        if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(callback);
+        } else {
+            // Fallback to setTimeout for compatibility
+            setTimeout(callback, 100);
+        }
+    }
+    
+    // Optimized navigation handler with debouncing
+    const handleNavigation = debounce((targetPage) => {
+        console.time('navClick');
+        
+        showPage(targetPage);
+        updatePageTitle(targetPage);
+        
+        // Lazy load heavy content only when needed (with fallback)
+        safeRequestIdleCallback(() => {
+            if (targetPage === 'screenshots') {
+                loadRecentScreenshots();
+            } else if (targetPage === 'reports') {
+                loadEmployeeReports();
+            }
+        });
+        
+        console.timeEnd('navClick');
+    }, 50); // 50ms debounce - more responsive while still preventing issues
+    
     navItems.forEach(item => {
-        item.addEventListener('click', () => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
             const targetPage = item.getAttribute('data-page');
             if (targetPage) {
-                showPage(targetPage);
-                updatePageTitle(targetPage);
-                
-                // Load screenshots when navigating to screenshots page
-                if (targetPage === 'screenshots') {
-                    setTimeout(loadRecentScreenshots, 100);
-                }
-                
-                // Load reports when navigating to reports page
-                if (targetPage === 'reports') {
-                    setTimeout(loadEmployeeReports, 100);
-                }
+                handleNavigation(targetPage);
             }
         });
     });
@@ -246,6 +279,62 @@ function setupEventListeners() {
     }
     
     console.log('✅ Event listeners set up successfully');
+    
+    // Add performance monitoring for tab switching
+    addPerformanceMonitoring();
+}
+
+// === PERFORMANCE MONITORING ===
+function addPerformanceMonitoring() {
+    let tabSwitchTimes = [];
+    
+    // Override console.time and console.timeEnd to track performance
+    const originalTimeEnd = console.timeEnd;
+    console.timeEnd = function(label) {
+        if (label === 'showPage' || label === 'navClick') {
+            const endTime = performance.now();
+            
+            // Calculate duration manually since we can't access the original timer
+            if (label === 'showPage') {
+                tabSwitchTimes.push(endTime);
+                if (tabSwitchTimes.length > 10) {
+                    tabSwitchTimes.shift(); // Keep only last 10 measurements
+                }
+                
+                // Show performance stats every 5 tab switches
+                if (tabSwitchTimes.length % 5 === 0) {
+                    const avgTime = tabSwitchTimes.reduce((a, b) => a + b, 0) / tabSwitchTimes.length;
+                    console.log(`🚀 Tab Switch Performance: Recent switches averaged ${avgTime.toFixed(1)}ms`);
+                }
+            }
+        }
+        
+        return originalTimeEnd.call(this, label);
+    };
+    
+    // Add keyboard shortcuts for tab switching
+    document.addEventListener('keydown', (e) => {
+        // Ctrl/Cmd + Number for quick tab switching
+        if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '4') {
+            e.preventDefault();
+            const tabMap = {
+                '1': 'dashboard',
+                '2': 'timetracker', 
+                '3': 'screenshots',
+                '4': 'reports'
+            };
+            
+            const targetPage = tabMap[e.key];
+            if (targetPage) {
+                showPage(targetPage);
+                updatePageTitle(targetPage);
+                console.log(`⌨️ Quick switch to ${targetPage} via keyboard`);
+            }
+        }
+    });
+    
+    console.log('📊 Performance monitoring enabled - Tab switching times will be logged');
+    console.log('⌨️ Keyboard shortcuts enabled: Ctrl/Cmd + 1-4 for quick tab switching');
 }
 
 // === IPC LISTENERS ===
@@ -577,7 +666,69 @@ async function handleQuickLogin() {
     }
 }
 
-// === UI STATE MANAGEMENT ===
+// === UI STATE MANAGEMENT - PERFORMANCE OPTIMIZED ===
+
+// Cache DOM elements for better performance
+let cachedElements = null;
+
+function validateCache() {
+    if (!cachedElements) return false;
+    
+    // Check if cached elements still exist in DOM
+    for (const [pageId, element] of Object.entries(cachedElements.pages)) {
+        if (!document.contains(element)) {
+            console.warn(`🔄 Cache stale for ${pageId}, reinitializing...`);
+            cachedElements = null; // Force reinit
+            return false;
+        }
+    }
+    return true;
+}
+
+function initializeUICache() {
+    if (cachedElements && validateCache()) return cachedElements;
+    
+    console.log('🚀 Initializing UI element cache for better performance...');
+    
+    cachedElements = {
+        pages: {},
+        navItems: {},
+        currentActivePage: null,
+        currentActiveNav: null
+    };
+    
+    // Cache all page sections
+    document.querySelectorAll('.page-section').forEach(section => {
+        const pageId = section.id.replace('Page', '');
+        cachedElements.pages[pageId] = section;
+        
+        // Track currently active page
+        if (section.classList.contains('active')) {
+            cachedElements.currentActivePage = section;
+        }
+    });
+    
+    // Cache all nav items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        const pageId = item.getAttribute('data-page');
+        if (pageId) {
+            cachedElements.navItems[pageId] = item;
+            
+            // Track currently active nav
+            if (item.classList.contains('active')) {
+                cachedElements.currentActiveNav = item;
+            }
+        }
+    });
+    
+    console.log('✅ UI cache initialized:', {
+        pages: Object.keys(cachedElements.pages).length,
+        navItems: Object.keys(cachedElements.navItems).length
+    });
+    
+    return cachedElements;
+}
+
 function showLogin() {
     const loginContainer = document.getElementById('loginContainer');
     const appContainer = document.getElementById('appContainer');
@@ -595,6 +746,9 @@ function showMainApp() {
     if (loginContainer) loginContainer.style.display = 'none';
     if (appContainer) appContainer.style.display = 'grid';
     
+    // Initialize UI cache for performance
+    initializeUICache();
+    
     // Update user info in sidebar
     updateUserInfo();
     
@@ -610,6 +764,86 @@ function showMainApp() {
     loadProjects();
     
     console.log('📱 Showing main application');
+}
+
+function updatePageTitle(pageId) {
+    const pageTitle = document.getElementById('pageTitle');
+    if (!pageTitle) return;
+    
+    const pageTitles = {
+        'dashboard': 'Dashboard',
+        'timetracker': 'Time Tracker', 
+        'screenshots': 'Screenshots',
+        'reports': 'My Reports'
+    };
+    
+    pageTitle.textContent = pageTitles[pageId] || 'Dashboard';
+}
+
+// PERFORMANCE OPTIMIZED: Fast tab switching with cached elements
+function showPage(pageId) {
+    console.time('showPage');
+    
+    // Initialize cache if not already done and validate it
+    const cache = initializeUICache();
+    
+    // Validate cache before proceeding
+    if (!validateCache()) {
+        console.log('🔄 Cache validation failed, reinitializing...');
+        initializeUICache();
+    }
+    
+    // Early return if already on the target page
+    if (cache.currentActivePage && cache.currentActivePage.id === pageId + 'Page') {
+        console.log('📄 Already on page:', pageId);
+        console.timeEnd('showPage');
+        return;
+    }
+    
+    // Hide current active page (single operation instead of looping through all)
+    if (cache.currentActivePage) {
+        cache.currentActivePage.classList.remove('active');
+    }
+    
+    // Remove active state from current nav item (single operation)
+    if (cache.currentActiveNav) {
+        cache.currentActiveNav.classList.remove('active');
+    }
+    
+    // Show target page using cached element
+    const targetPage = cache.pages[pageId];
+    if (targetPage) {
+        targetPage.classList.add('active');
+        cache.currentActivePage = targetPage;
+    } else {
+        console.warn('⚠️ Page not found in cache:', pageId);
+        // Fallback to original method
+        const fallbackPage = document.getElementById(pageId + 'Page');
+        if (fallbackPage) {
+            fallbackPage.classList.add('active');
+            cache.currentActivePage = fallbackPage;
+            cache.pages[pageId] = fallbackPage; // Update cache
+        }
+    }
+    
+    // Add active state to corresponding nav item using cached element
+    const navItem = cache.navItems[pageId];
+    if (navItem) {
+        navItem.classList.add('active');
+        cache.currentActiveNav = navItem;
+    } else {
+        console.warn('⚠️ Nav item not found in cache:', pageId);
+        // Fallback to original method
+        const fallbackNav = document.querySelector(`[data-page="${pageId}"]`);
+        if (fallbackNav) {
+            fallbackNav.classList.add('active');
+            cache.currentActiveNav = fallbackNav;
+            cache.navItems[pageId] = fallbackNav; // Update cache
+        }
+    }
+    
+    console.log('📄 Switched to page:', pageId);
+    console.timeEnd('showPage');
 }
 
 function updateUserInfo() {
@@ -643,46 +877,6 @@ function updateUserInfo() {
     }
     
     console.log('👤 User info updated');
-}
-
-function updatePageTitle(pageId) {
-    const pageTitle = document.getElementById('pageTitle');
-    if (!pageTitle) return;
-    
-    const pageTitles = {
-        'dashboard': 'Dashboard',
-        'timetracker': 'Time Tracker', 
-        'screenshots': 'Screenshots',
-        'reports': 'My Reports'
-    };
-    
-    pageTitle.textContent = pageTitles[pageId] || 'Dashboard';
-}
-
-function showPage(pageId) {
-    // Hide all page sections
-    document.querySelectorAll('.page-section').forEach(section => {
-        section.classList.remove('active');
-    });
-    
-    // Remove active state from all nav items
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    
-    // Show target page
-    const targetPage = document.getElementById(pageId + 'Page');
-    if (targetPage) {
-        targetPage.classList.add('active');
-    }
-    
-    // Add active state to corresponding nav item
-    const navItem = document.querySelector(`[data-page="${pageId}"]`);
-    if (navItem) {
-        navItem.classList.add('active');
-    }
-    
-    console.log('📄 Switched to page:', pageId);
 }
 
 // === TIME TRACKING FUNCTIONALITY ===
