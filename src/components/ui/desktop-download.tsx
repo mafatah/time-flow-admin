@@ -123,7 +123,7 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
     setDownloading(platform);
     
     // Use direct downloads for reliable access - Updated automatically by release pipeline
-          const currentVersion = "1.0.54"; // v1.0.54 - Enhanced Performance & Security
+          const currentVersion = "1.0.55"; // v1.0.55 - Signed & Notarized Release
     const downloadFiles = {
       windows: `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Setup.exe`,
       'mac-intel': `https://github.com/mafatah/time-flow-admin/releases/download/v${currentVersion}/TimeFlow-v${currentVersion}-Intel.dmg`, // SIGNED & NOTARIZED
@@ -290,14 +290,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getFileSize = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return '94MB'; // TimeFlow-v1.0.54-ARM64.dmg (UPDATED for v1.0.54)
+        return '94MB'; // TimeFlow-v1.0.55-ARM64.dmg (SIGNED & NOTARIZED)
       case 'mac-intel':
       case 'mac':
-        return '101MB'; // TimeFlow-v1.0.54-Intel.dmg (UPDATED for v1.0.54)
+        return '101MB'; // TimeFlow-v1.0.55-Intel.dmg (SIGNED & NOTARIZED)
       case 'windows':
-        return '78MB'; // TimeFlow-v1.0.54-Setup.exe (UPDATED for v1.0.54)
+        return '75MB'; // TimeFlow-v1.0.55-Setup.exe (UPDATED for v1.0.55)
       case 'linux':
-        return '104MB'; // TimeFlow-v1.0.54.AppImage (UPDATED for v1.0.54)
+        return '104MB'; // TimeFlow-v1.0.55.AppImage (UPDATED for v1.0.55)
       default:
         return '';
     }
@@ -306,14 +306,14 @@ const DesktopDownload: React.FC<DesktopDownloadProps> = ({ variant = 'compact', 
   const getExpectedBytes = (platform: string) => {
     switch (platform) {
       case 'mac-arm':
-        return 98675650; // TimeFlow-v1.0.54-ARM64.dmg (UPDATED for v1.0.54)
+        return 98669595; // TimeFlow-v1.0.55-ARM64.dmg (SIGNED & NOTARIZED)
       case 'mac-intel':
       case 'mac':
-        return 106161980; // TimeFlow-v1.0.54-Intel.dmg (UPDATED for v1.0.54)
+        return 106221965; // TimeFlow-v1.0.55-Intel.dmg (SIGNED & NOTARIZED)
       case 'windows':
-        return 81387610; // TimeFlow-v1.0.54-Setup.exe (UPDATED for v1.0.54)
+        return 78884442; // TimeFlow-v1.0.55-Setup.exe (UPDATED for v1.0.55)
       case 'linux':
-        return 109171105; // TimeFlow-v1.0.54.AppImage (UPDATED for v1.0.54)
+        return 109171188; // TimeFlow-v1.0.55.AppImage (UPDATED for v1.0.55)
       default:
         return 0;
     }
