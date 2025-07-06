@@ -3790,7 +3790,7 @@ app.on('before-quit', async () => {
 // PERFORMANCE FIX: Debounced activate event to prevent Apple Events loop
 app.on('activate', debounceEvent('app-activate', () => {
   if (mainWindow) {
-    console.log('📱 App activate event (debounced)');
+    safeLog('📱 App activate event (debounced)');
     
     try {
       // Properly restore window when dock/taskbar icon is clicked
@@ -3805,7 +3805,7 @@ app.on('activate', debounceEvent('app-activate', () => {
         app.focus();
       }
       
-      console.log('📱 Window activated from dock/taskbar click');
+      safeLog('📱 Window activated from dock/taskbar click');
     } catch (error) {
       console.error('❌ Error in activate event:', error);
     }
