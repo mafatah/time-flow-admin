@@ -103,6 +103,21 @@ cd desktop-agent
 # Install dependencies
 npm install --no-audit --no-fund
 
+# Validate required environment variables
+if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+    echo -e "${RED}❌ Missing required environment variables:${NC}"
+    echo "   VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set"
+    echo "💡 Please set these in your shell environment before running the release script"
+    exit 1
+fi
+
+# Set up environment variables for build
+export VITE_SUPABASE_URL="$VITE_SUPABASE_URL"
+export VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY"
+
+echo -e "${BLUE}🔧 Generating embedded configuration...${NC}"
+node generate-env-config.js --build
+
 # Create entitlements file for macOS
 cat > entitlements.mac.plist << EOL
 <?xml version="1.0" encoding="UTF-8"?>

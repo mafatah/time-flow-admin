@@ -156,9 +156,30 @@ build_desktop() {
     # Clean previous builds
     rm -rf dist
     
+    # Enter desktop-agent directory
+    cd desktop-agent
+    
+    # Validate required environment variables
+    if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+        print_error "Missing required environment variables:"
+        print_error "   VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set"
+        print_error "💡 Please set these in your shell environment before running the release script"
+        exit 1
+    fi
+    
+    # Set up environment variables for build
+    export VITE_SUPABASE_URL="$VITE_SUPABASE_URL"
+    export VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY"
+    
+    print_status "🔧 Generating embedded configuration..."
+    node generate-env-config.js --build
+    
     # Build with electron-builder (includes signing and notarization)
     # Build for all platforms: macOS, Windows, and Linux
     npx electron-builder --mac --win --linux --publish=never
+    
+    # Return to root directory
+    cd ..
     
     print_success "Desktop applications built and signed"
 }

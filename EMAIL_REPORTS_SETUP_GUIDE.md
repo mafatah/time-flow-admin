@@ -10,7 +10,7 @@ Add these environment variables to your backend:
 
 ```bash
 # Backend .env file
-RESEND_API_KEY=re_SyA14jRb_MDnC1CzdvLgvw8JqPFD45XMR
+RESEND_API_KEY=[YOUR_ACTUAL_RESEND_API_KEY]
 
 # Optional: Configure email sender domain
 EMAIL_FROM_DOMAIN=timeflow.app

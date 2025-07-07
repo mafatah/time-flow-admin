@@ -18,7 +18,7 @@ You now have a **comprehensive, dynamic email reports system** that allows admin
 
 Add this to your backend `.env` file:
 ```bash
-RESEND_API_KEY=re_SyA14jRb_MDnC1CzdvLgvw8JqPFD45XMR
+RESEND_API_KEY=[YOUR_ACTUAL_RESEND_API_KEY]
 ```
 
 ### Step 2: Run Database Migration
