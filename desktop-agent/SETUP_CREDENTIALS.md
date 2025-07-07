@@ -1,123 +1,117 @@
-# TimeFlow Desktop Agent - Secure Credentials Setup
+# 🔐 Desktop Agent Credentials Setup Guide
 
-## 🔐 Secure Local Configuration
+## Quick Setup (Recommended)
 
-The desktop agent now uses **local environment variables only** for maximum security. No credentials are hardcoded or embedded in the application.
+### 1. **Run Setup Script**
+```bash
+cd desktop-agent
+./setup-local-env.sh
+```
 
-### Step 1: Copy the Environment Template
+This will:
+- Create a `.env` file from the template
+- Open it in your editor
+- Guide you through the setup process
 
-Copy the template file to create your local environment configuration:
+### 2. **Manual Setup**
+If you prefer to set up manually:
 
 ```bash
 cd desktop-agent
 cp .env.template .env
 ```
 
-### Step 2: Configure Your Supabase Credentials
+Then edit `.env` with your actual credentials:
 
-Edit the `.env` file with your actual Supabase credentials:
-
-```bash
-# Open the .env file in your editor
-nano .env
-# or
-code .env
-```
-
-**Required Configuration:**
 ```env
-# =============================================================================
-# SUPABASE CONFIGURATION (REQUIRED)
-# =============================================================================
-
-# Your Supabase Project URL
-VITE_SUPABASE_URL=https://your-actual-project-id.supabase.co
-
-# Your Supabase Anonymous Key
-VITE_SUPABASE_ANON_KEY=your-actual-anon-key-here
-
-# Alternative format for compatibility
-SUPABASE_URL=https://your-actual-project-id.supabase.co
-SUPABASE_ANON_KEY=your-actual-anon-key-here
+# Desktop Agent Environment Configuration
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here (optional)
 ```
 
-### Step 3: Find Your Supabase Credentials
+## 🔒 Security Features
 
-1. **Go to your Supabase Dashboard**: https://supabase.com/dashboard
-2. **Select your project**
-3. **Navigate to**: Settings → API
-4. **Copy the following values**:
-   - **URL**: Project URL
-   - **anon public**: This is your ANON_KEY
+### ✅ **What's Secure:**
+- ✅ No hardcoded credentials in source code
+- ✅ Local `.env` files are git-ignored
+- ✅ Build process embeds credentials securely
+- ✅ Packaged apps work without exposing credentials
 
-### Step 4: Test the Configuration
+### 🔧 **How It Works:**
 
-After setting up your `.env` file:
+1. **Development Mode:**
+   - Uses local `.env` file
+   - Fallback to environment variables
+   - Safe error handling
 
+2. **Build Process:**
+   - Runs `generate-env-config.js --build`
+   - Validates required credentials
+   - Embeds credentials in packaged app
+   - Generated config is temporary
+
+3. **Packaged App:**
+   - Uses embedded configuration
+   - No external dependencies
+   - Secure credential loading
+
+## 🚀 Usage
+
+### **Development:**
 ```bash
-cd desktop-agent
-npm start
+npm start           # Uses .env file
 ```
 
-The app should now launch successfully with your local credentials.
+### **Building:**
+```bash
+npm run build       # Generates embedded config + builds
+npm run build:mac   # Mac-specific build
+npm run build:dmg   # DMG package
+```
 
-## 🛡️ Security Features
+### **Environment Variables (Alternative):**
+```bash
+export VITE_SUPABASE_URL="your_url"
+export VITE_SUPABASE_ANON_KEY="your_key"
+npm run build
+```
 
-### ✅ What's Secure Now:
-- **No hardcoded credentials** in any files
-- **Local .env files** are excluded from version control
-- **Environment variable priority** system
-- **Validation checks** for missing credentials
+## 🔧 Troubleshooting
 
-### 🔒 Security Best Practices:
-- ✅ `.env` files are automatically ignored by Git
-- ✅ No credentials are embedded in built applications
-- ✅ Each developer uses their own local credentials
-- ✅ Production and development environments are separated
+### **Error: "Missing required Supabase configuration"**
+- Ensure `.env` file exists with proper credentials
+- Or set environment variables before building
 
-### ⚠️ Important Security Notes:
-- **Never commit** your `.env` file to version control
-- **Keep your service role key secure** and only use when necessary
-- **Regenerate keys** if you suspect they've been compromised
-- **The anon key is safe** for client-side use but should still be kept private
+### **Error: "Invalid Supabase URL format"**
+- Check your Supabase URL format
+- Should be: `https://your-project.supabase.co`
 
-## 🔧 Configuration Priority
-
-The desktop agent loads configuration in this order:
-
-1. **Process environment variables** (highest priority)
-2. **Local .env file** in desktop-agent directory
-3. **Embedded config** (now uses environment variables)
-4. **config.json** for app settings (lowest priority)
-
-## 🚨 Troubleshooting
-
-### "Missing Supabase credentials" Error
-1. Ensure your `.env` file exists in the `desktop-agent` directory
-2. Check that all required variables are set
-3. Verify there are no extra spaces or characters in your credentials
-4. Restart the desktop agent application
-
-### "Invalid URL" Error
-1. Check that your `VITE_SUPABASE_URL` is correctly formatted
-2. Ensure it starts with `https://` and ends with `.supabase.co`
-3. Verify the project ID is correct
-
-### Still Having Issues?
-1. Check the console output for specific error messages
-2. Verify your Supabase project is active and accessible
-3. Try regenerating your API keys in the Supabase dashboard
+### **Build fails with credential errors:**
+- Run `npm run prebuild` manually to test
+- Check that `generate-env-config.js` finds your credentials
 
 ## 📁 File Structure
 
 ```
 desktop-agent/
-├── .env                    # Your local credentials (NEVER commit!)
-├── .env.template          # Template for setup (safe to commit)
-├── .gitignore            # Ensures .env is never committed
-├── load-config.js        # Secure config loading logic
-├── env-config.js         # Uses environment variables only
-└── SETUP_CREDENTIALS.md  # This file
+├── .env.template      # Template for local setup
+├── .env              # Your local credentials (git-ignored)
+├── .gitignore        # Protects sensitive files
+├── env-config.js     # Generated embedded config
+├── generate-env-config.js  # Config generator
+├── load-config.js    # Config loader
+└── setup-local-env.sh # Quick setup script
 ```
 
-The application is now completely secure with no embedded credentials! 
+## 🎯 Best Practices
+
+1. **Never commit `.env` files** - They're automatically ignored
+2. **Use environment variables** for CI/CD builds
+3. **Test builds locally** before releasing
+4. **Keep credentials secure** - Don't share in chat/email
+5. **Regenerate keys periodically** for security
+
+---
+
+**🎉 Your desktop agent is now secure and ready for development and distribution!** 
