@@ -1,43 +1,38 @@
 const fs = require('fs');
 const path = require('path');
 
-// Load environment variables from .env file
-const envPath = path.join(__dirname, '.env');
-const envContent = fs.readFileSync(envPath, 'utf8');
+console.log('🔧 Generating secure environment configuration...');
 
-// Parse environment variables
-const envVars = {};
-envContent.split('\n').forEach(line => {
-    if (line.trim() && !line.startsWith('#')) {
-        const [key, value] = line.split('=');
-        if (key && value) {
-            envVars[key.trim()] = value.trim();
-        }
-    }
-});
+// Check if environment variables are available
+const hasEnvVars = process.env.VITE_SUPABASE_URL && process.env.VITE_SUPABASE_ANON_KEY;
 
-console.log('🔧 Loaded environment variables:', {
-    hasUrl: !!envVars.VITE_SUPABASE_URL,
-    hasKey: !!envVars.VITE_SUPABASE_ANON_KEY,
-    urlPreview: envVars.VITE_SUPABASE_URL ? envVars.VITE_SUPABASE_URL.substring(0, 30) + '...' : 'None'
-});
+if (!hasEnvVars) {
+  console.log('⚠️  No environment variables found. Please set up your .env file first.');
+  console.log('   Required variables:');
+  console.log('   - VITE_SUPABASE_URL');
+  console.log('   - VITE_SUPABASE_ANON_KEY');
+  console.log('');
+  console.log('📋 Create a .env file in the desktop-agent directory with your Supabase credentials.');
+  process.exit(1);
+}
 
-// Generate env-config.js with embedded credentials
+// Generate env-config.js with environment variable references only
 const configContent = `// Auto-generated configuration file
-// This file embeds Supabase credentials into the desktop app
+// This file loads Supabase credentials from environment variables only
 // Generated: ${new Date().toISOString()}
 
 module.exports = {
-    supabase_url: '${envVars.VITE_SUPABASE_URL}',
-    supabase_key: '${envVars.VITE_SUPABASE_ANON_KEY}',
-    app_url: '${envVars.VITE_APP_URL || ''}',
-    environment: '${envVars.VITE_ENVIRONMENT || 'development'}',
-    debug_mode: ${envVars.VITE_DEBUG_MODE === 'true'}
+    supabase_url: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
+    supabase_key: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+    app_url: process.env.VITE_APP_URL || '',
+    environment: process.env.VITE_ENVIRONMENT || 'development',
+    debug_mode: process.env.VITE_DEBUG_MODE === 'true'
 };
 `;
 
 // Write to env-config.js
 fs.writeFileSync(path.join(__dirname, 'env-config.js'), configContent);
 
-console.log('✅ Generated env-config.js with embedded Supabase credentials');
-console.log('📄 File created at:', path.join(__dirname, 'env-config.js')); 
+console.log('✅ Configuration file generated successfully');
+console.log('🔒 No credentials embedded - using environment variables only');
+console.log('📁 File location: env-config.js'); 

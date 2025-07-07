@@ -2,7 +2,7 @@
 -- RESEND API KEY CONFIGURATION
 -- ============================================================================
 -- This script will help you configure the Resend API key for email reports
--- Your API key: re_8GzN35eR_FM1FMAiRLdH9KdFuVW3Uy1UP
+-- Your API key: [GET FROM RESEND DASHBOARD - https://resend.com/api-keys]
 
 -- Step 1: First, make sure you have the fix script applied
 -- If you haven't run fix-email-reports-system.sql yet, do that first!
@@ -139,7 +139,7 @@ SELECT
 UNION ALL
 SELECT 
     'Step 3:', 
-    'Add environment variable: RESEND_API_KEY = re_8GzN35eR_FM1FMAiRLdH9KdFuVW3Uy1UP'
+    'Add environment variable: RESEND_API_KEY = [YOUR_ACTUAL_RESEND_API_KEY]'
 UNION ALL
 SELECT 
     'Step 4:', 

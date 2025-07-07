@@ -2,7 +2,7 @@
 
 ## 🎯 **Your Resend API Key is WORKING!**
 
-✅ **API Key**: `re_8GzN35eR_FM1FMAiRLdH9KdFuVW3Uy1UP` (Verified)
+✅ **API Key**: `[YOUR_RESEND_API_KEY]` (Get from Resend Dashboard)
 
 The API key has been tested and is valid. Follow these final steps to complete the setup:
 
@@ -15,7 +15,7 @@ The API key has been tested and is valid. Follow these final steps to complete t
 3. **Go to Settings tab**
 4. **Add Environment Variable**:
    - **Name**: `RESEND_API_KEY`
-   - **Value**: `re_8GzN35eR_FM1FMAiRLdH9KdFuVW3Uy1UP`
+   - **Value**: `[YOUR_ACTUAL_RESEND_API_KEY]`
 5. **Click Save**
 
 ---
