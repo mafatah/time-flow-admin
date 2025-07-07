@@ -1,6 +1,6 @@
 {
   "name": "ebdaa-work-time-agent",
-  "version": "1.0.56",
+  "version": "1.0.57",
   "description": "Ebdaa Work Time Agent - Employee time tracking and productivity monitoring",
   "main": "src/main.js",
   "author": "Ebdaa Digital Technology",

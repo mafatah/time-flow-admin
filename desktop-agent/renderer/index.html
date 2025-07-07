@@ -624,17 +624,17 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* === PERFORMANCE OPTIMIZED TAB SWITCHING === */
+        /* === ULTRA PERFORMANCE OPTIMIZED TAB SWITCHING === */
         .page-section {
-            /* Hardware acceleration for smooth transitions */
+            /* Maximum hardware acceleration */
             transform: translateZ(0);
             backface-visibility: hidden;
             perspective: 1000px;
+            will-change: transform, opacity;
             
-            /* Fast transitions */
-            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+            /* Instant transitions - no animation delays */
+            transition: opacity 0.1s ease-out;
             opacity: 0;
-            transform: translateX(20px);
             
             /* Hidden by default */
             display: none;
@@ -643,26 +643,58 @@
         .page-section.active {
             display: block;
             opacity: 1;
-            transform: translateX(0);
+            /* Force layer creation for better performance */
+            transform: translateZ(0);
         }
 
         .nav-item {
-            /* Hardware acceleration for hover effects */
+            /* Maximum hardware acceleration for nav items */
             transform: translateZ(0);
             backface-visibility: hidden;
+            will-change: transform, background-color;
             
-            /* Fast transitions */
-            transition: all 0.15s ease-out;
+            /* Ultra-fast transitions */
+            transition: background-color 0.1s ease-out, transform 0.1s ease-out;
         }
 
         .nav-item:hover {
-            /* Optimize hover for better responsiveness */
-            transform: translateX(4px) translateZ(0);
+            /* Minimal transform for better performance */
+            transform: translateX(2px) translateZ(0);
         }
 
         .nav-item.active {
             /* Hardware accelerated active state */
             transform: translateZ(0);
+        }
+
+        /* === CONTENT LOADING OPTIMIZATION === */
+        .loading-skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* === ENHANCED SCROLLING PERFORMANCE === */
+        .main-content {
+            /* Smooth scrolling with hardware acceleration */
+            scroll-behavior: smooth;
+            transform: translateZ(0);
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* === MEMORY EFFICIENT ANIMATIONS === */
+        .fade-in {
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         /* === HEALTH CHECK MODAL === */
