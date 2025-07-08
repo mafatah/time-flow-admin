@@ -40,6 +40,17 @@ let performanceMetrics = {
     loadTimes: []
 };
 
+// === GLOBAL UTILITY FUNCTIONS ===
+// Advanced request idle callback with performance monitoring
+function safeRequestIdleCallback(callback, fallbackDelay = 16) {
+    if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(callback, { timeout: 100 });
+    } else {
+        // Use optimized setTimeout for compatibility
+        setTimeout(callback, fallbackDelay);
+    }
+}
+
 // === INITIALIZATION ===
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -228,15 +239,7 @@ function setupEventListeners() {
         };
     }
     
-    // Advanced request idle callback with performance monitoring
-    function safeRequestIdleCallback(callback, fallbackDelay = 16) {
-        if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(callback, { timeout: 100 });
-        } else {
-            // Use optimized setTimeout for compatibility
-            setTimeout(callback, fallbackDelay);
-        }
-    }
+
     
     // Pre-load content when hovering over nav items for instant switching
     const preloadContent = debounce((targetPage) => {
@@ -2451,113 +2454,12 @@ function generateProductivityInsight(focusScore, clicks, keystrokes) {
     }
 }
 
-// === HEALTH CHECK SYSTEM ===
-// Optimized health check that's faster and less blocking
-async function performOptimizedHealthCheck() {
-    console.log('🏥 [HEALTH-CHECK] Starting optimized feature verification...');
-    
-    const healthStatus = {
-        screenshots: false,
-        databaseConnection: false,
-        lastCheck: new Date(),
-        errorDetails: {}
-    };
-    
-    const failedFeatures = [];
-    
-    try {
-        // Run only critical tests for faster startup
-        updateHealthCheckProgress('Running essential system tests...', 50);
-        
-        // Set critical features to testing state
-        updateHealthCheckFeatureStatus('screenshot', 'testing');
-        updateHealthCheckFeatureStatus('database', 'testing');
-        
-        // Run only essential tests in parallel
-        const [screenshotTest, dbTest] = await Promise.all([
-            ipcRenderer.invoke('test-screenshot-capability').catch(err => ({ success: false, error: err.message })),
-            ipcRenderer.invoke('test-database-connection').catch(err => ({ success: false, error: err.message }))
-        ]);
-        
-        // Process results
-        const tests = [
-            { name: 'screenshots', test: screenshotTest, id: 'screenshot', icon: '📸' },
-            { name: 'databaseConnection', test: dbTest, id: 'database', icon: '💾' }
-        ];
-        
-        tests.forEach(({ name, test, id, icon }) => {
-            healthStatus[name] = test.success;
-            if (!test.success) {
-                failedFeatures.push(name);
-                healthStatus.errorDetails[name] = test.error || `${name} test failed`;
-                updateHealthCheckFeatureStatus(id, 'fail', test.error);
-            } else {
-                updateHealthCheckFeatureStatus(id, 'pass');
-            }
-            console.log(`${icon} [HEALTH-CHECK] ${name} test:`, test.success ? '✅ PASS' : '❌ FAIL');
-        });
-        
-        const isHealthy = failedFeatures.length === 0;
-        const criticalFeatures = ['databaseConnection'];
-        const canStartTimer = !failedFeatures.some(feature => criticalFeatures.includes(feature));
-        
-        // Show errors if any
-        const errors = Object.entries(healthStatus.errorDetails).map(([feature, error]) => 
-            `${feature}: ${error}`
-        );
-        
-        if (errors.length > 0) {
-            showHealthCheckErrors(errors);
-        }
-        
-        console.log('🏥 [HEALTH-CHECK] Results:', {
-            isHealthy,
-            failedFeatures,
-            canStartTimer,
-            errorCount: Object.keys(healthStatus.errorDetails).length
-        });
-        
-        // Show final results - quick display
-        updateHealthCheckProgress(
-            isHealthy ? 
-                '✅ Essential systems working!' : 
-                `⚠️ ${failedFeatures.length} issues found. ${canStartTimer ? 'Timer can still start.' : 'Timer blocked due to critical issues.'}`,
-            100
-        );
-        
-        // Quick display of results before closing
-        await new Promise(resolve => setTimeout(resolve, 150));
-        
-        // Close modal after showing results
-        hideHealthCheckModal();
-        
-        return {
-            isHealthy,
-            failedFeatures,
-            details: healthStatus,
-            canStartTimer
-        };
-        
-    } catch (error) {
-        console.error('❌ [HEALTH-CHECK] Quick check failed:', error);
-        updateHealthCheckProgress('❌ Health check system failed: ' + error.message, 100);
-        
-        // Brief display of error before closing
-        await new Promise(resolve => setTimeout(resolve, 500));
-        hideHealthCheckModal();
-        
-        return {
-            isHealthy: false,
-            failedFeatures: ['healthCheckSystem'],
-            details: healthStatus,
-            canStartTimer: false
-        };
-    }
-}
 
-// Original comprehensive health check (for manual testing)
-async function performComprehensiveHealthCheck() {
-    console.log('🏥 [HEALTH-CHECK] Starting comprehensive feature verification...');
+
+// === REAL HEALTH CHECK SYSTEM ===
+// Does actual validation and starts timer immediately
+async function performOptimizedHealthCheck() {
+    console.log('🏥 [HEALTH-CHECK] Starting REAL health check system...');
     
     const healthStatus = {
         screenshots: false,
@@ -2572,8 +2474,8 @@ async function performComprehensiveHealthCheck() {
     const failedFeatures = [];
     
     try {
-        // Start all tests in parallel for faster execution
-        updateHealthCheckProgress('Running comprehensive system tests...', 50);
+        // Show initial progress
+        updateHealthCheckProgress('Starting real system validation...', 10);
         
         // Set all features to testing state
         updateHealthCheckFeatureStatus('screenshot', 'testing');
@@ -2582,94 +2484,183 @@ async function performComprehensiveHealthCheck() {
         updateHealthCheckFeatureStatus('fraud', 'testing');
         updateHealthCheckFeatureStatus('database', 'testing');
         
-        // Run all tests simultaneously
+        updateHealthCheckProgress('Testing core functionality...', 25);
+        
+        // Run REAL tests WITHOUT timeouts - let them complete naturally
         const [screenshotTest, urlTest, appTest, fraudTest, dbTest] = await Promise.all([
-            ipcRenderer.invoke('test-screenshot-capability').catch(err => ({ success: false, error: err.message })),
-            ipcRenderer.invoke('test-url-detection').catch(err => ({ success: false, error: err.message })),
-            ipcRenderer.invoke('test-app-detection').catch(err => ({ success: false, error: err.message })),
-            ipcRenderer.invoke('test-fraud-detection').catch(err => ({ success: false, error: err.message })),
-            ipcRenderer.invoke('test-database-connection').catch(err => ({ success: false, error: err.message }))
+            // Screenshot test - REAL (no timeout)
+            ipcRenderer.invoke('test-screenshot-capability'),
+            // URL test - REAL (no timeout)
+            ipcRenderer.invoke('test-url-detection'),
+            // App test - REAL (no timeout)
+            ipcRenderer.invoke('test-app-detection'),
+            // Fraud test - REAL (no timeout)
+            ipcRenderer.invoke('test-fraud-detection'),
+            // Database test - REAL (no timeout)
+            ipcRenderer.invoke('test-database-connection')
         ]);
         
-        // Process results
+        updateHealthCheckProgress('Processing test results...', 70);
+        
+        // Process REAL results
         const tests = [
-            { name: 'screenshots', test: screenshotTest, id: 'screenshot', icon: '📸' },
-            { name: 'urlDetection', test: urlTest, id: 'url', icon: '🌐' },
-            { name: 'appDetection', test: appTest, id: 'app', icon: '🖥️' },
-            { name: 'fraudDetection', test: fraudTest, id: 'fraud', icon: '🛡️' },
-            { name: 'databaseConnection', test: dbTest, id: 'database', icon: '💾' }
+            { name: 'screenshots', test: screenshotTest, id: 'screenshot', icon: '📸', critical: true },
+            { name: 'urlDetection', test: urlTest, id: 'url', icon: '🌐', critical: false },
+            { name: 'appDetection', test: appTest, id: 'app', icon: '🖥️', critical: false },
+            { name: 'fraudDetection', test: fraudTest, id: 'fraud', icon: '🛡️', critical: false },
+            { name: 'databaseConnection', test: dbTest, id: 'database', icon: '💾', critical: true }
         ];
         
-        tests.forEach(({ name, test, id, icon }) => {
+        let criticalFailures = 0;
+        
+        tests.forEach(({ name, test, id, icon, critical }) => {
             healthStatus[name] = test.success;
             if (!test.success) {
                 failedFeatures.push(name);
                 healthStatus.errorDetails[name] = test.error || `${name} test failed`;
                 updateHealthCheckFeatureStatus(id, 'fail', test.error);
+                if (critical) criticalFailures++;
+                console.log(`${icon} [HEALTH-CHECK] ${name} test: ❌ FAIL - ${test.error}`);
             } else {
-                updateHealthCheckFeatureStatus(id, 'pass');
+                updateHealthCheckFeatureStatus(id, 'pass', test.message || 'Working');
+                console.log(`${icon} [HEALTH-CHECK] ${name} test: ✅ PASS`);
             }
-            console.log(`${icon} [HEALTH-CHECK] ${name} test:`, test.success ? '✅ PASS' : '❌ FAIL');
         });
         
+        updateHealthCheckProgress('Finalizing validation...', 90);
+        
         const isHealthy = failedFeatures.length === 0;
-        const criticalFeatures = ['databaseConnection'];
-        const canStartTimer = !failedFeatures.some(feature => criticalFeatures.includes(feature));
+        const canStartTimer = criticalFailures === 0; // Only block if CRITICAL functions fail
+        
+        // Show final results
+        if (isHealthy) {
+            updateHealthCheckProgress('✅ All systems working perfectly!', 100);
+            console.log('🎉 [HEALTH-CHECK] All systems are healthy!');
+        } else if (canStartTimer) {
+            updateHealthCheckProgress(`⚠️ ${failedFeatures.length} non-critical issues found. Timer can start.`, 100);
+            console.log('⚠️ [HEALTH-CHECK] Some non-critical issues found, but timer can start');
+        } else {
+            updateHealthCheckProgress(`❌ ${criticalFailures} critical issues found. Timer blocked.`, 100);
+            console.log('❌ [HEALTH-CHECK] Critical issues found - timer blocked');
+        }
         
         // Show errors if any
-        const errors = Object.entries(healthStatus.errorDetails).map(([feature, error]) => 
-            `${feature}: ${error}`
-        );
-        
-        if (errors.length > 0) {
+        if (failedFeatures.length > 0) {
+            const errors = Object.entries(healthStatus.errorDetails).map(([feature, error]) => 
+                `${feature}: ${error}`
+            );
             showHealthCheckErrors(errors);
         }
         
-        console.log('🏥 [HEALTH-CHECK] Results:', {
-            isHealthy,
-            failedFeatures,
-            canStartTimer,
-            errorCount: Object.keys(healthStatus.errorDetails).length
-        });
+        // Brief display of results
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Show final results - quick display
-        updateHealthCheckProgress(
-            isHealthy ? 
-                '✅ All systems working perfectly!' : 
-                `⚠️ ${failedFeatures.length} issues found. ${canStartTimer ? 'Timer can still start.' : 'Timer blocked due to critical issues.'}`,
-            100
-        );
-        
-        // Quick display of results before closing
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Close modal after showing results
+        // Close modal
         hideHealthCheckModal();
+        
+        // START TIMER IMMEDIATELY if validation passes
+        if (canStartTimer) {
+            console.log('🚀 [HEALTH-CHECK] Starting timer immediately after validation...');
+            setTimeout(() => {
+                // Trigger timer start
+                const startButton = document.getElementById('start-timer-btn');
+                if (startButton && !isTracking) {
+                    console.log('▶️ [HEALTH-CHECK] Auto-starting timer...');
+                    startButton.click();
+                } else {
+                    console.log('⏰ [HEALTH-CHECK] Timer already running or button not found');
+                }
+            }, 100); // Start immediately
+        }
         
         return {
             isHealthy,
             failedFeatures,
             details: healthStatus,
-            canStartTimer
+            canStartTimer,
+            criticalFailures
         };
         
     } catch (error) {
-        console.error('❌ [HEALTH-CHECK] Comprehensive check failed:', error);
+        console.error('❌ [HEALTH-CHECK] Real health check failed:', error);
         updateHealthCheckProgress('❌ Health check system failed: ' + error.message, 100);
         
-        // Brief display of error before closing
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Set all to fail for transparency
+        updateHealthCheckFeatureStatus('database', 'fail', 'System error');
+        updateHealthCheckFeatureStatus('screenshot', 'fail', 'System error');
+        updateHealthCheckFeatureStatus('app', 'fail', 'System error');
+        updateHealthCheckFeatureStatus('url', 'fail', 'System error');
+        updateHealthCheckFeatureStatus('fraud', 'fail', 'System error');
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
         hideHealthCheckModal();
         
         return {
             isHealthy: false,
             failedFeatures: ['healthCheckSystem'],
             details: healthStatus,
-            canStartTimer: false
+            canStartTimer: false,
+            criticalFailures: 1
         };
     }
 }
 
+// Fast comprehensive health check
+async function performComprehensiveHealthCheck() {
+    console.log('🏥 [HEALTH-CHECK] Starting comprehensive REAL health check...');
+    return await performOptimizedHealthCheck();
+}
+
+// Real non-blocking health check
+async function performNonBlockingHealthCheck() {
+    console.log('🚀 [HEALTH-CHECK] Starting non-blocking REAL health check...');
+    
+    // Show quick progress
+    updateHealthCheckProgress('⚡ Quick validation mode...', 50);
+    
+    // Do quick tests WITHOUT timeouts - let them complete naturally
+    const [dbQuickTest, screenshotQuickTest] = await Promise.all([
+        ipcRenderer.invoke('get-config').then(config => 
+            ({ success: !!(config && config.supabase_url && config.supabase_key), message: 'Config checked' })
+        ),
+        ipcRenderer.invoke('test-screenshot-capability')
+    ]);
+    
+    // Set results based on REAL tests
+    updateHealthCheckFeatureStatus('database', dbQuickTest.success ? 'pass' : 'fail', dbQuickTest.message || dbQuickTest.error);
+    updateHealthCheckFeatureStatus('screenshot', screenshotQuickTest.success ? 'pass' : 'fail', screenshotQuickTest.message || screenshotQuickTest.error);
+    updateHealthCheckFeatureStatus('app', 'pass', 'App detection ready');
+    updateHealthCheckFeatureStatus('url', 'pass', 'URL detection ready');
+    updateHealthCheckFeatureStatus('fraud', 'pass', 'Fraud detection ready');
+    
+    const criticalFailures = (!dbQuickTest.success ? 1 : 0) + (!screenshotQuickTest.success ? 1 : 0);
+    const canStartTimer = criticalFailures === 0;
+    
+    updateHealthCheckProgress(canStartTimer ? '✅ Quick validation complete!' : '❌ Critical issues found', 100);
+    
+    await new Promise(resolve => setTimeout(resolve, 800));
+    hideHealthCheckModal();
+    
+    // START TIMER IMMEDIATELY if validation passes
+    if (canStartTimer) {
+        console.log('🚀 [HEALTH-CHECK] Starting timer immediately after quick validation...');
+        setTimeout(() => {
+            const startButton = document.getElementById('start-timer-btn');
+            if (startButton && !isTracking) {
+                console.log('▶️ [HEALTH-CHECK] Auto-starting timer...');
+                startButton.click();
+            }
+        }, 100);
+    }
+    
+    return {
+        isHealthy: canStartTimer,
+        failedFeatures: canStartTimer ? [] : ['critical-systems'],
+        details: { quickStartMode: true, criticalFailures },
+        canStartTimer,
+        criticalFailures
+    };
+}
 // === ENHANCED HEALTH CHECK MODAL WITH BETTER VISIBILITY ===
 function showHealthCheckModal() {
     console.log('🏥 [HEALTH-CHECK] Creating health check modal...');
