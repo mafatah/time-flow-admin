@@ -1,11 +1,11 @@
-version: 1.0.57
+version: 1.0.58
 files:
-  - url: TimeFlow-v1.0.57-Intel.dmg
-    sha512: 5605c5031dfb3681833cfb73129bf88634f73f5e513985766debdf554dc444ec2769a4328209ba9464ea008d5aea9fe51b2ff758fb48979a5326eb65113dd39e
-    size: 106176353
-  - url: TimeFlow-v1.0.57-ARM64.dmg
-    sha512: 2d0f8415547688025ad4ac0f6e3d45abf94049e874967dcef0e1a76577a31be37ed88fc48ccc0d16995614b3246bb7c4885c9b56896c41f64d2f541cc23593fa
-    size: 98704981
-path: TimeFlow-v1.0.57-Intel.dmg
-sha512: 5605c5031dfb3681833cfb73129bf88634f73f5e513985766debdf554dc444ec2769a4328209ba9464ea008d5aea9fe51b2ff758fb48979a5326eb65113dd39e
-releaseDate: '2025-07-07T12:18:00.000Z'
+  - url: https://github.com/mafatah/time-flow-admin/releases/download/v1.0.58/TimeFlow-v1.0.58-ARM64.dmg
+    sha512: V9SMX6FYTF/6EaJ7MXUrBznu9tOfG6VKPZd91NWv7bP+sunRQEWGdN3S5bJU1pZ1uHeVcz2SOZWyIQhnkAT49Q==
+    size: 98708346
+  - url: https://github.com/mafatah/time-flow-admin/releases/download/v1.0.58/TimeFlow-v1.0.58-Intel.dmg
+    sha512: /FkHDksAPi8TL0vQt0KFVUy3vfoo5/isR36xBcUxMZ/WV8AYWP7IFdzFd+B+W3Kk9zjR4QmSwSfKoX3zw1+CHg==
+    size: 106184824
+path: TimeFlow-v1.0.58-ARM64.dmg
+sha512: V9SMX6FYTF/6EaJ7MXUrBznu9tOfG6VKPZd91NWv7bP+sunRQEWGdN3S5bJU1pZ1uHeVcz2SOZWyIQhnkAT49Q==
+releaseDate: '2025-07-08T00:30:18.555Z'
