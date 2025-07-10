@@ -62,6 +62,7 @@ const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
 const SyncManager = require('./sync-manager');
 const AntiCheatDetector = require('./anti-cheat-detector');
+const IntervalManager = require('./interval-manager');
 
 // Global system state variables
 let systemSuspended = false;
@@ -241,6 +242,7 @@ if (config.supabase_service_key) {
 }
 let syncManager;
 let antiCheatDetector;
+let intervalManager;
 let mainWindow;
 let debugWindow;
 let tray;
@@ -1897,7 +1899,7 @@ function startActiveBrowserMonitoring() {
   
   console.log('🔍 [TAB-MONITOR] Starting enhanced tab change detection...');
   
-  // Check for tab changes every 2 seconds when browser is active
+  // Check for tab changes every 15 seconds when browser is active (performance optimized)
   activeBrowserUrlCheckInterval = setInterval(async () => {
     try {
       const activeApp = await detectActiveApplication();
@@ -1934,7 +1936,7 @@ function startActiveBrowserMonitoring() {
     } catch (error) {
       console.log('❌ [TAB-MONITOR] Error during tab monitoring:', error.message);
     }
-  }, 2000); // Check every 2 seconds for tab changes
+  }, 15000); // Check every 15 seconds for tab changes (performance optimized)
 }
 
 function stopActiveBrowserMonitoring() {
@@ -3323,8 +3325,9 @@ async function resumeTracking() {
   
   // Restart captures
   startScreenshotCapture();
-  startAppCapture();
-  startUrlCapture();
+  // DISABLED OLD SYSTEMS - now handled by centralized manager
+  // startAppCapture();
+  // startUrlCapture();
 
   // Update UI
   mainWindow?.webContents.send('tracking-resumed');
@@ -3895,6 +3898,8 @@ powerMonitor.on('unlock-screen', () => {
 // Initialize components
 function initializeComponents() {
   syncManager = new SyncManager(config);
+  intervalManager = new IntervalManager();
+  
   console.log('📱 Ebdaa Work Time Agent initialized');
   
   // Load saved system state and offline queue on startup

@@ -67,16 +67,9 @@ class SyncManager {
       retries: 0
     };
 
-    if (this.isOnline) {
-      try {
-        await this.uploadScreenshot(screenshotData);
-        console.log('✅ Screenshot uploaded immediately');
-        return;
-      } catch (error) {
-        console.log('⚠️ Screenshot upload failed, queuing for later');
-      }
-    }
-
+    // PERFORMANCE OPTIMIZATION: Always queue screenshots for batch processing
+    // instead of immediate upload to reduce database write frequency
+    
     // Add to queue
     this.queue.screenshots.push(screenshotData);
     this.saveQueue();
@@ -129,17 +122,8 @@ class SyncManager {
       retries: 0
     };
 
-    if (this.isOnline) {
-      try {
-        await this.uploadAppLogs(logData);
-        console.log('✅ App logs uploaded immediately');
-        return;
-      } catch (error) {
-        console.log('⚠️ App logs upload failed, queuing for later');
-      }
-    }
-
-    // Add to queue
+    // PERFORMANCE OPTIMIZATION: Always queue app logs for batch processing
+    // instead of immediate upload to reduce database write frequency
     this.queue.appLogs.push(logData);
     this.saveQueue();
     console.log(`📦 App logs queued (${this.queue.appLogs.length} pending)`);
@@ -162,17 +146,8 @@ class SyncManager {
       retries: 0
     };
 
-    if (this.isOnline) {
-      try {
-        await this.uploadUrlLogs(logData);
-        console.log('✅ URL logs uploaded immediately');
-        return;
-      } catch (error) {
-        console.log('⚠️ URL logs upload failed, queuing for later');
-      }
-    }
-
-    // Add to queue
+    // PERFORMANCE OPTIMIZATION: Always queue URL logs for batch processing
+    // instead of immediate upload to reduce database write frequency
     this.queue.urlLogs.push(logData);
     this.saveQueue();
     console.log(`📦 URL logs queued (${this.queue.urlLogs.length} pending)`);
@@ -195,16 +170,9 @@ class SyncManager {
       retries: 0
     };
 
-    if (this.isOnline) {
-      try {
-        await this.uploadIdleLog(logData);
-        console.log('✅ Idle log uploaded immediately');
-        return;
-      } catch (error) {
-        console.log('⚠️ Idle log upload failed, queuing for later');
-      }
-    }
-
+    // PERFORMANCE OPTIMIZATION: Always queue idle logs for batch processing
+    // instead of immediate upload to reduce database write frequency
+    
     // Add to queue
     this.queue.idleLogs.push(logData);
     this.saveQueue();
@@ -228,16 +196,9 @@ class SyncManager {
       retries: 0
     };
 
-    if (this.isOnline) {
-      try {
-        await this.uploadTimeLog(logData);
-        console.log('✅ Time log uploaded immediately');
-        return;
-      } catch (error) {
-        console.log('⚠️ Time log upload failed, queuing for later');
-      }
-    }
-
+    // PERFORMANCE OPTIMIZATION: Always queue time logs for batch processing
+    // instead of immediate upload to reduce database write frequency
+    
     // Add to queue
     this.queue.timeLogs.push(logData);
     this.saveQueue();
@@ -270,16 +231,9 @@ class SyncManager {
       retries: 0
     };
 
-    if (this.isOnline) {
-      try {
-        await this.uploadFraudAlert(alertData);
-        console.log('✅ Fraud alert uploaded immediately');
-        return;
-      } catch (error) {
-        console.log('⚠️ Fraud alert upload failed, queuing for later');
-      }
-    }
-
+    // PERFORMANCE OPTIMIZATION: Always queue fraud alerts for batch processing
+    // instead of immediate upload to reduce database write frequency
+    
     // Add to queue
     this.queue.fraudAlerts.push(alertData);
     this.saveQueue();
@@ -287,28 +241,9 @@ class SyncManager {
   }
 
   async uploadFraudAlert(alertData) {
-    const { alert } = alertData;
-    
-    // Transform the alert data to match database schema
-    const fraudAlertRecord = {
-      user_id: alert.userId,
-      time_log_id: alert.timeLogId || null,
-      alert_type: alert.type,
-      severity: alert.severity || 'HIGH',
-      risk_score: (alert.riskScore * 100), // Convert to percentage
-      confidence: (alert.confidence * 100) || 0,
-      suspicious_patterns: alert.suspiciousPatterns || [],
-      detection_details: alert.details || {},
-      behavior_analysis: alert.behaviorAnalysis || {},
-      screenshot_context: alert.screenshotContext || {},
-      activity_context: alert.activityContext || {},
-      system_context: alert.systemContext || {},
-      detected_at: new Date(alert.timestamp).toISOString()
-    };
-
     const { error } = await this.supabaseService
-      .from('fraud_alerts')
-      .insert(fraudAlertRecord);
+      .from('fraud_detection_alerts')
+      .insert(alertData.alert);
 
     if (error) throw error;
   }
@@ -465,6 +400,12 @@ class SyncManager {
   }
 
   async syncFraudAlerts() {
+    // Safety check to ensure fraudAlerts array exists
+    if (!this.queue.fraudAlerts || !Array.isArray(this.queue.fraudAlerts)) {
+      this.queue.fraudAlerts = [];
+      return;
+    }
+    
     const fraudAlerts = [...this.queue.fraudAlerts];
     
     for (let i = fraudAlerts.length - 1; i >= 0; i--) {
@@ -521,27 +462,22 @@ class SyncManager {
       idleLogs: this.queue.idleLogs.length,
       timeLogs: this.queue.timeLogs.length,
       fraudAlerts: this.queue.fraudAlerts.length,
-      total: Object.values(this.queue).reduce((sum, arr) => sum + arr.length, 0),
-      isOnline: this.isOnline
+      total: Object.values(this.queue).reduce((sum, arr) => sum + arr.length, 0)
     };
   }
 
+  // Clean up any old URL logs with is_active field
   cleanBadUrlLogs() {
-    const originalCount = this.queue.urlLogs.length;
-    
-    // Remove URL logs that contain is_active field (old format causing database errors)
-    this.queue.urlLogs = this.queue.urlLogs.filter(urlLog => {
-      const hasInvalidField = urlLog.logs && urlLog.logs.some(log => 
-        log.hasOwnProperty('is_active')
-      );
-      return !hasInvalidField;
+    console.log('🧹 [CLEANUP] Removing malformed URL logs...');
+    this.queue.urlLogs = this.queue.urlLogs.filter(logData => {
+      const hasActiveField = logData.logs.some(log => log.hasOwnProperty('is_active'));
+      if (hasActiveField) {
+        console.log('🗑️ [CLEANUP] Removed URL log with legacy is_active field');
+        return false;
+      }
+      return true;
     });
-    
-    const removedCount = originalCount - this.queue.urlLogs.length;
-    if (removedCount > 0) {
-      this.saveQueue();
-      console.log(`🧹 Cleaned ${removedCount} bad URL logs from queue (had is_active field)`);
-    }
+    this.saveQueue();
   }
 
   clearQueue() {
@@ -550,10 +486,10 @@ class SyncManager {
       appLogs: [],
       urlLogs: [],
       idleLogs: [],
-      timeLogs: []
+      timeLogs: [],
+      fraudAlerts: []
     };
     this.saveQueue();
-    console.log('🗑️ Queue cleared');
   }
 
   destroy() {

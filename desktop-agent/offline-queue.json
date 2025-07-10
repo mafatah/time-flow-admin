@@ -3,5 +3,6 @@
   "appLogs": [],
   "urlLogs": [],
   "idleLogs": [],
-  "timeLogs": []
+  "timeLogs": [],
+  "fraudAlerts": []
 }

@@ -11,18 +11,18 @@ const INTERVALS = {
   // === CORE MONITORING INTERVALS ===
   
   // Idle detection - how often to check if user is idle
-  IDLE_CHECK: 5000, // 5 seconds (was 1000ms)
+  IDLE_CHECK: 5000, // 5 seconds - optimal for responsive idle detection
   
   // Mouse activity tracking - how often to check mouse position/movement
-  MOUSE_TRACKING: 1000, // 1 second (was 200ms, then 50ms originally)
+  MOUSE_TRACKING: 10000, // 10 seconds - maximum performance optimization (reduced from 2000ms)
   
   // Keyboard activity tracking - how often to check for keyboard activity
-  KEYBOARD_TRACKING: 3000, // 3 seconds (was 1000ms)
+  KEYBOARD_TRACKING: 10000, // 10 seconds - maximum performance optimization (reduced from 5000ms)
   
   // === CAPTURE INTERVALS ===
   
   // App capture throttling - minimum time between app captures
-  APP_CAPTURE_THROTTLE: 5000, // 5 seconds
+  APP_CAPTURE_THROTTLE: 3000, // 3 seconds - faster app switch detection (optimized from 5000ms)
   
   // URL capture throttling - minimum time between URL captures  
   URL_CAPTURE_THROTTLE: 5000, // 5 seconds
@@ -68,6 +68,8 @@ const INTERVALS = {
     IDLE_CHECK: 15000, // 15 seconds
     MOUSE_TRACKING: 5000, // 5 seconds  
     KEYBOARD_TRACKING: 10000, // 10 seconds
+    APP_CAPTURE_THROTTLE: 8000, // 8 seconds - balanced app capture
+    URL_CAPTURE_THROTTLE: 8000, // 8 seconds - balanced URL capture (catches 3 websites in 24s)
     SCREENSHOT_MONITORING: 300 * 1000, // 5 minutes
     NOTIFICATIONS: 300 * 1000, // 5 minutes
   },

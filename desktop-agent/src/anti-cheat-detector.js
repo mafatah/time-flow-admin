@@ -33,10 +33,10 @@ class AntiCheatDetector {
     console.log('🕵️  Starting anti-cheat detection...');
     this.isMonitoring = true;
     
-    // Monitor every 2 seconds for suspicious patterns
+    // Monitor every 15 seconds for suspicious patterns (performance optimized)
     this.monitoringInterval = setInterval(() => {
       this.analyzeActivity();
-    }, 2000);
+    }, 15000);
     
     // Deep analysis every 30 seconds
     this.deepAnalysisInterval = setInterval(() => {
