@@ -17,11 +17,29 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get all active report configurations
-    const { data: configs, error } = await supabase
+    // Parse request body to get report type (from cron job)
+    const requestBody = await req.json().catch(() => ({}));
+    const { reportType, automated = false } = requestBody;
+
+    console.log(`📅 Schedule-reports triggered: reportType=${reportType}, automated=${automated}`);
+
+    // Get active report configurations based on the report type
+    let query = supabase
       .from('report_configurations')
-      .select('*')
+      .select(`
+        *,
+        report_types(*)
+      `)
       .eq('is_active', true);
+
+    // Filter by report type if specified
+    if (reportType === 'daily') {
+      query = query.eq('report_types.template_type', 'daily');
+    } else if (reportType === 'weekly') {
+      query = query.eq('report_types.template_type', 'weekly');
+    }
+
+    const { data: configs, error } = await query;
 
     if (error) {
       console.error('Error fetching report configurations:', error);
@@ -31,32 +49,26 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Check which reports are due
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    if (!configs || configs.length === 0) {
+      console.log(`⚠️ No active ${reportType || 'any'} report configurations found`);
+      return new Response(JSON.stringify({
+        success: true,
+        message: `No active ${reportType || 'any'} report configurations found`,
+        results: []
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
 
-    const dueReports = configs.filter(config => {
-      if (!config.schedule_cron) return false;
-      
-      // Simple cron parsing for our use cases
-      if (config.schedule_cron === '0 19 * * *' && currentHour === 19 && currentMinute < 15) {
-        return true; // Daily at 7 PM
-      }
-      if (config.schedule_cron === '0 9 * * 1' && currentDay === 1 && currentHour === 9 && currentMinute < 15) {
-        return true; // Weekly on Monday at 9 AM
-      }
-      
-      return false;
-    });
+    console.log(`📋 Found ${configs.length} ${reportType || 'report'} configurations to process`);
 
-    console.log(`Found ${dueReports.length} reports due for sending`);
-
-    // Send each due report
+    // Send each report configuration
     const results = [];
-    for (const report of dueReports) {
+    for (const config of configs) {
       try {
+        console.log(`📧 Sending ${config.name} (ID: ${config.id})`);
+        
         const response = await fetch(`${supabaseUrl}/functions/v1/send-report-email`, {
           method: 'POST',
           headers: {
@@ -64,43 +76,56 @@ const handler = async (req: Request): Promise<Response> => {
             'Authorization': `Bearer ${supabaseServiceKey}`,
           },
           body: JSON.stringify({
-            configId: report.id,
+            configId: config.id,
             isTest: false
           }),
         });
 
         const result = await response.json();
         results.push({
-          reportId: report.id,
-          reportName: report.name,
+          reportId: config.id,
+          reportName: config.name,
+          reportType: config.report_types?.template_type,
           success: response.ok,
           message: result.message,
           recipients: result.recipients
         });
 
-        console.log(`Report ${report.name}: ${response.ok ? 'Success' : 'Failed'} - ${result.message}`);
+        console.log(`${response.ok ? '✅' : '❌'} Report ${config.name}: ${result.message}`);
       } catch (error: any) {
         results.push({
-          reportId: report.id,
-          reportName: report.name,
+          reportId: config.id,
+          reportName: config.name,
+          reportType: config.report_types?.template_type,
           success: false,
           message: error.message
         });
-        console.error(`Failed to send report ${report.name}:`, error);
+        console.error(`❌ Failed to send report ${config.name}:`, error);
       }
     }
 
+    const successCount = results.filter(r => r.success).length;
+    const totalRecipients = results.reduce((sum, r) => sum + (r.recipients || 0), 0);
+
+    console.log(`📊 Summary: ${successCount}/${configs.length} reports sent to ${totalRecipients} total recipients`);
+
     return new Response(JSON.stringify({
       success: true,
-      message: `Processed ${dueReports.length} scheduled reports`,
-      results
+      message: `Processed ${configs.length} ${reportType || 'scheduled'} reports: ${successCount} sent, ${configs.length - successCount} failed`,
+      results,
+      summary: {
+        total: configs.length,
+        sent: successCount,
+        failed: configs.length - successCount,
+        totalRecipients
+      }
     }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
 
   } catch (error: any) {
-    console.error('Error in schedule-reports function:', error);
+    console.error('❌ Error in schedule-reports function:', error);
     return new Response(JSON.stringify({
       success: false,
       message: error.message
