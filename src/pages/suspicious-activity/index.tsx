@@ -190,6 +190,83 @@ export default function SuspiciousActivityPage() {
         return;
       }
 
+      // 🔥 NEW: First, fetch pre-calculated suspicious activities from database
+      try {
+        let dbQuery = supabase
+          .from('suspicious_activity')
+          .select(`
+            user_id,
+            activity_type,
+            details,
+            risk_score,
+            category,
+            timestamp,
+            reviewed,
+            users!inner(id, email, full_name, role)
+          `)
+          .gte('timestamp', startDate.toISOString())
+          .lte('timestamp', endDate.toISOString())
+          .order('risk_score', { ascending: false });
+
+        if (selectedEmployee !== 'all') {
+          dbQuery = dbQuery.eq('user_id', selectedEmployee);
+        }
+
+        const { data: dbActivities, error: dbError } = await dbQuery;
+        
+        if (!dbError && dbActivities) {
+          // Convert database records to frontend format
+          const convertedActivities = dbActivities.map((record: any) => ({
+            user_id: record.user_id,
+            risk_score: record.risk_score,
+            social_media_usage: record.category === 'social_media' ? 1 : 0,
+            news_consumption: record.category === 'news' ? 1 : 0,
+            idle_time_hours: 0,
+            unproductive_websites: record.category === 'entertainment' ? 1 : 0,
+            entertainment_apps: record.category === 'entertainment' ? 1 : 0,
+            low_focus_periods: 0,
+            duplicate_screenshots: 0,
+            low_activity_periods: 0,
+            screenshot_analysis: {
+              total_screenshots: 0,
+              suspicious_screenshots: 1,
+              duplicate_screenshots: 0,
+              static_screen_periods: 0,
+              entertainment_count: record.category === 'entertainment' ? 1 : 0,
+              social_media_count: record.category === 'social_media' ? 1 : 0,
+              news_count: record.category === 'news' ? 1 : 0,
+              gaming_count: record.category === 'gaming' ? 1 : 0,
+              avg_activity_level: record.risk_score,
+              low_activity_count: 0
+            },
+            productivity_metrics: {
+              avg_activity_level: record.risk_score,
+              productive_hours: 0,
+              total_hours: 1,
+              efficiency_rating: 100 - record.risk_score,
+              focus_consistency: 100 - record.risk_score,
+              work_pattern_score: 100 - record.risk_score
+            },
+            suspicious_patterns: {
+              social_media_during_work: record.category === 'social_media',
+              entertainment_heavy_usage: record.category === 'entertainment',
+              static_screen_syndrome: false,
+              low_activity_with_tracking: false,
+              suspicious_timing_patterns: false,
+              minimal_productivity_signs: record.risk_score > 50
+            },
+            flags: [record.activity_type, record.category, `Database: ${record.details}`],
+            last_analyzed: record.timestamp
+          }));
+          
+          activities.push(...convertedActivities);
+          console.log(`🔍 Found ${convertedActivities.length} pre-calculated suspicious activities from database`);
+        }
+      } catch (dbError) {
+        console.error('Error fetching database suspicious activities:', dbError);
+        // Continue with custom analysis even if database query fails
+      }
+
       // Limit number of employees to analyze for performance
       const limitedEmployees = employeesToAnalyze.slice(0, 50); // Max 50 employees at once
 
