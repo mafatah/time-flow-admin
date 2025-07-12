@@ -115,7 +115,7 @@ export default function SuspiciousActivityPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [dateRange, setDateRange] = useState<number>(7); // days
-  const [riskThreshold, setRiskThreshold] = useState<number>(15); // Lowered from 20 to catch more cases
+  const [riskThreshold, setRiskThreshold] = useState<number>(0); // Show all activities by default
   const [detailsEmployee, setDetailsEmployee] = useState<SuspiciousActivity | null>(null);
 
   // Memoize filtered activities to prevent unnecessary re-renders
@@ -201,8 +201,7 @@ export default function SuspiciousActivityPage() {
             risk_score,
             category,
             timestamp,
-            reviewed,
-            users!inner(id, email, full_name, role)
+            reviewed
           `)
           .gte('timestamp', startDate.toISOString())
           .lte('timestamp', endDate.toISOString())
@@ -214,7 +213,10 @@ export default function SuspiciousActivityPage() {
 
         const { data: dbActivities, error: dbError } = await dbQuery;
         
+        console.log('🔍 Database query result:', { dbActivities, dbError, selectedEmployee, startDate, endDate });
+        
         if (!dbError && dbActivities) {
+          console.log(`🔍 Found ${dbActivities.length} suspicious activities in database`);
           // Convert database records to frontend format
           const convertedActivities = dbActivities.map((record: any) => ({
             user_id: record.user_id,
