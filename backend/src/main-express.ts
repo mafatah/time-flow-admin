@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { Module, Controller, Get, Injectable, Logger } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule, Cron } from '@nestjs/schedule';
 import { createClient } from '@supabase/supabase-js';
 
 @Injectable()
@@ -14,19 +15,9 @@ class SuspiciousActivityService {
       process.env.SUPABASE_URL || '',
       process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     );
-    
-    // Start periodic detection every 15 minutes
-    this.startPeriodicDetection();
   }
 
-  private startPeriodicDetection() {
-    // Run immediately
-    setTimeout(() => this.detectSuspiciousActivity(), 5000);
-    
-    // Then every 15 minutes
-    setInterval(() => this.detectSuspiciousActivity(), 15 * 60 * 1000);
-  }
-
+  @Cron('*/15 * * * *') // Every 15 minutes  
   async detectSuspiciousActivity() {
     this.logger.log('🔍 Starting suspicious activity detection...');
     
@@ -50,8 +41,7 @@ class SuspiciousActivityService {
       // Define suspicious domains
       const suspiciousDomains = [
         'facebook.com', 'instagram.com', 'twitter.com', 'x.com', 
-        'tiktok.com', 'snapchat.com', 'reddit.com', 'youtube.com',
-        'linkedin.com', 'whatsapp.com', 'telegram.org', 'discord.com'
+        'tiktok.com', 'snapchat.com', 'reddit.com', 'youtube.com'
       ];
 
       let suspiciousCount = 0;
@@ -138,18 +128,6 @@ class AppController {
   async detectSuspicious() {
     return await this.suspiciousActivityService.detectNow();
   }
-
-  @Get('/status')
-  getStatus() {
-    return {
-      service: 'TimeFlow Suspicious Activity Detection',
-      status: 'running',
-      detection_interval: '15 minutes',
-      targets: ['Instagram', 'Facebook', 'Twitter', 'TikTok', 'YouTube', 'Reddit'],
-      manual_trigger: '/detect-suspicious',
-      timestamp: new Date().toISOString()
-    };
-  }
 }
 
 @Module({
@@ -157,6 +135,7 @@ class AppController {
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [SuspiciousActivityService],
@@ -190,7 +169,6 @@ async function bootstrap() {
     console.log(`✅ TimeFlow Backend running on port ${port}`);
     console.log(`🔍 Suspicious Activity Detection: Running every 15 minutes`);
     console.log(`🧪 Manual trigger: GET /detect-suspicious`);
-    console.log(`📊 Status endpoint: GET /status`);
     
   } catch (error) {
     console.error('❌ Failed to start application:', error);

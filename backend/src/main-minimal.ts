@@ -1,7 +1,10 @@
 import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Module, Controller, Get, Injectable, Logger } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule, Cron, CronExpression } from '@nestjs/schedule';
 import { createClient } from '@supabase/supabase-js';
 
 @Injectable()
@@ -14,30 +17,20 @@ class SuspiciousActivityService {
       process.env.SUPABASE_URL || '',
       process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     );
-    
-    // Start periodic detection every 15 minutes
-    this.startPeriodicDetection();
   }
 
-  private startPeriodicDetection() {
-    // Run immediately
-    setTimeout(() => this.detectSuspiciousActivity(), 5000);
-    
-    // Then every 15 minutes
-    setInterval(() => this.detectSuspiciousActivity(), 15 * 60 * 1000);
-  }
-
+  @Cron('*/30 * * * *') // Every 30 minutes
   async detectSuspiciousActivity() {
     this.logger.log('🔍 Starting suspicious activity detection...');
     
     try {
-      // Get URL logs from last 15 minutes
-      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      // Get URL logs from last 30 minutes
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
       
       const { data: urlLogs, error } = await this.supabase
         .from('url_logs')
         .select('*')
-        .gte('started_at', fifteenMinutesAgo)
+        .gte('started_at', thirtyMinutesAgo)
         .order('started_at', { ascending: false });
 
       if (error) {
@@ -49,9 +42,9 @@ class SuspiciousActivityService {
 
       // Define suspicious domains
       const suspiciousDomains = [
-        'facebook.com', 'instagram.com', 'twitter.com', 'x.com', 
-        'tiktok.com', 'snapchat.com', 'reddit.com', 'youtube.com',
-        'linkedin.com', 'whatsapp.com', 'telegram.org', 'discord.com'
+        'facebook.com', 'instagram.com', 'twitter.com', 'x.com', 'linkedin.com',
+        'tiktok.com', 'snapchat.com', 'reddit.com', 'pinterest.com', 'youtube.com',
+        'whatsapp.com', 'telegram.org', 'discord.com', 'teams.microsoft.com'
       ];
 
       let suspiciousCount = 0;
@@ -73,7 +66,7 @@ class SuspiciousActivityService {
             .select('id')
             .eq('user_id', log.user_id)
             .eq('activity_type', 'social_media')
-            .gte('timestamp', fifteenMinutesAgo)
+            .gte('timestamp', thirtyMinutesAgo)
             .like('details', `%${url}%`)
             .single();
 
@@ -99,13 +92,14 @@ class SuspiciousActivityService {
         }
       }
 
-      this.logger.log(`✅ Detection complete. Found ${suspiciousCount} suspicious URLs`);
+      this.logger.log(`✅ Suspicious activity detection complete. Found ${suspiciousCount} suspicious URLs`);
       
     } catch (error) {
       this.logger.error('Error in suspicious activity detection:', error);
     }
   }
 
+  @Get('/detect-now')
   async detectNow() {
     await this.detectSuspiciousActivity();
     return { message: 'Suspicious activity detection triggered', timestamp: new Date().toISOString() };
@@ -118,7 +112,7 @@ class AppController {
 
   @Get()
   getHello(): string {
-    return 'TimeFlow Suspicious Activity Detection is running! 🚀';
+    return 'TimeFlow Suspicious Activity Detection Backend is running! 🚀';
   }
 
   @Get('/health')
@@ -138,18 +132,6 @@ class AppController {
   async detectSuspicious() {
     return await this.suspiciousActivityService.detectNow();
   }
-
-  @Get('/status')
-  getStatus() {
-    return {
-      service: 'TimeFlow Suspicious Activity Detection',
-      status: 'running',
-      detection_interval: '15 minutes',
-      targets: ['Instagram', 'Facebook', 'Twitter', 'TikTok', 'YouTube', 'Reddit'],
-      manual_trigger: '/detect-suspicious',
-      timestamp: new Date().toISOString()
-    };
-  }
 }
 
 @Module({
@@ -157,17 +139,21 @@ class AppController {
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [SuspiciousActivityService],
 })
-class AppModule {}
+class MinimalAppModule {}
 
 async function bootstrap() {
   try {
     console.log('🚀 Starting TimeFlow Suspicious Activity Detection Backend...');
     
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create<NestFastifyApplication>(
+      MinimalAppModule,
+      new FastifyAdapter({ logger: true }),
+    );
 
     // Enable CORS
     app.enableCors({
@@ -184,13 +170,23 @@ async function bootstrap() {
       }),
     );
 
+    // Swagger documentation
+    const config = new DocumentBuilder()
+      .setTitle('TimeFlow Suspicious Activity API')
+      .setDescription('Backend service for detecting suspicious activity')
+      .setVersion('1.0')
+      .build();
+    
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api', app, document);
+
     const port = process.env.PORT || 3000;
     await app.listen(port, '0.0.0.0');
     
     console.log(`✅ TimeFlow Backend running on port ${port}`);
-    console.log(`🔍 Suspicious Activity Detection: Running every 15 minutes`);
+    console.log(`📚 API Documentation: http://localhost:${port}/api`);
+    console.log(`🔍 Suspicious Activity Detection: Running every 30 minutes`);
     console.log(`🧪 Manual trigger: GET /detect-suspicious`);
-    console.log(`📊 Status endpoint: GET /status`);
     
   } catch (error) {
     console.error('❌ Failed to start application:', error);

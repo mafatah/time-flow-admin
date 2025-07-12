@@ -57,10 +57,11 @@ export default function UrlActivityPage() {
   const { userDetails } = useAuth();
   const [urlData, setUrlData] = useState<UrlData[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [dateRange, setDateRange] = useState('week');
+  const [dateRange, setDateRange] = useState('today');
   const [selectedUser, setSelectedUser] = useState('all');
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(true);
+  const [showAllWebsites, setShowAllWebsites] = useState(false);
 
   useEffect(() => {
     if (userDetails?.role === 'admin') {
@@ -165,11 +166,9 @@ export default function UrlActivityPage() {
           avg_duration: url.total_visits > 0 ? Math.round(url.total_duration / url.total_visits) : 0,
           percentage: totalDuration > 0 ? Math.round((url.total_duration / totalDuration) * 100) : 0
         }))
-        .sort((a: any, b: any) => b.total_duration - a.total_duration)
-        .slice(0, 20); // Top 20 domains
+        .sort((a: any, b: any) => b.total_duration - a.total_duration);
 
-      // Processed URL data logging disabled for performance
-      
+      // Store all processed URLs (not limited to top 20)
       setUrlData(processedUrls);
     } catch (error) {
       console.error('❌ Error fetching URL data:', error);
@@ -220,13 +219,30 @@ export default function UrlActivityPage() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">URL Activity</h1>
-          <p className="text-muted-foreground">Track website visits and browsing behavior</p>
-        </div>
+                  <div>
+            <h1 className="text-3xl font-bold">URL Activity</h1>
+            <p className="text-muted-foreground">
+              Track website visits and browsing behavior 
+              {urlData.length > 0 && (
+                <span className="ml-2 text-sm font-medium text-blue-600">
+                  ({urlData.length} unique websites found)
+                </span>
+              )}
+            </p>
+          </div>
         <div className="flex items-center space-x-2">
           <Button onClick={fetchData} disabled={loading}>
             {loading ? 'Loading...' : 'Refresh'}
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setUrlData([]);
+              fetchData();
+            }}
+            disabled={loading}
+          >
+            Clear Cache
           </Button>
         </div>
       </div>
@@ -291,7 +307,9 @@ export default function UrlActivityPage() {
               <Globe className="h-5 w-5 text-green-500" />
               <div>
                 <div className="text-2xl font-bold">{urlData.length}</div>
-                <div className="text-sm text-muted-foreground">Websites</div>
+                <div className="text-sm text-muted-foreground">
+                  Websites ({dateRange === 'today' ? 'Today' : dateRange === 'week' ? 'Last 7 days' : 'Last 30 days'})
+                </div>
               </div>
             </div>
           </CardContent>
@@ -417,7 +435,14 @@ export default function UrlActivityPage() {
       <Card>
         <CardHeader>
           <CardTitle>Detailed Website Usage</CardTitle>
-          <CardDescription>Complete breakdown of website activity</CardDescription>
+          <CardDescription>
+            Complete breakdown of website activity
+            {urlData.length > 0 && (
+              <span className="ml-2 text-sm">
+                ({urlData.length} unique websites total)
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -428,34 +453,49 @@ export default function UrlActivityPage() {
               <p className="text-xs mt-2">Try selecting "Last 7 days" to see historical data.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {urlData.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div className="flex-1">
-                    <div className="font-medium">{item.domain}</div>
-                    {item.site_url && (
-                      <div className="text-sm text-muted-foreground truncate max-w-md">
-                        {item.site_url}
+            <>
+              <div className="space-y-3">
+                {(showAllWebsites ? urlData : urlData.slice(0, 20)).map((item, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div className="flex-1">
+                      <div className="font-medium">{item.domain}</div>
+                      {item.site_url && (
+                        <div className="text-sm text-muted-foreground truncate max-w-md">
+                          {item.site_url}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>Total: {formatDuration(item.total_duration)}</span>
+                        <span>Visits: {item.total_visits}</span>
+                        <span>Avg: {formatDuration(item.avg_duration)}</span>
                       </div>
-                    )}
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Total: {formatDuration(item.total_duration)}</span>
-                      <span>Visits: {item.total_visits}</span>
-                      <span>Avg: {formatDuration(item.avg_duration)}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="text-lg font-bold">{item.percentage}%</div>
+                        <Progress value={item.percentage} className="w-20" />
+                      </div>
+                      {item.category && (
+                        <Badge variant="secondary">{item.category}</Badge>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="text-lg font-bold">{item.percentage}%</div>
-                      <Progress value={item.percentage} className="w-20" />
-                    </div>
-                    {item.category && (
-                      <Badge variant="secondary">{item.category}</Badge>
-                    )}
-                  </div>
+                ))}
+              </div>
+              {urlData.length > 20 && (
+                <div className="text-center mt-4 pt-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowAllWebsites(!showAllWebsites)}
+                  >
+                    {showAllWebsites 
+                      ? `Show Top 20 Only` 
+                      : `Show All ${urlData.length} Websites`
+                    }
+                  </Button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

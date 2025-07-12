@@ -1,0 +1,9 @@
+version: 1.0.59
+files:
+  - url: TimeFlow-v1.0.59-Setup.exe
+    sha512: b2d50370a7acf2e5d74872528b7909881e8b7f280352f02a699e15931fac14e2d04a1e4293aedf67dc60d0d2393dcb04dc94683cdceaf5b55595fa1daa37ab0b
+    size: 78890783
+    blockMapSize: 82988
+path: TimeFlow-v1.0.59-Setup.exe
+sha512: b2d50370a7acf2e5d74872528b7909881e8b7f280352f02a699e15931fac14e2d04a1e4293aedf67dc60d0d2393dcb04dc94683cdceaf5b55595fa1daa37ab0b
+releaseDate: '2025-01-11T13:56:00.000Z'

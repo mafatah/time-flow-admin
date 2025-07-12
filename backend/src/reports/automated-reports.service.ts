@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { SupabaseService } from '../common/supabase.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, subDays } from 'date-fns';
 
 interface EmployeePerformance {
@@ -31,6 +32,7 @@ export class AutomatedReportsService {
   constructor(
     private configService: ConfigService,
     private supabaseService: SupabaseService,
+    private notificationsService: NotificationsService,
   ) {}
 
   // Daily Report - Every day at 7 PM

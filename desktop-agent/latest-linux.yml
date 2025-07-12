@@ -1,0 +1,8 @@
+version: 1.0.59
+files:
+  - url: TimeFlow-v1.0.59.AppImage
+    sha512: 0da7134d180ae1a9988b689bc156e679ff9d2509a2340f5e71e8a4b3c8b9957b115ba4ec539e15b46dfbf6b20289c5e8bcf48ebd8e20ac0b9c171e0ee4c9d543
+    size: 109183476
+path: TimeFlow-v1.0.59.AppImage
+sha512: 0da7134d180ae1a9988b689bc156e679ff9d2509a2340f5e71e8a4b3c8b9957b115ba4ec539e15b46dfbf6b20289c5e8bcf48ebd8e20ac0b9c171e0ee4c9d543
+releaseDate: '2025-01-11T13:56:00.000Z'
